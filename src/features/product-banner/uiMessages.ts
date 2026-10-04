@@ -1,5 +1,6 @@
 export const uiMessages = {
   ko: {
+    sample: "샘플 보기", realData: "내 상품 보기", sampleNotice: "개발용 샘플 · 로컬 합성 이미지와 비수익 예시 링크입니다. 내 상품 목록은 유지됩니다.", realNotice: "내가 가져온 상품 · 파일·편집용 파일에서 불러온 데이터입니다.", sampleBlocked: "샘플은 내보낼 수 없습니다. 내 상품 보기로 돌아가 코드를 복사하거나 저장하세요.",
     controls: { visibleCount: "표시 상품 수", imageHeight: "사진 높이", intervalSeconds: "전환 간격(초)", gridColumns: "격자 열", gridRows: "격자 행", showName: "상품명 표시", showPrice: "가격 표시 — 파일 기준 정보", showDiscount: "할인율 표시 — 파일 기준 정보", showButton: "상품 보기 버튼", background: "배경색", text: "글자색", accent: "강조색", border: "테두리색", gridPreset: "격자 구성", moveBy: "이동 단위", one: "한 상품", page: "한 묶음", custom: "직접 설정" },
     retry: "이미지 재시도", imageStates: { unchecked: "이미지 미확인", checking: "이미지 확인 중", success: "이미지 표시 성공", failure: "이미지 표시 실패 — 주소 수정·제외·재시도를 선택하세요." },
     title: "상품 배너 만들기", description: "엑셀 상품 목록을 확인하고 웹사이트에 넣을 배너 코드를 만드세요.",
@@ -13,6 +14,7 @@ export const uiMessages = {
     html: "HTML 직접 삽입", iframe: "iframe 삽입", copyHtml: "HTML 코드 복사", copyIframe: "iframe 코드 복사", saveHtml: "HTML 파일 저장", saveJson: "편집용 파일 저장", loadJson: "편집용 파일 불러오기", copied: "코드를 복사했습니다.", saved: "파일을 저장했습니다.", copyFailed: "복사할 수 없습니다. 아래 코드 영역을 선택해 복사하세요.", exportError: "내보내려면 포함 상품의 이미지 주소와 링크를 확인하세요.", inputError: "파일을 읽을 수 없습니다. 파일 형식과 필수 열(이미지 주소·제휴 링크)을 확인하세요.", jsonError: "편집용 JSON 파일을 불러올 수 없습니다. 이 도구에서 저장한 편집용 파일인지, 파일 형식과 버전을 확인하세요.", limitError: "파일은 최대 20MB, 상품은 최대 10,000개까지 처리합니다. 파일을 나누어 불러오세요.",
   },
   en: {
+    sample: "View sample", realData: "View my products", sampleNotice: "Development sample · Local synthetic images and noncommercial example links. Your product list is preserved.", realNotice: "My imported products · Data loaded from your spreadsheet or editing file.", sampleBlocked: "Samples cannot be exported. Return to your products to copy or save banner code.",
     controls: { visibleCount: "Visible products", imageHeight: "Image height", intervalSeconds: "Interval (seconds)", gridColumns: "Grid columns", gridRows: "Grid rows", showName: "Show names", showPrice: "Show prices — file-based information", showDiscount: "Show discounts — file-based information", showButton: "Product button", background: "Background color", text: "Text color", accent: "Accent color", border: "Border color", gridPreset: "Grid layout", moveBy: "Move by", one: "One product", page: "One group", custom: "Custom" },
     retry: "Retry image", imageStates: { unchecked: "Image not checked", checking: "Checking image", success: "Image loaded", failure: "Image failed — edit the URL, exclude it or retry." },
     title: "Product Banner Builder", description: "Review an Excel product list and create banner code for your website.",

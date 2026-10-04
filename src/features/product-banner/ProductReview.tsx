@@ -1,10 +1,24 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { UtilityField, UtilityInput } from "../../components/UtilitySurface";
 import { detectDuplicates, imageStatus, productReviewFields, type EditorAction } from "./state";
 import type { BannerEditorState } from "./stateTypes";
 import { validateProductUrl } from "./urlPolicy";
 import type { BannerUiText } from "./uiMessages";
+
+function ReviewImage({ id, url, name, retry, dispatch }: { id: string; url: string; name: string; retry: number; dispatch: (action: EditorAction) => void }) {
+  const image = useRef<HTMLImageElement>(null), dispatchRef = useRef(dispatch); dispatchRef.current = dispatch;
+  useEffect(() => {
+    const img = image.current!;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      const status = img.currentSrc && img.complete ? img.naturalWidth ? "success" : "failure" : "checking";
+      dispatchRef.current({ type: "image-status", id, url, status }); observer.disconnect();
+    });
+    observer.observe(img); return () => observer.disconnect();
+  }, [id, url, retry]);
+  return <img ref={image} key={`${url}-${retry}`} src={url} alt={name} loading="lazy" className="h-24 w-24 rounded-lg object-contain" onLoad={() => dispatchRef.current({ type: "image-status", id, url, status: "success" })} onError={() => dispatchRef.current({ type: "image-status", id, url, status: "failure" })} />;
+}
 
 export function ProductReview({ state, dispatch, text }: { state: BannerEditorState; dispatch: (action: EditorAction) => void; text: BannerUiText }) {
   const [page, setPage] = useState(0), [dragged, setDragged] = useState<string | null>(null), [retry, setRetry] = useState<Record<string, number>>({});
@@ -20,7 +34,7 @@ export function ProductReview({ state, dispatch, text }: { state: BannerEditorSt
     {detectDuplicates(products).length > 0 && <p role="status">{text.duplicate}</p>}
     {products.slice(current * 20, current * 20 + 20).map((p, index) => <article key={p.id} className="space-y-3 rounded-2xl border border-border p-4" data-testid="banner-product" onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); if (dragged) dispatch({ type: "move", id: dragged, to: current * 20 + index }); setDragged(null); }}>
       <span draggable onDragStart={() => setDragged(p.id)} onDragEnd={() => setDragged(null)} className="cursor-grab">↕</span>
-      {validateProductUrl(p.imageUrl).valid && <img key={`${p.imageUrl}-${retry[p.id] ?? 0}`} src={p.imageUrl} alt={p.name} loading="lazy" className="h-24 w-24 rounded-lg object-contain" onLoad={() => dispatch({ type: "image-status", id: p.id, url: p.imageUrl, status: "success" })} onError={() => dispatch({ type: "image-status", id: p.id, url: p.imageUrl, status: "failure" })} />}
+      {validateProductUrl(p.imageUrl).valid && <ReviewImage id={p.id} url={p.imageUrl} name={p.name} retry={retry[p.id] ?? 0} dispatch={dispatch} />}
       <p role="status">{text.imageStates[imageStatus(state, p.id)]}</p>
       <Button variant="secondary" size="sm" onClick={() => { dispatch({ type: "image-status", id: p.id, url: p.imageUrl, status: "checking" }); setRetry((previous) => ({ ...previous, [p.id]: (previous[p.id] ?? 0) + 1 })); }}>{text.retry}</Button>
       <div className="flex flex-wrap items-center gap-2">
