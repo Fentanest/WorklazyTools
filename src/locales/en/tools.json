@@ -48,6 +48,17 @@
     }
   },
   "items": {
+  "product-banner": {
+    "title": "Product Banner Builder",
+    "shortTitle": "Product Banner Builder",
+    "description": "Build five banner designs and HTML or iframe code from Excel product lists.",
+    "eyebrow": "Product banners",
+    "highlights": [
+      "Five designs",
+      "Excel & CSV input",
+      "HTML & iframe code"
+    ]
+  },
     "foliotrace": {
       "title": "FolioTrace",
       "shortTitle": "FolioTrace",

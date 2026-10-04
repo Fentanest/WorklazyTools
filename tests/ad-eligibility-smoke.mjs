@@ -18,7 +18,9 @@ import {
 // Real ad requests / clicks never happen; "allowedExternal" must stay 0.
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const ARTIFACT_DIR = path.join(REPO_ROOT, "tests", "visual-artifacts", "adsense-recheck");
+const ARTIFACT_DIR = process.env.WORKLAZY_AD_ARTIFACT_DIR
+  ? path.resolve(process.env.WORKLAZY_AD_ARTIFACT_DIR)
+  : path.join(REPO_ROOT, "tests", "visual-artifacts", "adsense-recheck");
 const RESULTS_FILE = path.join(ARTIFACT_DIR, "ad-smoke-results.json");
 const DISCRIMINATION_FILE = path.join(ARTIFACT_DIR, "ad-smoke-discrimination.json");
 const PORT = Number(process.env.RECOVERY_TEST_PORT || "4182");

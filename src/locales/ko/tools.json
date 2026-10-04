@@ -48,6 +48,17 @@
     }
   },
   "items": {
+  "product-banner": {
+    "title": "상품 배너 만들기",
+    "shortTitle": "상품 배너 만들기",
+    "description": "엑셀 상품 목록으로 5종 배너와 HTML·iframe 코드를 만듭니다.",
+    "eyebrow": "상품 배너",
+    "highlights": [
+      "5종 디자인",
+      "Excel·CSV 입력",
+      "HTML·iframe 코드"
+    ]
+  },
     "foliotrace": {
       "title": "FolioTrace",
       "shortTitle": "FolioTrace",
