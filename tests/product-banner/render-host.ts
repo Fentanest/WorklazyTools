@@ -7,7 +7,7 @@ import { DESIGN_IDS, type BannerSettings, type DesignId } from "../../src/featur
 import { stateWith } from "../fixtures/product-banner/state.ts";
 import { buildBannerRuntime } from "../../scripts/product-banner-runtime.mjs";
 
-export const shotDir = "docs/jobs/todo/product-banner/work/shots-T3";
+export const shotDir = process.env.PB_RENDER_SHOT_DIR || "docs/jobs/todo/product-banner/work/shots-T3";
 export function hostDocument(runtime: string, designs: readonly DesignId[] = DESIGN_IDS, count = 10, patch: Partial<BannerSettings> = {}) {
   const banners = designs.map((design) => {
     const project = stateWith(count).project, settings = { ...createDefaultSettings("ko", design), ...patch };

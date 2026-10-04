@@ -1,4 +1,5 @@
 import { advanceIndex, canPlay, windowIndices, type Playback } from "./rotation.ts";
+import { installFrameHeight } from "./frameHeight.ts";
 
 type Instance = { destroy: () => void };
 type Registry = { serial: number; instances: Map<HTMLElement, Instance>; observer?: MutationObserver; init: () => void; destroy: (root: HTMLElement) => void };
@@ -114,3 +115,4 @@ const registry: Registry = window.WorklazyProductBannerV1 ||= {
   },
 };
 registry.init();
+installFrameHeight();

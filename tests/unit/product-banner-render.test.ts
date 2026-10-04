@@ -81,7 +81,7 @@ test("one deterministic IIFE builder supplies Vite dev/build and Node without fo
   assert.doesNotMatch(runtime, /react|xlsx|gtag|adsbygoogle|coupang|import\s*\(|\bimport\s|https?:|fetch\s*\(|XMLHttpRequest|sendBeacon/iu);
   const id = plugin.resolveId("virtual:product-banner-runtime"), watched: string[] = [];
   const module = await plugin.load.call({ addWatchFile: (path: string) => watched.push(path) }, id);
-  assert.equal(module, `export default ${JSON.stringify(runtime)};`); assert.equal(watched.length, 2);
+  assert.equal(module, `export default ${JSON.stringify(runtime)};`); assert.equal(watched.length, 3);
 });
 test("actual Vite dev transform and production bundle supply the same runtime bytes as Node", async () => {
   const plugin = productBannerRuntimePlugin(), source = await buildBannerRuntime();

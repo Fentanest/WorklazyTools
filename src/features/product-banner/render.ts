@@ -2,8 +2,8 @@ import type { BannerDisplayModel, DisplayProduct } from "./displayModel.ts";
 import { validateSettings } from "./settings.ts";
 import { validateProductUrl } from "./urlPolicy.ts";
 import { bannerCss } from "./styles.ts";
+import { escapeHtml as escape } from "./serialization.ts";
 
-const escape = (value: string) => value.replace(/[&<>"']/gu, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 export const bannerLabels = {
   ko: { ad: "광고", source: "배너 제작 · worklazy.net", credit: "이 배너는 worklazy.net의 무료 배너 생성기로 만들었습니다.",
     previous: "이전 상품", next: "다음 상품", pause: "일시정지", play: "자동 넘김 재생", visit: "상품 보기", image: "사진을 불러올 수 없습니다", file: "파일 기준 정보", region: "상품 배너" },
