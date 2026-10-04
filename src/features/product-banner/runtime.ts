@@ -87,8 +87,10 @@ function mount(root: HTMLElement, registry: Registry): Instance {
     const failed = () => { img.hidden = true; fallback.hidden = false; };
     listen(img, "error", failed);
     listen(img, "load", () => { img.hidden = false; fallback.hidden = true; });
-    // A lazy image with no request yet can be complete with zero natural width.
-    // Only an actual error event establishes failure.
+    // currentSrc identifies the current request; an unrequested lazy image has none.
+    // A completed current request without decoded dimensions is already broken,
+    // even when its error event happened before these listeners were attached.
+    if (img.currentSrc && img.complete && !img.naturalWidth) failed();
   });
   const intersection = new IntersectionObserver(([entry]) => update({ visible: entry.isIntersecting }));
   const size = new ResizeObserver(resize);

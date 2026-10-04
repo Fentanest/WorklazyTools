@@ -4,6 +4,11 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-10-05 — R3afix-F01 초기 오류 복구 수리 후보
+
+- 초기 판정의 단순 제거는 마크업과 뒤따르는 script를 나누어 전송할 때 이미 발생한 error를 놓쳤다. 수정 전 HTML 직접·iframe·독립 HTML 3건에서 실제 ready=false error 후 대체 표시가 나오지 않는 실패를 보존했다. 리스너 부착 후 `currentSrc && complete && !naturalWidth`로 초기 복구한다. 설치 Chromium 153의 미요청 lazy는 currentSrc가 비어 있고 요청 0이며, 화면 진입 후 loading=lazy 상태로 폭 220과 load가 확인됐다. 부착 전/후 오류·lazy 회귀 9/9, T3 49/49, T4 19/19, F01/F02 UI 26/26, tsc 통과. — Codx
+- 첫 기준 대조는 검사기 timeout 누락으로 중단했고, 중간 lazy fixture는 ResizeObserver 재숨김으로 3건 실패했다. 각각 중단 기록·실패 영수증/로그를 보존하고 검사 fixture만 바로잡아 새 ID로 실행했다. iframe srcdoc는 원문 document.write 두 단계 재파싱이며 HTTP 청크 전송으로 확대하지 않는다. 새 캡처는 shots-R3afix2에 보존한다. 시스템 Chrome 154는 이번 실행 대상이 아니며 이전 가로채기 한계는 유지한다. 범위는 F01 차단 수리로 닫고 재검수 대기, T5 전체 완료는 아니다. — Codx
+
 ## 2026-10-05 — R3a 이미지·매핑 국소 수리 후보
 
 - 실제 초기 UI srcdoc의 요청·load/error·complete/폭/loading/hidden 전이를 기록했다. Chrome 154 가로채기에서는 첫 두 미리보기 요청이 누락됐으나 같은 URL의 로컬 HTTPS 서버가 직접 PNG를 응답하면 원본 런타임도 3장 모두 정상 로드됐다. 설치된 Chromium 153에서도 원본이 정상이다. 다음 프레임 전환은 가로채기 누락을 피했던 임시 대조로 분류하고 제품에 적용하지 않았다. 검사기는 Playwright 설치 브라우저를 기본으로 쓰며 초기 complete/폭만으로 실패를 단정하던 판정은 실제 error 이벤트 계약에 맞춰 제거했다. 전역 COEP·이미지 URL·활성 검사 조건은 완화하지 않았다. — Codx
