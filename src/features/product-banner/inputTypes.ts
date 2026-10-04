@@ -15,13 +15,15 @@ export type InputErrorCode = typeof INPUT_ERROR_CODES[number];
 export type InputFormat = "xls" | "xlsx" | "csv";
 export type ProductField = "imageUrl" | "promotionUrl" | "name" | "productId" | "videoUrl" | "originPrice" | "discountPrice" | "discount" | "currency";
 export type ColumnMapping = Partial<Record<ProductField, number>>;
+// Omitted/undefined uses detection; null explicitly releases the field.
+export type MappingOverrides = Partial<Record<ProductField, number | null>>;
 export type CellValue = { text: string; kind: "string" | "number" | "boolean" | "error"; display?: string; hyperlink?: string; formula?: boolean; cacheMissing?: boolean; unsafeInteger?: boolean };
 export type InputRow = { rowNumber: number; cells: (CellValue | null)[] };
 export type InputSheet = { name: string; rows: InputRow[]; rowCount: number; columnCount: number };
 export type InputBook = { format: InputFormat; sheets: InputSheet[] };
 export type MappingIssue = { code: "MAPPING_REQUIRED" | "MAPPING_AMBIGUOUS"; field: ProductField; columns?: number[] };
 export type SheetSummary = { sheetIndex: number; name: string; rowCount: number; columnCount: number; headerCandidates: { rowNumber: number; labels: string[]; mapping: ColumnMapping; issues: MappingIssue[] }[]; suggestedHeaderRow: number | null };
-export type SheetSelection = { sheetIndex: number; headerRow?: number; mapping?: ColumnMapping };
+export type SheetSelection = { sheetIndex: number; headerRow?: number; mapping?: MappingOverrides };
 export type PriceValue = { raw: string | null; amount: number | null; currency: string | null };
 export type BannerInputProduct = {
   source: { fileIndex: number; sheetIndex: number; rowNumber: number };

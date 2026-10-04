@@ -78,8 +78,16 @@ export function extractInputProducts(book: InputBook, fileIndex: number, fileNam
     const header = sheet.rows.find((row) => row.rowNumber === selection.headerRow);
     if (!header) { issues.push({ sheetIndex, code: selection.headerRow == null ? "MAPPING_REQUIRED" : "HEADER_ROW_INVALID" }); continue; }
     const mapped = mapHeaders(header.cells.map((cell) => cell?.text ?? ""));
-    const mapping = { ...mapped.mapping, ...selection.mapping };
-    const unresolved = mapped.issues.filter((issue) => selection.mapping?.[issue.field] == null);
+    const mapping: ColumnMapping = { ...mapped.mapping };
+    for (const field of Object.keys(selection.mapping ?? {}) as ProductField[]) {
+      const column = selection.mapping![field];
+      if (column === null) delete mapping[field];
+      else if (column !== undefined) mapping[field] = column;
+    }
+    const unresolved = mapped.issues.filter((issue) => selection.mapping?.[issue.field] === undefined);
+    for (const field of ["imageUrl", "promotionUrl"] as const) {
+      if (mapping[field] == null && !unresolved.some((issue) => issue.field === field)) unresolved.push({ code: "MAPPING_REQUIRED", field });
+    }
     for (const field of Object.keys(mapping) as ProductField[]) {
       const column = mapping[field]!;
       if (!Number.isInteger(column) || column < 0 || column >= sheet.columnCount) unresolved.push({ code: "MAPPING_REQUIRED", field });

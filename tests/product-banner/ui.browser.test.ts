@@ -24,7 +24,8 @@ let externalAttempts = 0;
 before(async () => {
   await mkdir(shots, { recursive: false });
   if (!base) { server = await startRecoveryServer({ root: "dist", port: 0 }); base = server.url; }
-  browser = await chromium.launch({ executablePath: "/usr/bin/google-chrome", args: ["--no-sandbox"] });
+  browser = await chromium.launch({ executablePath: process.env.PB_UI_CHROMIUM_PATH, args: ["--no-sandbox"] });
+  console.log(`Browser ${browser.version()}`);
 });
 after(async () => {
   await browser?.close();

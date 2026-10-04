@@ -87,7 +87,8 @@ function mount(root: HTMLElement, registry: Registry): Instance {
     const failed = () => { img.hidden = true; fallback.hidden = false; };
     listen(img, "error", failed);
     listen(img, "load", () => { img.hidden = false; fallback.hidden = true; });
-    if (img.complete && !img.naturalWidth) failed();
+    // A lazy image with no request yet can be complete with zero natural width.
+    // Only an actual error event establishes failure.
   });
   const intersection = new IntersectionObserver(([entry]) => update({ visible: entry.isIntersecting }));
   const size = new ResizeObserver(resize);

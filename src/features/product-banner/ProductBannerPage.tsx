@@ -46,7 +46,7 @@ export function ProductBannerPage() {
     if (hasBannerWork(state) && !window.confirm(text.confirm)) return;
     if (file.size > PROJECT_LIMITS.bytes) { setMessage(text.limitError); return; }
     try { dispatch({ type: "load", project: loadProjectJson(await file.text()), confirmDiscard: true }); }
-    catch { setMessage(text.inputError); }
+    catch { setMessage(text.jsonError); }
   }
   async function copy(which: "html" | "iframe") {
     setFormat(which);

@@ -9,7 +9,7 @@ import { startHost, shotDir } from "./render-host.ts";
 let browser: Browser, host: Awaited<ReturnType<typeof startHost>>, runtime: string;
 const optionGeometry: unknown[] = [];
 before(async () => { runtime = await buildBannerRuntime(); host = await startHost(runtime); browser = await chromium.launch({ headless: true }); await mkdir(shotDir, { recursive: true }); });
-after(async () => { await writeFile("docs/jobs/todo/product-banner/work/R2a-option-geometry.json", JSON.stringify(optionGeometry, null, 2)); await browser?.close(); if (host) await new Promise<void>((resolve) => host.server.close(() => resolve())); });
+after(async () => { await writeFile(process.env.PB_RENDER_RESULT_PATH || "docs/jobs/todo/product-banner/work/R2a-option-geometry.json", JSON.stringify(optionGeometry, null, 2)); await browser?.close(); if (host) await new Promise<void>((resolve) => host.server.close(() => resolve())); });
 async function pageFor(t: test.TestContext, query = "", options = {}, clock = false) {
   const context = await browser.newContext({ viewport: { width: 1100, height: 1000 }, ...options });
   t.after(() => context.close()); const page = await context.newPage(), external: string[] = [], errors: string[] = [];

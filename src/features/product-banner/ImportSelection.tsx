@@ -3,7 +3,7 @@ import { FileDropZone } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { UtilityField, UtilityInput, UtilitySelect } from "../../components/UtilitySurface";
 import { clientErrorCode, inspectProductFile, readProductFiles } from "./inputClient";
-import type { BannerInputProduct, ColumnMapping, InputErrorCode, ProductField, SheetSelection, SheetSummary } from "./inputTypes";
+import type { BannerInputProduct, MappingOverrides, InputErrorCode, ProductField, SheetSelection, SheetSummary } from "./inputTypes";
 import type { BannerUiText } from "./uiMessages";
 
 type PendingFile = { file: File; sheets: SheetSummary[]; selections: SheetSelection[] };
@@ -32,6 +32,9 @@ export function ImportSelection({ text, onImport, errorText, onBusy, onPending }
     setFiles((previous) => previous.map((entry, i) => i === index ? { ...entry, selections: [...entry.selections.filter((s) => s.sheetIndex !== selection.sheetIndex), selection].sort((a, b) => a.sheetIndex - b.sheetIndex) } : entry));
   }
   async function extract() {
+    if (files.some((entry) => entry.selections.some((s) => s.mapping?.imageUrl === null || s.mapping?.promotionUrl === null))) {
+      setStatus(errorText("MAPPING_REQUIRED")); return;
+    }
     const abort = new AbortController(); controller.current = abort; running(true); setStatus("");
     try {
       const selectionsByFile = Object.fromEntries(files.map((entry, i) => [i, entry.selections]));
@@ -54,7 +57,7 @@ export function ImportSelection({ text, onImport, errorText, onBusy, onPending }
           <label className="flex gap-2"><input type="checkbox" checked={!!selected} disabled={busy} onChange={(e) => e.target.checked ? update(index, { sheetIndex: sheet.sheetIndex, headerRow: sheet.suggestedHeaderRow ?? 1, mapping: {} }) : setFiles((previous) => previous.map((f, i) => i === index ? { ...f, selections: f.selections.filter((s) => s.sheetIndex !== sheet.sheetIndex) } : f))} />{sheet.sheetIndex + 1}. {sheet.name}</label>
           {selected && <>
             <UtilityField><span>{text.headerRow}</span><UtilityInput type="number" min={1} max={sheet.rowCount} value={selected.headerRow ?? 1} disabled={busy} onChange={(e) => { const row = e.target.valueAsNumber; if (Number.isInteger(row) && row > 0 && row <= sheet.rowCount) update(index, { ...selected, headerRow: row, mapping: sheet.headerCandidates.find((h) => h.rowNumber === row)?.mapping ?? {} }); }} /></UtilityField>
-            <details><summary>{text.mapping}</summary>{fields.map((field) => <UtilityField key={field}><span>{text.fields[field]}</span><UtilitySelect disabled={busy} value={selected.mapping?.[field] ?? ""} onChange={(e) => { const mapping: ColumnMapping = { ...selected.mapping }; if (e.target.value === "") delete mapping[field]; else mapping[field] = Number(e.target.value); update(index, { ...selected, mapping }); }}><option value="">—</option>{Array.from({ length: sheet.columnCount }, (_, c) => <option key={c} value={c}>{c + 1}. {candidate?.labels[c] ?? ""}</option>)}</UtilitySelect></UtilityField>)}</details>
+            <details><summary>{text.mapping}</summary>{fields.map((field) => <UtilityField key={field}><span>{text.fields[field]}</span><UtilitySelect disabled={busy} value={selected.mapping?.[field] === null ? "" : selected.mapping?.[field] ?? candidate?.mapping[field] ?? ""} onChange={(e) => { const mapping: MappingOverrides = { ...selected.mapping, [field]: e.target.value === "" ? null : Number(e.target.value) }; update(index, { ...selected, mapping }); }}><option value="">—</option>{Array.from({ length: sheet.columnCount }, (_, c) => <option key={c} value={c}>{c + 1}. {candidate?.labels[c] ?? ""}</option>)}</UtilitySelect></UtilityField>)}</details>
           </>}
         </div>;
       })}
