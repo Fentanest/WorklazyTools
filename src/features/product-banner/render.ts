@@ -36,7 +36,7 @@ export function renderBanner(model: BannerDisplayModel): Readonly<{ markup: stri
   const button = (action: string, label: string, text: string) => `<button class="wlpb-v1-control" type="button" data-wlpb-action="${action}" aria-label="${label}">${text}</button>`;
   return { css: bannerCss, markup: `<section class="wlpb-v1-root wlpb-v1-${s.design}" data-wlpb-root="1" data-wlpb-theme="${s.theme}" data-wlpb-design="${s.design}" data-wlpb-count="${s.visibleCount}" data-wlpb-rows="${s.gridRows}" data-wlpb-auto="${s.autoPlay}" data-wlpb-interval="${s.intervalSeconds}" data-wlpb-move="${s.moveBy}" style="${variables}" aria-label="${labels.region}">
 <div class="wlpb-v1-layout"><ul class="wlpb-v1-list">${items}</ul></div>
-<div class="wlpb-v1-controls" hidden>${button("previous", labels.previous, "‹")}${button("pause", labels.pause, labels.pause)}${button("next", labels.next, "›")}<span class="wlpb-v1-status" aria-live="off"></span></div>
+<div class="wlpb-v1-controls" hidden>${button("previous", labels.previous, "‹")}${button("pause", labels.pause, labels.pause)}${button("next", labels.next, "›")}<span class="wlpb-v1-status" role="status" aria-live="off"></span></div>
 <footer class="wlpb-v1-footer"><span class="wlpb-v1-ad">${labels.ad}</span>${s.affiliateNotice ? `<span class="wlpb-v1-notice">${escape(s.affiliateNotice)}</span>` : ""}${model.fileBasedInformation ? `<span class="wlpb-v1-notice">${labels.file}</span>` : ""}<a class="wlpb-v1-source" href="${escape(source)}" target="_blank" rel="nofollow noopener" title="${labels.credit}" aria-label="${labels.credit}">${labels.source}</a></footer>
 </section>` };
 }

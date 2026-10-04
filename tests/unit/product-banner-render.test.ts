@@ -56,6 +56,13 @@ test("renderer rejects invalid settings/URLs and never adds empty or duplicate p
     assert.equal(dom.window.document.querySelectorAll("li").length, n); dom.window.close();
   }
 });
+for (const language of ["ko", "en"] as const) test(`price markup preserves source decimal digits: ${language}`, () => {
+  const project = stateWith(1).project;
+  const dom = new JSDOM(renderBanner(createDisplayModel({ ...project, settings: { ...project.settings, language, showPrice: true } })).markup);
+  assert.equal(dom.window.document.querySelector(".wlpb-v1-prices strong")!.textContent, "USD 206.50");
+  assert.equal(dom.window.document.querySelector(".wlpb-v1-prices span")!.textContent, "USD 282.87");
+  dom.window.close();
+});
 test("one-step and page-step wrap retain source order with no padding/duplicates", () => {
   assert.deepEqual(windowIndices(10, 4, 0), [0, 1, 2, 3]);
   for (let start = 0; start < 10; start++) assert.deepEqual(windowIndices(10, 4, start), [0, 1, 2, 3].map((i) => (start + i) % 10));

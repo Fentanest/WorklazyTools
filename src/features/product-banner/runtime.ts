@@ -38,7 +38,15 @@ function mount(root: HTMLElement, registry: Registry): Instance {
     items.forEach((item, i) => { const img = item.querySelector<HTMLImageElement>("img"); if (img) img.loading = shown.has(i) || next.includes(i) ? "eager" : "lazy"; });
     controls.hidden = items.length <= count;
     pause.hidden = !state.enabled;
-    status.textContent = indices.length ? `${indices.map((i) => i + 1).join(", ")} / ${items.length}` : "";
+    const ranges: number[][] = [];
+    for (const i of indices) {
+      const last = ranges[ranges.length - 1], number = i + 1;
+      if (last && number === last[1] + 1) last[1] = number;
+      else ranges.push([number, number]);
+    }
+    status.textContent = ranges.length ? `${ranges.map(([first, last]) => first === last ? `${first}` : `${first}–${last}`).join(", ")} / ${items.length}` : "";
+    const spoken = ranges.map(([first, last]) => english ? first === last ? `${first}` : `${first} through ${last}` : first === last ? `${first}번` : `${first}번부터 ${last}번까지`).join(english ? ", then " : ", 이어서 ");
+    status.setAttribute("aria-label", ranges.length ? english ? `Showing products ${spoken} out of ${items.length}` : `전체 ${items.length}개 상품 중 ${spoken} 표시` : "");
     sync();
   };
   const step = () => root.dataset.wlpbMove === "page" || ["vertical", "grid"].includes(root.dataset.wlpbDesign!) ? count : 1;

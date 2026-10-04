@@ -31,6 +31,7 @@ export async function startHost(runtime: string) {
       res.end(hostDocument(runtime, designs, Number(url.searchParams.get("count") ?? 10), {
         autoPlay: url.searchParams.get("auto") === "true", intervalSeconds: 2,
         theme: url.searchParams.get("theme") === "dark" ? "dark" : "light",
+        language: url.searchParams.get("language") === "en" ? "en" : "ko",
         ...Object.fromEntries(["showButton", "showName", "showPrice", "showDiscount"].filter((key) => url.searchParams.has(key)).map((key) => [key, url.searchParams.get(key) === "true"])),
       }));
     }

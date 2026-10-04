@@ -23,6 +23,24 @@ async function pageFor(t: test.TestContext, query = "", options = {}, clock = fa
 const visible = (page: Page, root = 0) => page.locator("[data-wlpb-root]").nth(root).locator("li:not([hidden])").evaluateAll((items) => items.map((i) => Number((i as HTMLElement).dataset.wlpbIndex) + 1));
 const playing = (page: Page, value: boolean) => page.waitForFunction((v) => document.querySelector<HTMLElement>("[data-wlpb-root]")?.dataset.wlpbPlaying === String(v), value);
 
+for (const language of ["ko", "en"]) for (const design of ["photo-strip", "slim"]) test(`R2afix2 price and page ranges: ${language} ${design}`, async (t) => {
+  const page = await pageFor(t, `?designs=${design}&language=${language}&showPrice=true`);
+  const status = page.getByRole("status"), next = page.getByRole("button", { name: language === "en" ? "Next products" : "다음 상품", exact: true });
+  assert.equal(await page.locator(".wlpb-v1-prices strong").first().textContent(), "USD 206.50");
+  assert.equal(await status.textContent(), design === "slim" ? "1 / 10" : "1–4 / 10");
+  assert.equal(await status.getAttribute("aria-label"), language === "en"
+    ? `Showing products ${design === "slim" ? "1" : "1 through 4"} out of 10`
+    : `전체 10개 상품 중 ${design === "slim" ? "1번" : "1번부터 4번까지"} 표시`);
+  if (design === "photo-strip") {
+    for (let i = 0; i < 8; i++) await next.click();
+    assert.equal(await status.textContent(), "9–10, 1–2 / 10");
+    assert.equal(await status.getAttribute("aria-label"), language === "en" ? "Showing products 9 through 10, then 1 through 2 out of 10" : "전체 10개 상품 중 9번부터 10번까지, 이어서 1번부터 2번까지 표시");
+    await next.click(); assert.equal(await status.textContent(), "10, 1–3 / 10");
+  } else {
+    await next.click(); assert.equal(await status.textContent(), "2 / 10");
+  }
+});
+
 for (const javaScriptEnabled of [true, false]) for (const width of [960, 320]) for (let mask = 0; mask < 8; mask++) {
   const showButton = Boolean(mask & 1), showName = Boolean(mask & 2), showPrice = Boolean(mask & 4);
   test(`R2a photo options: JS=${javaScriptEnabled} width=${width} button=${showButton} name=${showName} price=${showPrice}`, async (t) => {

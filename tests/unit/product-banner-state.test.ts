@@ -5,7 +5,7 @@ import { BannerStateError, DESIGN_IDS, UNDO_LIMITS } from "../../src/features/pr
 import { createDefaultSettings, DEFAULT_AFFILIATE_NOTICES, SETTING_RANGES, updateSettings } from "../../src/features/product-banner/settings.ts";
 import { createDisplayModel } from "../../src/features/product-banner/displayModel.ts";
 import { inputProduct, importedAt, stateWith } from "../fixtures/product-banner/state.ts";
-import { extractInputProducts } from "../../src/features/product-banner/inputMapping.ts";
+import { extractInputProducts, parsePrice } from "../../src/features/product-banner/inputMapping.ts";
 import { parseInputBytes } from "../../src/features/product-banner/inputParser.ts";
 import { utf8 } from "../fixtures/product-banner/synthetic.ts";
 const code = (expected: string) => (error: unknown) => error instanceof BannerStateError && error.code === expected;
@@ -161,11 +161,35 @@ test("display allowlist strips excluded products/metadata/unselected prices and 
 test("price/discount opt-in exposes validated labels and currency only, missing/failing values are omitted without zero filling", () => {
   let s = reduce(stateWith(1), { type: "settings", patch: { showPrice: true, showDiscount: true } });
   const model = createDisplayModel(s.project); assert.equal(model.fileBasedInformation, true);
-  assert.deepEqual(model.products[0].prices, { original: { text: "282.87", currency: "USD" }, sale: { text: "206.5", currency: "USD" } });
+  assert.deepEqual(model.products[0].prices, { original: { text: "282.87", currency: "USD" }, sale: { text: "206.50", currency: "USD" } });
   assert.equal(model.products[0].discount, "27%"); assert.ok(!JSON.stringify(model).includes(importedAt));
   const failed = inputProduct(); failed.originPrice = { raw: "unknown", amount: null, currency: "USD" }; failed.discountPrice = { raw: "10", amount: 10, currency: null }; failed.discount = { raw: "invalid", percent: null };
   s = reduce(s, { type: "replace", products: [failed], importedAt, confirmDiscard: true });
   assert.equal(Object.hasOwn(createDisplayModel(s.project).products[0], "prices"), false); assert.equal(Object.hasOwn(createDisplayModel(s.project).products[0], "discount"), false);
   const zero = inputProduct(); zero.discountPrice = { raw: "USD 0", amount: 0, currency: "USD" };
   s = reduce(s, { type: "replace", products: [zero], importedAt, confirmDiscard: true }); assert.equal(createDisplayModel(s.project).products[0].prices?.sale?.text, "0");
+});
+
+for (const language of ["ko", "en"] as const) for (const [raw, text, kind] of [
+  ["USD 206.50", "206.50", "string"], ["USD 1,150.16", "1,150.16", "string"],
+  ["USD 387", "387", "string"], ["282.8", "282.8", "number"],
+  ["USD 1.1234567890123456789010", "1.1234567890123456789010", "string"],
+] as const) test(`price digits: ${language} ${raw} (${kind})`, () => {
+  const input = inputProduct(), price = parsePrice({ text: raw, kind }, kind === "number" ? "USD" : undefined);
+  input.originPrice = price; input.discountPrice = price;
+  let s = reduce(createEditorState(language), { type: "append", products: [input], importedAt });
+  s = reduce(s, { type: "settings", patch: { showPrice: true } });
+  const display = createDisplayModel(s.project).products[0];
+  assert.deepEqual(display.prices, { original: { text, currency: "USD" }, sale: { text, currency: "USD" } });
+  assert.equal(s.project.products[0].originPrice.raw, raw);
+  assert.equal(Object.hasOwn(display.prices!.original!, "raw"), false);
+});
+test("price display omits invalid or inconsistent raw digits without substituting amounts", () => {
+  for (const raw of ["USD 206.50<script>", "USD 206.51", "KRW 206.50", "USD 20,6.50", ""]) {
+    const project = stateWith(1).project;
+    const model = createDisplayModel({ ...project, settings: { ...project.settings, showPrice: true }, products: [{
+      ...project.products[0], originPrice: { raw, amount: 206.5, currency: "USD" }, discountPrice: { raw: null, amount: null, currency: null },
+    }] });
+    assert.equal(model.products[0].prices, undefined);
+  }
 });

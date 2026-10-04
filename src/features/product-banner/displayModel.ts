@@ -2,6 +2,7 @@ import { validatePrice, validateDiscount } from "./projectJson.ts";
 import { validateSettings } from "./settings.ts";
 import { string } from "./stateValidation.ts";
 import { BannerStateError, type BannerProject, type BannerSettings } from "./stateTypes.ts";
+import { parsePrice } from "./inputMapping.ts";
 import { validateProductUrl } from "./urlPolicy.ts";
 import type { PriceValue } from "./inputTypes.ts";
 
@@ -15,11 +16,14 @@ export type DisplayProduct = Readonly<{
 export type BannerDisplayModel = Readonly<{
   settings: BannerSettings; products: readonly DisplayProduct[]; fileBasedInformation: boolean;
 }>;
-function displayPrice(value: PriceValue, language: BannerSettings["language"]): DisplayPrice | undefined {
+function displayPrice(value: PriceValue): DisplayPrice | undefined {
   const price = validatePrice(value);
   if (price.amount === null || price.currency === null) return undefined;
-  // Build display text from validated numbers. Raw input is never used as HTML or a price label.
-  const text = new Intl.NumberFormat(language === "ko" ? "ko-KR" : "en-US", { maximumFractionDigits: 20 }).format(price.amount);
+  // Revalidate the raw numeric token before displaying it, preserving every source digit.
+  // The display model contains only that token and currency, never the full raw field.
+  const parsed = parsePrice({ text: price.raw!, kind: "string" }, price.currency);
+  if (parsed.amount !== price.amount || parsed.currency !== price.currency) return undefined;
+  const text = price.raw!.trim().replace(/^[A-Za-z]{3}\s+/u, "");
   return { text, currency: price.currency };
 }
 export function createDisplayModel(project: BannerProject): BannerDisplayModel {
@@ -32,7 +36,7 @@ export function createDisplayModel(project: BannerProject): BannerDisplayModel {
       id: p.id, name, accessibleName, imageUrl: image.value, promotionUrl: link.value,
     };
     if (settings.showPrice) {
-      const original = displayPrice(p.originPrice, settings.language), sale = displayPrice(p.discountPrice, settings.language);
+      const original = displayPrice(p.originPrice), sale = displayPrice(p.discountPrice);
       if (original || sale) result.prices = { ...(original ? { original } : {}), ...(sale ? { sale } : {}) };
     }
     if (settings.showDiscount) {
