@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { chromium, type Browser, type Page, type Frame } from "playwright";
+import { chromium, type Browser, type Page, type Frame, type Locator } from "playwright";
 import { PNG } from "pngjs";
 import { stateWith } from "../fixtures/product-banner/state.ts";
 import { saveProjectJson } from "../../src/features/product-banner/projectJson.ts";
@@ -98,10 +98,49 @@ function workbook() {
 const input = (page: Page) => page.locator('input[accept=".xls,.xlsx,.csv"]');
 const importButton = (page: Page) => page.getByRole("button", { name: "Import products in selected order", exact: true });
 
+async function settleForClick(button: Locator) {
+  await button.evaluate(async (element) => {
+    const destinationFor = () => {
+      const box = element.getBoundingClientRect();
+      return Math.max(0, Math.min(document.documentElement.scrollHeight - innerHeight, scrollY + box.top + box.height / 2 - innerHeight / 2));
+    };
+    let destination = destinationFor();
+    window.scrollTo({ top: destination, behavior: "smooth" });
+    const deadline = performance.now() + 6000;
+    let previous: number[] = [], stable = 0;
+    while (stable < 3) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      // Switching preview data can finish changing the document height here.
+      const nextDestination = destinationFor();
+      if (Math.abs(nextDestination - destination) >= 1) {
+        destination = nextDestination; window.scrollTo({ top: destination, behavior: "smooth" }); stable = 0;
+      }
+      const rect = element.getBoundingClientRect();
+      const positions = [rect.top, rect.bottom, rect.left, rect.right];
+      const visible = rect.top > 80 && rect.bottom < innerHeight - 80;
+      stable = visible && Math.abs(scrollY - destination) < 1 && positions.every((value, i) => Math.abs(value - previous[i]) < 0.5) ? stable + 1 : 0;
+      previous = positions;
+      if (performance.now() > deadline) throw new Error("Sample control did not settle in the viewport");
+    }
+    const rect = element.getBoundingClientRect();
+    if (!element.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2))) throw new Error("Settled sample control is covered");
+  });
+}
+
 test("M02 sample: ko/en, light/dark, 1440/375; five designs, local images and preserved work", async (t) => {
   for (const lang of ["ko", "en"] as const) for (const width of [1440, 375]) for (const theme of ["light-coral", "dark-coral"]) {
     const page = await pageFor(lang, width, theme); t.after(() => page.close()); const text = uiMessages[lang];
-    await page.getByRole("button", { name: text.sample, exact: true }).click();
+    const clickButton = async (label: string) => {
+      const button = page.getByRole("button", { name: label, exact: true });
+      await settleForClick(button); await button.click();
+    };
+    const savedProject = async () => {
+      const button = page.getByRole("button", { name: text.saveJson, exact: true });
+      await settleForClick(button);
+      const pending = page.waitForEvent("download"); await button.click();
+      const file = await pending; return JSON.parse(await readFile((await file.path())!, "utf8"));
+    };
+    await clickButton(text.sample);
     assert.equal(await rows(page).count(), 0);
     assert.equal(await page.getByRole("button", { name: text.copyHtml, exact: true }).isEnabled(), false);
     assert.match(await page.getByTestId("preview-data-label").innerText(), /개발용 샘플|Development sample/u);
@@ -117,14 +156,14 @@ test("M02 sample: ko/en, light/dark, 1440/375; five designs, local images and pr
     }
     const project = await load(page);
     assert.equal(await page.getByRole("button", { name: text.saveHtml, exact: true }).isEnabled(), false);
-    await page.getByRole("button", { name: text.realData, exact: true }).click();
+    await clickButton(text.realData);
     assert.match(await page.getByTestId("preview-data-label").innerText(), /내가 가져온|My imported/u);
-    const saved = JSON.parse(await download(page, text.saveJson));
+    const saved = await savedProject();
     assert.deepEqual(saved, project, "sample never replaces imported products or settings");
-    await page.getByRole("button", { name: text.sample, exact: true }).click();
+    await clickButton(text.sample);
     await page.getByLabel(text.design, { exact: true }).selectOption("slim");
-    await page.getByRole("button", { name: text.realData, exact: true }).click();
-    assert.deepEqual(JSON.parse(await download(page, text.saveJson)), project);
+    await clickButton(text.realData);
+    assert.deepEqual(await savedProject(), project);
     await frameFor(page); await capture(page, `${lang}-${theme}-${width}-real.png`, true);
     await page.close();
   }
