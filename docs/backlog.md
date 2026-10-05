@@ -8,7 +8,7 @@
 
 ## 상품 배너 T5 후속 (2026-10-05, R3a 수정 후보)
 
-- R3a 수정 후보의 Astra 재검수·Claude 최종 판정이 남아 있다. 통과 후 M02 개발용 샘플/실제 데이터 구분 UI와 M03 나머지 위험 중심 UI 경계를 이어간다. T6·최종 통합 검사 및 기존 utilities 언어 전환 결함·ads S10 미확인은 이전 증거의 구분을 유지한다. — Codx
+- R3a 수정 후보의 Astra 재검수·Claude 최종 판정이 남아 있다. 통과 후 M02 개발용 샘플/실제 데이터 구분 UI와 M03 나머지 위험 중심 UI 경계를 이어간다. T6·최종 통합 검사 및 기존 utilities 언어 전환 결함·ads S10 미확인은 이전 증거의 구분을 유지한다. — Codx **현재 상태: T5b·R3b 이후 해당 T5 후속 구현·검수는 완료. 기존 utilities N02와 ads S10은 열린 상태로 별도 유지한다.**
 
 ## FolioTrace 역사적 이력 후속 (2026-09-27)
 
@@ -169,7 +169,15 @@
 - **EN320 동의 배너의 오른쪽 동작 잘림** — 320px에서 `Accept and continue` 버튼 right 381.97px, viewport 320px이며 문서 가로 스크롤로 복구되지 않는다. U6와 기존 PDF Merge에서 같은 geometry라 U6 회귀가 아니다. UI v3에서 버튼 줄바꿈·세로 배치를 포함해 공용 배너 경계를 고친다. 근거 `/tmp/worklazy-u6-preflight/final-ui-review/inherited-comparison.json`.
 - **고정 데스크톱 언어 스위처의 배경 의존 대비** — U6 결과 화면의 안정 axe에서 기존 translucent LanguageSwitcher 대비 1건이 남았다. UI v3에서 이 공용 control의 실제 배경별 대비를 고정한다. U6에서 전역 스위처 색을 임의 변경하지 않는다.
 
-- Codx(Sol), T6a: Product banner image-status callbacks clear a previously visible clipboard failure notice in ProductBannerPage dispatch (present at df460ee). Controlled held-image reproduction is recorded in T6a evidence. Scope a UI repair and retain the failing case before requiring three consecutive core/CI passes.
+- Codx(Sol), T6a: Product banner image-status callbacks clear a previously visible clipboard failure notice in ProductBannerPage dispatch (present at df460ee). Controlled held-image reproduction is recorded in T6a evidence. Scope a UI repair and retain the failing case before requiring three consecutive core/CI passes. **현재 상태: edd1872에서 수리하고 R4a 검수 통과로 해소.**
 
-- 2026-10-05 Codx(Sol), T6c: 광고 S4는 기준선 cc20462와 후보의 동일 조건 실행에서 모두 chunk 404 1회로 실패했다(기대 >=2 유지). 재로드 요청 뒤 TextMerger 재로드 문서 커밋 없이 /ko/error/가 커밋되는 기존 복구/오류 문서 전환 경쟁이다. 공유 복구 코드 수리는 이번 범위 밖이며 광고 필수 게이트 PASS가 아니다. 근거: product-banner/evidence/T6c.md 및 tmp/T6c/s4-comparison.json.
+- 2026-10-05 Codx(Sol), T6c: 광고 S4는 기준선 cc20462와 후보의 동일 조건 실행에서 모두 chunk 404 1회로 실패했다(기대 >=2 유지). 재로드 요청 뒤 TextMerger 재로드 문서 커밋 없이 /ko/error/가 커밋되는 기존 복구/오류 문서 전환 경쟁이다. 공유 복구 코드 수리는 이번 범위 밖이며 광고 필수 게이트 PASS가 아니다. 근거: product-banner/evidence/T6c.md 및 tmp/T6c/s4-comparison.json. **현재 상태: 열린 기존 부채. T7 ads-r1의 이번 S4 통과는 간헐 결함 종결이 아니다.**
 - 2026-10-05 Codx(Sol), T6c: S10은 스텁이 광고 오버레이를 렌더링하지 않아 실제 겹침 미검증이다. 자동화 운영 광고 호출은 유지 차단하고 실제 오버레이는 T7 운영 확인에 이월한다. analytics-2 자식의 호스트 전체 잔존 여부는 exec PID namespace 제약으로 미확인; 호스트 조회가 필요하다. lttng O_CREAT 2건의 배타 생성/파일 소유도 미확인이며 다음 선택적 WebKit 실행 전 경로 제약 진단을 이월한다.
+- **현재 상태 — analytics-2 잔존 확인 해소**: 총괄의 호스트 전체 /proc 조회에서 잔존 0을 확인했고 T7 Astra가 `resolved_at_recorded_host_observation`으로 정식 수용했다. 종료 143의 원인은 미확인으로 유지하며 지속 감시를 주장하지 않는다. 근거: 로컬 작업 기록 docs/jobs/todo/product-banner/claude-evidence/R4c-M01/README.md (gitignored), 로컬 작업 기록 docs/jobs/todo/product-banner/logs/T7-final-review-result.json (gitignored). — Codx(Sol)
+- **열림 — S10·lttng IPC**: 실제 모바일 광고 오버레이 겹침과 lttng O_CREAT 2건의 배타 생성/소유는 미확인으로 유지한다. 자동화의 운영 광고·분석 공급자 호출 차단도 유지한다. — Codx(Sol)
+- **열림 — utilities N02**: 기존 HWP → 영어 전환에서 query/hash가 유실된다. T7 utilities-r3는 이 결함에서 실패했고 이후 순차 검사는 미실행이므로 utilities 전체 FAIL이다. 별도 카탈로그 4건의 범위 PASS 재사용은 전체 utilities 통과가 아니다. 근거: 로컬 작업 기록 docs/jobs/todo/product-banner/logs/R4b-review-result.json (gitignored), 로컬 작업 기록 docs/jobs/todo/product-banner/logs/T7-final-review-result.json (gitignored). — Codx(Sol)
+
+## 상품 배너 T7 비차단 이월 (2026-10-05)
+
+- **열림 — 200% 확대의 공통 고정 내비·헤더와 포커스 가림**: 사이트 공통 하단 고정 내비 및 상단 헤더가 화면 하단 입력란을 가릴 수 있다. R4c-N02에서는 Tab 이동 시 입력란이 중앙으로 스크롤되고 키보드 편집·포인터 클릭·출력 반영이 가능했다. 조작 불가로 판정하지 않지만, 공통 셸의 모든 포커스 위치에 대해 가림(WCAG 2.4.11)을 전수 검증한 것은 아니다. 공통 셸 `scroll-padding` 등 후속 보정을 검토한다. 근거: 로컬 작업 기록 docs/jobs/todo/product-banner/logs/R4c-review-result.json (gitignored), 로컬 작업 기록 docs/jobs/todo/product-banner/work/tmp/T6c/runs/native-zoom-wWIVB3/generator-200-edit.png (gitignored), 로컬 작업 기록 docs/jobs/todo/product-banner/research/gemini-visual-T6c-native-out.md (gitignored). — Codx(Sol)
+- **열림 — 실제 이미지 로드 2/3·원격 서버 거부**: 실제 샘플 3행 중 2행 이미지는 정상 로드됐고 2번 행 이미지는 원격 HTTP 403 `text/html` 응답으로 브라우저 ORB에 차단됐다. 출력은 HTML·iframe 각각 상품별 대체 표시 1건이며 원본 링크·이미지 주소·순서 보존은 정상이다. 서버 거부 사유는 미확인으로 유지하며 이 외부 호스트 한계를 제품 차단으로 재분류하지 않는다. 실제 URL·상품 정보는 기록하지 않는다. 근거: 로컬 작업 기록 docs/jobs/todo/product-banner/logs/R4b-review-result.json (gitignored), 로컬 작업 기록 docs/jobs/todo/product-banner/evidence/T6b.md (gitignored). — Codx(Sol)
