@@ -100,25 +100,22 @@ const importButton = (page: Page) => page.getByRole("button", { name: "Import pr
 
 async function settleForClick(button: Locator) {
   await button.evaluate(async (element) => {
-    const destinationFor = () => {
-      const box = element.getBoundingClientRect();
-      return Math.max(0, Math.min(document.documentElement.scrollHeight - innerHeight, scrollY + box.top + box.height / 2 - innerHeight / 2));
-    };
-    let destination = destinationFor();
-    window.scrollTo({ top: destination, behavior: "smooth" });
     const deadline = performance.now() + 6000;
     let previous: number[] = [], stable = 0;
     while (stable < 3) {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      // Switching preview data can finish changing the document height here.
-      const nextDestination = destinationFor();
-      if (Math.abs(nextDestination - destination) >= 1) {
-        destination = nextDestination; window.scrollTo({ top: destination, behavior: "smooth" }); stable = 0;
+      const before = element.getBoundingClientRect();
+      // The preview column is sticky on desktop. Re-centering its already-visible
+      // controls can keep moving the scroll destination instead of settling.
+      // Scroll only when needed, then require the actual control to remain stable.
+      if (before.top <= 80 || before.bottom >= innerHeight - 80) {
+        element.scrollIntoView({ block: "center", behavior: "instant" });
+        stable = 0;
       }
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const rect = element.getBoundingClientRect();
       const positions = [rect.top, rect.bottom, rect.left, rect.right];
       const visible = rect.top > 80 && rect.bottom < innerHeight - 80;
-      stable = visible && Math.abs(scrollY - destination) < 1 && positions.every((value, i) => Math.abs(value - previous[i]) < 0.5) ? stable + 1 : 0;
+      stable = visible && positions.every((value, i) => Math.abs(value - previous[i]) < 0.5) ? stable + 1 : 0;
       previous = positions;
       if (performance.now() > deadline) throw new Error("Sample control did not settle in the viewport");
     }
