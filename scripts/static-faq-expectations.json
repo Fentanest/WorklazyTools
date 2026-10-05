@@ -1,8 +1,8 @@
 {
   "/tools/product-banner": {
     "slug": "product-banner",
-    "ko": "상품 정보도 자동 갱신되나요?",
-    "en": "Does product information update automatically?"
+    "ko": "알리익스프레스 상품 정보도 자동 갱신되나요?",
+    "en": "Does AliExpress product information update automatically?"
   },
   "/tools/foliotrace": { "slug": "foliotrace", "ko": "실제 국민연금 보유잔고인가요?", "en": "Is this the NPS actual account balance?" },
   "/tools/excel-merger": { "slug": "excel-merger", "ko": "XLSX 수식과 서식을 따로 보존할 수 있나요?", "en": "Can XLSX formulas and formatting be preserved independently?" },

@@ -1,5 +1,5 @@
 {
-  "scope": "T6a core + T6b full Chromium matrix; suite/name is a fixed required case ID",
+  "scope": "T6a core + T6b full Chromium matrix + AliExpress editor repair; suite/name is a fixed required case ID",
   "suites": [
     {
       "id": "unit",
@@ -116,7 +116,13 @@
         "price digits: en USD 387 (string)",
         "price digits: en 282.8 (number)",
         "price digits: en USD 1.1234567890123456789010 (string)",
-        "banner runner rejects a missing or duplicate suite"
+        "banner runner rejects a missing or duplicate suite",
+        "saved false choices survive JSON load and every design switch: photo-strip",
+        "saved false choices survive JSON load and every design switch: product-card",
+        "saved false choices survive JSON load and every design switch: slim",
+        "saved false choices survive JSON load and every design switch: vertical",
+        "saved false choices survive JSON load and every design switch: grid",
+        "AliExpress names, descriptions, search aliases and OG source agree in both languages"
       ]
     },
     {
@@ -399,6 +405,37 @@
         "T6b zoom200 grid html",
         "T6b zoom200 grid iframe"
       ]
+    },
+    {
+      "id": "editor-repair",
+      "files": [
+        "tests/product-banner/editor-repair.browser.test.ts"
+      ],
+      "cases": [
+        "keyboard drafts, bounds, blur, undo and saved/exported height: ko",
+        "keyboard drafts, bounds, blur, undo and saved/exported height: en",
+        "new defaults, saved false and mixed display choices survive design switches and JSON reload",
+        "English UI exports ko photo-strip: HTML, iframe and standalone actual localized builder links",
+        "English UI exports ko product-card: HTML, iframe and standalone actual localized builder links",
+        "English UI exports ko slim: HTML, iframe and standalone actual localized builder links",
+        "English UI exports ko vertical: HTML, iframe and standalone actual localized builder links",
+        "English UI exports ko grid: HTML, iframe and standalone actual localized builder links",
+        "English UI exports en photo-strip: HTML, iframe and standalone actual localized builder links",
+        "English UI exports en product-card: HTML, iframe and standalone actual localized builder links",
+        "English UI exports en slim: HTML, iframe and standalone actual localized builder links",
+        "English UI exports en vertical: HTML, iframe and standalone actual localized builder links",
+        "English UI exports en grid: HTML, iframe and standalone actual localized builder links",
+        "local layout and visible keyboard focus: ko 1440 light-coral",
+        "local layout and visible keyboard focus: ko 1440 dark-coral",
+        "local layout and visible keyboard focus: ko 375 light-coral",
+        "local layout and visible keyboard focus: ko 375 dark-coral",
+        "local layout and visible keyboard focus: en 1440 light-coral",
+        "local layout and visible keyboard focus: en 1440 dark-coral",
+        "local layout and visible keyboard focus: en 375 light-coral",
+        "local layout and visible keyboard focus: en 375 dark-coral",
+        "built static SEO and FAQ use exact AliExpress name: ko",
+        "built static SEO and FAQ use exact AliExpress name: en"
+      ]
     }
   ],
   "deferred": {},
@@ -407,7 +444,8 @@
     "standalone-json-security-sandbox-height-blocking": "export",
     "rotation-lifecycle-instances-image-failure": "render,late-image",
     "ko-en-import-edits-work-guard-no-egress": "ui,t5b,r3a,r3b",
-    "full-matrix": "matrix/T6b matrix {design} {format} {width} {theme}: 8 counts per case; matrix/T6b zoom200 {design} {format}"
+    "full-matrix": "matrix/T6b matrix {design} {format} {width} {theme}: 8 counts per case; matrix/T6b zoom200 {design} {format}",
+    "editor-repair": "editor-repair: actual sequential keyboard drafts, saved/exported height, defaults/saved false/design switches, localized links in 10 designs/languages × HTML/iframe/standalone from English UI, desktop/375px both themes, static SEO/FAQ"
   },
   "supplemental": "T6b performance/base/final-visual have independent test files and raw receipts; see evidence/T6b.md for measured scope and unverified gates"
 }

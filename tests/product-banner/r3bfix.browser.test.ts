@@ -110,7 +110,7 @@ test("R3bfix JSON read guards route exit and cannot affect a remounted editor", 
   assert.match(page.url(), /\/tools\/product-banner\/$/u);
   await page.getByRole("link", { name: "All tools", exact: true }).first().click();
   await page.getByTestId("unsaved-leave").click(); await page.waitForURL(/\/en\/tools\/?$/u);
-  await page.getByRole("link", { name: /Product Banner Builder/u }).first().click();
+  await page.getByRole("link", { name: /AliExpress Ad Banner Builder/u }).first().click();
   await page.locator('[data-tool-page="product-banner"]').waitFor();
   await choose(page, "New editor"); await expectName(page, "New editor");
   await release(page, "held-leave.json");

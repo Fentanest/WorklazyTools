@@ -43,11 +43,11 @@ export function exportBanner(project: BannerProject, runtime: ExportRuntime, opt
   const html = `<style>${css}</style>${markup}<script>${runtime.banner}</script>`;
   // Reject before nesting/escaping an already oversized document, avoiding needless allocations.
   if (utf8Bytes(html) > OUTPUT_LIMITS.bytes) throw new Error("EXPORT_SIZE_LIMIT");
-  const documentFor = (auto: boolean) => `<!doctype html><html lang="${s.language}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${s.language === "ko" ? "상품 배너" : "Product banner"}</title><style>body{margin:0}</style></head><body>${auto ? `<script type="application/json" data-wlpb-frame-config>${scriptJson({ parentOrigin: options.parentOrigin || "" })}</script>` : ""}${html}</body></html>`;
+  const documentFor = (auto: boolean) => `<!doctype html><html lang="${s.language}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${s.language === "ko" ? "알리익스프레스 광고 배너 만들기" : "AliExpress Ad Banner Builder"}</title><style>body{margin:0}</style></head><body>${auto ? `<script type="application/json" data-wlpb-frame-config>${scriptJson({ parentOrigin: options.parentOrigin || "" })}</script>` : ""}${html}</body></html>`;
   if (options.parentOrigin && (!/^https:\/\//u.test(options.parentOrigin) || new URL(options.parentOrigin).origin !== options.parentOrigin)) throw new Error("INVALID_PARENT_ORIGIN");
   const height = options.height ?? defaultFrameHeight(model);
   if (!Number.isInteger(height) || height < 120 || height > 2400) throw new Error("INVALID_IFRAME_HEIGHT");
-  const frame = `<iframe data-wlpb-frame title="${s.language === "ko" ? "상품 배너" : "Product banner"}" width="100%" height="${height}" loading="lazy" style="border:0" sandbox="${BANNER_SANDBOX}" srcdoc="${escapeHtml(documentFor(s.autoHeight))}">${escapeHtml(help.frame)}</iframe>`;
+  const frame = `<iframe data-wlpb-frame title="${s.language === "ko" ? "알리익스프레스 광고 배너 만들기" : "AliExpress Ad Banner Builder"}" width="100%" height="${height}" loading="lazy" style="border:0" sandbox="${BANNER_SANDBOX}" srcdoc="${escapeHtml(documentFor(s.autoHeight))}">${escapeHtml(help.frame)}</iframe>`;
   const iframe = `<span data-wlpb-embed>${frame}<small>${escapeHtml(s.autoHeight ? help.auto : help.frame)}</small></span>${s.autoHeight ? `<script>${runtime.heightParent}</script>` : ""}`;
   const standalone = documentFor(false), json = saveProjectJson(project);
   const contents = { html, iframe, standalone, json };

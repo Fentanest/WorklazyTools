@@ -122,10 +122,10 @@ test("undo is bounded, no-op changes do not fill it and large appends reject wit
 });
 for (const design of DESIGN_IDS) test(`settings: ${design} defaults, language, constrained layout and immutable patches`, () => {
   const defaults = createDefaultSettings("en", design); assert.equal(defaults.design, design); assert.equal(defaults.language, "en");
-  assert.equal(defaults.intervalSeconds, 5); assert.equal(defaults.showPrice, false); assert.equal(defaults.showDiscount, false); assert.equal(defaults.advertisingLabel, true);
+  assert.equal(defaults.intervalSeconds, 5); assert.equal(defaults.showPrice, true); assert.equal(defaults.showDiscount, true); assert.equal(defaults.showName, true); assert.equal(defaults.showButton, true); assert.equal(defaults.autoHeight, true); assert.equal(defaults.advertisingLabel, true);
   assert.equal(defaults.autoPlay, design !== "grid" && design !== "vertical");
   assert.equal(defaults.affiliateNotice, DEFAULT_AFFILIATE_NOTICES.en);
-  if (design === "photo-strip") { assert.equal(defaults.visibleCount, 4); assert.equal(defaults.showName, false); assert.equal(defaults.showButton, false); }
+  if (design === "photo-strip") { assert.equal(defaults.visibleCount, 4); assert.equal(defaults.showName, true); assert.equal(defaults.showButton, true); }
   const updated = updateSettings(defaults, { visibleCount: 6, gridPreset: "3x2", gridColumns: 6, gridRows: 9, autoPlay: true });
   assert.equal(updated.visibleCount, design === "slim" ? 1 : 6); assert.equal(updated.gridColumns, 3); assert.equal(updated.gridRows, 2);
   assert.equal(defaults.visibleCount, createDefaultSettings("en", design).visibleCount);
@@ -149,6 +149,7 @@ test("setting range boundaries are accepted, values outside each range and CSS/J
 });
 test("display allowlist strips excluded products/metadata/unselected prices and supplies an accessible name for photo-only links", () => {
   let s = reduce(stateWith(), { type: "include", ids: ["pb-2"], included: false });
+  s = reduce(s, { type: "settings", patch: { showPrice: false, showDiscount: false } });
   s = reduce(s, { type: "edit", id: "pb-1", changes: { name: "  " } });
   const model = createDisplayModel(s.project);
   assert.deepEqual(model.products.map((p) => p.id), ["pb-1", "pb-3"]);

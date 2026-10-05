@@ -94,7 +94,7 @@ const socialImageSlugByPath: Record<string, string> = {
 };
 
 export const seoByPath: Record<string, SeoDefinition> = {
-  "/tools/product-banner": { title: "상품 배너 만들기 - Excel·CSV로 HTML·iframe 생성 | Worklazy Tools", description: "엑셀 상품 목록으로 5종 배너를 만들고 HTML·iframe 코드를 저장하세요. 파일은 브라우저에서 처리합니다.", application: { name: "상품 배너 만들기", featureList: ["Excel·CSV 입력", "5종 디자인", "HTML·iframe 코드", "편집용 JSON"] } },
+  "/tools/product-banner": { title: "알리익스프레스 광고 배너 만들기 - Excel·CSV로 HTML·iframe 생성 | Worklazy Tools", description: "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 광고 배너를 만들고 HTML·iframe 코드를 저장하세요. 파일은 브라우저에서 처리합니다.", application: { name: "알리익스프레스 광고 배너 만들기", featureList: ["Excel·CSV 입력", "5종 디자인", "HTML·iframe 코드", "편집용 JSON"] } },
   "/tools/foliotrace": { title: "FolioTrace | 국민연금 공개 공시 추적", description: "국민연금의 국내주식 DART 대량보유 공시를 근거로 공개 추적 범위를 살펴봅니다. 실제 계좌 잔고나 전체 자산을 뜻하지 않습니다." },
   "/tools/document-redactor": {title: "PDF·이미지 개인정보 가리기 - 직접 영역 선택 | Worklazy Tools", description: "PDF와 이미지 파일에서 민감한 개인정보 영역을 검정색으로 가리고 안전하게 사본을 저장하세요.", application: {name: "개인정보 가리기", featureList: ["직접 영역 선택", "검정 픽셀 마스킹", "모든 PDF 페이지 재생성", "PNG 이미지 저장", "결과 확인"]}},
   "/": {
@@ -358,7 +358,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
 };
 
 const englishToolTitles: Record<keyof typeof enTools.items, string> = {
-  "product-banner": "Product Banner Builder - Excel to HTML & Iframe | Worklazy Tools",
+  "product-banner": "AliExpress Ad Banner Builder - Excel to HTML & Iframe | Worklazy Tools",
   "foliotrace": "FolioTrace | NPS Disclosed Holdings",
   "document-redactor": "Redact PDF & Images - Blackout Private Info | Worklazy Tools",
   "excel-merger": "Excel Merger - Combine Files & Merge Sheets | Worklazy Tools",

@@ -88,7 +88,7 @@ export function ProductBannerPage() {
     <p className="mb-5 max-w-3xl text-sm text-muted-foreground">{text.privacy}</p>
     <div role="status" aria-live="polite" className="mb-4">{message === text.copyFailed ? "" : message}</div>
     <div className="grid items-start gap-5 xl:grid-cols-2">
-      <div className="min-w-0 space-y-5">
+      <div className="min-w-0 space-y-5" data-testid="settings-column">
         <SectionCard step={1} title={text.import}>
           <UtilitySelect aria-label={text.import} value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="append">{text.add}</option><option value="replace">{text.replace}</option></UtilitySelect>
           <ImportSelection text={text} errorText={errorText} onBusy={setBusy} onPending={setPending} onImport={(products) => {
@@ -98,16 +98,6 @@ export function ProductBannerPage() {
         </SectionCard>
         <SectionCard step={2} title={text.products}>{!state.project.products.length && <p className="mb-4 text-muted-foreground">{text.empty}</p>}<ProductReview state={state} dispatch={dispatch} text={text} /></SectionCard>
         <SectionCard step={3} title={text.settings}><BannerAppearance settings={showSample ? sampleSettings : state.project.settings} update={(patch) => showSample ? setSampleSettings((previous) => updateSettings(previous, patch)) : dispatch({ type: "settings", patch })} text={text} /></SectionCard>
-      </div>
-      <div className="min-w-0 space-y-5 xl:sticky xl:top-24">
-        <SectionCard title={text.preview}>
-          <div className="mb-3 flex flex-wrap gap-2"><Button variant="secondary" aria-pressed={showSample} onClick={() => { if (!showSample) setSampleSettings(state.project.settings); setShowSample(true); }}>{text.sample}</Button><Button variant="secondary" aria-pressed={!showSample} onClick={() => setShowSample(false)}>{text.realData}</Button></div>
-          <p className="mb-3 rounded-xl border border-border p-3 text-sm" data-testid="preview-data-label">{showSample ? text.sampleNotice : text.realNotice}</p>
-          <p className="mb-3">{text.count}: {showSample ? 3 : state.project.products.filter((p) => p.included).length}</p>
-          <UtilitySelect disabled={showSample} aria-label={text.preview} value={format} onChange={(e) => setFormat(e.target.value as typeof format)}><option value="html">{text.html}</option><option value="iframe">{text.iframe}</option></UtilitySelect>
-          {/* Replace changed sandbox documents: srcdoc navigation would add joint history entries and obstruct the app's leave guard. */}
-          {sample ? <div className="mt-4 overflow-auto"><iframe key={sample.document} title={text.sample} data-testid="sample-preview" sandbox={BANNER_SANDBOX} srcDoc={sample.document} style={{ width: "100%", maxWidth: sampleSettings.width, height: sample.height + 60, border: 0 }} /></div> : output.error ? <p role="alert" className="mt-4 text-destructive">{text.exportError}</p> : !state.project.products.length ? <p className="mt-4 text-muted-foreground">{text.empty}</p> : <div className="mt-4 overflow-auto"><iframe key={preview} title={text.preview} data-testid="banner-preview" sandbox={BANNER_SANDBOX} srcDoc={preview} style={{ width: "100%", maxWidth: state.project.settings.width, height: (output.value?.height ?? 420) + 60, border: 0 }} /></div>}
-        </SectionCard>
         <SectionCard step={4} title={text.export}>
           {message === text.copyFailed && <p role="status" className="mb-3 text-sm">{text.copyFailed}</p>}
           {showSample && <p className="mb-3 text-sm text-muted-foreground">{text.sampleBlocked}</p>}
@@ -120,6 +110,16 @@ export function ProductBannerPage() {
             <input ref={jsonInput} type="file" accept=".json" className="hidden" aria-label={text.loadJson} onChange={(e) => { void importJson(e.target.files?.[0]); e.target.value = ""; }} />
           </div>
           {!showSample && output.value && <div className="mt-4 space-y-3 text-sm text-muted-foreground"><p>{format === "html" ? help.direct : help.frame}</p>{state.project.settings.autoHeight && <p>{help.auto}</p>}<p>{help.images}</p><p>{output.value.bytes[format].toLocaleString(language)} bytes</p>{output.value.largeOutput && <p>{help.large}</p>}<UtilityTextarea aria-label={text.export} readOnly value={output.value[format]} className="h-40" onFocus={(e) => e.target.select()} /></div>}
+        </SectionCard>
+      </div>
+      <div className="min-w-0 xl:sticky xl:top-24" data-testid="preview-column">
+        <SectionCard title={text.preview}>
+          <div className="mb-3 flex flex-wrap gap-2"><Button variant="secondary" aria-pressed={showSample} onClick={() => { if (!showSample) setSampleSettings(state.project.settings); setShowSample(true); }}>{text.sample}</Button><Button variant="secondary" aria-pressed={!showSample} onClick={() => setShowSample(false)}>{text.realData}</Button></div>
+          <p className="mb-3 rounded-xl border border-border p-3 text-sm" data-testid="preview-data-label">{showSample ? text.sampleNotice : text.realNotice}</p>
+          <p className="mb-3">{text.count}: {showSample ? 3 : state.project.products.filter((p) => p.included).length}</p>
+          <UtilitySelect disabled={showSample} aria-label={text.preview} value={format} onChange={(e) => setFormat(e.target.value as typeof format)}><option value="html">{text.html}</option><option value="iframe">{text.iframe}</option></UtilitySelect>
+          {/* Replace changed sandbox documents: srcdoc navigation would add joint history entries and obstruct the app's leave guard. */}
+          {sample ? <div className="mt-4 max-h-[70vh] overflow-auto xl:max-h-[calc(100dvh-24rem)]"><iframe key={sample.document} title={text.sample} data-testid="sample-preview" sandbox={BANNER_SANDBOX} srcDoc={sample.document} style={{ width: "100%", maxWidth: sampleSettings.width, height: sample.height + 60, border: 0 }} /></div> : output.error ? <p role="alert" className="mt-4 text-destructive">{text.exportError}</p> : !state.project.products.length ? <p className="mt-4 text-muted-foreground">{text.empty}</p> : <div className="mt-4 max-h-[70vh] overflow-auto xl:max-h-[calc(100dvh-24rem)]"><iframe key={preview} title={text.preview} data-testid="banner-preview" sandbox={BANNER_SANDBOX} srcDoc={preview} style={{ width: "100%", maxWidth: state.project.settings.width, height: (output.value?.height ?? 420) + 60, border: 0 }} /></div>}
         </SectionCard>
       </div>
     </div>

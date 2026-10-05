@@ -25,10 +25,26 @@ test("banner registration supplies localized SEO, guides, FAQ and generated soci
   for (const language of ["ko", "en"] as const) {
     const seo = getSeoDefinition(language, path);
     const guide = getGuideData(language, "productBanner");
-    assert.ok(seo.title.includes(language === "ko" ? "상품 배너" : "Product Banner"));
+    assert.ok(seo.title.includes(uiMessages[language].title));
     assert.equal(seo.faq?.length, 2);
     assert.ok(guide.blocks.length > 0);
     assert.equal(getSocialImageDefinition(language, path).path, `social/tools/product-banner-${language}.png`);
     assert.ok(fs.statSync(`public/social/tools/product-banner-${language}.png`).size > 10_000);
   }
+});
+
+test("AliExpress names, descriptions, search aliases and OG source agree in both languages", async () => {
+  const { default: ko } = await import("../../src/locales/ko/tools.json", { with: { type: "json" } });
+  const { default: en } = await import("../../src/locales/en/tools.json", { with: { type: "json" } });
+  const source = fs.readFileSync("scripts/generate-social-images.mjs", "utf8");
+  const search = fs.readFileSync("src/app/toolSearch.ts", "utf8").split('"product-banner":')[1].split("\n")[0];
+  for (const [language, dictionary, title] of [["ko", ko, "알리익스프레스 광고 배너 만들기"], ["en", en, "AliExpress Ad Banner Builder"]] as const) {
+    const tool = dictionary.items["product-banner"], seo = getSeoDefinition(language, "/tools/product-banner");
+    assert.equal(tool.title, title); assert.equal(tool.shortTitle, title); assert.equal(uiMessages[language].title, title);
+    assert.ok(seo.title.startsWith(title)); assert.equal(seo.application?.name, title);
+    assert.ok(getGuideData(language, "productBanner").title.startsWith(title)); assert.ok(source.includes(title));
+    assert.match(tool.description, /HTML.*iframe/u); assert.match(seo.description, /HTML.*iframe/u);
+    assert.match(seo.faq![0].question, language === "ko" ? /알리익스프레스/u : /AliExpress/u);
+  }
+  for (const keyword of ["알리익스프레스", "알리", "제휴 마케팅", "엑셀", "aliexpress", "affiliate", "ad", "banner", "builder", "excel", "html", "iframe"]) assert.ok(search.includes(`"${keyword}"`));
 });

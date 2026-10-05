@@ -17,7 +17,7 @@ test("banner runner counts only the declared successful cases", () => {
   assert.equal(result.ok, true); assert.equal(result.passed, 2); assert.equal(result.notRun, 0);
 });
 test("banner runner rejects a missing or duplicate suite", () => {
-  const ids = ["unit", "render", "export", "ui", "t5b", "r3a", "r3b", "late-image", "matrix"].map((id) => ({ id }));
+  const ids = ["unit", "render", "export", "ui", "t5b", "r3a", "r3b", "late-image", "matrix", "editor-repair"].map((id) => ({ id }));
   assert.equal(validSuites(ids), true);
-  for (const bad of [[], ids.slice(1), [...ids, ids[0]]]) assert.equal(validSuites(bad), false);
+  for (const bad of [[], ...ids.map((_, index) => ids.filter((_, i) => i !== index)), [...ids, ids[0]]]) assert.equal(validSuites(bad), false);
 });

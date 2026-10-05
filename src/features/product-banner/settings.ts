@@ -10,17 +10,17 @@ export const DEFAULT_AFFILIATE_NOTICES = {
   en: "The publisher may earn a commission if you purchase through product links in this banner.",
 } as const;
 const layoutDefaults = {
-  "photo-strip": { visibleCount: 4, imageHeight: 160, showName: false, showButton: false, autoPlay: true, iframeHeight: 300 },
-  "product-card": { visibleCount: 3, imageHeight: 180, showName: true, showButton: false, autoPlay: true, iframeHeight: 420 },
-  slim: { visibleCount: 1, imageHeight: 64, showName: true, showButton: false, autoPlay: true, iframeHeight: 200 },
-  vertical: { visibleCount: 4, imageHeight: 80, showName: true, showButton: false, autoPlay: false, iframeHeight: 600 },
-  grid: { visibleCount: 4, imageHeight: 160, showName: true, showButton: false, autoPlay: false, iframeHeight: 600 },
+  "photo-strip": { visibleCount: 4, imageHeight: 160, autoPlay: true, iframeHeight: 300 },
+  "product-card": { visibleCount: 3, imageHeight: 180, autoPlay: true, iframeHeight: 420 },
+  slim: { visibleCount: 1, imageHeight: 64, autoPlay: true, iframeHeight: 200 },
+  vertical: { visibleCount: 4, imageHeight: 80, autoPlay: false, iframeHeight: 600 },
+  grid: { visibleCount: 4, imageHeight: 160, autoPlay: false, iframeHeight: 600 },
 } as const;
 export function createDefaultSettings(language: BannerLanguage, design: DesignId = "photo-strip"): BannerSettings {
   return validateSettings({ design, ...layoutDefaults[design], width: 1030, gridPreset: "2x2", gridColumns: 2, gridRows: 2,
-    showPrice: false, showDiscount: false, colors: { background: "#ffffff", text: "#172033", accent: "#2563eb", border: "#d5dbe5" },
+    showName: true, showPrice: true, showDiscount: true, showButton: true, colors: { background: "#ffffff", text: "#172033", accent: "#2563eb", border: "#d5dbe5" },
     theme: "auto", intervalSeconds: 5, moveBy: "one", language, advertisingLabel: true,
-    affiliateNotice: DEFAULT_AFFILIATE_NOTICES[language], autoHeight: false });
+    affiliateNotice: DEFAULT_AFFILIATE_NOTICES[language], autoHeight: true });
 }
 /** Reject invalid types/ranges. Only documented layout constraints are corrected. Unknown fields are discarded. */
 export function validateSettings(value: unknown): BannerSettings {
@@ -47,7 +47,7 @@ export function validateSettings(value: unknown): BannerSettings {
 }
 export type SettingsPatch = Partial<Omit<BannerSettings, "colors">> & { colors?: Partial<BannerSettings["colors"]> };
 export function updateSettings(current: BannerSettings, patch: SettingsPatch): BannerSettings {
-  // Switching designs applies that design's layout defaults, leaving publisher text/theme/price choices intact.
+  // Switching designs applies that design's layout defaults, preserving display checkboxes and publisher text/theme choices.
   const layout = patch.design && patch.design !== current.design ? layoutDefaults[oneOf(patch.design, DESIGN_IDS)] : {};
   const notice = patch.language && patch.language !== current.language && current.affiliateNotice === DEFAULT_AFFILIATE_NOTICES[current.language]
     ? DEFAULT_AFFILIATE_NOTICES[oneOf(patch.language, ["ko", "en"])] : current.affiliateNotice;

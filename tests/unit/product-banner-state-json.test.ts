@@ -144,3 +144,15 @@ test("load corrects only surrounding URL whitespace while preserving raw origina
   assert.equal(loaded.products[0].originalUrls.promotionUrl, original);
   assert.equal(createDisplayModel(loaded).products[0].promotionUrl, v.products[0].promotionUrl.trim());
 });
+
+for (const design of ["photo-strip", "product-card", "slim", "vertical", "grid"] as const) test(`saved false choices survive JSON load and every design switch: ${design}`, () => {
+  let s = reduce(stateWith(1), { type: "settings", patch: { design, showName: false, showPrice: false, showDiscount: false, showButton: false, autoHeight: false, autoPlay: false } });
+  const loaded = loadProjectJson(saveProjectJson(s.project));
+  for (const key of ["showName", "showPrice", "showDiscount", "showButton", "autoHeight", "autoPlay"] as const) assert.equal(loaded.settings[key], false);
+  s = reduce(s, { type: "load", project: loaded, confirmDiscard: true });
+  for (const next of ["photo-strip", "product-card", "slim", "vertical", "grid"] as const) {
+    s = reduce(s, { type: "settings", patch: { design: next } });
+    for (const key of ["showName", "showPrice", "showDiscount", "showButton", "autoHeight"] as const) assert.equal(s.project.settings[key], false);
+    assert.deepEqual(s.project.products, loaded.products);
+  }
+});

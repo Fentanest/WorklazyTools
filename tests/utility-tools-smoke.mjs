@@ -18,7 +18,7 @@ function visit(node) {
 visit(source);
 assert.ok(registry.length > 0);
 assert.equal(new Set(registry.map((t) => t.id)).size, registry.length);
-assert.deepEqual(registry.find((t) => t.id === "product-banner"), { id: "product-banner", category: "media", path: "/tools/product-banner", title: "상품 배너 만들기", shortTitle: "상품 배너", description: "엑셀 상품 목록으로 5종 배너와 HTML·iframe 코드를 만듭니다.", eyebrow: "상품 배너", accent: "pink", status: "available" });
+assert.deepEqual(registry.find((t) => t.id === "product-banner"), { id: "product-banner", category: "media", path: "/tools/product-banner", title: "알리익스프레스 광고 배너 만들기", shortTitle: "알리익스프레스 광고 배너 만들기", description: "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 광고 배너를 만들고 HTML·iframe 코드를 저장하세요. 파일은 브라우저에서 처리합니다.", eyebrow: "알리익스프레스 광고 배너", accent: "pink", status: "available" });
 const published = registry.filter((t) => t.status === "available" && (t.id !== "video-studio" || VIDEO_STUDIO_PUBLIC));
 const expectedPaths = (language, category) => published.filter((t) => (language !== "en" || t.id !== "hwp-editor") && (!category || t.category === category)).map((t) => `/${language}${t.path}`).sort();
 const verifyPaths = (actual, language, category) => assert.deepEqual(actual.sort(), expectedPaths(language, category));

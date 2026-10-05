@@ -14,10 +14,11 @@ for (const design of DESIGN_IDS) test(`export ${design}: four outputs, exact lin
   assert.equal(frame.getAttribute("sandbox"), BANNER_SANDBOX);
   assert.equal(frame.getAttribute("height"), String(output.height));
   assert.equal(frame.getAttribute("width"), "100%"); assert.equal(frame.getAttribute("loading"), "lazy");
-  assert.equal(frame.style.border, "0px"); assert.equal(frame.title, "상품 배너");
+  assert.equal(frame.style.border, "0px"); assert.equal(frame.title, "알리익스프레스 광고 배너 만들기");
   for (const html of [output.html, frame.getAttribute("srcdoc")!, output.standalone]) {
     const dom = new JSDOM(html), d = dom.window.document;
-    assert.deepEqual([...d.querySelectorAll("li a")].map((a) => a.getAttribute("href")), p.products.map((p) => p.promotionUrl));
+    assert.deepEqual([...d.querySelectorAll("li a:not([data-wlpb-cta])")].map((a) => a.getAttribute("href")), p.products.map((p) => p.promotionUrl));
+    assert.deepEqual([...d.querySelectorAll("li a[data-wlpb-cta]")].map((a) => a.getAttribute("href")), p.products.map((p) => p.promotionUrl));
     assert.equal(d.querySelectorAll("footer .wlpb-v1-source").length, 1);
     assert.equal(d.querySelector("footer a")!.getAttribute("rel"), "nofollow noopener");
     assert.doesNotMatch(html, /react|xlsx|gtag|googletagmanager|adsbygoogle|coupang|naver[\s._-]*wcs|<script\b[^>]*\bsrc\s*=|blob:/iu);

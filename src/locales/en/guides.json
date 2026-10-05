@@ -1,24 +1,24 @@
 {
   "productBanner": {
-    "title": "Product Banner Builder guide",
-    "description": "Build five banner designs and HTML or iframe code from Excel product lists.",
+    "title": "AliExpress Ad Banner Builder guide",
+    "description": "Build five AliExpress affiliate ad banner designs from Excel or CSV product lists and save HTML or iframe code. Files are processed in your browser.",
     "blocks": [
       {
         "title": "Files and editing",
         "paragraphs": [
-          "Files are processed in your browser. Product photos load from external URLs in the file. Check product links and write required disclosures."
+          "Files are processed in your browser. Product photos load from external URLs in the file. Imported AliExpress affiliate links are preserved. Check product links and write required disclosures. Names, prices, discounts, product buttons and automatic height start enabled; saved choices and display choices across design changes are preserved. You can finish typing a number; an out-of-range value returns to the last valid value when you leave the field."
         ]
       },
       {
         "title": "Embedding",
         "paragraphs": [
-          "Direct HTML can conflict with host styles. Iframes provide stronger isolation. Automatic rotation requires JavaScript. CSP, iframe and srcdoc filtering can restrict embedding. Support for untested platforms is not confirmed."
+          "Direct HTML can conflict with host styles. Iframes provide stronger isolation. Automatic rotation requires JavaScript. CSP, iframe and srcdoc filtering can restrict embedding. Banner text and the language of its builder link follow the Banner language setting. Changing the editor language or loading an editing file preserves the saved banner language. Support for untested platforms is not confirmed."
         ]
       }
     ],
     "faq": {
       "refresh": {
-        "q": "Does product information update automatically?",
+        "q": "Does AliExpress product information update automatically?",
         "a": "Automatic rotation cycles through imported products. It does not fetch or update prices or stock."
       },
       "offline": {

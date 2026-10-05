@@ -64,7 +64,7 @@ test("localized empty/data screens at desktop/mobile widths and light/dark theme
   for (const language of ["ko", "en"]) for (const width of [1440, 375]) for (const theme of ["light-coral", "dark-coral"]) {
     const page = await pageFor(language, width, theme);
     await page.reload(); await page.locator('[data-tool-page="product-banner"]').waitFor();
-    assert.equal(await page.locator("h1").textContent(), language === "ko" ? "상품 배너 만들기" : "Product Banner Builder");
+    assert.equal(await page.locator("h1").textContent(), language === "ko" ? "알리익스프레스 광고 배너 만들기" : "AliExpress Ad Banner Builder");
     await shot(page, `${language}-${theme}-${width}-empty.png`);
     await loadProject(page);
     assert.equal(await page.locator('[data-testid="product-id-warning"]').count(), 1);
@@ -89,7 +89,7 @@ test("five designs × two previews use the chosen real export, with matching pro
       const host = await (await preview.elementHandle())!.contentFrame();
       const banner = format === "iframe" ? await host!.locator("iframe[data-wlpb-frame]").elementHandle().then((element) => element!.contentFrame()) : host;
       await banner!.locator("[data-wlpb-ready]").waitFor();
-      assert.equal(await banner!.locator('a[rel="sponsored noopener"]').count(), 3);
+      assert.equal(await banner!.locator('a[rel="sponsored noopener"]:not([data-wlpb-cta])').count(), 3);
       await banner!.waitForFunction(() => Array.from(document.querySelectorAll("img")).filter((image) => !image.closest("li")?.hidden).every((image) => image.complete && image.naturalWidth > 0), undefined, { timeout: 2000 }).catch(async () => failures.push({ design, format, images: await banner!.locator("img").evaluateAll((images) => images.map((image) => ({ width: (image as HTMLImageElement).naturalWidth, hidden: (image as HTMLImageElement).hidden }))) }));
       assert.equal(await banner!.locator('a[rel="nofollow noopener"]').getAttribute("href"), "https://worklazy.net/ko/tools/product-banner/");
     }
@@ -160,6 +160,6 @@ test("Korean errors and export, copy fallback and editing-file warning round tri
   assert.equal(content.products[0].productIdNeedsReview, true);
   assert.equal(content.products[0].productId, "0001");
   await shot(page, "ko-export.png");
-  assert.equal(await page.getByText("상품 정보도 자동 갱신되나요?", { exact: true }).count(), 1);
+  assert.equal(await page.getByText("알리익스프레스 상품 정보도 자동 갱신되나요?", { exact: true }).count(), 1);
   await page.close();
 });

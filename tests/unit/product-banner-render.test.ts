@@ -11,7 +11,7 @@ import { buildBannerRuntime, productBannerRuntimePlugin } from "../../scripts/pr
 import { createServer, build } from "vite";
 
 for (const design of DESIGN_IDS) test(`${design}: all ordered products, distinct layout, safe links, footer and validated settings`, () => {
-  const project = stateWith(7).project, settings = createDefaultSettings("ko", design);
+  const project = stateWith(7).project, settings = { ...createDefaultSettings("ko", design), showPrice: false, showDiscount: false, showName: design !== "photo-strip", showButton: false };
   const model = createDisplayModel({ ...project, settings }), { markup, css } = renderBanner(model);
   const dom = new JSDOM(markup), d = dom.window.document;
   assert.equal(d.querySelectorAll("li").length, 7);

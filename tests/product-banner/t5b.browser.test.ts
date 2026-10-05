@@ -151,7 +151,8 @@ test("M02 sample: ko/en, light/dark, 1440/375; five designs, local images and pr
       assert.equal(await frame.locator("[data-wlpb-design]").getAttribute("data-wlpb-design"), design);
       const sources = await frame.locator("img").evaluateAll((imgs) => imgs.map((img) => img.getAttribute("src")));
       assert.ok(sources.every((src) => src?.startsWith(`${server.url}/product-banner-samples/`)));
-      assert.deepEqual(await frame.locator('a[rel="sponsored noopener"]').evaluateAll((links) => links.map((a) => a.getAttribute("href"))), [1, 2, 3].map((n) => `https://example.com/#sample-${n}`));
+      assert.deepEqual(await frame.locator('a[rel="sponsored noopener"]:not([data-wlpb-cta])').evaluateAll((links) => links.map((a) => a.getAttribute("href"))), [1, 2, 3].map((n) => `https://example.com/#sample-${n}`));
+      assert.deepEqual(await frame.locator('a[data-wlpb-cta]').evaluateAll((links) => links.map((a) => a.getAttribute("href"))), [1, 2, 3].map((n) => `https://example.com/#sample-${n}`));
       await capture(page, `${lang}-${theme}-${width}-${design}-sample.png`, true);
     }
     const project = await load(page);
@@ -344,7 +345,8 @@ test("M03 forced clipboard failure, standalone download and editing JSON restore
   const host = await browser.newPage(); t.after(() => host.close());
   await host.route("**/*", (route) => route.request().url().startsWith("https://example.com/img/") ? route.fulfill({ contentType: "image/png", body: image }) : route.abort());
   await host.setContent(html); await host.locator("[data-wlpb-ready]").waitFor();
-  assert.equal(await host.locator('a[rel="sponsored noopener"]').count(), project.products.length);
+  assert.equal(await host.locator('a[rel="sponsored noopener"]:not([data-wlpb-cta])').count(), project.products.length);
+  assert.deepEqual(await host.locator("li a[data-wlpb-cta]").evaluateAll((links) => links.map((a) => a.getAttribute("href"))), project.products.map((p) => p.promotionUrl));
   assert.equal(await host.locator("script[src]").count(), 0);
   const saved = await download(page, "Save editing file"); assert.deepEqual(JSON.parse(saved), project);
   await page.getByLabel("Product name", { exact: true }).first().fill("Unsaved edit");

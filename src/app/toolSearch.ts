@@ -18,7 +18,7 @@ export interface SearchableCategory {
 
 // Repository-fixed aliases. Do not guess beyond this table.
 const TOOL_ALIASES: Record<string, string[]> = {
-  "product-banner": ["배너", "알리", "제휴 링크", "banner", "affiliate", "aliexpress"],
+  "product-banner": ["알리익스프레스", "알리", "광고 배너", "배너 만들기", "배너 생성기", "제휴 마케팅", "제휴 링크", "엑셀", "aliexpress", "affiliate", "ad", "banner", "builder", "excel", "csv", "html", "iframe"],
   "excel-merger": ["엑셀", "xls", "xlsx"],
   "excel-compare": ["엑셀", "xls", "xlsx"],
   "excel-cleaner": ["엑셀", "xls", "xlsx"],

@@ -73,11 +73,14 @@ async function verify(frame: Page | Frame, p = project()) {
   await frame.locator('[data-wlpb-ready="true"]').waitFor();
   const data = await frame.locator("[data-wlpb-root]").evaluate((root) => ({
     indices: [...root.querySelectorAll("li")].map((p) => p.getAttribute("data-wlpb-index")),
-    links: [...root.querySelectorAll<HTMLAnchorElement>("li a")].map((a) => ({ raw: a.getAttribute("href"), normalized: a.href, target: a.target, rel: a.rel })),
+    links: [...root.querySelectorAll<HTMLAnchorElement>("li a:not([data-wlpb-cta])")].map((a) => ({ raw: a.getAttribute("href"), normalized: a.href, target: a.target, rel: a.rel })),
+    ctas: [...root.querySelectorAll<HTMLAnchorElement>("li a[data-wlpb-cta]")].map((a) => ({ raw: a.getAttribute("href"), target: a.target, rel: a.rel })),
     source: [...root.querySelectorAll<HTMLAnchorElement>("footer a")].map((a) => ({ raw: a.getAttribute("href"), target: a.target, rel: a.rel })),
   }));
   assert.deepEqual(data.indices, p.products.map((_, i) => String(i)));
   assert.deepEqual(data.links.map((a) => a.raw), p.products.map((p) => p.promotionUrl.trim()));
+  assert.deepEqual(data.ctas.map((a) => a.raw), p.settings.showButton ? p.products.map((p) => p.promotionUrl.trim()) : []);
+  assert.ok(data.ctas.every((a) => a.target === "_blank" && a.rel === "sponsored noopener"));
   assert.ok(data.links.every((a) => a.target === "_blank" && a.rel === "sponsored noopener"));
   assert.deepEqual(data.source, [{ raw: "https://worklazy.net/ko/tools/product-banner/", target: "_blank", rel: "nofollow noopener" }]);
   linkRecords.push(data); return data;

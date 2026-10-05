@@ -5,10 +5,10 @@ import { bannerCss } from "./styles.ts";
 import { escapeHtml as escape } from "./serialization.ts";
 
 export const bannerLabels = {
-  ko: { ad: "광고", source: "배너 제작 · worklazy.net", credit: "이 배너는 worklazy.net의 무료 배너 생성기로 만들었습니다.",
-    previous: "이전 상품", next: "다음 상품", pause: "일시정지", play: "자동 넘김 재생", visit: "상품 보기", image: "사진을 불러올 수 없습니다", file: "파일 기준 정보", region: "상품 배너" },
-  en: { ad: "Ad", source: "Made with worklazy.net", credit: "This banner was made with the free banner generator at worklazy.net.",
-    previous: "Previous products", next: "Next products", pause: "Pause", play: "Play automatic rotation", visit: "View product", image: "Image unavailable", file: "Information from the file", region: "Product banner" },
+  ko: { ad: "광고", source: "배너 제작 · worklazy.net", credit: "이 배너는 worklazy.net의 ‘알리익스프레스 광고 배너 만들기’로 제작했습니다.",
+    previous: "이전 상품", next: "다음 상품", pause: "일시정지", play: "자동 넘김 재생", visit: "상품 보기", image: "사진을 불러올 수 없습니다", file: "파일 기준 정보", region: "알리익스프레스 광고 배너" },
+  en: { ad: "Ad", source: "Made with worklazy.net", credit: "This banner was made with the AliExpress Ad Banner Builder at worklazy.net.",
+    previous: "Previous products", next: "Next products", pause: "Pause", play: "Play automatic rotation", visit: "View product", image: "Image unavailable", file: "Information from the file", region: "AliExpress ad banner" },
 } as const;
 
 /** Only the display boundary is accepted; no editor state or export document is assembled here. */
@@ -16,6 +16,7 @@ export function renderBanner(model: BannerDisplayModel): Readonly<{ markup: stri
   const s = validateSettings(model.settings), labels = bannerLabels[s.language];
   const configuredSite = import.meta.env?.VITE_SITE_URL || "https://worklazy.net/";
   if (!validateProductUrl(configuredSite).valid) throw new Error("INVALID_SITE_URL");
+  // Export language is a saved publisher choice, independent of the editor route language.
   const source = new URL(`/${s.language}/tools/product-banner/`, configuredSite).href;
   const defaults = { background: "#ffffff", text: "#172033", accent: "#2563eb", border: "#d5dbe5" };
   const dark = { background: "#151d2c", text: "#f1f5f9", accent: "#93c5fd", border: "#475569" };
