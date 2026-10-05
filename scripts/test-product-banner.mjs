@@ -21,6 +21,22 @@ export function validSuites(suites) {
     && new Set(suites.map((s) => s.id)).size === suites.length;
 }
 
+/** Print only declared synthetic case names and safe failure metadata, never raw TAP values. */
+export function caseDiagnostics(cases, tap) {
+  const failures = new Map(tap.split(/(?=^(?:# Subtest:|(?:not )?ok \d+ - |1\.\.))/m).flatMap((block) => {
+    const name = block.match(/^not ok \d+ - (.+)\r?\n/u)?.[1];
+    return name ? [[name, block]] : [];
+  }));
+  return cases.filter(({ status }) => status !== "PASS").map(({ name, status }) => {
+    const block = failures.get(name) || "";
+    const message = block.match(/^\s*error: (?:[|>][-+]?\r?\n[ \t]+)?['"]?((?:(?:locator|page|frame|browserContext)\.[a-zA-Z]+: )?(?:Timeout \d{1,9}ms exceeded\.|Test timeout of \d{1,9}ms exceeded\.|Target page, context or browser has been closed|Expected values to be strictly (?:deep-)?equal:|The expression evaluated to a falsy value:|Sample control did not settle in the viewport|Settled sample control is covered))/m)?.[1];
+    return { case: name.slice(0, 256), status,
+      errorType: block.match(/^\s*failureType: ['"]?(testCodeFailure|hookFailed|cancelledByParent|testTimeoutFailure|subtestsFailed)\b/m)?.[1] || "unavailable",
+      location: block.match(/\b(?:tests|src|scripts)\/[\w./-]+\.(?:mjs|tsx?|js):\d+(?::\d+)?/u)?.[0]?.slice(0, 160) || "unavailable",
+      message: message?.slice(0, 160) || "[message redacted or unavailable]" };
+  });
+}
+
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const root = process.env.PB_JOB_ROOT;
   if (!root) throw new Error("PB_JOB_ROOT required");
@@ -55,6 +71,10 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     const assessment = assess(suite.cases, observed, result.status);
     suites.push({ id: suite.id, exitCode: result.status, ...assessment });
     console.log(`${suite.id}: pass=${assessment.passed} fail=${assessment.failed} not_run=${assessment.notRun}`);
+    if (!assessment.ok) {
+      const tap = await readFile(`${dir}/tap.log`, "utf8").catch(() => "");
+      for (const diagnostic of caseDiagnostics(assessment.cases, tap)) console.log(`  ${JSON.stringify(diagnostic)}`);
+    }
   }
   const totals = suites.reduce((sum, s) => ({ passed: sum.passed + s.passed, failed: sum.failed + s.failed, notRun: sum.notRun + s.notRun }), { passed: 0, failed: 0, notRun: 0 });
   await writeFile(`${run}/RESULTS.json`, JSON.stringify({ scope: manifest.scope, suites, totals, deferred: manifest.deferred }, null, 2));
