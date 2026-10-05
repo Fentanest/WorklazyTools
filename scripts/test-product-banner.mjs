@@ -30,10 +30,12 @@ export function caseDiagnostics(cases, tap) {
   return cases.filter(({ status }) => status !== "PASS").map(({ name, status }) => {
     const block = failures.get(name) || "";
     const message = block.match(/^\s*error: (?:[|>][-+]?\r?\n[ \t]+)?['"]?((?:(?:locator|page|frame|browserContext)\.[a-zA-Z]+: )?(?:Timeout \d{1,9}ms exceeded\.|Test timeout of \d{1,9}ms exceeded\.|Target page, context or browser has been closed|Expected values to be strictly (?:deep-)?equal:|The expression evaluated to a falsy value:|Sample control did not settle in the viewport|Settled sample control is covered))/m)?.[1];
+    const stack = block.split(/\n\s*stack:.*\n/u)[1] || block;
+    const sampleFailure = block.match(/\b(?:Sample control did not settle in the viewport|Settled sample control is covered)\b/u)?.[0];
     return { case: name.slice(0, 256), status,
       errorType: block.match(/^\s*failureType: ['"]?(testCodeFailure|hookFailed|cancelledByParent|testTimeoutFailure|subtestsFailed)\b/m)?.[1] || "unavailable",
-      location: block.match(/\b(?:tests|src|scripts)\/[\w./-]+\.(?:mjs|tsx?|js):\d+(?::\d+)?/u)?.[0]?.slice(0, 160) || "unavailable",
-      message: message?.slice(0, 160) || "[message redacted or unavailable]" };
+      location: stack.match(/\b(?:tests|src|scripts)\/[\w./-]+\.(?:mjs|tsx?|js):\d+(?::\d+)?/u)?.[0]?.slice(0, 160) || "unavailable",
+      message: message?.slice(0, 160) || sampleFailure || "[message redacted or unavailable]" };
   });
 }
 

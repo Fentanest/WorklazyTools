@@ -18,6 +18,9 @@ test("banner runner rejects missing, skipped, failed, duplicate, extra and zero 
   assert.doesNotMatch(JSON.stringify(diagnostics), /PRIVATE|https?:|\/private\//u);
   assert.equal(caseDiagnostics([{ name: "A", status: "FAIL" }], "not ok 1 - A\n  ---\n  error: 'PRIVATE_PRODUCT secret=PRIVATE_SECRET'\n  ...\n")[0].message, "[message redacted or unavailable]");
   assert.deepEqual(caseDiagnostics([{ name: "A", status: "PASS" }], tap), []);
+  const wrapped = "not ok 1 - A\n  ---\n  location: \"/private/tests/product-banner/t5b.browser.test.ts:130:1\"\n  error: \"page.evaluate: Error: Sample control did not settle in the viewport PRIVATE\"\n  stack: |-\n    settleForClick (/private/tests/product-banner/t5b.browser.test.ts:100:2)\n  ...\n";
+  assert.equal(caseDiagnostics([{ name: "A", status: "FAIL" }], wrapped)[0].location, "tests/product-banner/t5b.browser.test.ts:100:2");
+  assert.equal(caseDiagnostics([{ name: "A", status: "FAIL" }], wrapped)[0].message, "Sample control did not settle in the viewport");
 });
 test("banner runner counts only the declared successful cases", () => {
   const result = assess(["A", "B"], [{ name: "A", status: "PASS" }, { name: "B", status: "PASS" }], 0);
