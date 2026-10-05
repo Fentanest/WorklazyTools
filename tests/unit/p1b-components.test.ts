@@ -31,6 +31,7 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
     "payroll-calculator/PayrollCalculatorPage.tsx",
     "pdf-compare/PdfComparePage.tsx",
     "pdf-editor/PdfEditorPage.tsx",
+    "product-banner/ProductBannerPage.tsx",
     "qr-studio/QrStudioPage.tsx",
     "security-tools/SecurityToolsPage.tsx",
     "text-formatter/TextFormatterPage.tsx",

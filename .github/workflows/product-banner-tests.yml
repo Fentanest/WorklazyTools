@@ -1,0 +1,31 @@
+name: Product banner tests
+on:
+  push:
+    branches: [main]
+    paths: ['src/features/product-banner/**', 'tests/product-banner/**', 'tests/unit/product-banner-*', 'tests/fixtures/product-banner/**', 'scripts/*product-banner*', 'package*.json', 'vite.config.ts', 'src/app/**', 'src/locales/**', 'public/product-banner-samples/**', '.github/workflows/product-banner-tests.yml']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  banner:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PB_JOB_ROOT: ${{ github.workspace }}/docs/jobs/todo/product-banner/work/tmp/ci
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/docs/jobs/todo/product-banner/work/tmp/ci/browsers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Build and execute banner cases
+        run: |
+          mkdir -p "$PB_JOB_ROOT"/{tmp,cache,config,data,runtime}
+          export TMPDIR="$PB_JOB_ROOT/tmp" TMP="$PB_JOB_ROOT/tmp" TEMP="$PB_JOB_ROOT/tmp"
+          export XDG_CACHE_HOME="$PB_JOB_ROOT/cache" XDG_CONFIG_HOME="$PB_JOB_ROOT/config" XDG_DATA_HOME="$PB_JOB_ROOT/data" XDG_RUNTIME_DIR="$PB_JOB_ROOT/runtime" GSETTINGS_BACKEND=memory
+          npm run build:product-banner-tests
+          npm run test:product-banner

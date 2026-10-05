@@ -1,4 +1,32 @@
 {
+  "productBanner": {
+    "title": "Product Banner Builder guide",
+    "description": "Build five banner designs and HTML or iframe code from Excel product lists.",
+    "blocks": [
+      {
+        "title": "Files and editing",
+        "paragraphs": [
+          "Files are processed in your browser. Product photos load from external URLs in the file. Check product links and write required disclosures."
+        ]
+      },
+      {
+        "title": "Embedding",
+        "paragraphs": [
+          "Direct HTML can conflict with host styles. Iframes provide stronger isolation. Automatic rotation requires JavaScript. CSP, iframe and srcdoc filtering can restrict embedding. Support for untested platforms is not confirmed."
+        ]
+      }
+    ],
+    "faq": {
+      "refresh": {
+        "q": "Does product information update automatically?",
+        "a": "Automatic rotation cycles through imported products. It does not fetch or update prices or stock."
+      },
+      "offline": {
+        "q": "Are images guaranteed offline?",
+        "a": "Photos reference remote URLs, so offline display is not guaranteed. Host image policies can affect display."
+      }
+    }
+  },
   "foliotrace": {
     "title": "Using FolioTrace",
     "description": "An estimated portfolio following NPS domestic equities through DART large-shareholding filings. This is neither an actual account balance nor all NPS assets.",

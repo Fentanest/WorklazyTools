@@ -4,6 +4,64 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-10-05 — T6b 국소 검사 및 최종 시각 후보
+
+- Chromium 행렬 90건(상품 수 셀 640개 + CSS 200% 대표 10건), Firefox/WebKit 핵심 부분집합 각 50건, 최종 unit 688건 및 루트/하위 실제 빌드 검사를 확인했다. 배너의 변경 없는 97사례만 T6afix 원문과 연결해 재사용했다. 일반 브라우저 확대와 보조 브라우저의 중간 폭은 미검증이다. — Codx(Sol)
+- 고정 폭 미리보기의 부모 초과를 새 시각 회귀에서 재현한 뒤 두 iframe 폭만 수정했다. 성능 수치는 계측·자동화 비용이 포함된 실측이며 속도 보장은 아니다. 실제 이미지 3건 중 1건은 403 HTML 응답과 ORB 차단, HTML/iframe 대체 표시를 확인했다. 제휴 요청은 0이다. — Codx(Sol)
+- 광고 S4는 404 요청 수 1/기대 2에서 실패했고 S10은 검사 방식 한계로 미검증이다. 제품 관련 광고 소스가 시작 HEAD와 동일하지만 실패 원인/선재성을 확정하지 않았다. 병렬 analytics의 종료 143 원인은 미확인으로 보존하고 순차 재실행 통과와 구분한다. 정식 검수·통합·원격 반영·배포는 하지 않았다. 상세 원문은 T6b 작업 기록에 보존한다. — Codx(Sol)
+
+## 2026-10-05 — T6afix 이미지 관찰의 사용자 안내 초기화 수리 후보
+
+- df460ee부터 있던 공통 dispatch의 무조건 안내 초기화가 이미지 응답 해제 뒤 복사 안내를 지웠다. 보류/해제 회귀 3건이 수정 전 실패했고, image-status만 초기화에서 제외한 뒤 3/3 통과했다. 선택·편집·프로젝트 불러오기 등 기존 reducer 사용자 동작은 초기화하고, 복사/저장/JSON 오류 결과는 안내를 교체한다. 표시 형식·샘플 전환·이미지 재확인은 기존 유지 동작을 따른다. 런타임·상태 구조·출력 계약을 바꾸지 않았다. — Codx(Sol)
+- 기존 T5b 13/13·일반 UI 5/5, 배너 core 229/229씩 3회 연속 통과. 시작 page 입력과 같았던 영수증 40개를 새 후보에서 무효화하고, 이미 상이한 143개 역사 기록과 구분했다. 모든 실행 원문·입력/로그 해시·자기 trace의 외부 임시 쓰기 0 및 종료 증거는 T6afix 작업 기록에 보존했다. — Codx(Sol)
+- Jev 1차 bounded 대조는 지원 선택이지만 정책 확률 기준 0.8 미만으로 세 요구 모두 근거 부족이다. 코드 재작성·기준 완화·판정 재호출 없이 원문과 결과를 보존했다. 이번 보존 후보는 정식 Astra/Claude 판정이 아니며, 기존 R4a 고정 후보의 통과로 확장하거나 T6b·통합·push·배포를 진행하지 않았다. — Codx(Sol)
+
+## 2026-10-05 — R3b-F01 JSON 읽기 경쟁 수리 후보
+
+- 수정 전 보류한 A가 B/C 최신 편집과 읽는 중 편집을 각각 덮어쓰는 국소 회귀 2건의 실패를 확인했다. 요청 세대를 새 요청·프로젝트 변경·unmount에서 무효화하며, 이미지 관측/선택은 교체 승인에 영향을 주지 않는다. 정상 교체 거절/승인·이탈 취소/수락·역전 완료·오래된 오류·Worker 완료 시 최신 상태 확인의 UI 6/6, 단위 51/51 통과. Worker 경로의 같은 결함은 재현되지 않아 제품 수정은 페이지 1곳에 한정했다. — Codx
+- 검사기의 입력/메뉴 레이블 오류와 Node 옵션 누락은 실패 기록·당시 소스를 보존하고 새 ID로 재실행했다. 작업 내부 영수증과 생성 경로를 사용했다. 추적한 하위 프로세스의 `/tmp` 쓰기는 0이지만 공용 `/tmp` 차분의 생성 귀속은 미확인으로 남긴다. 정식 재검수 대기이며 T6·통합·배포를 진행하지 않았다. — Codx
+
+## 2026-10-05 — R3afix-F01 초기 오류 복구 수리 후보
+
+- 초기 판정의 단순 제거는 마크업과 뒤따르는 script를 나누어 전송할 때 이미 발생한 error를 놓쳤다. 수정 전 HTML 직접·iframe·독립 HTML 3건에서 실제 ready=false error 후 대체 표시가 나오지 않는 실패를 보존했다. 리스너 부착 후 `currentSrc && complete && !naturalWidth`로 초기 복구한다. 설치 Chromium 153의 미요청 lazy는 currentSrc가 비어 있고 요청 0이며, 화면 진입 후 loading=lazy 상태로 폭 220과 load가 확인됐다. 부착 전/후 오류·lazy 회귀 9/9, T3 49/49, T4 19/19, F01/F02 UI 26/26, tsc 통과. — Codx
+- 첫 기준 대조는 검사기 timeout 누락으로 중단했고, 중간 lazy fixture는 ResizeObserver 재숨김으로 3건 실패했다. 각각 중단 기록·실패 영수증/로그를 보존하고 검사 fixture만 바로잡아 새 ID로 실행했다. iframe srcdoc는 원문 document.write 두 단계 재파싱이며 HTTP 청크 전송으로 확대하지 않는다. 새 캡처는 shots-R3afix2에 보존한다. 시스템 Chrome 154는 이번 실행 대상이 아니며 이전 가로채기 한계는 유지한다. 범위는 F01 차단 수리로 닫고 재검수 대기, T5 전체 완료는 아니다. — Codx
+
+## 2026-10-05 — R3a 이미지·매핑 국소 수리 후보
+
+- 실제 초기 UI srcdoc의 요청·load/error·complete/폭/loading/hidden 전이를 기록했다. Chrome 154 가로채기에서는 첫 두 미리보기 요청이 누락됐으나 같은 URL의 로컬 HTTPS 서버가 직접 PNG를 응답하면 원본 런타임도 3장 모두 정상 로드됐다. 설치된 Chromium 153에서도 원본이 정상이다. 다음 프레임 전환은 가로채기 누락을 피했던 임시 대조로 분류하고 제품에 적용하지 않았다. 검사기는 Playwright 설치 브라우저를 기본으로 쓰며 초기 complete/폭만으로 실패를 단정하던 판정은 실제 error 이벤트 계약에 맞춰 제거했다. 전역 COEP·이미지 URL·활성 검사 조건은 완화하지 않았다. — Codx
+- 매핑에서 미지정/undefined는 자동 감지, null은 명시적 해제다. 선택 열 해제는 원문 값을 가져오지 않고 필수 열 해제는 Worker 실행 전 재지정을 요구한다. 샘플 구분 UI(M02)·나머지 UI 경계(M03)는 이번에 구현하지 않으며 재검수 통과 후 T5로 이어간다. — Codx
+
+## 2026-10-05 — T5 생성기 UI 중간 묶음
+
+- 등록 전 실제 카탈로그는 ko 23·en 22여서 기존 영어 기대값 21과 불일치했다. utility 전체 검사는 기존 HWP→영어 query/hash 유실에서 먼저 실패했다. 신규 ID·media 소속·언어 제외를 대조하고 가이드/시각 검사 소비 목록도 갱신했다. — Codx
+- 미리보기는 선택한 실제 exporter 출력을 sandbox 호스트에 넣는다. Vite COEP 환경에서 sandbox 사진 차단을 재현해 공통 정책을 완화하지 않고 운영과 같은 정적 서버로 확인한다. 캡처 열람에서 초기 사진 누락을 발견했고 검사에서 숨겨진 실패 이미지를 제외하던 조건을 바로잡았다. 런타임 초기 lazy 이미지 실패 판정 한 줄만 임시 제거한 대조에서 2장 실패→3장 정상으로 바뀌었다. 제품 런타임은 유지하고 차단 후속·합성 증거를 T5 기록에 남긴다. — Codx
+- 약 700줄 경계에서 보존·종료하는 미완료 묶음이다. 개발용 데모, 추가 UI 경계 검증과 최종 검수는 후속으로 남기며 기존 ads S10의 실제 overlay 미확인을 통과로 바꾸지 않는다. — Codx
+
+## 2026-10-05 — T4 내보내기 국소 증거
+
+- Chromium 외부 호스트 10조합 및 격리·새 탭·동일 코드/다른 디자인·높이 위조·누수·차단·보안 문자열 등 19사례 통과, 누락 음성 대조는 18건 미실행으로 종료 1. 상품 링크는 getAttribute 원문 일치로 판정하고 브라우저 정규화 href는 별도로 기록했다. HTTP 요청은 합성 호스트/로컬 SVG/비수익 목적지의 route.fulfill 또는 차단으로만 처리했다. — Codx
+- sandbox 권한을 하나씩 제거해 스크립트 실행·새 탭 허용·새 탭 저장소의 차이를 확인했으므로 allow-scripts allow-popups allow-popups-to-escape-sandbox를 확정했다. 자동 높이의 패딩 변경 실패는 border-box 관찰로 수리했다. 새 단위 9·영향 단위 회귀 30·렌더 브라우저 회귀 49·tsc 통과; 정식 묶음 검수는 대기다. 상세 사례·기본 높이·입력 해시는 로컬 T4 증거에 있다. — Codx
+
+## 2026-10-05 — R2a 가격·페이지 문구 후속 수정
+
+- 숫자 포매터가 `USD 206.50`의 끝자리 0을 제거한 결함을 회귀 검사로 확인했다. 원문 숫자를 재파싱해 저장된 금액·통화와 일치할 때만 숫자 부분을 표시한다. 긴 소수도 원문 그대로 보존하고 불일치·잘못된 형식은 표시하지 않는다. — Codx
+- 가격 관련 12건·T3 단위 13건·브라우저 49건·tsc 새 실행 통과. 기존 순환 순서 단언은 유지하고 한·영 범위/aria 검사 4건을 추가했다. 지정 캡처 4장을 갱신·직접 열람했다. 중간 타입 import 누락 실패는 수정·재실행했고 증거를 보존했다. 정식 재검수 대기다. — Codx
+
+## 2026-10-05 — R2a 사진형 차단 지적 수정
+
+- 메인 링크의 `height:100%` 뒤에 형제 CTA가 추가되어 목록 밖에 놓이는 R2a-F01을 재현했다. 사진형에만 세로 flex·메인 링크 자동 높이를 적용해 CTA 단독 표시의 목록 client/scroll 높이를 212/264px에서 212/212px로 맞췄다. 다른 디자인 규칙·기본값·형제 링크 구조는 유지했다. — Codx
+- T3 단위 11건·브라우저 45건(기존 7+옵션 32+자동 넘김 6)·tsc 새 실행 통과. no-JS 클릭은 합성 목적지를 로컬 응답으로 가로채 검증했다. 옵션 ON 2장·자동 넘김 ON 6장을 직접 열람했다. 정식 재검수 대기이며 페이지 항목 나열 문구·T4는 별도다. — Codx
+
+## 2026-10-05 — 상품 배너 렌더링·수명 국소 확인
+
+- T3는 원본 상품 노드를 순환 순서로 이동하고 비활성 항목을 hidden/inert로 처리한다. 명시 정지와 hover·focus·탭·화면 밖·reduced-motion 조건을 분리했다. Vite dev 변환·production 번들과 Node 검사에서 같은 esbuild IIFE 바이트를 확인했다. 생성 코드 사본은 커밋하지 않는다. — Codx
+- 렌더러 단위 11건, 직접 소비 관계의 입력·상태·JSON 회귀 51건, Chromium 테스트 호스트 7건과 tsc 검사가 통과했다. 5종×960/320px·다크 2장·200% 1장 총 13장을 직접 열람했다. 넓은 슬림형 조작부는 상품 옆, 세로형은 최대 420px 사이드바로 표시한다. 출처는 별도 하단 12px 공간을 유지한다. T4 출력·T5 페이지·정식 검수는 별도다. — Codx
+
+## 2026-10-05 — 상품 배너 편집·JSON 경계
+
+- T2는 편집용 원문 링크와 실제 사용값을 분리하고, 프로젝트 JSON의 허용 필드를 새 객체로 구성한다. 파일명·로컬 경로·워크북·수수료와 이미지 확인 결과는 저장하지 않는다. JSON 상한은 UTF-8 20MiB·10,000상품·문자열 4,096 UTF-16 코드 단위·깊이 8이며, 합성 1,000/10,000상품 JSON은 각각 629,663/6,380,674바이트였다. Node 측정으로 브라우저 성능을 보증하지 않는다. — Codx
+- 새 상태·JSON 단위 36건, 입력 회귀 20건, 전체 공개 단위 642건과 타입 검사가 통과했다. 무효 URL은 편집 복원을 허용하되 표시 모델 생성 시 거부한다. 가져온 시각은 가격 검증 정보로 출력하지 않는다. R1 정식 묶음 검수는 별도 대기다. — Codx
+
 ## 2026-09-30 — 자체 광고·분석 동의창 제거 후 확인
 
 - 고정 후보 `33ca3d0`의 Astra 재검수는 `needs_changes`였다. 하위 경로 영문 화면에서 쿠팡 배너의 고지·iframe 제목이 한국어가 되는 점과, redactor 정적 계약이 새 AdSense 메타의 단순 존재만 검사해 중복 삽입 음성 대조가 실패하는 점을 재현했다. 하위 경로 판정과 계정 메타 정확히 1개 계약으로 수리하고 루트/하위 경로 × 한/영 배너 4상태, redactor 한/영 정상·각 8개 음성 경계를 검사한다. — Codx
@@ -2953,3 +3011,14 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - 고정 후보 `a18ec6e`의 독립 검수는 정상 `?category=media`가 `safeAnalyticsPage`의 쿼리 허용 목록에서 빠져 GA·네이버·AdSense를 모두 차단하는 회귀를 재현했다. 고정된 7개 카테고리 값만 허용하고, 자유 검색어 또는 임의 값이 섞인 쿼리는 계속 거부하도록 수정했다. 수정 전 브라우저 재검사는 구 빌드에서 시간 초과되어 무효이며, 새 production 빌드 후 `test:analytics`에서 해당 URL의 GA·네이버 각 1회와 AdSense 로더 1개를 확인했다. GA4 콘솔 History 자동 측정 해제는 사용자가 직접 수행하기로 했으며 코드 검사가 그 계정 상태를 증명하지 않는다. — Codx
 - 프로젝트 하위 경로의 쿠팡 배너 언어는 `BASE_URL`을 제거한 경로로 판정하고 `test:coupang-base`의 루트/하위 경로·두 언어 표본을 통과했다. 문서 가리기 AdSense 메타는 설정된 게시자 ID가 정확히 한 번 존재하도록 정적 계약과 음성 변이 검사를 강화했다.
 - 중간 `test:static` 실패는 메타 정규식의 따옴표 뒤 `\b`가 공백 앞에서 성립하지 않아 정상 메타를 0개로 본 검사 결함이었다. 경계식을 고친 뒤 정상·음성 변이와 공통 정적 검사를 다시 통과했다. 검색 상태 전환 중간 빌드는 `ToolsPage`의 추론 타입 오류 TS7006으로 실패했고 `useState<string>` 명시 뒤 최종 `tsc -b`와 빌드가 통과했다. 중간 실패를 최종 성공으로 덮어 기록하지 않는다.
+
+- 2026-10-05 Codx(Sol), T6a: Fixed case IDs now reject missing/skipped/duplicate cases and suites. Height verification compares the new rounded root height after the forged 777 message. WebKit selects currentSrc before lazy requests; the regression checks the actual failure predicate and request count. Provider frame ownership is inspected atomically to avoid detached handles. Real XLS output comparisons run locally without recording raw values; the separate image probe reports ORB failures as NETWORK_FAILURE. T6b coverage and formal review remain pending.
+
+- T6a verification gate remains unmet: core-8 passed 226/226; core-9 failed the clipboard feedback case. Held-image reproduction confirms an existing image-status callback removes the copy failure notice. No expectation weakening or out-of-scope product repair; preserve candidate and hand off the defect.
+
+## 2026-10-05 — 상품 배너 T6c 국소 판별 (Codx/Sol)
+
+- Headed Chromium 153.0.8010.12의 별도 100%/200% 사이트 확대 프로필을 같은 창 크기로 실행했다. 바깥 폭 1280을 유지하며 host innerWidth/clientWidth 1216→608, DPR 1→2를 확인했다. HTML photo-strip, iframe vertical, 생성기의 편집→출력·미리보기 출처·복사 버튼 조작 가능성이 통과했다. CSS zoom, 픽셀 밀도 설정, CDP 페이지 배율을 네이티브 확대 근거로 사용하지 않았다.
+- 공개 러너 최초 실제 실행은 319 선택·300 pass/19 fail이었다. T5b 13·R3b 6의 profiles 부모 폴더 누락을 러너에서 준비하도록 수리했다. 229사례의 이전 3회 기록은 이전 러너의 역사 증거로만 남긴다. core-2·3이 통과하고 core-4의 D18이 실패해 당시 연속 관문은 미충족이다. CDP 독립 재현에서 중간 reload ERR_ABORTED 뒤 정상 오류 문서/기대 공급자 상태가 확인되어 검사 대기 경합으로 수리했다. 기존 assertion·timeout·복구 코드는 유지하며 수정 후 core-5·6·7은 각각319/319·exit0·source_unchanged=true이고203개 입력 해시가 동일해 현재 공개 진입점3회 연속을 충족했다. T6c 원문에 실패 이력과 새 성공을 구분했다.
+- 동일 S4 하네스·브라우저·404 fault·차단 정책에서 독립 빌드한 cc20462와 후보가 모두 chunk 404 1회로 실패했다. CDP 재로드 요청·retry key·beforeunload 뒤 오류 문서 커밋이 관찰되며 TextMerger 재로드 문서는 커밋되지 않는다. 기존 회복/오류 전환 경쟁으로 이월하며 >=2 기대를 낮추지 않았다. 광고 필수 게이트 통과를 뜻하지 않는다.
+- T6b의 S10 설명을 ‘스텁이 오버레이를 렌더링하지 않아 실제 겹침 확인 불가’로 정정했다. 생성 시간 표는 Node exporter 마이크로벤치마크이며 파일/편집 시간은 브라우저 자동화 벽시계다. WebKit의 외부 O_CREAT 열기 2건을 배타 생성·파일 소유 확인으로 확대하지 않는다. analytics-2 잔존 조회는 현재 exec namespace만 확인했으며 호스트 전체 부재는 미확인이다. 상세 원문·실패 영수증·캡처는 gitignored product-banner 작업 묶음에 보존한다.

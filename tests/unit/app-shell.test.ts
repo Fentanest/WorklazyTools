@@ -65,6 +65,7 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     "tests/helpers/ad-stub.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.
     "tests/new-tools-smoke.mjs", // Owner: video-isolation absence and request assertions.
     "tests/office-editor-smoke.mjs", // Owner: office-isolation absence assertion.
+    "tests/product-banner/t5b.browser.test.ts", // Owner: banner generator mock-provider and exported tracking-absence assertions.
     "tests/control-geometry-smoke.mjs", // Owner: local QA control-geometry and tracking-absence assertions.
     "tests/ui-migration-layout-smoke.mjs", // Owner: local QA tracking-absence assertion.
     "tests/unit/app-shell.test.ts", // Owner: this explicit repository-wide allowlist audit.
