@@ -231,7 +231,10 @@
         "M03 initial checking, failure, retry and stale image callbacks",
         "M03 forced clipboard failure, standalone download and editing JSON restore/rejection",
         "M03 resource measurements: worker cancellation/exit, downloads, repeated previews and runtime removal",
-        "D18 new route provider loading/ready/error and QA-blocked samples"
+        "D18 new route provider loading/ready/error and QA-blocked samples",
+        "T6afix html copy failure survives held image completion",
+        "T6afix iframe copy failure survives held image completion",
+        "T6afix copy success, save and JSON error survive observations and expire on project changes"
       ]
     },
     {

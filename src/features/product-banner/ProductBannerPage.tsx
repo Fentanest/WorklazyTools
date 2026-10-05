@@ -43,7 +43,11 @@ export function ProductBannerPage() {
       // Project changes expire prior reads, including an edit followed by Undo.
       // Selection and observed image status do not invalidate a replacement approval.
       if (next.project !== editorRef.current.project) { jsonRequest.current++; setJsonReading(false); }
-      editorRef.current = next; setState(next); setMessage(""); return true;
+      editorRef.current = next; setState(next);
+      // Editor actions clear prior feedback; passive image observations preserve it.
+      // Copy/save/JSON failures replace feedback in their own handlers.
+      if (action.type !== "image-status") setMessage("");
+      return true;
     }
     catch { setMessage(text.limitError); return false; }
   };

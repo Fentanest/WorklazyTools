@@ -287,6 +287,82 @@ test("M03 forced clipboard failure, standalone download and editing JSON restore
   }
 });
 
+// The gate forces the observer callback to happen after the action result, without a timing delay.
+async function heldReviewImage(page: Page, outcome: "success" | "failure" = "success") {
+  let release!: () => void, seen!: () => void;
+  const held = new Promise<void>((resolve) => { release = resolve; });
+  const requested = new Promise<void>((resolve) => { seen = resolve; });
+  await page.route("https://example.com/img/1.jpg", async (route) => {
+    seen(); await held;
+    await (outcome === "success"
+      ? route.fulfill({ contentType: "image/png", body: image, headers: { "cross-origin-resource-policy": "cross-origin" } })
+      : route.fulfill({ status: 404, body: "Synthetic image failure" })).catch(() => {});
+  });
+  return { release, requested };
+}
+async function assertSelectedCode(page: Page, expected: string) {
+  const code = page.getByLabel("Export code", { exact: true });
+  // Blur first: focus selection must also work after a passive rerender.
+  await code.evaluate((el) => (el as HTMLTextAreaElement).blur()); await code.focus();
+  assert.deepEqual(await code.evaluate((el) => {
+    const area = el as HTMLTextAreaElement;
+    return { readOnly: area.readOnly, value: area.value, start: area.selectionStart, end: area.selectionEnd };
+  }), { readOnly: true, value: expected, start: 0, end: expected.length });
+}
+for (const format of ["html", "iframe"] as const) {
+  test(`T6afix ${format} copy failure survives held image completion`, async (t) => {
+    const page = await pageFor(); t.after(() => page.close());
+    const gate = await heldReviewImage(page); t.after(gate.release);
+    await load(page, 1);
+    const row = rows(page).first(); await row.locator("img").scrollIntoViewIfNeeded(); await gate.requested;
+    await row.getByText(uiMessages.en.imageStates.checking, { exact: true }).waitFor();
+    await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: () => Promise.reject(new Error("synthetic failure")) }, configurable: true }));
+    await page.getByRole("button", { name: format === "html" ? uiMessages.en.copyHtml : uiMessages.en.copyIframe, exact: true }).click();
+    const notice = page.getByText(uiMessages.en.copyFailed, { exact: true }); await notice.waitFor();
+    const code = await page.getByLabel("Export code", { exact: true }).inputValue();
+    assert.ok(code.length > 0); await assertSelectedCode(page, code);
+    gate.release(); await row.getByText(uiMessages.en.imageStates.success, { exact: true }).waitFor();
+    assert.equal(await notice.count(), 1, "image completion must preserve the copy failure notice");
+    await assertSelectedCode(page, code);
+    measurements.push({ regression: `T6afix-${format}-copy-failure`, heldImageRequested: true, noticeBefore: true, imageCompleted: true, noticeAfter: true, selectableCodeUnchanged: true });
+    // A new editor action clears the old result even when the project itself is unchanged.
+    await row.getByRole("checkbox").first().check(); assert.equal(await notice.count(), 0);
+  });
+}
+test("T6afix copy success, save and JSON error survive observations and expire on project changes", async (t) => {
+  for (const action of ["copy-html", "copy-iframe", "save", "json-error"] as const) {
+    const page = await pageFor(); t.after(() => page.close()); page.on("dialog", (dialog) => dialog.accept());
+    const gate = await heldReviewImage(page, "failure"); t.after(gate.release);
+    await load(page, 1);
+    const row = rows(page).first(); await row.locator("img").scrollIntoViewIfNeeded(); await gate.requested;
+    await row.getByText(uiMessages.en.imageStates.checking, { exact: true }).waitFor();
+    let expected = uiMessages.en.copied;
+    if (action.startsWith("copy-")) {
+      await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async (value: string) => { (window as any).__copiedCode = value; } }, configurable: true }));
+      await page.getByRole("button", { name: action === "copy-html" ? uiMessages.en.copyHtml : uiMessages.en.copyIframe, exact: true }).click();
+      assert.equal(await page.evaluate(() => (window as any).__copiedCode), await page.getByLabel("Export code", { exact: true }).inputValue());
+    } else if (action === "save") {
+      expected = uiMessages.en.saved;
+      assert.equal(JSON.parse(await download(page, uiMessages.en.saveJson)).products.length, 1);
+    } else {
+      expected = uiMessages.en.jsonError;
+      await page.locator('input[accept=".json"]').setInputFiles({ name: "synthetic-invalid.json", mimeType: "application/json", buffer: Buffer.from("{") });
+    }
+    const notice = page.getByText(expected, { exact: true }); await notice.waitFor();
+    gate.release(); await row.getByText(uiMessages.en.imageStates.failure, { exact: true }).waitFor();
+    assert.equal(await notice.count(), 1, `${action} notice survives the image error callback`);
+    measurements.push({ regression: `T6afix-${action}`, noticeBefore: true, imageFailed: true, noticeAfter: true });
+    // Copy replaces the previous result, and editing clears it.
+    await page.evaluate(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: async () => {} }, configurable: true }));
+    await page.getByRole("button", { name: uiMessages.en.copyHtml, exact: true }).click();
+    await page.getByText(uiMessages.en.copied, { exact: true }).waitFor();
+    if (expected !== uiMessages.en.copied) assert.equal(await notice.count(), 0);
+    await page.getByLabel("Product name", { exact: true }).fill("New user edit");
+    assert.equal(await page.getByText(uiMessages.en.copied, { exact: true }).count(), 0);
+    await page.close();
+  }
+});
+
 test("M03 resource measurements: worker cancellation/exit, downloads, repeated previews and runtime removal", async (t) => {
   const page = await pageFor(); t.after(() => page.close());
   await page.addInitScript(() => {

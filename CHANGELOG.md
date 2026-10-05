@@ -292,3 +292,5 @@
 - 2026-08-15–16 신뢰성 작업지시서 4개 종결·`docs/jobs/archive/` 이관(검토 내역은 `docs/review-notes.md`). — Codx
 
 - Codx(Sol): Added the product-banner core case runner and dedicated Chromium CI workflow, strengthened export height checks, and added local Firefox/WebKit and privacy-preserving real XLS verification. Full matrix coverage remains in T6b.
+
+- Codx(Sol): Preserve product-banner copy, save and JSON error notices during passive image status updates. Added controlled HTML/iframe copy regressions; the 229-case banner core passed three consecutive runs.
