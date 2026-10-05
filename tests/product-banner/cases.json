@@ -179,7 +179,8 @@
         "R2a autoplay capture: product-card width=960",
         "R2a autoplay capture: product-card width=320",
         "R2a autoplay capture: slim width=960",
-        "R2a autoplay capture: slim width=320"
+        "R2a autoplay capture: slim width=320",
+        "explicit per-banner language preserves renamed pause/status labels and legacy English fallback"
       ]
     },
     {

@@ -17,6 +17,7 @@ for (const design of DESIGN_IDS) test(`export ${design}: four outputs, exact lin
   assert.equal(frame.style.border, "0px"); assert.equal(frame.title, "알리익스프레스 광고 배너 만들기");
   for (const html of [output.html, frame.getAttribute("srcdoc")!, output.standalone]) {
     const dom = new JSDOM(html), d = dom.window.document;
+    assert.equal(d.querySelector("[data-wlpb-root]")!.getAttribute("lang"), p.settings.language);
     assert.deepEqual([...d.querySelectorAll("li a:not([data-wlpb-cta])")].map((a) => a.getAttribute("href")), p.products.map((p) => p.promotionUrl));
     assert.deepEqual([...d.querySelectorAll("li a[data-wlpb-cta]")].map((a) => a.getAttribute("href")), p.products.map((p) => p.promotionUrl));
     assert.equal(d.querySelectorAll("footer .wlpb-v1-source").length, 1);

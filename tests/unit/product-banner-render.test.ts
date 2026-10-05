@@ -17,6 +17,7 @@ for (const design of DESIGN_IDS) test(`${design}: all ordered products, distinct
   assert.equal(d.querySelectorAll("li").length, 7);
   assert.deepEqual([...d.querySelectorAll("li")].map((p) => p.getAttribute("data-wlpb-index")), ["0", "1", "2", "3", "4", "5", "6"]);
   assert.ok(d.querySelector(`.wlpb-v1-${design}`));
+  assert.equal(d.querySelector("[data-wlpb-root]")!.getAttribute("lang"), "ko");
   for (const [i, item] of [...d.querySelectorAll("li")].entries()) {
     assert.equal(item.querySelector("img")!.getAttribute("src"), model.products[i].imageUrl);
     assert.equal(item.querySelector("a")!.getAttribute("href"), model.products[i].promotionUrl);
@@ -41,6 +42,7 @@ test("text/attribute injection remains text; price, discount, optional CTA and E
   const model = createDisplayModel({ ...project, settings, products: project.products.map((p) => ({ ...p, name: '<img onerror="alert(1)"> & 😀' })) });
   const dom = new JSDOM(renderBanner(model).markup), d = dom.window.document;
   assert.equal(d.querySelectorAll("script, [onerror], a a").length, 0);
+  assert.equal(d.querySelector("[data-wlpb-root]")!.getAttribute("lang"), "en");
   assert.equal(d.querySelectorAll(".wlpb-v1-name")[0].textContent, model.products[0].name);
   assert.equal(d.querySelectorAll("[data-wlpb-cta]").length, 2);
   assert.equal(d.querySelectorAll(".wlpb-v1-prices").length, 2); assert.equal(d.querySelectorAll(".wlpb-v1-discount").length, 2);
@@ -59,6 +61,7 @@ test("renderer rejects invalid settings/URLs and never adds empty or duplicate p
 for (const language of ["ko", "en"] as const) test(`price markup preserves source decimal digits: ${language}`, () => {
   const project = stateWith(1).project;
   const dom = new JSDOM(renderBanner(createDisplayModel({ ...project, settings: { ...project.settings, language, showPrice: true } })).markup);
+  assert.equal(dom.window.document.querySelector("[data-wlpb-root]")!.getAttribute("lang"), language);
   assert.equal(dom.window.document.querySelector(".wlpb-v1-prices strong")!.textContent, "USD 206.50");
   assert.equal(dom.window.document.querySelector(".wlpb-v1-prices span")!.textContent, "USD 282.87");
   dom.window.close();

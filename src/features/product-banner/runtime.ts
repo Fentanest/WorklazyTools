@@ -11,7 +11,9 @@ function mount(root: HTMLElement, registry: Registry): Instance {
   const controls = root.querySelector<HTMLElement>(".wlpb-v1-controls")!;
   const pause = controls.querySelector<HTMLButtonElement>('[data-wlpb-action="pause"]')!;
   const status = controls.querySelector<HTMLElement>(".wlpb-v1-status")!;
-  const english = root.getAttribute("aria-label") === "Product banner";
+  // Language belongs to each banner; localized accessible names are display text.
+  const language = root.getAttribute("lang");
+  const english = language === "en" || (language === null && root.getAttribute("aria-label") === "Product banner");
   const motion = matchMedia("(prefers-reduced-motion: reduce)");
   let state: Playback = { enabled: root.dataset.wlpbAuto === "true", paused: false, reduced: motion.matches,
     hover: root.matches(":hover"), focus: root.contains(document.activeElement), visible: false, background: document.hidden };

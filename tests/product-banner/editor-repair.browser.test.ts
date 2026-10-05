@@ -156,6 +156,7 @@ for (const language of ["ko", "en"] as const) for (const design of DESIGN_IDS) t
   for (const format of ["html", "iframe"] as const) {
     await page.getByLabel(uiMessages.en.preview, { exact: true }).selectOption(format);
     const frame = await bannerFrame(page, format);
+    assert.equal(await frame.locator("[data-wlpb-root]").getAttribute("lang"), language);
     assert.equal(await frame.locator('.wlpb-v1-source').getAttribute("href"), expected);
     assert.equal(await frame.locator('.wlpb-v1-source').getAttribute("rel"), "nofollow noopener");
     assert.equal(await frame.locator('.wlpb-v1-source').getAttribute("target"), "_blank");
@@ -166,12 +167,15 @@ for (const language of ["ko", "en"] as const) for (const design of DESIGN_IDS) t
       assert.deepEqual(await frame.locator(selector).evaluateAll((links) => links.map((a) => a.getAttribute("href"))), project.products.map((p) => p.promotionUrl));
   }
   const downloaded = await standalone(page, "en"), dom = new JSDOM(downloaded);
+  assert.equal(dom.window.document.querySelector("[data-wlpb-root]")!.getAttribute("lang"), language);
   assert.equal(dom.window.document.documentElement.lang, language); assert.equal(dom.window.document.title, uiMessages[language].title);
   assert.equal(dom.window.document.querySelector('.wlpb-v1-source')!.getAttribute("href"), expected);
   dom.window.close();
   // Execute the downloaded standalone bytes locally, with the same network firewall.
   const standalonePage = await context.newPage(); await standalonePage.setContent(downloaded);
-  await standalonePage.locator('[data-wlpb-ready="true"]').waitFor(); assert.equal(await standalonePage.locator('.wlpb-v1-source').getAttribute("href"), expected);
+  await standalonePage.locator('[data-wlpb-ready="true"]').waitFor();
+  assert.equal(await standalonePage.locator("[data-wlpb-root]").getAttribute("lang"), language);
+  assert.equal(await standalonePage.locator('.wlpb-v1-source').getAttribute("href"), expected);
   await standalonePage.close();
   evidence.push({ test: "localized-output", ui: "en", language, design, formats: ["html", "iframe", "standalone"], expected, productLinksPreserved: true }); await page.close();
 });

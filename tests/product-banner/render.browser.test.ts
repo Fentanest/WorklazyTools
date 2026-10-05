@@ -4,6 +4,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { chromium, type Browser, type Page } from "playwright";
 import { buildBannerRuntime } from "../../scripts/product-banner-runtime.mjs";
 import { DESIGN_IDS } from "../../src/features/product-banner/stateTypes.ts";
+import { renderBanner, bannerLabels } from "../../src/features/product-banner/render.ts";
+import { createDisplayModel } from "../../src/features/product-banner/displayModel.ts";
+import { createDefaultSettings } from "../../src/features/product-banner/settings.ts";
+import { stateWith } from "../fixtures/product-banner/state.ts";
 import { startHost, shotDir } from "./render-host.ts";
 
 let browser: Browser, host: Awaited<ReturnType<typeof startHost>>, runtime: string;
@@ -178,4 +182,48 @@ test("per-product image failure fallback, drag suppresses click, 200% view keeps
   await page.waitForFunction(() => document.querySelectorAll("li:not([hidden])").length === 1);
   await page.locator("[data-wlpb-root]").screenshot({ path: `${shotDir}/product-card-320-zoom200.png` });
   assert.equal(await page.locator("[data-wlpb-root]").evaluate((r) => r.scrollWidth <= r.clientWidth + 1), true);
+});
+
+
+test("explicit per-banner language preserves renamed pause/status labels and legacy English fallback", async (t) => {
+  // The host document is Korean; each instance owns its language independently.
+  const scenarios = [
+    { language: "ko", rootLanguage: "ko", region: bannerLabels.ko.region },
+    { language: "en", rootLanguage: "en", region: bannerLabels.en.region },
+    { language: "ko", rootLanguage: "ko", region: "Product banner" },
+    { language: "en", rootLanguage: null, region: "Product banner" },
+  ] as const;
+  const banners = scenarios.map(({ language, rootLanguage, region }) => {
+    const project = stateWith(10).project;
+    const rendered = renderBanner(createDisplayModel({ ...project, settings: createDefaultSettings(language) }));
+    const markup = rendered.markup.replace(/https:\/\/example\.com\/img\/(\d+)\.jpg/gu, "/img/$1.svg")
+      .replace(`lang="${language}"`, rootLanguage === null ? "" : `lang="${rootLanguage}"`)
+      .replace(`aria-label="${bannerLabels[language].region}"`, `aria-label="${region}"`);
+    return `<div class="host"><style>${rendered.css}</style>${markup}</div>`;
+  }).join("");
+  const page = await pageFor(t, "?designs=photo-strip", {}, true);
+  await page.route(`${host.url}/language-regression`, (route) => route.fulfill({ contentType: "text/html", body: `<!doctype html><html lang="ko"><meta charset="utf-8"><style>body{margin:16px}.host{width:960px;max-width:100%}</style>${banners}<script>${runtime}</script></html>` }));
+  await page.goto(`${host.url}/language-regression`);
+  await page.waitForFunction(() => document.querySelectorAll('[data-wlpb-ready="true"]').length === 4);
+  const roots = page.locator("[data-wlpb-root]"), statuses = page.locator(".wlpb-v1-status");
+  for (const [i, scenario] of scenarios.entries()) {
+    const root = roots.nth(i), english = scenario.language === "en";
+    assert.equal(await root.getAttribute("lang"), scenario.rootLanguage);
+    assert.equal(await root.getAttribute("aria-label"), scenario.region);
+    assert.equal(await root.getByRole("status").getAttribute("aria-label"), english ? "Showing products 1 through 4 out of 10" : "전체 10개 상품 중 1번부터 4번까지 표시");
+    const pause = root.locator('[data-wlpb-action="pause"]');
+    assert.equal(await pause.textContent(), english ? "Pause" : "일시정지");
+    assert.equal(await pause.getAttribute("aria-label"), english ? "Pause" : "일시정지");
+    await pause.click();
+    assert.equal(await pause.textContent(), english ? "Play" : "재생");
+    assert.equal(await pause.getAttribute("aria-label"), english ? "Play automatic rotation" : "자동 넘김 재생");
+    assert.equal(await pause.getAttribute("aria-pressed"), "true");
+    await pause.click();
+    assert.equal(await pause.textContent(), english ? "Pause" : "일시정지");
+    assert.equal(await pause.getAttribute("aria-pressed"), "false");
+    const before = await statuses.allTextContents();
+    await root.getByRole("button", { name: english ? "Next products" : "다음 상품", exact: true }).click();
+    assert.equal(await root.getByRole("status").getAttribute("aria-label"), english ? "Showing products 2 through 5 out of 10" : "전체 10개 상품 중 2번부터 5번까지 표시");
+    assert.deepEqual(await statuses.allTextContents(), before.map((text, index) => index === i ? "2–5 / 10" : text), "neighbor instances remain unchanged");
+  }
 });
