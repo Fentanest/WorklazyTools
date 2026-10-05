@@ -48,6 +48,8 @@ try {
   });
   let allowImages = false;
   const imageRequests = new Set();
+  const failedImages = new Set(), fallbackDocuments = [];
+  let fallbackProbe = false;
   const image = await readFile(new URL("../fixtures/product-banner/local-image.svg", import.meta.url));
   await context.route("**/*", (route) => {
     const request = route.request(), url = new URL(request.url());
@@ -57,6 +59,7 @@ try {
       return route.continue();
     }
     if (request.resourceType() === "image" && images.has(request.url())) {
+      if (fallbackProbe && failedImages.has(request.url())) return route.abort();
       if (allowImages && !imageRequests.has(request.url())) { imageRequests.add(request.url()); return route.continue(); }
       if (allowImages) return route.abort();
       return route.fulfill({ body: image, contentType: "image/svg+xml", headers: { "cross-origin-resource-policy": "cross-origin" } });
@@ -68,6 +71,7 @@ try {
     page.on("pageerror", () => result.pageErrors++);
     page.on("requestfailed", (request) => {
       if (!allowImages || request.resourceType() !== "image") return;
+      failedImages.add(request.url());
       const host = new URL(request.url()).hostname;
       const message = request.failure()?.errorText || "";
       const policy = /ORB/iu.test(message) ? "ORB" : /COEP/iu.test(message) ? "COEP" : /CORP/iu.test(message) ? "CORP" : "host-or-network";
@@ -132,6 +136,7 @@ try {
     for (const format of ["html", "iframe"]) {
       await page.getByLabel("Preview", { exact: true }).selectOption(format);
       const code = await page.getByLabel("Export code", { exact: true }).inputValue();
+      if (network && design === "photo-strip") fallbackDocuments.push({ format, code });
       await inspect(`<!doctype html><html><body>${code}</body></html>`, format === "iframe", `${design}-${format}`);
     }
   }
@@ -150,6 +155,21 @@ try {
     await page.close(); await outputPage.close();
     const probe = await context.newPage();
     await probe.goto(`${server.url}/t6a-host`);
+    const cdp = await context.newCDPSession(probe), requestIds = new Map(), diagnostics = new Map();
+    await cdp.send("Network.enable");
+    cdp.on("Network.requestWillBeSent", (event) => {
+      const index = wanted.findIndex((r) => r.image === event.request.url);
+      if (index >= 0) { requestIds.set(event.requestId, index + 1); diagnostics.set(index + 1, { index: index + 1 }); }
+    });
+    cdp.on("Network.responseReceivedExtraInfo", (event) => {
+      const index = requestIds.get(event.requestId); if (!index) return;
+      const h = Object.fromEntries(Object.entries(event.headers).map(([k, v]) => [k.toLowerCase(), v]));
+      Object.assign(diagnostics.get(index), { status: event.statusCode, contentType: h["content-type"] || null,
+        contentLength: h["content-length"] ? Number(h["content-length"]) : null,
+        corp: h["cross-origin-resource-policy"] || null, coep: h["cross-origin-embedder-policy"] || null });
+    });
+    cdp.on("Network.loadingFinished", (event) => { const index = requestIds.get(event.requestId); if (index) diagnostics.get(index).encodedDataLength = event.encodedDataLength; });
+    cdp.on("Network.loadingFailed", (event) => { const index = requestIds.get(event.requestId); if (index) diagnostics.get(index).blocked = /ORB/u.test(event.errorText) ? "ORB" : event.blockedReason || "network"; });
     // Static server has no Vite COEP header; this is the production-like control.
     const headers = (await probe.request.get(`${server.url}/en/tools/product-banner/`)).headers();
     check(!headers["cross-origin-embedder-policy"], "unexpected server COEP");
@@ -158,6 +178,18 @@ try {
     await probe.waitForFunction(() => [...document.images].every((img) => img.complete), undefined, { timeout: 15000 }).catch(() => {});
     result.images = await probe.locator("img").evaluateAll((items) => ({ count: items.length, loaded: items.filter((img) => img.complete && img.naturalWidth > 0).length }));
     result.imageRequests = imageRequests.size;
+    result.diagnostics = [...diagnostics.values()];
+    result.serverCoep = headers["cross-origin-embedder-policy"] || null;
+    allowImages = false; fallbackProbe = true;
+    result.fallback = [];
+    for (const { format, code } of fallbackDocuments) {
+      await probe.setContent(`<!doctype html><body>${code}</body>`);
+      const frame = format === "html" ? probe.mainFrame() : await (await probe.locator("iframe[data-wlpb-frame]").elementHandle()).contentFrame();
+      await frame.waitForFunction(() => [...document.querySelectorAll("li img")].every((img) => img.complete));
+      const fallbackCount = await frame.locator(".wlpb-v1-fallback").evaluateAll((nodes) => nodes.filter((n) => !n.hidden).length);
+      result.fallback.push({ format, failedCount: failedImages.size, fallbackCount });
+      check(fallbackCount === failedImages.size, "output fallback mismatch");
+    }
     if (result.images.loaded !== 3) { failed = true; result.status = "NETWORK_FAILURE"; }
   }
   check(result.affiliateAttempts === 0 && result.affiliateSent === 0, "affiliate attempt forbidden");

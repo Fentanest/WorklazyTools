@@ -17,12 +17,12 @@ for (const project of ["app", "node"]) run([
   "node_modules/typescript/bin/tsc", "-p", `tsconfig.${project}.json`,
   "--incremental", "--tsBuildInfoFile", `${root}/cache/tsconfig.${project}.tsbuildinfo`,
 ]);
-const outDir = path.resolve(root, "dist");
+const outDir = path.resolve(process.env.PB_BUILD_OUTPUT_DIR || path.join(root, "dist"));
 await build({ ...config, configFile: false, cacheDir: `${root}/cache/vite`, build: { outDir, emptyOutDir: true } });
 run(["--experimental-strip-types", "scripts/generate-static-pages.mjs"], { ...process.env, WORKLAZY_STATIC_OUTPUT_DIR: outDir });
 const names = (await readdir(`${outDir}/assets`)).filter((name) => /^(ProductBannerPage|input.worker)-/u.test(name));
 names.push("../ko/tools/product-banner/index.html", "../en/tools/product-banner/index.html");
 const hashes = {};
 for (const name of names) hashes[name] = createHash("sha256").update(await readFile(`${outDir}/assets/${name}`)).digest("hex");
-await writeFile(`${root}/build-ready.json`, JSON.stringify({ completedAt: new Date().toISOString(), outDir, hashes }, null, 2));
+await writeFile(process.env.PB_BUILD_READY_PATH || `${root}/build-ready.json`, JSON.stringify({ completedAt: new Date().toISOString(), outDir, hashes }, null, 2));
 console.log("Product banner build and static generation complete");

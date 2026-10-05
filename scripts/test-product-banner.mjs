@@ -16,7 +16,7 @@ export function assess(expected, observed, exitCode) {
   return { cases, ...counts, ok: !invalid && exitCode === 0 && counts.passed === expected.length };
 }
 export function validSuites(suites) {
-  const required = ["unit", "render", "export", "ui", "t5b", "r3a", "r3b", "late-image"];
+  const required = ["unit", "render", "export", "ui", "t5b", "r3a", "r3b", "late-image", "matrix"];
   return Array.isArray(suites) && required.every((id) => suites.filter((s) => s.id === id).length === 1)
     && new Set(suites.map((s) => s.id)).size === suites.length;
 }
@@ -41,11 +41,12 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
       PB_T4_WORK_DIR: dir, PB_T4_SHOT_DIR: `${dir}/shots`, PB_T5_SHOT_DIR: `${dir}/shots`,
       PB_T5B_SHOT_DIR: `${dir}/shots-${path.basename(run)}`, PB_R3A_SHOT_DIR: `${dir}/shots`,
       PB_LATE_RESULT_DIR: `${dir}/late`, PB_R3BFIX_ROOT: root,
-      PB_R3BFIX_RUN: path.basename(run).toLowerCase(), PB_IMAGE_ENGINE: "chromium" };
+      PB_R3BFIX_RUN: path.basename(run).toLowerCase(), PB_MATRIX_RESULT_DIR: dir, PB_IMAGE_ENGINE: "chromium" };
     const result = spawnSync(process.execPath, ["--experimental-strip-types", "--test",
       "--test-reporter=tap", `--test-reporter-destination=${dir}/tap.log`,
       "--test-reporter=./tests/product-banner/case-reporter.mjs", "--test-reporter-destination=stdout", ...suite.files],
-      { env, encoding: "utf8", timeout: 600000, maxBuffer: 8 * 1024 * 1024 });
+      { env, encoding: "utf8", timeout: suite.id === "matrix" ? 1200000 : 600000, maxBuffer: 8 * 1024 * 1024 });
+    await writeFile(`${dir}/stdout.log`, result.stdout || "");
     await writeFile(`${dir}/outcomes.jsonl`, result.stdout || "");
     await writeFile(`${dir}/stderr.log`, result.stderr || "");
     const observed = (result.stdout || "").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line));
