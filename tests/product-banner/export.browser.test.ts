@@ -12,7 +12,7 @@ import { DESIGN_IDS, type DesignId } from "../../src/features/product-banner/sta
 import { stateWith } from "../fixtures/product-banner/state.ts";
 import { buildBannerRuntime, buildHeightParentRuntime } from "../../scripts/product-banner-runtime.mjs";
 
-const work = "docs/jobs/todo/product-banner/work", shots = process.env.PB_T4_SHOT_DIR || `${work}/shots-T4`;
+const work = process.env.PB_T4_WORK_DIR || "docs/jobs/todo/product-banner/work", shots = process.env.PB_T4_SHOT_DIR || `${work}/shots-T4`;
 const cases: string[] = JSON.parse(await readFile(new URL("./export-cases.json", import.meta.url), "utf8"));
 const results = new Map(cases.map((id) => [id, { status: "NOT_RUN", details: {} as object }]));
 const captures: string[] = [], linkRecords: object[] = [];
@@ -165,8 +165,12 @@ run("PB-EXPORT-height-validation", async (t) => {
   }); await page.waitForFunction(() => document.querySelector("iframe")!.height === "777");
   await page.waitForTimeout(150); assert.equal(await page.locator("iframe").first().getAttribute("height"), "777");
   await first.evaluate(() => { const root = document.querySelector<HTMLElement>("[data-wlpb-root]")!; root.style.paddingBottom = "100px"; });
-  await page.waitForFunction((old) => document.querySelector("iframe")!.height !== old, baseline[0]);
-  assert.equal(await page.locator("iframe").nth(1).getAttribute("height"), baseline[1]); return { ...stats(), distinctIds: true, rejectedHeights: 10 };
+  const measuredHeight = await first.locator("[data-wlpb-root]").evaluate((root) => Math.ceil(root.getBoundingClientRect().height));
+  assert.notEqual(measuredHeight, 777, "fixture must require a fresh height");
+  await page.waitForFunction((height) => Number(document.querySelector("iframe")!.height) === height, measuredHeight);
+  assert.equal(Number(await page.locator("iframe").first().getAttribute("height")), measuredHeight);
+  assert.equal(await page.locator("iframe").nth(1).getAttribute("height"), baseline[1]);
+  return { ...stats(), distinctIds: true, rejectedHeights: 10, measuredHeight, legacyWouldPassAt777: baseline[0] !== "777" };
 });
 run("PB-EXPORT-height-cleanup", async (t) => {
   const { page, stats } = await open(t, exportBanner(project("product-card", true), runtime).iframe); const frame = await child(page); await verify(frame, project("product-card"));

@@ -85,12 +85,12 @@ test("one deterministic IIFE builder supplies Vite dev/build and Node without fo
 });
 test("actual Vite dev transform and production bundle supply the same runtime bytes as Node", async () => {
   const plugin = productBannerRuntimePlugin(), source = await buildBannerRuntime();
-  const server = await createServer({ configFile: false, plugins: [plugin], server: { middlewareMode: true }, logLevel: "silent" });
+  const server = await createServer({ cacheDir: process.env.XDG_CACHE_HOME ? `${process.env.XDG_CACHE_HOME}/vite-unit` : undefined, configFile: false, plugins: [plugin], server: { middlewareMode: true }, logLevel: "silent" });
   try {
     const dev = await server.transformRequest("virtual:product-banner-runtime");
     assert.ok(dev?.code.includes(JSON.stringify(source)));
   } finally { await server.close(); }
-  const result: any = await build({ configFile: false, plugins: [plugin], logLevel: "silent", build: { write: false, minify: false,
+  const result: any = await build({ cacheDir: process.env.XDG_CACHE_HOME ? `${process.env.XDG_CACHE_HOME}/vite-unit` : undefined, configFile: false, plugins: [plugin], logLevel: "silent", build: { write: false, minify: false,
     rollupOptions: { input: "virtual:product-banner-runtime", preserveEntrySignatures: "strict" } } });
   const module = await import(`data:text/javascript,${encodeURIComponent(result.output[0].code)}`);
   assert.equal(module.default, source);

@@ -6,7 +6,7 @@ import { exportBanner } from "../../src/features/product-banner/exporter.ts";
 import { createDefaultSettings } from "../../src/features/product-banner/settings.ts";
 import { stateWith } from "../fixtures/product-banner/state.ts";
 import { buildBannerRuntime, buildHeightParentRuntime } from "../../scripts/product-banner-runtime.mjs";
-import { chromium, type Browser, type Frame } from "playwright";
+import { chromium, firefox, webkit, type Browser, type Frame } from "playwright";
 
 const work = process.env.PB_LATE_RESULT_DIR || "docs/jobs/todo/product-banner/work/late-image";
 const observations: object[] = [];
@@ -43,7 +43,9 @@ before(async () => {
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
-  browser = await chromium.launch(); console.log(`Browser ${browser.version()}`);
+  const engine = process.env.PB_IMAGE_ENGINE || "chromium";
+  assert.ok(["chromium", "firefox", "webkit"].includes(engine));
+  browser = await ({ chromium, firefox, webkit })[engine as "chromium"].launch(); console.log(`Browser ${browser.version()}`);
 });
 after(async () => {
   for (const { response } of pending.values()) response.end();
@@ -110,6 +112,9 @@ for (const format of ["html", "iframe", "standalone"]) for (const mode of ["late
       }
     }
     if (mode === "late" && format !== "iframe") {
+      // WebKit waits for document completion before requesting lazy images.
+      // Make the first host image eager to force a real error before the tail.
+      await frame.locator(".wlpb-v1-img").first().evaluate((img) => { (img as HTMLImageElement).loading = "eager"; });
       await frame.waitForFunction(() => (window as any).__lateEvents.some((e: any) => e.event === "error" && !e.ready));
       const before = await snapshot(frame); observations.push({ token, before });
       assert.equal(before.imageHidden, false); assert.equal(before.fallbackHidden, true);
@@ -121,7 +126,8 @@ for (const format of ["html", "iframe", "standalone"]) for (const mode of ["late
       // Slide 7 is neither active nor preloaded next. It has no image request.
       const before = await snapshot(frame, 7); observations.push({ token, before });
       assert.equal(requests.get(`/img/${token}/${mode}/7.svg`) || 0, 0);
-      assert.equal(before.currentSrc, ""); assert.equal(before.naturalWidth, 0);
+      assert.equal(Boolean(before.currentSrc && before.complete && !before.naturalWidth), false);
+      assert.equal(before.naturalWidth, 0); // WebKit selects currentSrc before requesting.
       assert.equal(before.imageHidden, false); assert.equal(before.fallbackHidden, true);
       assert.equal(before.loading, "lazy");
       // The host reveals this original node outside the banner, far offscreen.

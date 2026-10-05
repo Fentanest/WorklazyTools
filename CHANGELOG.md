@@ -290,3 +290,5 @@
 - Chrome 렌더링 기반 앱 아이콘 생성기(`scripts/generate-app-icons.mjs`)로 그라데이션 PNG 5종 재생성, manifest `any`/`maskable` 분리, iOS용 불투명 180px 생성. — Codx
 - 세 에이전트 협업 체계 도입: `PROJECT_RULES.md` 신설(공통 3규칙 명명 이관), 역할 지시서 `CLAUDE.md`·`AGENTS.md`·`GEMINI.md` 분리, `docs/jobs/` 작업지시서 체계·`docs/backlog.md` 도입, 「커밋·업로드·배포는 Codex」 규칙 추가(사용자 결정). 운영 문서 2종을 규칙 부속 명세로 연계. — Claude
 - 2026-08-15–16 신뢰성 작업지시서 4개 종결·`docs/jobs/archive/` 이관(검토 내역은 `docs/review-notes.md`). — Codx
+
+- Codx(Sol): Added the product-banner core case runner and dedicated Chromium CI workflow, strengthened export height checks, and added local Firefox/WebKit and privacy-preserving real XLS verification. Full matrix coverage remains in T6b.

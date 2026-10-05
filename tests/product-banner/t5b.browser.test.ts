@@ -24,7 +24,7 @@ let affiliateAttempts = 0, blockedExternal = 0;
 const pages = new Set<Page>();
 before(async () => {
   const root = path.dirname(process.env.TMPDIR!);
-  assert.ok(root.endsWith("/work/tmp/T5b"), "explicit job temporary directory required");
+  assert.ok(root === process.env.PB_JOB_ROOT || root.endsWith("/work/tmp/T5b"), "explicit job temporary directory required");
   const ready = JSON.parse(await readFile(`${root}/build-ready.json`, "utf8"));
   assert.equal(process.env.PB_T5B_DIST, ready.outDir);
   for (const [name, hash] of Object.entries(ready.hashes)) assert.equal(createHash("sha256").update(await readFile(`${ready.outDir}/assets/${name}`)).digest("hex"), hash, "completed build is unchanged");
@@ -380,9 +380,9 @@ test("M03 resource measurements: worker cancellation/exit, downloads, repeated p
   const previewDocumentsAfterExit = await page.locator('[data-testid="banner-preview"],[data-testid="sample-preview"]').count();
   measurements.push({ baseline, during, canceled, saved, live, beforeRemoval, removed, exited, providerFrames, frameUrlsAfterExit: page.frames().map((f) => f.url()), historyBefore, historyAfter: await cdp.send("Page.getNavigationHistory"), previewDocumentsAfterExit });
   assert.equal(previewDocumentsAfterExit, 0);
-  for (const remaining of page.frames().filter((f) => f !== page.mainFrame())) {
-    assert.ok(await (await remaining.frameElement()).evaluate((el) => !!el.closest(".coupang-banner")), "remaining child documents belong to the existing provider");
-  }
+  // The provider can remove its failed frame between frames() and frameElement().
+  // Inspect current DOM owners atomically; every remaining iframe must be a provider.
+  assert.ok(await page.locator("iframe").evaluateAll((frames) => frames.every((el) => !!el.closest(".coupang-banner"))), "remaining child documents belong to the existing provider");
 });
 
 test("D18 new route provider loading/ready/error and QA-blocked samples", async (t) => {

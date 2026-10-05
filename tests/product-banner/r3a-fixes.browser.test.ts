@@ -22,7 +22,7 @@ const image = PNG.sync.write(bitmap);
 let server: Awaited<ReturnType<typeof startRecoveryServer>>, browser: Browser, affiliateAttempts = 0;
 before(async () => {
   await mkdir(shots, { recursive: false });
-  server = await startRecoveryServer({ root: "dist", port: 0 });
+  server = await startRecoveryServer({ root: process.env.PB_DIST || "dist", port: 0 });
   browser = await chromium.launch({ executablePath: process.env.PB_R3A_BROWSER === "system" ? "/usr/bin/google-chrome" : undefined, args: ["--no-sandbox"] });
 });
 after(async () => {

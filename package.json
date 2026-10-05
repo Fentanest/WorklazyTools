@@ -61,7 +61,11 @@
     "test:coupang-base": "node tests/coupang-base-smoke.mjs",
     "test:provider-sdk": "node tests/provider-sdk-fenced-smoke.mjs",
     "test:i18n": "node scripts/validate-i18n.mjs",
-    "test:guides": "node --experimental-strip-types scripts/validate-guides.mjs"
+    "test:guides": "node --experimental-strip-types scripts/validate-guides.mjs",
+    "build:product-banner-tests": "node --experimental-strip-types scripts/build-product-banner-tests.mjs",
+    "test:product-banner": "node scripts/test-product-banner.mjs",
+    "test:product-banner:real": "node tests/product-banner/real-xls.mjs",
+    "test:product-banner:images": "node tests/product-banner/real-xls.mjs --images"
   },
   "dependencies": {
     "@ffmpeg/core": "0.12.10",

@@ -16,7 +16,7 @@ let context: BrowserContext, server: Awaited<ReturnType<typeof startRecoveryServ
 const pages = new Set<Page>(), results: object[] = [];
 let externalRequests = 0;
 before(async () => {
-  assert.ok(root?.endsWith("/work/tmp/R3bfix"));
+  assert.ok(root === process.env.PB_JOB_ROOT || root?.endsWith("/work/tmp/R3bfix"));
   assert.equal(process.env.TMPDIR, `${root}/tmp`);
   assert.match(run, /^[a-z0-9-]+$/u);
   const ready = JSON.parse(await readFile(`${root}/build-ready.json`, "utf8"));

@@ -168,3 +168,5 @@
 
 - **EN320 동의 배너의 오른쪽 동작 잘림** — 320px에서 `Accept and continue` 버튼 right 381.97px, viewport 320px이며 문서 가로 스크롤로 복구되지 않는다. U6와 기존 PDF Merge에서 같은 geometry라 U6 회귀가 아니다. UI v3에서 버튼 줄바꿈·세로 배치를 포함해 공용 배너 경계를 고친다. 근거 `/tmp/worklazy-u6-preflight/final-ui-review/inherited-comparison.json`.
 - **고정 데스크톱 언어 스위처의 배경 의존 대비** — U6 결과 화면의 안정 axe에서 기존 translucent LanguageSwitcher 대비 1건이 남았다. UI v3에서 이 공용 control의 실제 배경별 대비를 고정한다. U6에서 전역 스위처 색을 임의 변경하지 않는다.
+
+- Codx(Sol), T6a: Product banner image-status callbacks clear a previously visible clipboard failure notice in ProductBannerPage dispatch (present at df460ee). Controlled held-image reproduction is recorded in T6a evidence. Scope a UI repair and retain the failing case before requiring three consecutive core/CI passes.
