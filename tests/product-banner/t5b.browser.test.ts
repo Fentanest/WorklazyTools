@@ -216,7 +216,45 @@ test("M03 pages retain selection and order through buttons, keyboard and drag", 
   assert.deepEqual(await names(page), ["합성 상품 20", "합성 상품 22"]);
   await rows(page).first().getByRole("button", { name: "Move down", exact: true }).focus(); await page.keyboard.press("Enter");
   assert.deepEqual(await names(page), ["합성 상품 22", "합성 상품 20"]);
-  await rows(page).nth(1).locator("[draggable]").dragTo(rows(page).first());
+  const sourceHandle = rows(page).nth(1).locator("[draggable]"), targetHandle = rows(page).first().locator("[draggable]");
+  // Prepare both small handles before mouse-down; scrolling a whole target row
+  // during dragTo can move the source before Chromium starts a native drag.
+  await sourceHandle.evaluate(async (source) => {
+    const target = document.querySelector('[data-testid="banner-product"] [draggable]')!;
+    const middle = (target.getBoundingClientRect().top + source.getBoundingClientRect().bottom) / 2;
+    const destination = Math.max(0, Math.min(document.documentElement.scrollHeight - innerHeight, scrollY + middle - innerHeight / 2));
+    window.scrollTo({ top: destination, behavior: "smooth" });
+    const deadline = performance.now() + 6000;
+    let previous: number[] = [], stable = 0;
+    while (stable < 3) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      const boxes = [source, target].map((el) => el.getBoundingClientRect());
+      const positions = boxes.flatMap((box) => [box.top, box.bottom]);
+      const visible = boxes.every((box) => box.top > 80 && box.bottom < innerHeight - 80);
+      stable = visible && Math.abs(scrollY - destination) < 1 && positions.every((value, i) => Math.abs(value - previous[i]) < 0.5) ? stable + 1 : 0;
+      previous = positions;
+      if (performance.now() > deadline) throw new Error("Native drag handles did not settle in the viewport");
+    }
+  });
+  await page.evaluate(() => {
+    (window as any).__bannerDragEvents = [];
+    for (const type of ["dragstart", "drop"]) document.addEventListener(type, (event) => {
+      (window as any).__bannerDragEvents.push({ type: event.type, trusted: event.isTrusted, tag: (event.target as Element).tagName });
+    }, { once: true, capture: true });
+  });
+  const sourceBox = (await sourceHandle.boundingBox())!, targetBox = (await targetHandle.boundingBox())!;
+  const sourcePoint = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
+  const targetPoint = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 };
+  assert.equal(await sourceHandle.evaluate((handle, point) => handle.contains(document.elementFromPoint(point.x, point.y)), sourcePoint), true);
+  assert.equal(await targetHandle.evaluate((handle, point) => handle.contains(document.elementFromPoint(point.x, point.y)), targetPoint), true);
+  await page.mouse.move(sourcePoint.x, sourcePoint.y);
+  await page.mouse.down();
+  await page.mouse.move(sourcePoint.x + 8, sourcePoint.y, { steps: 3 });
+  await page.mouse.move(targetPoint.x, targetPoint.y, { steps: 8 });
+  await page.mouse.up();
+  assert.deepEqual(await page.evaluate(() => (window as any).__bannerDragEvents), [
+    { type: "dragstart", trusted: true, tag: "SPAN" }, { type: "drop", trusted: true, tag: "SPAN" },
+  ]);
   assert.deepEqual(await names(page), ["합성 상품 20", "합성 상품 22"]);
   await rows(page).first().getByRole("button", { name: "Move up", exact: true }).focus(); await page.keyboard.press("Space");
   await page.getByRole("button", { name: "Previous products", exact: true }).click();
