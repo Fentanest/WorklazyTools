@@ -31,6 +31,8 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
   const manifest = JSON.parse(await readFile("tests/product-banner/cases.json", "utf8"));
   if (!validSuites(manifest.suites)) throw new Error("Required suite missing or duplicated");
   await mkdir(`${root}/runs`, { recursive: true });
+  // Persistent suites create unique profiles beneath this job-owned parent.
+  await mkdir(`${root}/profiles`, { recursive: true });
   const run = await mkdtemp(`${root}/runs/core-`);
   const suites = [];
   for (const suite of manifest.suites) {

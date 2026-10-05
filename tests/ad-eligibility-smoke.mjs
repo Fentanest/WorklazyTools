@@ -21,6 +21,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const ARTIFACT_DIR = process.env.WORKLAZY_AD_ARTIFACT_DIR
   ? path.resolve(process.env.WORKLAZY_AD_ARTIFACT_DIR)
   : path.join(REPO_ROOT, "tests", "visual-artifacts", "adsense-recheck");
+const DIST_ROOT = process.env.WORKLAZY_AD_DIST ? path.resolve(process.env.WORKLAZY_AD_DIST) : path.join(REPO_ROOT, "dist");
 const RESULTS_FILE = path.join(ARTIFACT_DIR, "ad-smoke-results.json");
 const DISCRIMINATION_FILE = path.join(ARTIFACT_DIR, "ad-smoke-discrimination.json");
 const PORT = Number(process.env.RECOVERY_TEST_PORT || "4182");
@@ -230,7 +231,7 @@ async function buildProvenance() {
   }
   let distMtime = "unknown";
   try {
-    distMtime = (await fs.stat(path.join(REPO_ROOT, "dist", "index.html"))).mtime.toISOString();
+    distMtime = (await fs.stat(path.join(DIST_ROOT, "index.html"))).mtime.toISOString();
   } catch {
     // distMtime stays "unknown"; recorded as-is.
   }
@@ -360,6 +361,24 @@ async function scenarioS4(browser, server) {
     server.state.remaining = Infinity;
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
     const mark = server.state.requests.length;
+    const recoveryEvents = [], navigationEvents = [];
+    const diagnosticSession = await tracked.context.newCDPSession(tracked.page);
+    await diagnosticSession.send("Page.enable");
+    for (const event of ["Page.frameRequestedNavigation", "Page.frameScheduledNavigation", "Page.frameClearedScheduledNavigation"]) {
+      diagnosticSession.on(event, (detail) => navigationEvents.push({ event, ...detail }));
+    }
+    tracked.page.on("console", (message) => {
+      const prefix = "__WL_S4_RECOVERY__";
+      if (message.text().startsWith(prefix)) recoveryEvents.push(JSON.parse(message.text().slice(prefix.length)));
+    });
+    await tracked.page.addInitScript(() => {
+      const record = (event) => console.debug(`__WL_S4_RECOVERY__${JSON.stringify({
+        event, documentToken: window.__wlSmokeDocumentToken, url: location.href,
+        retryKeys: Object.keys(sessionStorage).filter((key) => key.startsWith("worklazy_tool_reload:")),
+      })}`);
+      window.addEventListener("vite:preloadError", () => record("vite:preloadError"));
+      window.addEventListener("beforeunload", () => record("beforeunload"));
+    });
     try {
       await tracked.page.goto(`${server.url}/ko/tools/text-merger/`, { waitUntil: "domcontentloaded" });
       // S4: After chunk fails → recovery reload fails → error boundary navigates to /error
@@ -403,6 +422,17 @@ async function scenarioS4(browser, server) {
         evidence: shot,
       };
     } finally {
+      // Preserve failed assertions and the document/request sequence independently.
+      // Observation only: recovery handlers and the >=2 expectation stay unchanged.
+      await sleep(500);
+      const requests = server.state.requests.slice(mark);
+      const observation = await observe(tracked.page).catch(() => null);
+      const evidence = await screenshot(tracked.page, "S4-final-observation").catch(() => null);
+      await fs.writeFile(path.join(ARTIFACT_DIR, "S4-diagnostics.json"), `${JSON.stringify({
+        recoveryEvents, navigationEvents, observation, docs: tracked.docs, docCommits: tracked.docCommits,
+        chunk404Count: requests.filter((entry) => entry.pathname.includes(TEXT_MERGER_CHUNK) && entry.status === 404).length,
+        serverRequests: requests, counters: counterSnapshot(tracked.counters), evidence,
+      }, null, 2)}\n`);
       resetServer(server);
       await tracked.context.close();
     }
@@ -866,10 +896,10 @@ async function scenarioS5(browser, server) {
   const THROW_EXPR = '(window.__wlForceRenderError?(()=>{throw new Error("WU2-S5-INJECTED-RENDER")})():"qr-bulk-page")';
   return [await runCase("S5-same-url-error", async () => {
     resetServer(server);
-    const distAssets = await fs.readdir(path.join(REPO_ROOT, "dist", "assets"));
+    const distAssets = await fs.readdir(path.join(DIST_ROOT, "assets"));
     const chunk = distAssets.find((f) => f.startsWith(CHUNK_PREFIX) && f.endsWith(".js"));
     assert.ok(chunk, "S5: QrBulkPanel chunk missing in dist");
-    const built = await fs.readFile(path.join(REPO_ROOT, "dist", "assets", chunk), "utf8");
+    const built = await fs.readFile(path.join(DIST_ROOT, "assets", chunk), "utf8");
     assert.ok(built.split(ANCHOR).length - 1 >= 1, "S5: injection anchor missing in built chunk");
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
     const mark = server.state.requests.length;
@@ -961,10 +991,10 @@ async function scenarioD4(browser, server) {
   const THROW_EXPR = '(window.__wlForceRenderError?(()=>{throw new Error("D4-LOOP-GUARD-TEST")})():"qr-bulk-page")';
   return [await runCase("D4-loop-guard", async () => {
     resetServer(server);
-    const distAssets = await fs.readdir(path.join(REPO_ROOT, "dist", "assets"));
+    const distAssets = await fs.readdir(path.join(DIST_ROOT, "assets"));
     const chunk = distAssets.find((f) => f.startsWith(CHUNK_PREFIX) && f.endsWith(".js"));
     assert.ok(chunk, "D4: QrBulkPanel chunk missing in dist");
-    const built = await fs.readFile(path.join(REPO_ROOT, "dist", "assets", chunk), "utf8");
+    const built = await fs.readFile(path.join(DIST_ROOT, "assets", chunk), "utf8");
     assert.ok(built.split(ANCHOR).length - 1 >= 1, "D4: injection anchor missing in built chunk");
     const tracked = await newTrackedContext(browser, server, { consent: "granted" });
     const mark = server.state.requests.length;
@@ -1101,7 +1131,7 @@ function isExpectedStubFailure(error) {
 async function main() {
   await fs.mkdir(ARTIFACT_DIR, { recursive: true });
   const { runHead, distMtime } = await buildProvenance();
-  const server = await startRecoveryServer({ root: "dist", port: PORT });
+  const server = await startRecoveryServer({ root: DIST_ROOT, port: PORT });
   console.log(`server: ${server.url}`);
   console.log(`adsense stub: ${ADSENSE_SCRIPT_URL}`);
   const browser = await chromium.launch({

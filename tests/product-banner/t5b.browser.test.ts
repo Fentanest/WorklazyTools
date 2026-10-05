@@ -496,8 +496,11 @@ test("D18 new route provider loading/ready/error and QA-blocked samples", async 
       assert.equal(counters.stub, 1, "export preview creates no provider request");
       assert.deepEqual(providerStubs, { google: 1, naver: 1, coupang: 1 }, "export preview creates no analytics/widget request");
     } else if (mode === "error") {
-      await page.waitForURL(/\/en\/error\/?$/u);
-      await page.waitForFunction(() => document.querySelector('script[data-worklazy-google-analytics][data-loaded="true"]') && typeof (window as any).wcs_do === "function");
+      // Chunk recovery can start a reload that the error-document transition
+      // cancels. A navigation waiter rejects that intermediate ERR_ABORTED;
+      // observe the required terminal document and its providers together.
+      await page.waitForFunction(() => /^\/en\/error\/?$/u.test(location.pathname)
+        && document.querySelector('script[data-worklazy-google-analytics][data-loaded="true"]') && typeof (window as any).wcs_do === "function");
       assert.equal(counters.stub, 0); assert.equal(await page.locator("script[data-worklazy-adsense]").count(), 0);
       assert.deepEqual(providerStubs, { google: 1, naver: 1, coupang: 0 }, "existing error document permits safe analytics without advertising");
     } else {

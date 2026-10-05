@@ -170,3 +170,6 @@
 - **고정 데스크톱 언어 스위처의 배경 의존 대비** — U6 결과 화면의 안정 axe에서 기존 translucent LanguageSwitcher 대비 1건이 남았다. UI v3에서 이 공용 control의 실제 배경별 대비를 고정한다. U6에서 전역 스위처 색을 임의 변경하지 않는다.
 
 - Codx(Sol), T6a: Product banner image-status callbacks clear a previously visible clipboard failure notice in ProductBannerPage dispatch (present at df460ee). Controlled held-image reproduction is recorded in T6a evidence. Scope a UI repair and retain the failing case before requiring three consecutive core/CI passes.
+
+- 2026-10-05 Codx(Sol), T6c: 광고 S4는 기준선 cc20462와 후보의 동일 조건 실행에서 모두 chunk 404 1회로 실패했다(기대 >=2 유지). 재로드 요청 뒤 TextMerger 재로드 문서 커밋 없이 /ko/error/가 커밋되는 기존 복구/오류 문서 전환 경쟁이다. 공유 복구 코드 수리는 이번 범위 밖이며 광고 필수 게이트 PASS가 아니다. 근거: product-banner/evidence/T6c.md 및 tmp/T6c/s4-comparison.json.
+- 2026-10-05 Codx(Sol), T6c: S10은 스텁이 광고 오버레이를 렌더링하지 않아 실제 겹침 미검증이다. 자동화 운영 광고 호출은 유지 차단하고 실제 오버레이는 T7 운영 확인에 이월한다. analytics-2 자식의 호스트 전체 잔존 여부는 exec PID namespace 제약으로 미확인; 호스트 조회가 필요하다. lttng O_CREAT 2건의 배타 생성/파일 소유도 미확인이며 다음 선택적 WebKit 실행 전 경로 제약 진단을 이월한다.
