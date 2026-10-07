@@ -17,7 +17,7 @@ resolved dependency versions.
 | --- | --- | --- |
 | `@ffmpeg/core` 0.12.10 | GPL-2.0-or-later | FFmpeg WebAssembly core · <https://github.com/ffmpegwasm/ffmpeg.wasm> |
 | `@ffmpeg/ffmpeg` 0.12.15 | MIT | FFmpeg browser API · <https://github.com/ffmpegwasm/ffmpeg.wasm> |
-| `@rhwp/core`, `@rhwp/editor` 0.8.6 | MIT | HWP/HWPX parsing and editing · <https://github.com/edwardkim/rhwp> |
+| `@rhwp/core`, `@rhwp/editor` 0.8.7 | MIT | HWP/HWPX parsing and editing · <https://github.com/edwardkim/rhwp> |
 | `buffer` 6.0.3 | MIT | Browser binary compatibility |
 | `crypto-browserify` 3.12.1 | MIT | Browser cryptographic compatibility |
 | `exceljs` 4.4.0 | MIT | XLSX/CSV processing · <https://github.com/exceljs/exceljs> |

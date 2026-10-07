@@ -6,7 +6,7 @@ const packageJson = JSON.parse(await fs.readFile(path.join(projectRoot, "package
 const currentVersion = packageJson.dependencies?.["@rhwp/core"];
 const editorVersion = packageJson.dependencies?.["@rhwp/editor"];
 const staleVersion = process.argv[2];
-const allowedStaleVersions = new Set(["0.8.4"]);
+const allowedStaleVersions = new Set(["0.8.4", "0.8.6"]);
 
 if (!currentVersion || currentVersion !== editorVersion) {
   throw new Error("rhwp core/editor 버전 고정이 일치하지 않습니다.");

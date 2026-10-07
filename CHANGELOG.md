@@ -2,6 +2,12 @@
 
 코드에 일어난 변경을 자신의 이름(Claude · Codx · Gemini)으로 간결히 기록한다(「작업 기록」 규칙). 검토 과정의 판정·기각 사유·실측 수치는 [`docs/review-notes.md`](docs/review-notes.md)에 기록한다.
 
+## 2026-10-07 — rhwp 0.8.7 적용·누적 국소 검사 (진행 중·미게시)
+
+정확한 npm/lock/Studio/config/license/static/smoke 참조를 0.8.7로 맞추고 0.8.6 스냅샷을 정리했다. upstream tag `1a76570e833917d15817415a53c09ad61ab3203f`, vendor payload 78파일/64,881,144바이트. HWP 비교·편집 저장 왕복 1건, 공개 unit 587건, build/static, PDF 변환 한영·명암·모바일/데스크톱 QA 캡처 32개가 통과했다. 시각검사의 기존 이미지 변환 두 상태를 새 도구로 옮겼고 초기·하단 상태를 추가했다. 이전 테스트 목록 누락 실패 및 수정은 작업 증거에 남겼다. 동일 조건 axe에서 0.8.6/0.8.7 모두 같은 위치의 serious 6노드이며 미해결이다.
+
+Office 6형식→PDF와 실제 MarkItDown 개별 converter의 Pyodide 프로브는 엔진 가능성 확인이며 제품 UI 완료가 아니다. 기존 PDF 변환 2탭 이외의 문서 양방향·별도 Markdown 도구 및 전체 품질 검증은 진행 중이다. 전체 완료 전 main 병합·push·배포하지 않았다. 근거와 후속은 `docs/jobs/todo/document-converters-20261007/handoff.md`. — Codx
+
 ## 2026-10-07 — PDF 변환 도구 초기 이동 (작업 중·미게시)
 
 - 이미지→PDF와 PDF→이미지의 기존 패널을 별도 PDF 변환 도구에 연결하고 이전 URL·한영 메뉴·안내·SEO를 맞췄다. StrictMode의 이미지 미리보기 URL 수명주기를 수정했다. 전체 4탭·문서 변환은 구현 중이며 통합·배포하지 않았다. — Codx

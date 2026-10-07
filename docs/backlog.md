@@ -158,6 +158,7 @@
 ## 배포 후 라이브 감사에서 나온 기존 결함 (S0 배포 2026-09-06 — S0 회귀 아님)
 
 - **HWP 편집기 iframe 접근성 위반 4노드** — 벤더 rhwp Studio 내부(`#sb-message` 대비 3.54 · `#style-name`·`#font-lang`·`#font-name` 는 title 만으로 라벨). `4d0bae9` 에서도 동일 검출(`/tmp/worklazy-s0/deploy/logs/baseline-findings-full.log`). `public/vendor/**` 라 저장소에서 수정 불가 — 선택지: ① 상류(rhwp) 이슈 제기 ② 접근성 게이트에서 벤더 iframe 을 목적·소유자 명시 예외로 분리(광역 wildcard 금지). S2-H ③ 에서 결정. — Claude
+- **rhwp 0.8.7 재검사 — 미해결** (2026-10-07, document-converters 작업본) — iframe 예외를 제외하지 않은 axe 실제 검사에서 `#sb-message` 대비 1개, title-only 라벨 `#style-name`·`#font-lang`·`#font-name`·`#font-size`·`#linespacing-select` 5개, 총 serious 6노드를 확인했다. 과거 4노드 기록을 0.8.7 통과로 재사용하지 않는다. 기존 iframe 면제를 확대 승인하거나 이 6개를 해결했다고 표시하지 않는다. 동일 axe·1280×800 호스트·960×720 iframe·빈 문서로 0.8.6과 0.8.7을 대조하니 rule ID와 여섯 target 모두 같았다(신규 회귀 0, 미해결 6). 과거 4노드와 조건이 달라 단순 증가량을 회귀로 해석하지 않는다. 원자료는 `docs/jobs/todo/document-converters-20261007/rhwp-0.8.6-a11y-ab.json`, `rhwp-0.8.7-a11y-ab.json`, `rhwp-087-a11y-raw.json`; 최종 공개 전 검수에서 처리해야 한다. — Codx
 - **모바일 하단 탭 라벨 대비 3.06**(`.bottom-tab > span`, `#909098`/`#fbfbfd`, 12px bold, 기준 4.5) — P2 셸 스타일, S0 diff 무관. 색 토큰 1개 조정 + 시각 기준선 갱신. 접근성 하네스가 mobile viewport 를 재지 않아 게이트에 안 걸렸다 — S2-H ③ 페이지·viewport 등록 확장과 함께. — Claude
 - **없는 경로의 인앱 NotFound 뷰 부재** — 정적 `404.html`(noindex)·HTTP 404 는 정상이나 앱 기동 후 React Router 가 홈을 렌더한다(`4d0bae9` 동일). SEO 영향 없음(HTTP 404 유지). 제품 결정 필요: 홈 폴백 유지 vs ko/en NotFound 뷰 신설(신설 시 「현지화·SEO·AdSense 동시 검토」·시각 회귀 추가). — Claude
 ## U6 검수에서 확인한 공용 UI 후속

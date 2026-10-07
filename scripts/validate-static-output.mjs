@@ -446,8 +446,8 @@ if (!koreanPages.includes("정상 공개 페이지는 도구 종류만으로 제
 // Recurse through every output directory, with an explicit minimum exception
 // list. A future route or vendor HTML must not silently escape this contract.
 const recoveryDocumentExceptions = new Map([
-  ["vendor/rhwp-studio/0.8.6/index.html", "RHWP snapshot owner: upstream Studio entry, validated by validate-rhwp-vendor.mjs"],
-  ["vendor/rhwp-studio/0.8.6/print.html", "RHWP snapshot owner: upstream print document, validated by validate-rhwp-vendor.mjs"],
+  ["vendor/rhwp-studio/0.8.7/index.html", "RHWP snapshot owner: upstream Studio entry, validated by validate-rhwp-vendor.mjs"],
+  ["vendor/rhwp-studio/0.8.7/print.html", "RHWP snapshot owner: upstream print document, validated by validate-rhwp-vendor.mjs"],
   ["naver05161fb06bc9701a23cfc09ad5773578.html", "Publishing integration owner: exact Naver site verification payload"],
 ]);
 let recoveryPages = 0;

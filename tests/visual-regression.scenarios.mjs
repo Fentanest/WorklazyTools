@@ -73,6 +73,7 @@ const migratedToolIds = new Set([
   "qr-studio",
   "audio-studio",
   "pdf-editor",
+  "pdf-converter",
   "video-studio",
   "image-studio",
 ]);
@@ -293,6 +294,33 @@ const interactionDefinitions = Object.freeze({
       assertSelector: "[data-testid='excel-cleaner-results']",
     }),
   ]),
+  "pdf-converter": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-image-to-pdf-thumbnails",
+      fixture: { kind: "generated-png", fileName: "visual-page.png", width: 320, height: 220 },
+      actions: [
+        { type: "click", selector: ".pdf-tool-navigation a[href$='/image-to-pdf']" },
+        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='image-to-pdf']" },
+        { type: "upload", selector: "[data-tool-page='pdf-converter'] input[type='file']" },
+        { type: "wait", selector: ".pdf-image-card" },
+        { type: "scroll-into-view", selector: ".pdf-image-grid", offset: -88 },
+      ],
+      assertSelector: ".pdf-tool-page[data-pdf-mode='image-to-pdf'] .pdf-image-card",
+    }),
+    Object.freeze({
+      stateId: "interaction-pdf-to-image-thumbnails",
+      fixture: { kind: "generated-pdf", fileName: "visual-images.pdf", pageCount: 2 },
+      actions: [
+        { type: "click", selector: ".pdf-tool-navigation a[href$='/pdf-to-image']" },
+        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='pdf-to-image']" },
+        { type: "upload", selector: "[data-tool-page='pdf-converter'] input[type='file']" },
+        { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
+        { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },
+        { type: "wait", selector: ".pdf-page-card .pdf-thumbnail-frame img", timeoutMs: 60_000 },
+      ],
+      assertSelector: ".pdf-tool-page[data-pdf-mode='pdf-to-image'] .pdf-page-card",
+    }),
+  ]),
   "pdf-editor": Object.freeze([
     Object.freeze({
       stateId: "interaction-organize-thumbnails",
@@ -304,31 +332,6 @@ const interactionDefinitions = Object.freeze({
         { type: "wait", selector: ".pdf-page-card .pdf-thumbnail-frame img", timeoutMs: 60_000 },
       ],
       assertSelector: ".pdf-page-card .pdf-thumbnail-frame img",
-    }),
-    Object.freeze({
-      stateId: "interaction-image-to-pdf-thumbnails",
-      fixture: { kind: "generated-png", fileName: "visual-page.png", width: 320, height: 220 },
-      actions: [
-        { type: "click", selector: ".pdf-tool-navigation [data-pdf-nav-mode='image-to-pdf']" },
-        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='image-to-pdf']" },
-        { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
-        { type: "wait", selector: ".pdf-image-card" },
-        { type: "scroll-into-view", selector: ".pdf-image-grid", offset: -88 },
-      ],
-      assertSelector: ".pdf-tool-page[data-pdf-mode='image-to-pdf'] .pdf-image-card",
-    }),
-    Object.freeze({
-      stateId: "interaction-pdf-to-image-thumbnails",
-      fixture: { kind: "generated-pdf", fileName: "visual-images.pdf", pageCount: 2 },
-      actions: [
-        { type: "click", selector: ".pdf-tool-navigation [data-pdf-nav-mode='pdf-to-image']" },
-        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='pdf-to-image']" },
-        { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
-        { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
-        { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },
-        { type: "wait", selector: ".pdf-page-card .pdf-thumbnail-frame img", timeoutMs: 60_000 },
-      ],
-      assertSelector: ".pdf-tool-page[data-pdf-mode='pdf-to-image'] .pdf-page-card",
     }),
     Object.freeze({
       stateId: "interaction-convert-thumbnails",

@@ -62,18 +62,18 @@ HWP 편집기는 공식 rhwp Studio를 Worklazy Tools와 같은 origin의 정적
 
 | 항목 | 고정값 |
 | --- | --- |
-| 버전 / 태그 | `0.8.6` / `v0.8.6` |
-| upstream 커밋 | `f1f9c6ae58344ee9368996d3543f76b9345cf227` |
-| npm 패키지 | `@rhwp/core@0.8.6`, `@rhwp/editor@0.8.6` |
-| payload | 77파일, 60,680,448바이트 |
-| `rhwp-vendor.json` | 11,836바이트, SHA-256 `a559f14562af337834843d3f9e207f93005faaa205a948e6110537f0acfc3440` |
-| manifest 포함 전체 | 78파일, 60,692,284바이트 |
+| 버전 / 태그 | `0.8.7` / `v0.8.7` |
+| upstream 커밋 | `1a76570e833917d15817415a53c09ad61ab3203f` |
+| npm 패키지 | `@rhwp/core@0.8.7`, `@rhwp/editor@0.8.7` |
+| payload | 78파일, 64,881,144바이트 |
+| `rhwp-vendor.json` | 11,973바이트, SHA-256 `984eba76e7c83d00cb6da02901c572bac3d54d5a6411ea0560a0e635384da533` |
+| manifest 포함 전체 | 79파일, 64,893,117바이트 |
 
-`scripts/vendor-rhwp-studio.mjs`는 GitHub의 정확한 `v0.8.6` 태그를 sparse clone하고, 설치된 두 npm 패키지 버전이 목표 버전과 정확히 일치할 때만 Studio를 빌드한다. 외부 웹폰트는 `RHWP_DISABLE_EXTERNAL_WEBFONTS=1`로 차단한다. Studio 단독 배포에는 HwpCtrl 플러그인이 필요하지 않아 `RHWP_WITHOUT_HWPCTRL=1`을 기본 적용하며, 이에 따라 플러그인 포함 빌드보다 payload가 1파일·54,571바이트 작고 `studio-plugin` 청크가 남지 않는다.
+`scripts/vendor-rhwp-studio.mjs`는 GitHub의 정확한 `v0.8.7` 태그를 sparse clone하고, 설치된 두 npm 패키지 버전이 목표 버전과 정확히 일치할 때만 Studio를 빌드한다. 외부 웹폰트는 `RHWP_DISABLE_EXTERNAL_WEBFONTS=1`로 차단한다. Studio 단독 배포에는 HwpCtrl 플러그인이 필요하지 않아 `RHWP_WITHOUT_HWPCTRL=1`을 기본 적용하며, `studio-plugin` 청크가 남지 않는지 검증한다. 이번 버전의 플러그인 포함 빌드와 payload 차이는 별도로 측정하지 않았다.
 
 생성과 검증 절차는 다음과 같다.
 
-1. `npm install`을 실행하고 `npm ls @rhwp/core @rhwp/editor --depth=0`과 두 설치 package.json에서 버전이 모두 `0.8.6`인지 확인한다.
+1. `npm install`을 실행하고 `npm ls @rhwp/core @rhwp/editor --depth=0`과 두 설치 package.json에서 버전이 모두 `0.8.7`인지 확인한다.
 2. `npm run vendor:rhwp`를 실행한다. 스크립트는 Studio 빌드 뒤 `workbox-*.js`, `registerSW.js`, `sw.js`, `manifest.webmanifest`를 재귀 제거하고 잔존 파일이 있으면 실패한다.
 3. 생성된 `rhwp-vendor.json`의 각 파일 `{bytes, sha256}`를 검토한 뒤 `node scripts/validate-rhwp-vendor.mjs`를 실행한다. validator는 manifest에 없는 추가 파일과 실제로 누락된 파일, 바이트·SHA-256 불일치를 모두 거부한다. 같은 검증은 `npm run build`의 prebuild 게이트에서도 실행된다.
 4. 교체 검증이 끝난 이전 스냅샷만 `npm run vendor:rhwp:prune`으로 제거한다. 스크립트의 명시 허용목록 밖 버전과 현재 버전은 제거할 수 없다.

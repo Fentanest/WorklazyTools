@@ -46,7 +46,8 @@ test("visual Date ignores host day/year changes and preserves explicit dates and
 test("all states and QA profiles of the three calendar tools and PDF finish receive the same pre-navigation clock", async () => {
   const clockedTools = ["payroll-calculator", "pdf-editor", "timezone-calculator", "work-calculator"];
   assert.deepEqual(Object.keys(clock.toolReasons).sort(), clockedTools);
-  for (const [scenarios, expectedScenarios, expectedCaptures] of [[visualRegressionConfig.scenarios, 24, 95], [qaCaptureScenarios, 15, 120]] as const) {
+  // Two image conversion states moved to pdf-converter and do not use a date token.
+  for (const [scenarios, expectedScenarios, expectedCaptures] of [[visualRegressionConfig.scenarios, 22, 93], [qaCaptureScenarios, 13, 104]] as const) {
     let fixedScenarios = 0;
     let fixedCaptures = 0;
     for (const scenario of scenarios) {

@@ -131,7 +131,8 @@ if (selectedPageIds.length && (new Set(selectedPageIds).size !== selectedPageIds
   throw new Error(`A11Y_PAGE_IDS contains an unknown or duplicate page: ${selectedPageIds.join(",")}.`);
 }
 
-// Minimal exception: rhwp Studio 0.8.6 upstream owns these vendor iframe nodes.
+// Historical exception approved for rhwp Studio 0.8.6; this does not certify 0.8.7.
+// The unexcluded 0.8.7 audit found six unresolved nodes; see docs/backlog.md.
 // See docs/backlog.md, "HWP 편집기 iframe 접근성 위반 4노드". The host page stays audited.
 export const accessibilityExceptions = Object.freeze([
   Object.freeze({ pageId: "hwp-editor", selector: 'iframe[title="rhwp HWP 문서 편집기"]',

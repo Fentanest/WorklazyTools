@@ -13,8 +13,8 @@ const dist = path.resolve(get("--dist", "dist"));
 const out = get("--out", undefined);
 
 const EXCEPTIONS = new Map([
-  ["vendor/rhwp-studio/0.8.6/index.html", "RHWP snapshot owner: upstream Studio entry"],
-  ["vendor/rhwp-studio/0.8.6/print.html", "RHWP snapshot owner: upstream print document"],
+  ["vendor/rhwp-studio/0.8.7/index.html", "RHWP snapshot owner: upstream Studio entry"],
+  ["vendor/rhwp-studio/0.8.7/print.html", "RHWP snapshot owner: upstream print document"],
   ["naver05161fb06bc9701a23cfc09ad5773578.html", "Publishing integration owner: exact Naver site verification payload"],
 ]);
 

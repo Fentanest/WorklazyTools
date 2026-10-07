@@ -56,7 +56,10 @@ try {
 
     if (onlyHwp) {
       console.log("[1/1] HWP editor and comparison");
-      await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx, fixtures.editorHwp);
+      await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx, fixtures.editorHwp).catch(async (error) => {
+        console.error("[HWP failure state]", await page.evaluate(() => ({ url: location.href, body: document.body.innerText })));
+        throw error;
+      });
     } else if (onlyImageMobile) {
       console.log("[1/1] Image studio mobile interactions");
       await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
@@ -148,7 +151,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
   await page.goto(`${koBaseUrl}/tools/document-compare`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-slot='rhwp-version-notice']");
   const compareVersion = await page.$eval("[data-slot='rhwp-version-notice']", (element) => element.textContent || "");
-  if (!compareVersion.includes("rhwp 0.8.6") || !compareVersion.includes("공식 비교 파일")) {
+  if (!compareVersion.includes("rhwp 0.8.7") || !compareVersion.includes("공식 비교 파일")) {
     throw new Error(`HWP comparison version notice is incomplete: ${compareVersion}`);
   }
   let compareInputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
@@ -207,7 +210,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
     const version = iframe.contentDocument?.querySelector('meta[name="rhwp-version"]')?.getAttribute("content") || "";
     return { sameOrigin: url.origin === location.origin, path: url.pathname, csp, version };
   });
-  if (!runtime.sameOrigin || !runtime.path.includes("/vendor/rhwp-studio/0.8.6/") || runtime.version !== "0.8.6"
+  if (!runtime.sameOrigin || !runtime.path.includes("/vendor/rhwp-studio/0.8.7/") || runtime.version !== "0.8.7"
     || !runtime.csp.includes("connect-src 'self'") || !runtime.csp.includes("font-src 'self'")) {
     throw new Error(`HWP editor is not using the isolated self-hosted runtime: ${JSON.stringify(runtime)}`);
   }
@@ -240,7 +243,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   const editorVersion = await page.$eval("[data-slot='rhwp-version-notice'][data-compact='true']", (element) => element.textContent || "");
-  if (!editorVersion.includes("rhwp 0.8.6") || !editorVersion.includes("이 사이트에 포함")) {
+  if (!editorVersion.includes("rhwp 0.8.7") || !editorVersion.includes("이 사이트에 포함")) {
     throw new Error(`HWP editor version notice is incomplete: ${editorVersion}`);
   }
 
