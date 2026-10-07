@@ -4,6 +4,7 @@ import test from "node:test";
 import { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition } from "../../src/app/seo.ts";
 
 const toolRoutes = [
+  "/tools/document-markdown", "/tools/pdf-converter/document-to-pdf", "/tools/pdf-converter/pdf-to-document",
   "/tools/pdf-converter", "/tools/pdf-converter/image-to-pdf", "/tools/pdf-converter/pdf-to-image",
   "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-generator", "/tools/document-compare", "/tools/pdf-compare", "/tools/pdf-editor",
   "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",

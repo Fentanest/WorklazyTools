@@ -1,0 +1,7 @@
+{
+  "docx": "한글 문서 PDF 확인\nOffice PDF probe",
+  "xlsx": "## Sheet1\n| 한글 표 PDF 확인 | Second cell |\n| --- | --- |\n| 42 | NaN |",
+  "xls": "## Sheet1\n| 한글 표 PDF 확인 | Second cell |\n| --- | --- |\n| 42 | NaN |",
+  "pptx": "<!-- Slide number: 1 -->\n한글 발표 PDF 확인",
+  "pdf": "한글 문서 PDF 확인\nOffice PDF probe\n\n"
+}

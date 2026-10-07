@@ -1,6 +1,6 @@
 import type { PdfOrganizePreset } from "./pdfOrganizeDirect";
 import type { PdfConvertPreset } from "./pdfConvertDirect";
-import { BadgeCheck, FileOutput, Layers3 } from "lucide-react";
+import { BadgeCheck, Layers3 } from "lucide-react";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 
@@ -33,7 +33,6 @@ interface PdfPageCopy {
 const navigation = [
   { mode: "organize", to: "/tools/pdf-editor", icon: Layers3 },
   { mode: "finish", to: "/tools/pdf-editor/finish", icon: BadgeCheck },
-  { mode: "convert", to: "/tools/pdf-editor/convert", icon: FileOutput },
 ] as const;
 
 type PdfEditorPageProps =

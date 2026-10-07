@@ -24,6 +24,7 @@ import type { QrMode } from "../features/qr-studio/QrStudioPage";
 import { InvalidLanguageRedirect, LocalizedNavigate, useAppLanguage } from "../i18n/routing";
 import { isAppLanguage } from "../i18n/languages";
 
+const DocumentMarkdownPage = lazy(() => import("../features/document-markdown/DocumentMarkdownPage").then(module => ({ default: module.DocumentMarkdownPage })));
 const PdfConverterPage = lazy(() => import("../features/pdf-converter/PdfConverterPage").then((module) => ({ default: module.PdfConverterPage })));
 const PdfEditorPage = lazy(() => import("../features/pdf-editor/PdfEditorPage").then((module) => ({ default: module.PdfEditorPage })));
 const HwpEditorPage = lazy(() => import("../features/hwp-editor/HwpEditorPage").then((module) => ({ default: module.HwpEditorPage })));
@@ -71,13 +72,17 @@ export function App() {
 <Route path="tools/pdf-editor/split" element={<PdfRoute mode="organize" organizePreset={{ purpose: "split", outputMode: "ranges", quickSplit: true }} />} />
 <Route path="tools/pdf-editor/delete" element={<PdfRoute mode="organize" organizePreset={{ purpose: "delete", outputMode: "merged", quickSplit: false, postLoadFocus: "delete" }} />} />
 <Route path="tools/pdf-editor/rotate" element={<PdfRoute mode="organize" organizePreset={{ purpose: "rotate", outputMode: "merged", quickSplit: false, postLoadFocus: "rotate" }} />} />
+          <Route path="tools/document-markdown" element={<LazyToolRoute label="Document to Markdown"><DocumentMarkdownPage /></LazyToolRoute>} />
           <Route path="tools/pdf-converter" element={<LazyToolRoute label="PDF converter"><PdfConverterPage mode="image-to-pdf" /></LazyToolRoute>} />
           <Route path="tools/pdf-converter/image-to-pdf" element={<LazyToolRoute label="Image to PDF"><PdfConverterPage mode="image-to-pdf" /></LazyToolRoute>} />
+          <Route path="tools/pdf-converter/document-to-pdf" element={<LazyToolRoute label="Document to PDF"><PdfConverterPage mode="document-to-pdf" /></LazyToolRoute>} />
+          <Route path="tools/pdf-converter/pdf-to-document/ocr" element={<LazyToolRoute label="PDF OCR"><PdfConverterPage mode="pdf-to-document" convertPreset={{ purpose: "ocr", format: "searchable-pdf", pageRange: "" }} /></LazyToolRoute>} />
+          <Route path="tools/pdf-converter/pdf-to-document" element={<LazyToolRoute label="PDF to document"><PdfConverterPage mode="pdf-to-document" /></LazyToolRoute>} />
           <Route path="tools/pdf-converter/pdf-to-image" element={<LazyToolRoute label="PDF to image"><PdfConverterPage mode="pdf-to-image" /></LazyToolRoute>} />
           <Route path="tools/pdf-editor/image-to-pdf" element={<LocalizedNavigate to="/tools/pdf-converter/image-to-pdf" />} />
           <Route path="tools/pdf-editor/pdf-to-image" element={<LocalizedNavigate to="/tools/pdf-converter/pdf-to-image" />} />
-          <Route path="tools/pdf-editor/convert" element={<PdfRoute mode="convert" convertPreset={{ purpose: "convert", format: "docx", pageRange: "", ocrMode: "auto" }} />} />
-          <Route path="tools/pdf-editor/ocr" element={<PdfRoute mode="convert" convertPreset={{ purpose: "ocr", format: "searchable-pdf", pageRange: "" }} />} />
+          <Route path="tools/pdf-editor/convert" element={<LocalizedNavigate to="/tools/pdf-converter/pdf-to-document" />} />
+          <Route path="tools/pdf-editor/ocr" element={<LocalizedNavigate to="/tools/pdf-converter/pdf-to-document/ocr" />} />
           <Route path="tools/pdf-editor/finish" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "page-numbers" }} />} />
           <Route path="tools/pdf-editor/page-numbers" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "page-numbers" }} />} />
           <Route path="tools/pdf-editor/header-footer" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "header-footer" }} />} />

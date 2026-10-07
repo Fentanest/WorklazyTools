@@ -30,7 +30,7 @@ export function documentReadiness(
   const path = stripLanguagePrefix(pathname).replace(/\/+$/, "") || "/";
   if (path === "/tools/hwp-editor" && /^\/en(?:\/|$)/.test(pathname)) return "navigation";
   const redactor = path === "/tools/document-redactor";
-  const office = path === "/tools/office-editor/app";
+  const office = path === "/tools/office-editor/app" || path === "/tools/pdf-converter/document-to-pdf";
   const excel = path === "/tools/excel-merger/xls-preserve";
   if (path === "/tools/office-editor" && new URLSearchParams(search).get("guide") !== "1") return "navigation";
   if (redactor !== markers.redactor || office !== markers.office || excel !== markers.excel) return "navigation";

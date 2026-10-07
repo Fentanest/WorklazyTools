@@ -16,11 +16,11 @@ const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData
 
 const toolRoutes = [
   "foliotrace",
-  "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "pdf-converter", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
+  "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "pdf-converter", "document-markdown", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
   "document-redactor", "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
 ];
-const pdfRoutes = ["pdf-converter/image-to-pdf", "pdf-converter/pdf-to-image", "pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark", "pdf-editor/stamp"];
+const pdfRoutes = ["pdf-converter/image-to-pdf", "pdf-converter/pdf-to-image", "pdf-converter/document-to-pdf", "pdf-converter/pdf-to-document", "pdf-converter/pdf-to-document/ocr", "pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark", "pdf-editor/stamp"];
 const pageRoutes = ["about", "privacy", "terms", "contact", "licenses"];
 const videoChildRoutes = VIDEO_STUDIO_PUBLIC ? VIDEO_DIRECT_PATHS.slice(1).map(route => route.slice(1)) : [];
 const coreDirectRoutes = ["tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr", "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark", "tools/audio-studio/trim"];
@@ -38,7 +38,7 @@ for (const language of languages) {
     const routeUrl = absolute(language, route);
     const canonicalRoute = canonicalSeoPath(`/${route}`).replace(/^\//, "");
     const canonical = absolute(language, canonicalRoute);
-    const html = route === "tools/document-redactor" ? renderRedactorPage(sourceHtml, page, canonical) : renderPage(sourceHtml, page, canonical);
+    const html = route === "tools/document-redactor" ? renderRedactorPage(sourceHtml, page, canonical) : route === "tools/pdf-converter/document-to-pdf" ? renderPage(sourceHtml, page, canonical).replace("</head>", `<meta name="worklazy-office-isolation" content="document-scope" /><script>globalThis.coi={quiet:true};</script><script data-worklazy-office-isolation src="./coi-serviceworker.js"></script></head>`) : renderPage(sourceHtml, page, canonical);
     const directory = path.join(outputDirectory, language, route);
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(path.join(directory, "index.html"), html);
@@ -103,7 +103,7 @@ if (VIDEO_STUDIO_PUBLIC) {
   }
 }
 for (const language of languages) {
-  for (const isolatedRoute of [officeAppRoute, excelPreserveRoute]) {
+  for (const isolatedRoute of [officeAppRoute, excelPreserveRoute, "tools/pdf-converter/document-to-pdf"]) {
     const target = path.join(outputDirectory, language, isolatedRoute, "coi-serviceworker.js");
     await fs.mkdir(path.dirname(target), { recursive: true });
     await fs.writeFile(target, officeCoiSourceText);

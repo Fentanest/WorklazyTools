@@ -130,7 +130,7 @@ try {
   if (cachedError) throw new Error(`Cached office editor start reported an error: ${cachedError}`);
   const cacheReuse = await page.evaluate(async () => {
     const messages = Array.from(document.querySelectorAll(".ui-operation-log li"), (item) => item.textContent || "");
-    const cache = await caches.open("worklazy-office-2026-08-26");
+    const cache = await caches.open("worklazy-office-2026-10-07");
     const keys = await cache.keys();
     return { messages, assetCount: keys.filter((request) => request.url.includes("/vendor/zetaoffice/")).length };
   });

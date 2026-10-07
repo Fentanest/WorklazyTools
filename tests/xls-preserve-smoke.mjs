@@ -161,7 +161,7 @@ try {
     const preparation = await page.evaluate(async () => ({
       samples: window.__xlsProgressSamples,
       cacheNames: (await caches.keys()).filter((name) => name.startsWith("worklazy-office-")),
-      cachedAssets: (await (await caches.open("worklazy-office-2026-08-26")).keys()).filter((request) => request.url.includes("/vendor/zetaoffice/")).length,
+      cachedAssets: (await (await caches.open("worklazy-office-2026-10-07")).keys()).filter((request) => request.url.includes("/vendor/zetaoffice/")).length,
     }));
     if (!preparation.samples.some((sample) => sample.includes("MB") || sample.includes("저장된 변환 파일"))
       || new Set(preparation.samples.map((sample) => sample.split(":", 1)[0])).size < 4

@@ -234,7 +234,7 @@ export function AppShell() {
   const redactorDocument = isRedactorDocument();
   useEffect(() => { if (import.meta.env.PROD && redactorActive !== redactorDocument) window.location.replace(window.location.href); }, [redactorActive, redactorDocument]);
   const videoStudioActive = VIDEO_STUDIO_PUBLIC && isVideoDirectPath(location.pathname, import.meta.env.BASE_URL);
-  const officeEditorAppActive = normalizedPath === "/tools/office-editor/app";
+  const officeEditorAppActive = normalizedPath === "/tools/office-editor/app" || normalizedPath === "/tools/pdf-converter/document-to-pdf";
   const excelPreserveActive = normalizedPath === "/tools/excel-merger/xls-preserve";
   const [videoControllerReady, setVideoControllerReady] = useState(false);
   const [videoIsolationFailed, setVideoIsolationFailed] = useState(false);
@@ -307,7 +307,7 @@ export function AppShell() {
       <div className={cn("app-shell", sidebarCollapsed && "wl-collapsed", focusMode === "editor" && "editor-mode")}>
       <RouteSeo />
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} onReady={setVideoControllerReady} onFailed={setVideoIsolationFailed} />
-      <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} language={language} />
+      <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} />
       <ExcelPreserveIsolationBoundary active={excelPreserveActive} isolationDocument={excelIsolationDocument} language={language} />
       <AnalyticsLoader ready={pageReady} />
       <AdSenseLoader ready={adReady} terminalIneligible={terminalAdState} />
@@ -579,17 +579,17 @@ function VideoIsolationBoundary({ active, isolationDocument, onReady, onFailed }
   return null;
 }
 
-function OfficeIsolationBoundary({ active, isolationDocument, language }: { active: boolean; isolationDocument: boolean; language: "ko" | "en" }) {
+function OfficeIsolationBoundary({ active, isolationDocument }: { active: boolean; isolationDocument: boolean }) {
   useEffect(() => {
     if (!import.meta.env.PROD) return;
     if (active && !isolationDocument) {
       const target = new URL(window.location.href);
-      target.pathname = withSiteBasePath(localizedPath(language, "/tools/office-editor/app/"), import.meta.env.BASE_URL);
+      target.pathname = target.pathname.replace(/\/?$/, "/");
       window.location.replace(target.href);
       return;
     }
     if (!active && isolationDocument) window.location.replace(window.location.href);
-  }, [active, isolationDocument, language]);
+  }, [active, isolationDocument]);
 
   return null;
 }

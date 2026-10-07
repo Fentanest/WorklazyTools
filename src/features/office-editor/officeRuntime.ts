@@ -21,6 +21,7 @@ declare global {
 export interface OfficeRuntime {
   open(file: File): Promise<void>;
   save(): Promise<{ bytes: Uint8Array; fileName: string }>;
+  convertToPdf(file: File): Promise<{ bytes: Uint8Array; fileName: string }>;
   convertLegacySpreadsheet(file: File): Promise<{ bytes: Uint8Array; fileName: string }>;
 }
 
@@ -103,6 +104,27 @@ export async function launchOfficeRuntime(
       const bytes = fileSystem.readFile(`/tmp/office/${fileName}`).slice();
       if (!isPlausibleOfficeFile(bytes)) throw new Error("office-save-verification-failed");
       return { bytes, fileName };
+    },
+    async convertToPdf(file) {
+      const extension = file.name.split(".").at(-1)?.toLowerCase() ?? "";
+      if (!["doc", "docx", "xls", "xlsx", "ppt", "pptx"].includes(extension)) throw new Error("unsupported-office-format");
+      spreadsheetConversionSequence += 1;
+      const inputName = `pdf-input-${spreadsheetConversionSequence}.${extension}`;
+      const outputName = `pdf-output-${spreadsheetConversionSequence}.pdf`;
+      const fileSystem = (globalThis as typeof globalThis & { FS: OfficeFileSystem }).FS;
+      try { fileSystem.mkdir("/tmp/office"); } catch { /* Existing directory. */ }
+      fileSystem.writeFile(`/tmp/office/${inputName}`, new Uint8Array(await file.arrayBuffer()));
+      try {
+        const converted = waitFor("converted", 120_000);
+        port.postMessage({ cmd: "convert-pdf", filename: inputName, output: outputName });
+        await converted;
+        const bytes = fileSystem.readFile(`/tmp/office/${outputName}`).slice();
+        if (new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-") throw new Error("office-convert-verification-failed");
+        return { bytes, fileName: file.name.replace(/\.[^.]+$/, "") + ".pdf" };
+      } finally {
+        try { fileSystem.unlink(`/tmp/office/${inputName}`); } catch { /* Input already removed. */ }
+        try { fileSystem.unlink(`/tmp/office/${outputName}`); } catch { /* No output on failure. */ }
+      }
     },
     async convertLegacySpreadsheet(file) {
       spreadsheetConversionSequence += 1;

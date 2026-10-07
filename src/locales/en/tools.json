@@ -48,10 +48,21 @@
     }
   },
   "items": {
+    "document-markdown": {
+      "title": "Document to Markdown",
+      "shortTitle": "Document to Markdown",
+      "description": "Extract DOCX, XLSX, XLS, PPTX, and PDF text and tables as Markdown with Microsoft MarkItDown.",
+      "eyebrow": "MARKDOWN",
+      "highlights": [
+        "Text and headings",
+        "Table extraction",
+        "Markdown download"
+      ]
+    },
     "pdf-converter": {
       "title": "PDF Converter",
       "shortTitle": "PDF Converter",
-      "description": "Combine JPG and PNG images into a PDF, or save selected PDF pages as PNG or JPG images.",
+      "description": "Convert images and Office files to PDF; extract PDF images, text and tables",
       "eyebrow": "PDF CONVERSION",
       "highlights": [
         "Image ordering",
@@ -65,7 +76,11 @@
       "shortTitle": "FolioTrace",
       "description": "Explore an estimate of NPS Korean equity holdings based on public filings.",
       "eyebrow": "Public filings",
-      "highlights": ["DART filing evidence", "Tracked securities", "Receipt dates"]
+      "highlights": [
+        "DART filing evidence",
+        "Tracked securities",
+        "Receipt dates"
+      ]
     },
     "document-redactor": {
       "title": "Redact Personal Info from PDF and Images",
@@ -117,15 +132,15 @@
       ]
     },
     "pdf-editor": {
-      "title": "Edit and Convert PDF Files",
+      "title": "Edit PDF Pages",
       "shortTitle": "PDF Editor",
-      "description": "Merge, extract, and convert PDF pages, or use Korean and English OCR to transform them into various document formats.",
-      "eyebrow": "PDF EDIT & CONVERT",
+      "description": "Merge, split, extract, and rotate PDF pages, then add page numbers, watermarks, or stamps.",
+      "eyebrow": "PDF PAGES & FINISHING",
       "highlights": [
         "Checkbox & continuous ranges",
         "Page numbers and watermarks",
-        "DOCX & TXT",
-        "XLSX & OCR"
+        "Rotate & reorder",
+        "Headers & stamps"
       ]
     },
     "document-compare": {

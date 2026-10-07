@@ -28,3 +28,6 @@ docs/jobs/
 dummyfortest/
 tests/visual-artifacts/
 public/vendor/pdfjs/
+
+public/vendor/markitdown/
+.cache/markitdown/

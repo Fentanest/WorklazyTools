@@ -10,7 +10,7 @@ export function isRedactorDocument() {
 }
 function isDedicatedWorkspacePath(pathname: string) {
   const route = stripSiteBasePath(pathname, import.meta.env.BASE_URL);
-  return route !== null && /^\/(?:ko\/|en\/)?tools\/(?:document-redactor|office-editor\/app|excel-merger\/xls-preserve)\/?$/.test(route);
+  return route !== null && /^\/(?:ko\/|en\/)?tools\/(?:document-redactor|office-editor\/app|pdf-converter\/document-to-pdf|excel-merger\/xls-preserve)\/?$/.test(route);
 }
 function isDedicatedWorkspaceDocument() {
   return Boolean(document.querySelector(`${REDACTOR_MARKER}, meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"]`));

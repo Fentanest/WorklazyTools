@@ -6,6 +6,7 @@ const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const publicVendorRoot = path.join(projectRoot, "public", "vendor");
 
 await copyPyodide();
+await import("./vendor-markitdown.mjs");
 await copyTesseract();
 await copySharedAudioRuntime();
 if (VIDEO_STUDIO_PUBLIC) await copyVideoRuntime();
@@ -83,7 +84,7 @@ async function copySharedAudioRuntime() {
 }
 
 async function vendorZetaOffice() {
-  const version = "2026-08-26";
+  const version = "2026-10-07";
   const sourceSnapshotVersion = "2026-08-25";
   const sourceBaseUrl = process.env.ZETAOFFICE_ASSET_BASE_URL || "https://cdn.zetaoffice.net/zetaoffice_latest/";
   const cacheDirectory = path.join(projectRoot, ".cache", "zetaoffice", sourceSnapshotVersion);
@@ -133,6 +134,7 @@ async function vendorZetaOffice() {
     fs.copyFile(path.join(projectRoot, "src", "features", "office-editor", "office_thread.js"), path.join(destination, "office_thread.js")),
   ]);
   await fs.writeFile(path.join(destination, "manifest.json"), `${JSON.stringify({ version, assets, editorFontAssets, fontLicenseAssets }, null, 2)}\n`);
+  await fs.rm(path.join(publicVendorRoot, "zetaoffice", "2026-08-26"), { recursive: true, force: true });
 }
 
 async function matchesAsset(filePath, asset) {

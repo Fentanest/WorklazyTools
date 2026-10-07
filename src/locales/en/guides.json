@@ -1,4 +1,32 @@
 {
+  "documentMarkdown": {
+    "title": "Extracting Markdown from documents",
+    "description": "Extract DOCX, XLSX, XLS, PPTX, and PDF text and tables as Markdown with Microsoft MarkItDown.",
+    "blocks": [
+      {
+        "title": "Supported formats",
+        "paragraphs": [
+          "Processes DOCX, XLSX, XLS, PPTX and text PDFs. DOC, PPT, HWP, and HWPX are not currently supported."
+        ]
+      },
+      {
+        "title": "Review the output",
+        "paragraphs": [
+          "Headings, paragraphs, and tables may differ from the original. Formulas, layout, images, and scanned text recognition are not restored. Compare important content with the original."
+        ]
+      }
+    ],
+    "faq": {
+      "privacy": {
+        "q": "Are documents sent to a server?",
+        "a": "No. Conversion assets are downloaded and documents are processed in this browser."
+      },
+      "scans": {
+        "q": "Are scanned or encrypted PDFs supported?",
+        "a": "OCR and encrypted documents are not supported. Use an unlocked document with extractable text."
+      }
+    }
+  },
   "foliotrace": {
     "title": "Using FolioTrace",
     "description": "An estimated portfolio following NPS domestic equities through DART large-shareholding filings. This is neither an actual account balance nor all NPS assets.",
@@ -2142,7 +2170,7 @@
     }
   },
   "pdfConverter": {
-    "title": "Converting PDFs and images",
+    "title": "Converting PDFs, images and documents",
     "description": "Files are processed in this browser. Keep your originals and check the output.",
     "blocks": [
       {
@@ -2155,6 +2183,18 @@
         "title": "PDF to image",
         "paragraphs": [
           "Choose PNG or JPG, a resolution, and a page range to download a ZIP of page images. More pages and higher resolutions require more memory and time."
+        ]
+      },
+      {
+        "title": "Document to PDF",
+        "paragraphs": [
+          "LibreOffice processes DOC, DOCX, XLS, XLSX, PPT and PPTX. The first run loads about 252 MiB; inputs may be up to 50 MiB. Fonts and print settings can change the output: check pages and tables. For HWP / HWPX, open the print dialog from the rhwp preview and choose Save as PDF in your browser. Password-protected documents are not supported."
+        ]
+      },
+      {
+        "title": "What PDF to Document provides",
+        "paragraphs": [
+          "Produces text/table extraction as DOCX, XLSX, plain text or searchable PDF. Original layout, formulas, shapes and editing structure are not guaranteed. PPTX and HWPX output are not available. Use OCR for scans and check the result."
         ]
       }
     ],

@@ -54,9 +54,13 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/document-compare": "document-compare",
   "/tools/pdf-compare": "pdf-compare",
   "/tools/pdf-editor": "pdf-tools",
+  "/tools/document-markdown": "document-markdown",
   "/tools/pdf-converter": "pdf-converter",
   "/tools/pdf-converter/image-to-pdf": "image-to-pdf",
   "/tools/pdf-converter/pdf-to-image": "pdf-to-image",
+  "/tools/pdf-converter/document-to-pdf": "document-to-pdf",
+  "/tools/pdf-converter/pdf-to-document": "pdf-to-document",
+  "/tools/pdf-converter/pdf-to-document/ocr": "pdf-editor-ocr",
   "/tools/pdf-editor/image-to-pdf": "image-to-pdf",
   "/tools/pdf-editor/pdf-to-image": "pdf-to-image",
   "/tools/pdf-editor/convert": "pdf-convert",
@@ -150,10 +154,10 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/pdf-editor": {
     title: "PDF 페이지 편집 - 순서 변경·병합·분할 | Worklazy Tools",
-    description: "PDF 페이지를 병합, 추출, 변환하거나 한국어·영어 OCR을 통해 다양한 문서 형식으로 만드세요.",
+    description: "PDF 페이지를 병합·분할·추출·회전하고 페이지 번호·워터마크·스탬프를 추가하세요.",
     application: {
       name: "PDF 편집",
-      featureList: ["PDF 페이지 편집·병합·추출", "체크박스 범위 선택·연속 분할", "페이지 순서 변경·회전", "이미지를 PDF로 변환", "PDF를 PNG·JPG로 변환", "PDF DOCX·XLSX·TXT 변환", "한국어·영어 OCR"],
+      featureList: ["PDF 페이지 편집·병합·추출", "체크박스 범위 선택·연속 분할", "페이지 순서 변경·회전", "페이지 번호·워터마크", "머리글·스탬프"],
     },
   },
   "/tools/pdf-editor/image-to-pdf": {
@@ -366,7 +370,8 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "excel-cleaner": "Excel Data Cleaner - Remove Spaces, Blank Rows & Duplicates | Worklazy Tools",
   "document-generator": "Batch Word Document Generator - Excel to Word Mail Merge | Worklazy Tools",
   "pdf-editor": "PDF Editor - Reorder, Merge, Split & Convert | Worklazy Tools",
-  "pdf-converter": "PDF Converter - JPG, PNG and PDF | Worklazy Tools",
+  "document-markdown": "Document to Markdown - MarkItDown | Worklazy Tools",
+  "pdf-converter": "PDF Converter - Images and Documents | Worklazy Tools",
   "document-compare": "Compare Word & HWP Documents - Track Changes | Worklazy Tools",
   "pdf-compare": "Compare PDF Files - Check Visual & Text Differences | Worklazy Tools",
   "hwp-editor": "HWP Editor - Edit HWP & HWPX Online | Worklazy Tools",
@@ -424,17 +429,37 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/licenses": { title: "Licenses & Third-Party Notices | Worklazy Tools", description: "Review Worklazy Tools copyright terms and licenses for rhwp, ffmpeg.wasm and other open-source components." },
 };
 
+seoByPath["/tools/document-markdown"] = {
+  title: "문서 → Markdown - MarkItDown | Worklazy Tools",
+  description: "DOCX·XLSX·XLS·PPTX·PDF의 텍스트와 표를 브라우저에서 Markdown으로 추출하세요.",
+  application: { name: "문서 → Markdown", featureList: ["Microsoft MarkItDown", "DOCX·XLSX·XLS·PPTX·PDF", "텍스트·표 추출", "로컬 처리"] },
+};
+englishPageSeo["/tools/document-markdown"] = {
+  title: "Document to Markdown - MarkItDown | Worklazy Tools",
+  description: "Extract DOCX, XLSX, XLS, PPTX and PDF text and tables into Markdown in your browser.",
+  application: { name: "Document to Markdown", featureList: ["Microsoft MarkItDown", "DOCX, XLSX, XLS, PPTX, PDF", "Text and table extraction", "Browser processing"] },
+};
 seoByPath["/tools/pdf-converter"] = {
-  title: "PDF 변환 - JPG·PNG·PDF | Worklazy Tools",
-  description: "이미지를 PDF로 묶거나 PDF의 선택 페이지를 PNG·JPG 이미지로 저장하세요.",
+  title: "PDF 변환 - 이미지·문서 변환 | Worklazy Tools",
+  description: "이미지·Office 문서를 PDF로 저장하고 PDF에서 이미지·텍스트·표를 추출하세요.",
   application: { name: "PDF 변환", featureList: ["JPG·PNG를 PDF로", "PDF를 PNG·JPG로", "A4·이미지 크기", "페이지 선택·ZIP"] },
 };
+for (const [mode, koTitle, enTitle, koDescription, enDescription] of [
+  ["document-to-pdf", "문서 → PDF", "Document to PDF", "HWP·HWPX와 DOC·DOCX·XLS·XLSX·PPT·PPTX를 브라우저에서 PDF로 저장하세요.", "Save HWP, HWPX, DOC, DOCX, XLS, XLSX, PPT and PPTX as PDF in your browser."],
+  ["pdf-to-document", "PDF → 문서", "PDF to Document", "PDF에서 텍스트와 표를 DOCX·XLSX로 추출하세요. 원본 편집 구조 복원은 보장하지 않습니다.", "Extract PDF text and tables into DOCX or XLSX. Original editing structure is not restored."],
+]) {
+  seoByPath[`/tools/pdf-converter/${mode}`] = { title: `${koTitle} | Worklazy Tools`, description: koDescription };
+  englishPageSeo[`/tools/pdf-converter/${mode}`] = { title: `${enTitle} | Worklazy Tools`, description: enDescription };
+}
+seoByPath["/tools/pdf-converter/pdf-to-document/ocr"] = seoByPath["/tools/pdf-editor/ocr"];
+englishPageSeo["/tools/pdf-converter/pdf-to-document/ocr"] = englishPageSeo["/tools/pdf-editor/ocr"];
 for (const mode of ["image-to-pdf", "pdf-to-image"]) {
   seoByPath[`/tools/pdf-converter/${mode}`] = seoByPath[`/tools/pdf-editor/${mode}`];
   englishPageSeo[`/tools/pdf-converter/${mode}`] = englishPageSeo[`/tools/pdf-editor/${mode}`];
 }
 
 export const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
+  "/tools/document-markdown": "document-markdown",
   "/tools/pdf-converter": "pdf-converter",
   "/tools/foliotrace": "foliotrace",
   "/tools/excel-merger": "excel-merger", "/tools/excel-compare": "excel-compare", "/tools/excel-cleaner": "excel-cleaner", "/tools/document-compare": "document-compare", "/tools/pdf-compare": "pdf-compare", "/tools/pdf-editor": "pdf-editor",
@@ -481,6 +506,8 @@ export function normalizeSeoPath(pathname: string) {
 
 export function canonicalSeoPath(pathname: string) {
   const path = normalizeSeoPath(pathname);
+  if (path === "/tools/pdf-editor/convert") return "/tools/pdf-converter/pdf-to-document";
+  if (path === "/tools/pdf-editor/ocr") return "/tools/pdf-converter/pdf-to-document/ocr";
   if (path === "/tools/pdf-editor/image-to-pdf" || path === "/tools/pdf-editor/pdf-to-image") return path.replace("pdf-editor", "pdf-converter");
   return ["/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp"].includes(path)
     ? "/tools/pdf-editor/finish"

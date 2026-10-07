@@ -11,9 +11,9 @@ import {
 } from "../visual-regression.scenarios.mjs";
 
 test("visual regression scenario manifest covers every available tool and state contract", () => {
-  assert.equal(availableToolRoutes.length, 24);
+  assert.equal(availableToolRoutes.length, 25);
   const availableToolIds = new Set(availableToolRoutes.map(({ toolId }) => toolId));
-  assert.equal(availableToolIds.size, 24);
+  assert.equal(availableToolIds.size, 25);
   assert.ok(!availableToolIds.has("video-studio"), "unpublished Video Studio must not be a public visual route");
 
   const requiredFields = [
@@ -62,7 +62,7 @@ test("visual regression scenario manifest covers every available tool and state 
   const bottomToolIds = new Set(bottomScenarios.map(({ toolId }) => toolId));
   assert.deepEqual(initialToolIds, availableToolIds);
   assert.deepEqual(bottomToolIds, availableToolIds);
-  assert.equal(bottomScenarios.length, 24);
+  assert.equal(bottomScenarios.length, 25);
   assert.ok(bottomScenarios.every(({ profiles }) => profiles.every(({ viewport }) => viewport === "mobile")));
   assert.ok(bottomScenarios.every(({ bottomTargetSelector }) => Boolean(bottomTargetSelector)));
 
@@ -84,7 +84,7 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 278);
+  assert.equal(names.length, 287);
   // Pinned scope additions (not copied historical totals): 4 desktop-1920
   // captures and 4 mint-family captures; unpublished video captures are excluded.
   assert.deepEqual(
@@ -100,8 +100,8 @@ test("visual regression scenario manifest covers every available tool and state 
     ].filter((name) => !names.includes(name)),
     [],
   );
-  assert.equal(qaCaptureScenarios.length, 88);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 692);
+  assert.equal(qaCaptureScenarios.length, 93);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 732);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -148,15 +148,15 @@ test("visual regression scenario manifest covers every available tool and state 
     "interaction-bulk-mode", "interaction-create", "interaction-scan",
   ]));
   const b5aQaScenarios = qaCaptureScenarios.filter(({ toolId }) => ["audio-studio", "pdf-editor", "pdf-converter"].includes(toolId));
-  assert.equal(b5aQaScenarios.length, 12);
-  assert.equal(b5aQaScenarios.flatMap(({ profiles }) => profiles).length, 96);
+  assert.equal(b5aQaScenarios.length, 14);
+  assert.equal(b5aQaScenarios.flatMap(({ profiles }) => profiles).length, 112);
   assert.deepEqual(Object.fromEntries(["initial", "bottom", "interaction"].map((stateType) => [
     stateType,
     b5aQaScenarios.filter((scenario) => scenario.stateType === stateType).flatMap(({ profiles }) => profiles).length,
-  ])), { initial: 24, bottom: 24, interaction: 48 });
+  ])), { initial: 24, bottom: 24, interaction: 64 });
   assert.deepEqual(new Set(b5aQaScenarios.filter(({ stateType }) => stateType === "interaction").map(({ stateId }) => stateId)), new Set([
     "interaction-waveform", "interaction-effect-robot", "interaction-organize-thumbnails",
-    "interaction-image-to-pdf-thumbnails", "interaction-pdf-to-image-thumbnails", "interaction-convert-thumbnails",
+    "interaction-image-to-pdf-thumbnails", "interaction-pdf-to-image-thumbnails", "interaction-convert-thumbnails", "interaction-document-to-pdf", "interaction-pdf-to-document",
   ]));
   const finishScenarios = visualRegressionScenarios.filter(({ stateType }) => ["finish", "finish-navigation"].includes(stateType));
   assert.equal(finishScenarios.length, 9);

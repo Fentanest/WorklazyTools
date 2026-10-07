@@ -4,8 +4,10 @@ self.addEventListener("fetch", (event) => {
   const requestUrl = new URL(event.request.url);
   const isOfficeResource = requestUrl.origin === self.location.origin
     && (/(?:^|\/)tools\/office-editor\/app(?:\/|$)/.test(requestUrl.pathname)
+      || /(?:^|\/)tools\/pdf-converter\/document-to-pdf(?:\/|$)/.test(requestUrl.pathname)
       || /(?:^|\/)tools\/excel-merger\/xls-preserve(?:\/|$)/.test(requestUrl.pathname)
-      || /(?:^|\/)vendor\/zetaoffice(?:\/|$)/.test(requestUrl.pathname));
+      || /(?:^|\/)vendor\/zetaoffice(?:\/|$)/.test(requestUrl.pathname)
+      || /(?:^|\/)vendor\/rhwp-studio(?:\/|$)/.test(requestUrl.pathname));
   const isWorkerResource = requestUrl.origin === self.location.origin
     && (event.request.destination === "worker" || event.request.destination === "sharedworker");
   if (!isOfficeResource && !isWorkerResource) return;

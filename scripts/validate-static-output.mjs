@@ -49,6 +49,20 @@ const { VIDEO_STUDIO_PUBLIC } = await import("../src/app/publicServiceConfig.mjs
 
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
+// The Markdown worker has no network fallback: every selected wheel must ship.
+const markdownRoot = path.join("dist", "vendor", "markitdown", "0.1.8");
+const markdownManifest = JSON.parse(await fs.readFile(path.join(markdownRoot, "manifest.json"), "utf8"));
+const markdownContract = JSON.parse(await fs.readFile("scripts/markitdown-assets.json", "utf8"));
+if (markdownManifest.version !== markdownContract.markitdownVersion || markdownManifest.pyodideVersion !== pyodideVersion) throw new Error("MarkItDown runtime version mismatch");
+const bundle = await fs.readFile(path.join(markdownRoot, "converters.zip"));
+if (bundle.length !== markdownManifest.bundle.bytes || createHash("sha256").update(bundle).digest("hex") !== markdownManifest.bundle.sha256) throw new Error("MarkItDown converter bundle integrity failure");
+for (const entry of markdownManifest.pyodideFiles) {
+  const file = await fs.readFile(path.join("dist", "vendor", "pyodide", pyodideVersion, entry.file));
+  if (file.length !== entry.bytes || createHash("sha256").update(file).digest("hex") !== entry.sha256) throw new Error(`Missing or damaged local Python dependency: ${entry.name}`);
+}
+for (const wheel of markdownContract.wheels) {
+  if (!markdownManifest.upstream.some(entry => entry.name === wheel.name && entry.version === wheel.version && entry.sha256 === wheel.sha256)) throw new Error(`MarkItDown upstream pin mismatch: ${wheel.name}`);
+}
 const rhwpCoreVersion = packageJson.dependencies?.["@rhwp/core"];
 const rhwpEditorVersion = packageJson.dependencies?.["@rhwp/editor"];
 if (!rhwpCoreVersion || rhwpCoreVersion !== rhwpEditorVersion) throw new Error("Pinned rhwp core/editor versions do not match.");
@@ -56,7 +70,8 @@ const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/
 
 const routes = [
   "", "tools", "tools/foliotrace", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare",
-  "tools/pdf-converter", "tools/pdf-converter/image-to-pdf", "tools/pdf-converter/pdf-to-image",
+  "tools/document-markdown",
+  "tools/pdf-converter", "tools/pdf-converter/image-to-pdf", "tools/pdf-converter/pdf-to-image", "tools/pdf-converter/document-to-pdf", "tools/pdf-converter/pdf-to-document", "tools/pdf-converter/pdf-to-document/ocr",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
   "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp",
@@ -69,6 +84,8 @@ const routes = [
   "about", "privacy", "terms", "contact", "licenses",
 ];
 const socialSlugByRoute = {
+  "tools/document-markdown": "document-markdown",
+  "tools/pdf-converter/document-to-pdf": "document-to-pdf", "tools/pdf-converter/pdf-to-document": "pdf-to-document", "tools/pdf-converter/pdf-to-document/ocr": "pdf-editor-ocr",
   "tools/pdf-converter": "pdf-converter", "tools/pdf-converter/image-to-pdf": "image-to-pdf", "tools/pdf-converter/pdf-to-image": "pdf-to-image",
   "tools/foliotrace": "foliotrace", "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-generator": "document-generator", "tools/document-compare": "document-compare", "tools/pdf-compare": "pdf-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
@@ -90,6 +107,11 @@ for (const route of routes) {
   const filePath = path.join("dist", language, route, "index.html");
   const html = await fs.readFile(filePath, "utf8");
   if (route === "tools/document-redactor") assertRedactorStatic(html);
+  if (route === "tools/pdf-converter/document-to-pdf") {
+    if (!html.includes('name="worklazy-office-isolation"') || !html.includes('src="./coi-serviceworker.js"')) throw new Error(`${filePath}: missing Office isolation bootstrap`);
+    const worker = await fs.readFile(path.join("dist", language, route, "coi-serviceworker.js"), "utf8");
+    if (!worker.includes("Cross-Origin-Opener-Policy")) throw new Error(`${filePath}: missing isolation worker`);
+  }
   const required = [
     "<title>",
     'name="description"',
@@ -290,7 +312,7 @@ const officeAssets = [
   ["NanumGothic-OFL.txt", 4534, "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f"],
 ];
 for (const [name, expectedSize, expectedHash] of officeAssets) {
-  const filePath = path.join("dist", "vendor", "zetaoffice", "2026-08-26", name);
+  const filePath = path.join("dist", "vendor", "zetaoffice", "2026-10-07", name);
   const bytes = await fs.readFile(filePath);
   if (bytes.length !== expectedSize || createHash("sha256").update(bytes).digest("hex") !== expectedHash) {
     throw new Error(`Pinned office asset verification failed in static output: ${name}`);
@@ -324,10 +346,10 @@ const [sourceStickerManifest, outputStickerManifest] = await Promise.all([
 ]);
 if (!sourceStickerManifest.equals(outputStickerManifest)) throw new Error("The emitted Image Studio sticker manifest does not match its source.");
 const [officeThread, officeThreadSource] = await Promise.all([
-  fs.readFile(path.join("dist", "vendor", "zetaoffice", "2026-08-26", "office_thread.js")),
+  fs.readFile(path.join("dist", "vendor", "zetaoffice", "2026-10-07", "office_thread.js")),
   fs.readFile(path.join("src", "features", "office-editor", "office_thread.js")),
 ]);
-if (officeThread.length !== 2983 || !officeThread.equals(officeThreadSource)) {
+if (officeThread.length !== 4397 || !officeThread.equals(officeThreadSource)) {
   throw new Error("The pinned office command bridge is missing or does not match the current source.");
 }
 for (const language of ["ko", "en"]) {

@@ -18,6 +18,7 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
     "data-converter/DataConverterPage.tsx",
     "document-compare/DocumentComparePage.tsx",
     "document-generator/DocumentGeneratorPage.tsx",
+    "document-markdown/DocumentMarkdownPage.tsx",
     "document-redactor/DocumentRedactorFallback.tsx",
     "document-redactor/DocumentRedactorPage.tsx",
     "excel-cleaner/ExcelCleanerPage.tsx",
@@ -57,7 +58,7 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<OperationProgress"));
 
   // S1 removed two pages; U4-3, U6 and U7 add scoped consumers.
-  assert.equal(consumers.length, 16);
+  assert.equal(consumers.length, 18);
   assert.match(source, /entry\.id === activeLogId \|\| Boolean\(entry\.stageKey && entry\.stageKey === activeStageKey\)/);
   assert.match(source, /isCurrent && status === "running" \? LoaderCircle : Circle/);
   assert.match(source, /className=\{isCurrent && status === "running" \? "animate-spin" : ""\}/);

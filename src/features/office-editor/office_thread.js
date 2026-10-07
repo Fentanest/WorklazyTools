@@ -24,6 +24,10 @@ function startOffice() {
       }
       return;
     }
+    if (event.data.cmd === 'convert-pdf') {
+      convertPdf(event.data.filename, event.data.output);
+      return;
+    }
     if (event.data.cmd === 'convert-xls') {
       convertSpreadsheet(event.data.filename, event.data.output);
     }
@@ -53,6 +57,31 @@ function convertSpreadsheet(filename, output) {
     zetajs.mainPort.postMessage({ cmd: 'convert-failed' });
   } finally {
     try { sourceModel?.dispose(); } catch { /* 변환 문서는 다음 작업 전에 정리합니다. */ }
+  }
+}
+
+function convertPdf(filename, output) {
+  let sourceModel;
+  try {
+    const extension = filename.split('.').pop();
+    const filters = { doc: 'writer_pdf_Export', docx: 'writer_pdf_Export', xls: 'calc_pdf_Export', xlsx: 'calc_pdf_Export', ppt: 'impress_pdf_Export', pptx: 'impress_pdf_Export' };
+    if (!Object.hasOwn(filters, extension)) throw new Error('unsupported-office-format');
+    sourceModel = desktop.loadComponentFromURL(conversionFileUrl(filename), '_blank', 0, [
+      new css.beans.PropertyValue({ Name: 'MacroExecutionMode', Value: 0 }),
+      new css.beans.PropertyValue({ Name: 'UpdateDocMode', Value: 0 }),
+      new css.beans.PropertyValue({ Name: 'Hidden', Value: true }),
+      new css.beans.PropertyValue({ Name: 'ReadOnly', Value: true }),
+    ]);
+    if (!sourceModel) throw new Error('convert-open-failed');
+    sourceModel.storeToURL(conversionFileUrl(output), [
+      new css.beans.PropertyValue({ Name: 'FilterName', Value: filters[extension] }),
+      new css.beans.PropertyValue({ Name: 'Overwrite', Value: true }),
+    ]);
+    zetajs.mainPort.postMessage({ cmd: 'converted' });
+  } catch {
+    zetajs.mainPort.postMessage({ cmd: 'convert-failed' });
+  } finally {
+    try { sourceModel?.dispose(); } catch { /* Release the hidden source document. */ }
   }
 }
 

@@ -19,7 +19,8 @@ test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect owne
   assert.match(appShellSource, /normalizedPath === "\/tools\/office-editor\/app"/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/excel-merger\/xls-preserve"/);
   assert.match(appShellSource, /videoParentAssetUrl\(window\.location\.pathname/);
-  assert.match(appShellSource, /target\.pathname = withSiteBasePath\(localizedPath\(language, "\/tools\/office-editor\/app\/"\), import\.meta\.env\.BASE_URL\)/);
+  assert.match(appShellSource, /function OfficeIsolationBoundary[\s\S]*?const target = new URL\(window\.location\.href\)[\s\S]*?target\.pathname = target\.pathname\.replace/);
+  assert.match(appShellSource, /normalizedPath === "\/tools\/pdf-converter\/document-to-pdf"/);
   assert.match(appShellSource, /target\.pathname = withSiteBasePath\(localizedPath\(language, "\/tools\/excel-merger\/xls-preserve\/"\), import\.meta\.env\.BASE_URL\)/);
   assert.match(appShellSource, /<aside className="sidebar glass-panel"/);
   assert.match(appShellSource, /<nav className="bottom-tabs glass-bar"/);

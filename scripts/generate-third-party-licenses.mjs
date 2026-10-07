@@ -21,6 +21,7 @@ const sections = [
   "",
   "RUNTIME-LOADED COMPONENTS",
   "Pyodide 0.29.4 — MPL-2.0 — https://github.com/pyodide/pyodide",
+  "Microsoft MarkItDown 0.1.8 official converters — MIT — https://github.com/microsoft/markitdown",
   "Tesseract language data — see the model's upstream notice and https://github.com/tesseract-ocr/tessdata",
   "ZetaOffice / LibreOffice browser build snapshot 2026-08-25 — MPL-2.0 — https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2",
   "LibreOffice source and license information — https://www.libreoffice.org/about-us/licenses/",
@@ -30,7 +31,10 @@ const sections = [
   `Twemoji graphics ${stickerManifest.version} — CC BY 4.0 — https://github.com/jdecked/twemoji/tree/${stickerManifest.commit}/assets/svg`,
 ];
 
-const nanumLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "zetaoffice", "2026-08-26", "NanumGothic-OFL.txt"), "utf8");
+const markdownNotices = await fs.readFile(path.join(projectRoot, "public/vendor/markitdown/0.1.8/THIRD_PARTY_LICENSES.txt"), "utf8");
+sections.push("", "=".repeat(78), markdownNotices.trim().replace(/[ \t]+$/gm, ""));
+
+const nanumLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "zetaoffice", "2026-10-07", "NanumGothic-OFL.txt"), "utf8");
 sections.push("", "=".repeat(78), "Nanum Gothic", "Declared license: SIL Open Font License 1.1", "", "--- LICENSE ---", nanumLicense.trim().replace(/[ \t]+$/gm, ""));
 
 const notoQrLicense = await fs.readFile(path.join(projectRoot, "public", "vendor", "qr-label-font", "noto-cjk-sans-2.004", "OFL.txt"), "utf8");
@@ -131,8 +135,15 @@ function buildRootNotices() {
     "## Runtime resources loaded on demand",
     "",
     `- Pyodide ${versionOf("pyodide")} is copied into the Worklazy Tools GitHub Pages deployment and`,
-    "  loaded from the same origin for Word comparison. It is distributed under",
+    "  loaded from the same origin for Word comparison and Markdown extraction. It is distributed under",
     "  MPL-2.0. Source: <https://github.com/pyodide/pyodide>",
+    "- Microsoft MarkItDown 0.1.8 official document converters (MIT) are hosted locally.",
+    "  Only the package entry point is adapted to defer the Magika dispatcher import;",
+    "  converter implementations remain unmodified. The browser chooses converters explicitly.",
+    "  Auto-classification, remote/LLM conversion, PDF rendering and OCR are not included.",
+    "  Exact Python wheels and SHA-256 values are pinned in scripts/markitdown-assets.json",
+    "  and Pyodide's versioned lock. Their included license texts are in the deployed bundle.",
+    "  Source: <https://github.com/microsoft/markitdown>. This is not all upstream extras.",
     "- Tesseract OCR engine resources and Korean/English trained data are copied into",
     "  the same GitHub Pages deployment and loaded on demand by Tesseract.js. Their",
     "  respective upstream licenses continue to apply.",

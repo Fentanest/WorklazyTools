@@ -1,4 +1,32 @@
 {
+  "documentMarkdown": {
+    "title": "문서의 Markdown 추출",
+    "description": "Microsoft MarkItDown으로 DOCX·XLSX·XLS·PPTX·PDF의 텍스트와 표를 Markdown으로 추출합니다.",
+    "blocks": [
+      {
+        "title": "지원 형식",
+        "paragraphs": [
+          "DOCX·XLSX·XLS·PPTX와 텍스트가 있는 PDF를 처리합니다. 현재 DOC·PPT·HWP·HWPX는 지원하지 않습니다."
+        ]
+      },
+      {
+        "title": "결과 확인",
+        "paragraphs": [
+          "제목·문단·표는 원본과 다르게 표현될 수 있습니다. 수식·배치·이미지·스캔 문자 인식을 복원하는 도구가 아닙니다. 중요한 내용은 원본과 대조하세요."
+        ]
+      }
+    ],
+    "faq": {
+      "privacy": {
+        "q": "파일을 서버에 보내나요?",
+        "a": "아니요. 변환 파일을 내려받은 뒤 문서는 현재 브라우저에서만 처리합니다."
+      },
+      "scans": {
+        "q": "스캔·암호화 PDF도 지원하나요?",
+        "a": "OCR과 암호화 문서는 지원하지 않습니다. 추출 가능한 텍스트가 있는 비암호화 문서가 필요합니다."
+      }
+    }
+  },
   "foliotrace": {
     "title": "FolioTrace 사용 안내",
     "description": "국민연금 국내주식 대량보유 공시(DART)에서 따라가 본 포트폴리오 추정치입니다. 실제 계좌 잔고나 국민연금 전체 자산이 아닙니다.",
@@ -2166,6 +2194,18 @@
         "title": "PDF→이미지",
         "paragraphs": [
           "PNG·JPG, 해상도와 페이지 범위를 선택하면 페이지별 이미지를 ZIP으로 저장합니다. 해상도와 페이지 수가 많을수록 메모리와 시간이 더 필요합니다."
+        ]
+      },
+      {
+        "title": "문서 → PDF",
+        "paragraphs": [
+          "DOC·DOCX·XLS·XLSX·PPT·PPTX를 LibreOffice로 처리합니다. 첫 실행은 약 252 MiB를 내려받으며 50 MiB 이하 입력을 받습니다. 글꼴·인쇄 설정에 따라 결과가 달라질 수 있어 페이지와 표를 확인하세요. HWP·HWPX는 rhwp 미리보기에서 인쇄 창을 열고 브라우저의 PDF로 저장을 선택합니다. 암호 문서는 지원하지 않습니다."
+        ]
+      },
+      {
+        "title": "PDF → 문서의 범위",
+        "paragraphs": [
+          "텍스트·표 추출형 DOCX·XLSX와 텍스트, 검색 가능한 PDF를 제공합니다. 원본 배치·수식·도형이나 편집 구조의 복원을 보장하지 않습니다. PPTX·HWPX 출력은 제공하지 않습니다. 스캔은 OCR 설정을 사용하고 결과를 대조하세요."
         ]
       }
     ],

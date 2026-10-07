@@ -44,13 +44,22 @@ test('new and old conversion URLs resolve in both languages; remaining PDF edito
       await page.goto(`${base}/${language}/tools/pdf-editor/${mode}`);
       await page.waitForURL(url => url.pathname.replace(/\/$/, '') === `/${language}/tools/pdf-converter/${mode}`);
       await page.locator(`[data-tool-page="pdf-converter"] [data-pdf-mode="${mode}"]`).waitFor();
-      assert.equal(await page.locator('nav.pdf-tool-navigation a').count(), 2);
+      assert.equal(await page.locator('nav.pdf-tool-navigation a').count(), 4);
       assert.equal(await page.locator('[data-route-error]').count(), 0);
+    }
+  }
+  for (const language of ['ko','en']) {
+    for (const [old, target] of [['convert','pdf-to-document'],['ocr','pdf-to-document/ocr']]) {
+      await page.goto(`${base}/${language}/tools/pdf-editor/${old}`);
+      await page.waitForURL(url => url.pathname.replace(/\/$/,'') === `/${language}/tools/pdf-converter/${target}`);
+      await page.locator('[data-pdf-mode="pdf-to-document"]').waitFor();
+      assert.equal(await page.locator('nav.pdf-tool-navigation a').count(),4);
+      if (old === 'ocr') assert.equal(await page.getByRole('radio', {name:/^(검색 PDF|Searchable PDF)/}).getAttribute('aria-checked'), 'true');
     }
   }
   await page.goto(`${base}/en/tools/pdf-editor/`);
   await page.locator('[data-pdf-mode="organize"]').waitFor();
-  assert.equal(await page.locator('nav.pdf-tool-navigation a').count(), 3);
+  assert.equal(await page.locator('nav.pdf-tool-navigation a').count(), 2);
 });
 
 test('image to PDF preserves filename, page order, A4 sizing and original image dimensions', async () => {

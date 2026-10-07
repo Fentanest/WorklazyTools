@@ -52,8 +52,15 @@ repeated in this summary.
 ## Runtime resources loaded on demand
 
 - Pyodide 0.29.4 is copied into the Worklazy Tools GitHub Pages deployment and
-  loaded from the same origin for Word comparison. It is distributed under
+  loaded from the same origin for Word comparison and Markdown extraction. It is distributed under
   MPL-2.0. Source: <https://github.com/pyodide/pyodide>
+- Microsoft MarkItDown 0.1.8 official document converters (MIT) are hosted locally.
+  Only the package entry point is adapted to defer the Magika dispatcher import;
+  converter implementations remain unmodified. The browser chooses converters explicitly.
+  Auto-classification, remote/LLM conversion, PDF rendering and OCR are not included.
+  Exact Python wheels and SHA-256 values are pinned in scripts/markitdown-assets.json
+  and Pyodide's versioned lock. Their included license texts are in the deployed bundle.
+  Source: <https://github.com/microsoft/markitdown>. This is not all upstream extras.
 - Tesseract OCR engine resources and Korean/English trained data are copied into
   the same GitHub Pages deployment and loaded on demand by Tesseract.js. Their
   respective upstream licenses continue to apply.

@@ -72,6 +72,7 @@ export const toolCategories: ToolCategoryDefinition[] = [
 ];
 
 const allTools = [
+  { id: "document-markdown", category: "documents", path: "/tools/document-markdown", title: "문서 → Markdown", shortTitle: "문서 → Markdown", description: "Microsoft MarkItDown으로 DOCX·XLSX·XLS·PPTX·PDF를 Markdown으로 추출합니다.", eyebrow: "MARKDOWN", accent: "blue", icon: FileText, highlights: [{ icon: FileText, label: "텍스트·제목" }, { icon: Table2, label: "표 추출" }, { icon: Files, label: "Markdown 저장" }], status: "available" },
   { id: "foliotrace", category: "investment-research", path: "/tools/foliotrace", title: "FolioTrace", shortTitle: "FolioTrace", description: "공개 공시로 추적하는 포트폴리오 추정 자료를 살펴봅니다.", eyebrow: "공개 공시 탐색", accent: "blue", icon: WalletCards, highlights: [{ icon: FileSearch2, label: "DART 공시 근거" }, { icon: Table2, label: "추적 종목" }, { icon: CalendarDays, label: "접수일 구분" }], status: "available" },
   { id: "document-redactor", category: "security-share", path: "/tools/document-redactor", title: "개인정보 가리기", shortTitle: "개인정보 가리기", description: "PDF와 이미지에서 직접 선택한 영역을 검정으로 가리고 새 사본으로 저장합니다.", eyebrow: "문서 개인정보", accent: "violet", icon: LockKeyhole, highlights: [{icon: Scissors, label: "직접 영역 선택"}, {icon: Files, label: "모든 PDF 페이지 재생성"}, {icon: Images, label: "이미지 PNG 저장"}, {icon: FileSearch2, label: "결과 다시 확인"}], status: "available" },
   {
@@ -170,15 +171,15 @@ const allTools = [
     path: "/tools/pdf-editor",
     title: "PDF Tools",
     shortTitle: "PDF 도구",
-    description: "PDF 페이지를 편집·병합·범위별 추출하고 마무리하거나 DOCX·XLSX·TXT 추출과 브라우저 OCR을 실행합니다.",
-    eyebrow: "PDF 편집·변환",
+    description: "PDF 페이지를 편집·병합·범위별 추출하고 페이지 번호·워터마크·스탬프를 추가합니다.",
+    eyebrow: "PDF 페이지·마무리",
     accent: "coral",
     icon: FileStack,
     highlights: [
       { icon: Files, label: "편집·범위 추출" },
       { icon: FileStack, label: "번호·워터마크" },
-      { icon: FileText, label: "DOCX·TXT" },
-      { icon: FileSpreadsheet, label: "XLSX·OCR" },
+      { icon: FileText, label: "회전·순서 변경" },
+      { icon: FileSpreadsheet, label: "머리글·스탬프" },
     ],
     status: "available",
   },

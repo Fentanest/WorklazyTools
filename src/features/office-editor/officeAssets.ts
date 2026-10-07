@@ -1,4 +1,4 @@
-export const OFFICE_ASSET_VERSION = "2026-08-26";
+export const OFFICE_ASSET_VERSION = "2026-10-07";
 
 export const OFFICE_CORE_ASSETS = [
   { name: "soffice.js", size: 858124 },
@@ -6,7 +6,7 @@ export const OFFICE_CORE_ASSETS = [
   { name: "soffice.data", size: 99520604 },
   { name: "soffice.data.js.metadata", size: 215180 },
   { name: "zeta.js", size: 42946 },
-  { name: "office_thread.js", size: 2983 },
+  { name: "office_thread.js", size: 4397 },
 ] as const;
 
 export const OFFICE_EDITOR_FONT_ASSETS = [

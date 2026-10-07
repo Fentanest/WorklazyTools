@@ -497,6 +497,13 @@ async function performScenarioActions(page, actions, fixture) {
           if (!(element instanceof HTMLElement)) throw new Error(`Clickable element ${index} is missing.`);
           element.click();
         }, action.elementIndex);
+      } else if (action.navigation) {
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+          page.click(action.selector),
+        ]);
+        // A dedicated document may reload once more to activate its COI worker.
+        if (action.readySelector) await page.waitForSelector(action.readySelector, { visible: true });
       } else {
         await page.click(action.selector);
       }

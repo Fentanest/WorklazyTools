@@ -65,3 +65,15 @@ test("Video Studio and aliases are unpublished without removing implementation s
     assert.equal(safeAnalyticsPage(route), null);
   }
 });
+
+
+test("document to PDF waits for its own isolated document while other conversion tabs are ordinary pages", () => {
+  const route = "/ko/tools/pdf-converter/document-to-pdf/";
+  assert.equal(documentReadiness(route, noMarkers, true), "navigation");
+  assert.equal(documentReadiness(route, { ...noMarkers, office: true }, false), "isolation-pending");
+  assert.equal(documentReadiness(route, { ...noMarkers, office: true }, true, "", "https://worklazy.net/ko/tools/pdf-converter/document-to-pdf/coi-serviceworker.js"), "ready");
+  assert.equal(documentReadiness(route, { ...noMarkers, office: true }, true, "", "https://worklazy.net/en/tools/office-editor/app/coi-serviceworker.js"), "isolation-pending");
+  for (const mode of ["image-to-pdf", "pdf-to-image", "pdf-to-document"]) {
+    assert.equal(documentReadiness(`/en/tools/pdf-converter/${mode}/`, noMarkers, false), "ready");
+  }
+});

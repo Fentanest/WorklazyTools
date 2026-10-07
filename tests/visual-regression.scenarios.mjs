@@ -74,6 +74,7 @@ const migratedToolIds = new Set([
   "audio-studio",
   "pdf-editor",
   "pdf-converter",
+  "document-markdown",
   "video-studio",
   "image-studio",
 ]);
@@ -294,7 +295,33 @@ const interactionDefinitions = Object.freeze({
       assertSelector: "[data-testid='excel-cleaner-results']",
     }),
   ]),
+  "document-markdown": Object.freeze([
+    { stateId: "interaction-file", fixture: { kind: "generated-pdf", fileName: "markdown-input.pdf", pageCount: 2 }, actions: [
+      { type: "upload", selector: "[data-tool-page='document-markdown'] input[type='file']" },
+    ], assertSelector: "[data-tool-page='document-markdown'] [data-ui-component='file-list']" },
+  ]),
   "pdf-converter": Object.freeze([
+    Object.freeze({
+      stateId: "interaction-convert-thumbnails",
+      fixture: { kind: "generated-pdf", fileName: "visual-convert.pdf", pageCount: 2 },
+      actions: [
+        { type: "click", selector: ".pdf-tool-navigation a[href$='/pdf-to-document']" },
+        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='pdf-to-document']" },
+        { type: "upload", selector: "[data-tool-page='pdf-converter'] input[type='file']" },
+        { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
+        { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },
+        { type: "wait", selector: ".pdf-page-card .pdf-thumbnail-frame img", timeoutMs: 60_000 },
+      ],
+      assertSelector: ".pdf-tool-page[data-pdf-mode='pdf-to-document'] .pdf-page-card",
+    }),
+    Object.freeze({ stateId: "interaction-document-to-pdf", fixture: null, actions: [
+      { type: "click", selector: ".pdf-tool-navigation a[href$='/document-to-pdf']", navigation: true, readySelector: "[data-document-pdf-ready='true']" },
+      { type: "wait", selector: "[data-document-pdf-ready='true']" },
+    ], assertSelector: "[data-pdf-mode='document-to-pdf']" }),
+    Object.freeze({ stateId: "interaction-pdf-to-document", fixture: null, actions: [
+      { type: "click", selector: ".pdf-tool-navigation a[href$='/pdf-to-document']" },
+      { type: "wait", selector: "[data-pdf-mode='pdf-to-document'] input[type='file']" },
+    ], assertSelector: "[data-pdf-mode='pdf-to-document']" }),
     Object.freeze({
       stateId: "interaction-image-to-pdf-thumbnails",
       fixture: { kind: "generated-png", fileName: "visual-page.png", width: 320, height: 220 },
@@ -333,19 +360,7 @@ const interactionDefinitions = Object.freeze({
       ],
       assertSelector: ".pdf-page-card .pdf-thumbnail-frame img",
     }),
-    Object.freeze({
-      stateId: "interaction-convert-thumbnails",
-      fixture: { kind: "generated-pdf", fileName: "visual-convert.pdf", pageCount: 2 },
-      actions: [
-        { type: "click", selector: ".pdf-tool-navigation [data-pdf-nav-mode='convert']" },
-        { type: "wait", selector: ".pdf-tool-page[data-pdf-mode='convert']" },
-        { type: "upload", selector: "[data-tool-page='pdf-editor'] input[type='file']" },
-        { type: "wait", selector: ".pdf-page-card", timeoutMs: 60_000 },
-        { type: "scroll-into-view", selector: ".pdf-page-grid", offset: -88 },
-        { type: "wait", selector: ".pdf-page-card .pdf-thumbnail-frame img", timeoutMs: 60_000 },
-      ],
-      assertSelector: ".pdf-tool-page[data-pdf-mode='convert'] .pdf-page-card",
-    }),
+
   ]),
   "document-compare": Object.freeze([
     Object.freeze({
