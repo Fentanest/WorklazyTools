@@ -99,7 +99,8 @@ export function createUniqueSafeFileName(
   while (registry.has(candidate)) {
     sequence += 1;
     const suffix = `-${sequence}`;
-    candidate = validateSafeFileName(limitUtf8(`${base}${suffix}${extension}`, 255));
+    const shortened = splitExtension(limitUtf8(`${base}${extension}`, 255 - new TextEncoder().encode(suffix).byteLength));
+    candidate = validateSafeFileName(`${shortened.base}${suffix}${shortened.extension}`);
   }
   return registry.add(candidate);
 }

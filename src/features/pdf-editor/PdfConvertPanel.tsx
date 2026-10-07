@@ -1,3 +1,4 @@
+import { BatchConversionPanel } from "../conversion-batch/BatchConversionPanel";
 import { FileOutput, Languages, ScanText, Wifi } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -25,6 +26,9 @@ import { pdfConvertDirty, type PdfConvertPreset } from "./pdfConvertDirect";
 import { usePdfConvert } from "./pdfConvertDirectLifecycle";
 export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   const language = useAppLanguage();
+  const [batchFiles, setBatchFiles] = useState<File[]>();
+  const batchInputs = useRef<File[]>([]);
+  const [batchGeneration, setBatchGeneration] = useState(0);
     const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [format, setFormat] = useState<OutputFormat>("docx");
@@ -42,7 +46,8 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   const inputHandler = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
   const resumeGeneration = useRef(0);
   const activeController = useRef<AbortController | undefined>(undefined);
-  const direct = usePdfConvert(preset, pdfConvertDirty({ file, loading, status: operation.status, result: download.result }), next => {
+  const direct = usePdfConvert(preset, Boolean(batchFiles) || pdfConvertDirty({ file, loading, status: operation.status, result: download.result }), next => {
+    if (batchFiles) { setBatchFiles([...batchInputs.current]); setBatchGeneration(value => value + 1); }
     const resume = pendingInputs.current;
     const generation = ++resumeGeneration.current;
     activeController.current?.abort();
@@ -86,6 +91,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   };
 
   const setInput = (files: File[]) => {
+    if (files.length > 1) { activeController.current?.abort(); setFile(null); download.clearResult(); setBatchFiles(files); return Promise.resolve(); }
     const task = acquireInput(files);
     inputTask.current = task;
     return task;
@@ -134,6 +140,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   const extension = format === "searchable-pdf" ? "pdf" : format;
   const previewItems: PdfPageItem[] = file ? Array.from({ length: pageCount }, (_, index) => ({ id: `convert-${index}`, sourceId: "convert-source", sourceName: file.name, sourcePageIndex: index, rotation: 0 })) : [];
 
+  if (batchFiles) return <><DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} /><BatchConversionPanel key={batchGeneration} mode="pdf-document" files={batchFiles} onFilesChange={files => { batchInputs.current = files; }} initialOptions={{ format, ocrMode, ocrLayout, pageRange }} onClose={() => setBatchFiles(undefined)} /></>;
   return (
     <>
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
@@ -141,7 +148,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
         <div>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfConvertPanel.chooseAPdf")} description={featureMessage(language, "pdf.messages.PdfConvertPanel.convertTextOrScannedPdfsToDocxXlsx")} className="">
-            <FileDropZone accept=".pdf,application/pdf" files={file ? [file] : []} onFiles={setInput} accent="violet" hint={featureMessage(language, "pdf.messages.PdfConvertPanel.chooseOnePdfToExtractTextFromOr")} />
+            <FileDropZone accept=".pdf,application/pdf" multiple files={[]} onFiles={setInput} accent="violet" hint={language === "ko" ? "여러 PDF를 한 번에 선택할 수 있습니다." : "Choose one or more PDFs."} />
             {file && <FileList files={[file]} accent="violet" onRemove={() => { activeController.current?.abort(); void releasePdf(file); setLoading(false); operation.reset(); setFile(null); setPageCount(0); download.clearResult(); }} />}
           </SectionCard>
           {file && (

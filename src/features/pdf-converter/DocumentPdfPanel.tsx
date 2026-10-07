@@ -1,16 +1,15 @@
-import { Download, FileText, RotateCcw, X } from "lucide-react";
+import { Download, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { clearUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import { useUnsavedWorkGuard } from "../../app/toolState";
 import { OperationProgress } from "../../components/OperationProgress";
 import { UtilityInput, UtilityNotice } from "../../components/UtilitySurface";
-import { FileDropZone, FileList, PrimaryButton, SectionCard, formatBytes } from "../../components/ui";
+import { FileDropZone, FileList, PrimaryButton, SectionCard } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage } from "../../i18n/routing";
 import { createSafeFileName } from "../../utils/fileNameSafety";
-import { prepareOfficeAssets } from "../office-editor/officeAssetLoader";
-import { OFFICE_EDITOR_FONT_ASSETS } from "../office-editor/officeAssets";
-import { launchOfficeRuntime, type OfficeRuntime } from "../office-editor/officeRuntime";
+import { convertOfficePdf } from "./officePdfClient";
+import { BatchConversionPanel } from "../conversion-batch/BatchConversionPanel";
 
 import { HwpPdfPanel } from "./HwpPdfPanel";
 
@@ -19,6 +18,7 @@ const maxBytes = 50 * 1024 * 1024;
 export function DocumentPdfPanel() {
   const language = useAppLanguage();
   const L = (ko: string, en: string) => language === "en" ? en : ko;
+  const [batchFiles, setBatchFiles] = useState<File[]>();
   const [file, setFile] = useState<File>();
   const isHwp = /\.hwpx?$/i.test(file?.name ?? "");
   const [bytes, setBytes] = useState<Uint8Array>();
@@ -26,12 +26,8 @@ export function DocumentPdfPanel() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [reloadRequired, setReloadRequired] = useState(false);
   const [saved, setSaved] = useState(false);
   const controller = useRef<AbortController | undefined>(undefined);
-  const runtime = useRef<OfficeRuntime | undefined>(undefined);
-  const started = useRef(false);
-  const canvas = useRef<HTMLCanvasElement>(null);
   const operation = useOperationProgress();
   useUnsavedWorkGuard("document-to-pdf", Boolean(file) && !saved, { kind: "files", scopePath: "/tools/pdf-converter/document-to-pdf" });
   useEffect(() => () => controller.current?.abort(), []);
@@ -42,7 +38,8 @@ export function DocumentPdfPanel() {
     return () => URL.revokeObjectURL(next);
   }, [bytes]);
   const choose = (files: File[]) => {
-    if (loading || reloadRequired) return;
+    if (loading) return;
+    if (files.length > 1) { controller.current?.abort(); setFile(undefined); setBytes(undefined); setBatchFiles(files); return; }
     const next = files.at(-1);
     setBytes(undefined); setFile(undefined); setError(""); setSaved(false); operation.reset();
     if (next && !supported.has(next.name.split(".").at(-1)?.toLowerCase() ?? "")) {
@@ -53,54 +50,27 @@ export function DocumentPdfPanel() {
     }
     setFile(next); setName(next?.name.replace(/\.[^.]+$/, "") ?? "");
   };
-  const resetRuntime = () => {
-    controller.current?.abort(); clearUnsavedWork("document-to-pdf");
-    // LibreOffice owns native threads in this document. Reload releases them,
-    // including a parser that has stopped responding; no background job remains.
-    window.location.reload();
-  };
   const cancel = () => {
-    if (started.current) { resetRuntime(); return; }
     controller.current?.abort(); controller.current = undefined;
     setLoading(false); operation.reset();
   };
   const run = async () => {
-    if (!file || isHwp || loading || reloadRequired) return;
+    if (!file || isHwp || loading) return;
     const active = new AbortController(); controller.current = active;
     setLoading(true); setBytes(undefined); setError(""); setSaved(false);
     operation.start(L("문서 변환을 준비합니다.", "Preparing document conversion."));
-    let touchedRuntime = false;
     try {
-      const extension = file.name.split(".").at(-1)?.toLowerCase() ?? "";
-      const header = new Uint8Array(await file.slice(0, 4).arrayBuffer());
-      if (["docx", "xlsx", "pptx"].includes(extension) && header[0] === 0xd0 && header[1] === 0xcf && header[2] === 0x11 && header[3] === 0xe0) throw new Error("encrypted-document");
-      if (active.signal.aborted) return;
-      if (!crossOriginIsolated || typeof SharedArrayBuffer === "undefined" || !canvas.current) throw new Error("isolation-required");
-      if (!runtime.current) {
-        let previous = -1;
-        const base = await prepareOfficeAssets(({ loaded, total }) => {
-          if (active.signal.aborted) return;
-          const progress = Math.floor(loaded / total * 75);
-          if (progress === previous) return;
-          previous = progress;
-          operation.updateCurrent(progress, L(`변환 파일을 준비합니다: ${formatBytes(loaded)} / ${formatBytes(total)}`, `Preparing conversion files: ${formatBytes(loaded)} / ${formatBytes(total)}`));
-        }, active.signal, "editor");
-        if (active.signal.aborted) return;
-        started.current = true; touchedRuntime = true;
-        operation.updateCurrent(80, L("문서 변환 기능을 시작합니다.", "Starting document conversion."));
-        runtime.current = await launchOfficeRuntime(canvas.current, base, OFFICE_EDITOR_FONT_ASSETS.map(font => font.name));
-      }
-      if (active.signal.aborted) return;
-      operation.updateCurrent(90, L("문서를 PDF로 변환하고 있습니다.", "Converting the document to PDF."));
-      touchedRuntime = true;
-      const result = await runtime.current.convertToPdf(file);
+      const result = await convertOfficePdf(file, active.signal, value => {
+        if (!active.signal.aborted) operation.updateCurrent(value, value < 90
+          ? L("문서 변환 기능을 준비합니다.", "Preparing document conversion.")
+          : L("문서를 PDF로 변환하고 있습니다.", "Converting the document to PDF."));
+      });
       if (active.signal.aborted) return;
       setBytes(result.bytes);
       operation.succeed(L("PDF를 만들었습니다. 저장 후 페이지와 글꼴을 확인해 주세요.", "PDF created. Check its pages and fonts after saving."));
     } catch (reason) {
       if (active.signal.aborted) return;
       const code = (reason as Error).message;
-      setReloadRequired(touchedRuntime);
       const message = code === "encrypted-document"
         ? L("암호화된 Office 파일은 지원하지 않습니다. 암호를 해제한 사본을 선택해 주세요.", "Encrypted Office files are not supported. Choose an unlocked copy.")
         : code === "isolation-required"
@@ -113,18 +83,18 @@ export function DocumentPdfPanel() {
       if (controller.current === active) { controller.current = undefined; setLoading(false); }
     }
   };
+  if (batchFiles) return <BatchConversionPanel mode="document-pdf" files={batchFiles} onClose={() => setBatchFiles(undefined)} />;
   return <div data-document-pdf-ready={crossOriginIsolated}>
     <SectionCard step={1} title={L("문서 선택", "Choose a document")} description="HWP · HWPX · DOC · DOCX · XLS · XLSX · PPT · PPTX">
-      <FileDropZone disabled={!crossOriginIsolated || loading || reloadRequired} files={file ? [file] : []} accept=".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onFiles={choose} accent="coral" hint={L("파일 한 개, 최대 50 MiB", "One file, up to 50 MiB")} />
+      <FileDropZone disabled={!crossOriginIsolated || loading} multiple files={[]} accept=".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onFiles={choose} accent="coral" hint={L("여러 파일 선택 가능 · 파일당 최대 50 MiB", "Choose one or more files · up to 50 MiB each")} />
       {file && <FileList files={[file]} accent="coral" onRemove={() => choose([])} />}
     </SectionCard>
     {!isHwp && <UtilityNotice kind="info" className="my-4"><FileText className="shrink-0" size={18} /><span>{L(
       "첫 실행 시 약 252 MiB의 변환 파일을 브라우저에 불러옵니다. 메모리가 충분한 데스크톱을 권장합니다. 원본 글꼴과 인쇄 설정에 따라 줄바꿈·표·페이지가 달라질 수 있습니다. 암호 파일은 지원하지 않습니다. HWP·HWPX는 파일 선택 후 브라우저 인쇄로 PDF를 저장합니다.",
       "The first run loads about 252 MiB of conversion files into your browser. A desktop with sufficient memory is recommended. Fonts and print settings can change line breaks, tables, and pages. Password-protected files are not supported. HWP / HWPX saves PDF through browser printing after file selection.")}</span></UtilityNotice>}
     {!isHwp && <div className="my-4 flex flex-wrap gap-2">
-      <PrimaryButton accent="coral" disabled={!file || loading || reloadRequired} loading={loading} onClick={() => void run()}>{L("PDF 만들기", "Create PDF")}</PrimaryButton>
+      <PrimaryButton accent="coral" disabled={!file || loading} loading={loading} onClick={() => void run()}>{L("PDF 만들기", "Create PDF")}</PrimaryButton>
       {loading && <Button variant="outline" onClick={cancel}><X size={16} />{L("취소 및 초기화", "Cancel and reset")}</Button>}
-      {reloadRequired && <Button variant="outline" onClick={resetRuntime}><RotateCcw size={16} />{L("변환 초기화", "Reset conversion")}</Button>}
     </div>}
     {isHwp && file && <HwpPdfPanel file={file} onClear={() => choose([])} />}
     {error && <UtilityNotice kind="error" role="alert">{error}</UtilityNotice>}
@@ -133,6 +103,5 @@ export function DocumentPdfPanel() {
       <label className="my-3 flex items-center gap-2 text-sm">{L("파일명", "File name")}<UtilityInput value={name} onChange={event => { setName(event.target.value); setSaved(false); }} /><span>.pdf</span></label>
       <Button render={<a data-testid="document-pdf-download" href={url} download={createSafeFileName(name || "document") + ".pdf"} onClick={() => setSaved(true)} />}><Download size={16} />{L("PDF 다운로드", "Download PDF")}</Button>
     </SectionCard>}
-    <canvas ref={canvas} id="qtcanvas" width={640} height={480} tabIndex={-1} aria-hidden="true" style={{ position: "fixed", left: -10000, top: 0, width: 640, height: 480, pointerEvents: "none" }} />
   </div>;
 }

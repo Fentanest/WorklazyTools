@@ -1,3 +1,4 @@
+import { BatchConversionPanel } from "../conversion-batch/BatchConversionPanel";
 import { FileImage, GripVertical, Images, Trash2 } from "lucide-react";
 import Sortable from "sortablejs";
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +24,8 @@ export function PdfImagePanel({ direction }: { direction: "image-to-pdf" | "pdf-
 
 function ImagesToPdf() {
   const language = useAppLanguage();
+  const active = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => active.current?.abort(), []);
     const [files, setFiles] = useState<File[]>([]);
   const [pageMode, setPageMode] = useState<"a4" | "image">("a4");
   const [outputName, setOutputName] = useState(featureMessage(language, "pdf.messages.PdfImagePanel.worklazyImagePdf"));
@@ -62,14 +65,17 @@ function ImagesToPdf() {
   };
 
   const exportPdf = async () => {
+    active.current?.abort(); const controller = new AbortController(); active.current = controller;
     setError("");
     download.clearResult();
     operation.start(featureMessage(language, "pdf.messages.PdfImagePanel.preparingImagesAsPdfPages", { p0: files.length }));
     try {
-      const output = await imagesToPdf(files, pageMode, normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfImagePanel.worklazyImagePdf")), operation.update, language);
+      const output = await imagesToPdf(files, pageMode, normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfImagePanel.worklazyImagePdf")), (value, message) => { if (!controller.signal.aborted) operation.update(value, message); }, language, {}, controller.signal);
+      if (controller.signal.aborted) return;
       download.makeResult(output);
       operation.succeed(featureMessage(language, "pdf.messages.PdfImagePanel.createdAPdfInTheSelectedImageOrder"));
     } catch (reason) {
+      if (controller.signal.aborted) return;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfImagePanel.unableToConvertTheImagesToPdf");
       setError(message);
       operation.fail(message);
@@ -102,6 +108,7 @@ function ImagesToPdf() {
             </dl>
             <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfImagePanel.outputFileName")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={outputName} onChange={(event) => setOutputName(event.target.value)} /><small className="text-xs text-muted-foreground">.pdf</small></label>
             <PrimaryButton accent="violet" disabled={!files.length || operation.status === "running"} loading={operation.status === "running"} onClick={exportPdf}><FileImage size={18} /> {featureMessage(language, "pdf.messages.PdfImagePanel.createPdf")}</PrimaryButton>
+            {operation.status === "running" && <Button variant="outline" onClick={() => { active.current?.abort(); operation.reset(); }}>{language === "ko" ? "변환 취소" : "Cancel conversion"}</Button>}
           </Card>
           <OperationProgress {...operation} accent="coral" title={featureMessage(language, "pdf.messages.PdfImagePanel.imageConversionLog")} />
         </aside>
@@ -114,6 +121,9 @@ function ImagesToPdf() {
 
 function PdfToImages() {
   const language = useAppLanguage();
+  const [batchFiles, setBatchFiles] = useState<File[]>();
+  const active = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => active.current?.abort(), []);
     const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [format, setFormat] = useState<"png" | "jpeg">("png");
@@ -127,6 +137,9 @@ function PdfToImages() {
   useEffect(() => () => { if (file) void releasePdf(file); }, [file]);
 
   const setInput = async (files: File[]) => {
+    active.current?.abort();
+    if (files.length > 1) { setFile(null); download.clearResult(); setBatchFiles(files); return; }
+    const controller = new AbortController(); active.current = controller;
     const next = files.at(-1);
     if (!next || next === file) return;
     setLoading(true);
@@ -134,30 +147,36 @@ function PdfToImages() {
     download.clearResult();
     operation.start(featureMessage(language, "pdf.messages.PdfImagePanel.checkingPagesIn", { p0: next.name }));
     try {
-      const inspected = await inspectPdf(next, language);
+      const inspected = await inspectPdf(next, language, { signal: controller.signal });
+      if (controller.signal.aborted) return;
       setFile(next);
       setPageCount(inspected.pageCount);
       setPageRange("");
       operation.succeed(featureMessage(language, "pdf.messages.PdfImagePanel.loadedPages", { p0: inspected.pageCount }));
     } catch (reason) {
+      if (controller.signal.aborted) return;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfImagePanel.unableToReadThePdf");
       setError(message);
       operation.fail(message);
-    } finally { setLoading(false); }
+    } finally { if (active.current === controller) setLoading(false); }
   };
 
   const convert = async () => {
     if (!file) return;
+    active.current?.abort();
+    const controller = new AbortController(); active.current = controller;
     setError("");
     download.clearResult();
     operation.start(featureMessage(language, "pdf.messages.PdfImagePanel.startingPdfPageImageConversion"));
     try {
       const selectedPages = pageRange.trim() ? parsePageRange(pageRange, pageCount, language) : undefined;
-      const output = await pdfToImageArchive(file, format, dpi, 0.9, operation.update, language, selectedPages);
+      const output = await pdfToImageArchive(file, format, dpi, 0.9, (value, message) => { if (!controller.signal.aborted) operation.update(value, message); }, language, selectedPages, controller.signal);
+      if (controller.signal.aborted) return;
       download.makeBlobResult(output.blob, output.fileName, [featureMessage(language, "pdf.messages.PdfImagePanel.morePagesAndHigherResolutionIncreaseConversionTime")]);
       const convertedCount = selectedPages?.length ?? pageCount;
       operation.succeed(featureMessage(language, "pdf.messages.PdfImagePanel.createdAZipContainingPageImages", { p0: convertedCount }));
     } catch (reason) {
+      if (controller.signal.aborted) return;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfImagePanel.unableToConvertThePdfToImages");
       setError(message);
       operation.fail(message);
@@ -166,13 +185,14 @@ function PdfToImages() {
 
   const previewItems: PdfPageItem[] = file ? Array.from({ length: pageCount }, (_, index) => ({ id: `image-preview-${index}`, sourceId: "image-source", sourceName: file.name, sourcePageIndex: index, rotation: 0 })) : [];
 
+  if (batchFiles) return <BatchConversionPanel mode="pdf-images" files={batchFiles} initialOptions={{ imageFormat: format, dpi, pageRange }} onClose={() => setBatchFiles(undefined)} />;
   return (
     <>
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
         <div>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfImagePanel.chooseAPdf")} description={featureMessage(language, "pdf.messages.PdfImagePanel.convertEveryPageToAHighResolutionPng")} className="">
-            <FileDropZone accept=".pdf,application/pdf" files={file ? [file] : []} onFiles={setInput} accent="violet" hint={featureMessage(language, "pdf.messages.PdfImagePanel.chooseOnePdfToConvertToImages")} />
-            {file && <FileList files={[file]} accent="violet" onRemove={() => { void releasePdf(file); setFile(null); setPageCount(0); download.clearResult(); }} />}
+            <FileDropZone accept=".pdf,application/pdf" multiple files={[]} onFiles={setInput} accent="violet" hint={language === "ko" ? "여러 PDF를 한 번에 선택할 수 있습니다." : "Choose one or more PDFs."} />
+            {file && <FileList files={[file]} accent="violet" onRemove={() => { active.current?.abort(); operation.reset(); void releasePdf(file); setFile(null); setPageCount(0); download.clearResult(); }} />}
           </SectionCard>
           {!!file && <SectionCard step={2} title={featureMessage(language, "pdf.messages.PdfImagePanel.pagePreview")} description={featureMessage(language, "pdf.messages.PdfImagePanel.everyPageIsConvertedWithTheSameFormat")} className="overflow-visible "><div className="pdf-page-grid grid max-h-[610px] grid-cols-[repeat(auto-fill,minmax(145px,1fr))] gap-3 overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable] max-[620px]:max-h-[520px] max-[620px]:grid-cols-2" data-density="compact">{previewItems.map((item, index) => <PdfThumbnail key={`${file.name}-${file.size}-${file.lastModified}-${item.id}`} item={item} file={file} outputIndex={index} totalItems={previewItems.length} draggable={false} />)}</div></SectionCard>}
         </div>
@@ -184,6 +204,7 @@ function PdfToImages() {
             <label className="pdf-output-field mt-3 mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfImagePanel.pagesToConvert")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={pageRange} onChange={(event) => setPageRange(event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfImagePanel.allEG13710")} /><small className="text-xs text-muted-foreground">{pageRange.trim() ? featureMessage(language, "pdf.messages.PdfImagePanel.custom") : featureMessage(language, "pdf.messages.PdfImagePanel.all")}</small></label>
             <dl className="my-5"><SummaryRow label={featureMessage(language, "pdf.messages.PdfImagePanel.pages")} value={pageCount} /><SummaryRow label={featureMessage(language, "pdf.messages.PdfImagePanel.output")} value="ZIP" /></dl>
             <PrimaryButton accent="violet" disabled={!file || loading || operation.status === "running"} loading={operation.status === "running"} onClick={convert}><Images size={18} /> {featureMessage(language, "pdf.messages.PdfImagePanel.createImageZip")}</PrimaryButton>
+            {operation.status === "running" && <Button variant="outline" onClick={() => { active.current?.abort(); operation.reset(); setLoading(false); }}>{language === "ko" ? "변환 취소" : "Cancel conversion"}</Button>}
           </Card>
           <OperationProgress {...operation} accent="coral" title={featureMessage(language, "pdf.messages.PdfImagePanel.pdfImageConversionLog")} />
         </aside>

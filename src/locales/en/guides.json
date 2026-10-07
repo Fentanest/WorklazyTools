@@ -34,7 +34,7 @@
       {
         "title": "Choose a supported document",
         "paragraphs": [
-          "Select one Word DOCX, Excel XLS or XLSX, PowerPoint PPTX, or PDF with readable text, up to 50 MiB. Legacy DOC and PPT files and Hangul HWP or HWPX files are not supported by this Markdown tool."
+          "Choose one or more DOCX, XLS, XLSX, PPTX documents or PDFs with readable text, up to 50 MiB each. This Markdown tool does not support legacy DOC or PPT, or Hangul HWP / HWPX files."
         ]
       },
       {
@@ -47,6 +47,12 @@
         "title": "Compare with the original",
         "paragraphs": [
           "Visual layout, formulas, editing structure and images are not reproduced exactly. This tool does not recognize text in scanned PDFs. Check table cells, numbers and missing content against the original."
+        ]
+      },
+      {
+        "title": "Batch conversion and downloads",
+        "paragraphs": [
+          "Selecting multiple files opens a serial queue. Add up to 20 files, 50 MiB each and 200 MiB total input. Cancel or retry files individually, and download successful Markdown files individually or in a combined ZIP. Up to 128 MiB of results are retained; combined ZIP creation supports up to 64 MiB of results."
         ]
       }
     ],
@@ -75,18 +81,56 @@
     "title": "Using FolioTrace",
     "description": "An estimated portfolio following NPS domestic equities through DART large-shareholding filings. This is neither an actual account balance nor all NPS assets.",
     "blocks": [
-      { "title": "Filing date and holding date are different", "paragraphs": ["Each filing shows the date it was received and the holding date it refers to. These are different dates, so always check them together. Records for the same company with different holding dates describe different points in time."] },
-      { "title": "Values use checked quantities and same-day closes", "paragraphs": ["A value is calculated only when the filing gives a checked share quantity and a checked KRX regular-session close exists for the same trading day. Each holding's share is shown as a percentage of the combined value of all holdings with a calculated value. Holdings without a checked close are left out of the value calculation."] },
-      { "title": "A percentage alone does not give a value", "paragraphs": ["Records that show only a percentage, without a checked share quantity, stay on the list but get no calculated value. A percentage on its own does not settle the amount."] },
-      { "title": "Dates and reloading data", "paragraphs": ["The filing receipt date, price date, and time the data was prepared are different. Publication time appears when available. ‘Reload published data’ shows the latest posted records; it does not fetch new DART filings right away."] }
+      {
+        "title": "Filing date and holding date are different",
+        "paragraphs": [
+          "Each filing shows the date it was received and the holding date it refers to. These are different dates, so always check them together. Records for the same company with different holding dates describe different points in time."
+        ]
+      },
+      {
+        "title": "Values use checked quantities and same-day closes",
+        "paragraphs": [
+          "A value is calculated only when the filing gives a checked share quantity and a checked KRX regular-session close exists for the same trading day. Each holding's share is shown as a percentage of the combined value of all holdings with a calculated value. Holdings without a checked close are left out of the value calculation."
+        ]
+      },
+      {
+        "title": "A percentage alone does not give a value",
+        "paragraphs": [
+          "Records that show only a percentage, without a checked share quantity, stay on the list but get no calculated value. A percentage on its own does not settle the amount."
+        ]
+      },
+      {
+        "title": "Dates and reloading data",
+        "paragraphs": [
+          "The filing receipt date, price date, and time the data was prepared are different. Publication time appears when available. ‘Reload published data’ shows the latest posted records; it does not fetch new DART filings right away."
+        ]
+      }
     ],
     "faq": {
-      "scope": { "q": "Is this the NPS actual account balance?", "a": "An estimated portfolio following NPS domestic equities through DART large-shareholding filings. It is not total NPS assets, actual account balances, or actual returns." },
-      "valuation": { "q": "How is the estimated value calculated?", "a": "The checked share quantity from the filing is multiplied by the KRX regular-session close on the same trading day. The values of holdings with a calculated value are added up, and each holding's share of that total is shown as a percentage." },
-      "dates": { "q": "How do the price date and the filings check differ?", "a": "The price date is the trading day whose closing price is final. The filing receipt date and time the data was prepared are shown separately; publication time appears when available." },
-      "exclusion": { "q": "Why are some holdings left out of the value calculation?", "a": "Holdings without a checked close or with an unchecked latest filing get no calculated value. They stay on the list with their reason, and a missing value is shown as unavailable rather than zero." },
-      "threshold": { "q": "Does below 5% ownership mean everything was sold?", "a": "No. Holdings below 5% stay on the list and remain subject to follow-up searches and rechecks. It does not mean all shares were sold or that the value is zero." },
-      "refresh": { "q": "What does ‘Reload published data’ do?", "a": "It reloads the currently published records. It does not fetch new DART filings right away." }
+      "scope": {
+        "q": "Is this the NPS actual account balance?",
+        "a": "An estimated portfolio following NPS domestic equities through DART large-shareholding filings. It is not total NPS assets, actual account balances, or actual returns."
+      },
+      "valuation": {
+        "q": "How is the estimated value calculated?",
+        "a": "The checked share quantity from the filing is multiplied by the KRX regular-session close on the same trading day. The values of holdings with a calculated value are added up, and each holding's share of that total is shown as a percentage."
+      },
+      "dates": {
+        "q": "How do the price date and the filings check differ?",
+        "a": "The price date is the trading day whose closing price is final. The filing receipt date and time the data was prepared are shown separately; publication time appears when available."
+      },
+      "exclusion": {
+        "q": "Why are some holdings left out of the value calculation?",
+        "a": "Holdings without a checked close or with an unchecked latest filing get no calculated value. They stay on the list with their reason, and a missing value is shown as unavailable rather than zero."
+      },
+      "threshold": {
+        "q": "Does below 5% ownership mean everything was sold?",
+        "a": "No. Holdings below 5% stay on the list and remain subject to follow-up searches and rechecks. It does not mean all shares were sold or that the value is zero."
+      },
+      "refresh": {
+        "q": "What does ‘Reload published data’ do?",
+        "a": "It reloads the currently published records. It does not fetch new DART filings right away."
+      }
     }
   },
   "documentCompare": {
@@ -2254,7 +2298,14 @@
       {
         "title": "Cancel, recover and try again",
         "paragraphs": [
-          "Canceling does not create a new result. Once Office conversion has started, Cancel and reset reloads the page to release its memory. Keep the original and retry with fewer pages or another output format if conversion fails."
+          "Canceling creates no new result. Office conversion ends that document’s engine so the next file can run without reloading the page. Queue a failed file again to retry. Keep the original and, if needed, change the page range or output format."
+        ]
+      },
+      {
+        "title": "Convert several documents or PDFs at once",
+        "paragraphs": [
+          "Choose or drop multiple files to open the batch queue. Add up to 20 files, 50 MiB each and 200 MiB total input; files run one at a time. PDFs process up to 200 selected pages per file, applying the chosen page range to each file. Failed files can be queued again.",
+          "Download results individually or in a combined ZIP. For PDF to image, that ZIP contains the per-document image ZIPs. Up to 128 MiB of results are retained, and combined ZIP creation supports up to 64 MiB of results. HWP / HWPX require individual printing after automatic conversions finish and are excluded from the ZIP. Image to PDF continues to combine multiple images into one PDF."
         ]
       }
     ],

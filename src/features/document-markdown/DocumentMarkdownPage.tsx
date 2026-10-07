@@ -1,3 +1,4 @@
+import { BatchConversionPanel } from "../conversion-batch/BatchConversionPanel";
 import { Download, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useUnsavedWorkGuard } from "../../app/toolState";
@@ -15,6 +16,7 @@ import { convertToMarkdown, MARKDOWN_ACCEPT, MARKDOWN_EXTENSIONS, MARKDOWN_MAX_B
 export function DocumentMarkdownPage() {
   const language = useAppLanguage();
   const L = (ko: string, en: string) => language === "en" ? en : ko;
+  const [batchFiles, setBatchFiles] = useState<File[]>();
   const [file, setFile] = useState<File>();
   const [markdown, setMarkdown] = useState("");
   const [outputName, setOutputName] = useState("");
@@ -36,6 +38,7 @@ export function DocumentMarkdownPage() {
     active.current?.abort();
     active.current = undefined;
     setLoading(false); setMarkdown(""); setSaved(false); setError(""); operation.reset();
+    if (files.length > 1) { setFile(undefined); setBatchFiles(files); return; }
     const next = files.at(-1);
     if (next && !MARKDOWN_EXTENSIONS.has(next.name.split(".").at(-1)?.toLowerCase() ?? "")) {
       setFile(undefined);
@@ -90,9 +93,10 @@ export function DocumentMarkdownPage() {
       description={L("워드·엑셀·PPTX·PDF의 제목, 문단과 표를 Markdown 파일로 추출하세요.", "Convert Word, Excel, PowerPoint PPTX and text PDFs into Markdown headings, paragraphs and tables.")}>
       <PrivacyBanner compact />
     </PageHeader>
+    {batchFiles ? <BatchConversionPanel mode="markdown" files={batchFiles} onClose={() => setBatchFiles(undefined)} /> : <>
     <SectionCard step={1} title={L("문서 선택", "Choose a document")} description="DOCX · XLSX · XLS · PPTX · PDF">
-      <FileDropZone accept={MARKDOWN_ACCEPT} files={file ? [file] : []} onFiles={choose} accent="blue"
-        hint={L("파일 한 개를 놓거나 선택하세요. 최대 50 MiB.", "Drop or choose one file, up to 50 MiB.")} />
+      <FileDropZone accept={MARKDOWN_ACCEPT} multiple files={[]} onFiles={choose} accent="blue"
+        hint={L("여러 파일을 놓거나 선택하세요. 파일당 최대 50 MiB.", "Drop or choose files, up to 50 MiB each.")} />
       {file && <FileList files={[file]} accent="blue" onRemove={() => choose([])} />}
     </SectionCard>
     <UtilityNotice className="my-4" kind="info">
@@ -116,6 +120,7 @@ export function DocumentMarkdownPage() {
       </label>
       {url && <Button render={<a data-testid="markdown-download" href={url} download={createSafeFileName(outputName || "document") + ".md"} onClick={() => setSaved(true)} />}><Download size={16} />{L("Markdown 다운로드", "Download Markdown")}</Button>}
     </SectionCard>}
+    </>}
     <ToolGuideWrapper slug="documentMarkdown" />
   </UtilityPage>;
 }

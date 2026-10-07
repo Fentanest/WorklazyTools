@@ -347,12 +347,14 @@ export async function pdfToImageArchive(
   language: AppLanguage = "ko",
   selectedPageIndexes?: number[],
   signal?: AbortSignal,
+  maxArchiveBytes = Infinity,
 ) {
   throwIfAborted(signal);
-  const document = await getPdfDocument(file, language);
+  const document = await getPdfDocument(file, language, signal);
   throwIfAborted(signal);
   const archiveFiles: Array<{ fileName: string; blob: Blob }> = [];
   const scale = dpi / 72;
+  let archiveBytes = 0;
   const baseName = stripExtension(file.name);
   const pageNumbers = selectedPageIndexes?.length ? selectedPageIndexes.map((index) => index + 1) : Array.from({ length: document.numPages }, (_, index) => index + 1);
   for (let index = 0; index < pageNumbers.length; index += 1) {
@@ -362,6 +364,8 @@ export async function pdfToImageArchive(
     const canvas = await renderPageForExport(document, pageNumber, scale, language, signal);
     const blob = await canvasToBlob(canvas, format === "png" ? "image/png" : "image/jpeg", quality, language);
     throwIfAborted(signal);
+    archiveBytes += blob.size;
+    if (archiveBytes > maxArchiveBytes) { canvas.width = 1; canvas.height = 1; throw new Error("BATCH_IMAGE_LIMIT"); }
     archiveFiles.push({ fileName: `${baseName}-${String(pageNumber).padStart(3, "0")}.${format === "jpeg" ? "jpg" : "png"}`, blob });
     canvas.width = 1;
     canvas.height = 1;
