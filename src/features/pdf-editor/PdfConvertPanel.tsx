@@ -16,7 +16,7 @@ import { combineOcrPdfPages, textDocumentToOffice } from "./pdfWorkerClient";
 import type { PdfPageItem } from "./types";
 import { featureMessage } from "../../i18n/featureMessages";
 
-type OutputFormat = "docx" | "xlsx" | "txt" | "searchable-pdf";
+type OutputFormat = "docx" | "xlsx" | "txt" | "pptx" | "hwpx" | "searchable-pdf";
 
 import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
 import { pdfConvertDirty, type PdfConvertPreset } from "./pdfConvertDirect";
@@ -26,6 +26,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
     const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [format, setFormat] = useState<OutputFormat>("docx");
+  const [ocrLayout, setOcrLayout] = useState<"sparse" | "paragraphs">("sparse");
   const [ocrMode, setOcrMode] = useState<PdfOcrMode>("auto");
   const [outputName, setOutputName] = useState(featureMessage(language, "pdf.messages.PdfConvertPanel.worklazyPdfConversion"));
   const [pageRange, setPageRange] = useState("");
@@ -102,7 +103,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
     try {
       const selectedPageIndexes = pageRange.trim() ? parsePageRange(pageRange, pageCount, language) : undefined;
       const selectedPageCount = selectedPageIndexes?.length || pageCount;
-      const extracted = await extractPdfText(file, searchable ? "all" : ocrMode, searchable, update, selectedPageIndexes, language, controller.signal);
+      const extracted = await extractPdfText(file, searchable ? "all" : ocrMode, searchable, update, selectedPageIndexes, language, controller.signal, { includeImages: format === "pptx" || format === "hwpx", ocrLayout });
       if (searchable) {
         if (extracted.ocrPdfBuffers.length !== selectedPageCount) throw new Error(featureMessage(language, "pdf.messages.PdfConvertPanel.searchablePdfDataCouldNotBeCreatedFor"));
         update(91, featureMessage(language, "pdf.messages.PdfConvertPanel.combiningPagesWithOcrTextLayers"));
@@ -137,7 +138,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
         <div>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfConvertPanel.chooseAPdf")} description={featureMessage(language, "pdf.messages.PdfConvertPanel.convertTextOrScannedPdfsToDocxXlsx")} className="">
             <FileDropZone accept=".pdf,application/pdf" files={file ? [file] : []} onFiles={setInput} accent="violet" hint={featureMessage(language, "pdf.messages.PdfConvertPanel.chooseOnePdfToExtractTextFromOr")} />
-            {file && <FileList files={[file]} accent="violet" onRemove={() => { void releasePdf(file); setFile(null); setPageCount(0); download.clearResult(); }} />}
+            {file && <FileList files={[file]} accent="violet" onRemove={() => { activeController.current?.abort(); void releasePdf(file); setLoading(false); operation.reset(); setFile(null); setPageCount(0); download.clearResult(); }} />}
           </SectionCard>
           {file && (
             <SectionCard step={2} title={featureMessage(language, "pdf.messages.PdfConvertPanel.reviewTheConversionRange")} description={featureMessage(language, "pdf.messages.PdfConvertPanel.embeddedTextIsUsedFirstPageImagesAre")} className="overflow-visible ">
@@ -154,12 +155,15 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
               {([
                 ["docx", "DOCX", featureMessage(language, "pdf.messages.PdfConvertPanel.paragraphs")],
                 ["xlsx", "XLSX", featureMessage(language, "pdf.messages.PdfConvertPanel.estimatedCells")],
+                ["pptx", "PPTX", language === "ko" ? "편집 가능한 슬라이드" : "Editable slides"],
+                ["hwpx", "HWPX", language === "ko" ? "편집 가능한 문단" : "Editable paragraphs"],
                 ["txt", "TXT", featureMessage(language, "pdf.messages.PdfConvertPanel.textOnly")],
                 ["searchable-pdf", featureMessage(language, "pdf.messages.PdfConvertPanel.searchablePdf"), featureMessage(language, "pdf.messages.PdfConvertPanel.ocrLayer")],
-              ] as Array<[OutputFormat, string, string]>).map(([value, label, hint]) => { const selected = format === value; return <Button key={value} type="button" role="radio" aria-checked={selected} data-selected={selected || undefined} variant="outline" className={cn("min-h-[52px] flex-col items-start justify-center gap-1 rounded-xl px-2.5 py-2 text-left", selected ? "border-primary bg-primary/10 text-primary hover:bg-primary/15 " : "border-transparent bg-muted text-muted-foreground")} onClick={() => { setFormat(value); download.clearResult(); }}><strong className="text-sm">{label}</strong><small className="text-xs text-muted-foreground">{hint}</small></Button>; })}
+              ] as Array<[OutputFormat, string, string]>).map(([value, label, hint]) => { const selected = format === value; return <Button key={value} type="button" disabled={operation.status === "running"} role="radio" aria-checked={selected} data-selected={selected || undefined} variant="outline" className={cn("min-h-[52px] flex-col items-start justify-center gap-1 rounded-xl px-2.5 py-2 text-left", selected ? "border-primary bg-primary/10 text-primary hover:bg-primary/15 " : "border-transparent bg-muted text-muted-foreground")} onClick={() => { setFormat(value); download.clearResult(); }}><strong className="text-sm">{label}</strong><small className="text-xs text-muted-foreground">{hint}</small></Button>; })}
             </div>
             {format !== "searchable-pdf" && <div className="pdf-summary-control mt-4 mb-1.5"><span className="mx-0.5 mb-2 flex items-center gap-1.5 text-[13px] font-bold text-muted-foreground"><Languages size={13} /> {featureMessage(language, "pdf.messages.PdfConvertPanel.scannedPageOcr")}</span><SegmentedControl value={ocrMode} onChange={setOcrMode} label={featureMessage(language, "pdf.messages.PdfConvertPanel.ocrScope")} options={[{ value: "auto", label: featureMessage(language, "pdf.messages.PdfConvertPanel.auto") }, { value: "off", label: featureMessage(language, "pdf.messages.PdfConvertPanel.off") }, { value: "all", label: featureMessage(language, "pdf.messages.PdfConvertPanel.all") }]} /></div>}
             {format === "searchable-pdf" && <p className="mt-3 rounded-xl bg-primary/10 p-2.5 text-xs leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfConvertPanel.aSearchablePdfAppliesKoreanAndEnglishOcr")}</p>}
+            {(format === "searchable-pdf" || ocrMode !== "off") && <label className="mt-3 grid gap-2 text-sm text-muted-foreground">{language === "ko" ? "OCR 글 배치" : "OCR text layout"}<select disabled={operation.status === "running"} aria-label={language === "ko" ? "OCR 글 배치" : "OCR text layout"} className="min-h-10 rounded-lg border border-border bg-background px-2 text-foreground" value={ocrLayout} onChange={event => { setOcrLayout(event.target.value as "sparse" | "paragraphs"); download.clearResult(); }}><option value="sparse">{language === "ko" ? "표·흩어진 글자" : "Tables / scattered text"}</option><option value="paragraphs">{language === "ko" ? "연속된 문단" : "Continuous paragraphs"}</option></select><span className="text-xs">{language === "ko" ? "인식한 숫자·읽기 순서를 원본과 대조하세요. 누락되면 다른 배치로 다시 시도하세요." : "Check numbers and reading order against the original. Try the other layout if text is missing."}</span></label>}
             <dl className="my-5">
               <SummaryRow label={featureMessage(language, "pdf.messages.PdfConvertPanel.pages")} value={pageCount} />
               <SummaryRow label={featureMessage(language, "pdf.messages.PdfConvertPanel.languages")} value={featureMessage(language, "pdf.messages.PdfConvertPanel.koreanEnglish")} />
@@ -168,6 +172,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
             <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfConvertPanel.pagesToProcess")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={pageRange} onChange={(event) => setPageRange(event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfConvertPanel.allEG158Max", { p0: pageCount })} /><small className="text-xs text-muted-foreground">{pageRange.trim() ? featureMessage(language, "pdf.messages.PdfConvertPanel.custom") : featureMessage(language, "pdf.messages.PdfConvertPanel.all")}</small></label>
             <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfConvertPanel.outputFileName")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={outputName} onChange={(event) => setOutputName(event.target.value)} /><small className="text-xs text-muted-foreground">.{extension}</small></label>
             <PrimaryButton accent="violet" disabled={!file || loading || operation.status === "running"} loading={operation.status === "running"} onClick={convert}><ScanText size={18} /> {format === "searchable-pdf" ? featureMessage(language, "pdf.messages.PdfConvertPanel.createOcrPdf") : featureMessage(language, "pdf.messages.PdfConvertPanel.convertTo", { p0: format.toUpperCase() })}</PrimaryButton>
+            {operation.status === "running" && <Button type="button" variant="outline" className="mt-2 w-full" onClick={() => { activeController.current?.abort(); operation.reset(); download.clearResult(); }}>{language === "ko" ? "변환 취소" : "Cancel conversion"}</Button>}
             <p className="mx-0.5 mt-3 text-center text-sm leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfConvertPanel.pdfsMayNotContainOriginalParagraphOrTable")}</p>
           </Card>
           <OperationProgress {...operation} accent="coral" title={featureMessage(language, "pdf.messages.PdfConvertPanel.pdfConversionOcrLog")} />

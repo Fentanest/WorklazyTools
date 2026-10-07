@@ -177,7 +177,7 @@ async function normalizeImageOrientation(file: File, language: AppLanguage) {
 
 export function textDocumentToOffice(
   document: PdfTextDocument,
-  format: "docx" | "xlsx" | "txt",
+  format: "docx" | "xlsx" | "txt" | "pptx" | "hwpx",
   fileName: string,
   onProgress?: WorkerProgress,
   language: AppLanguage = "ko",

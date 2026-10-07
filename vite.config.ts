@@ -41,6 +41,9 @@ export default defineConfig({
     plugins: () => [browserNodePolyfills()],
     rollupOptions: {
       output: {
+        // PptxGenJS has optional Node-only dynamic imports. Keep browser workers
+        // as single IIFE bundles, including Vite's empty browser shims.
+        inlineDynamicImports: true,
         entryFileNames: (chunk) => chunk.facadeModuleId?.includes("/features/video-studio/")
           ? "tools/video-studio/workers/[name]-[hash].js"
           : "assets/[name]-[hash].js",

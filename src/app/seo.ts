@@ -446,7 +446,7 @@ seoByPath["/tools/pdf-converter"] = {
 };
 for (const [mode, koTitle, enTitle, koDescription, enDescription] of [
   ["document-to-pdf", "문서 → PDF", "Document to PDF", "HWP·HWPX와 DOC·DOCX·XLS·XLSX·PPT·PPTX를 브라우저에서 PDF로 저장하세요.", "Save HWP, HWPX, DOC, DOCX, XLS, XLSX, PPT and PPTX as PDF in your browser."],
-  ["pdf-to-document", "PDF → 문서", "PDF to Document", "PDF에서 텍스트와 표를 DOCX·XLSX로 추출하세요. 원본 편집 구조 복원은 보장하지 않습니다.", "Extract PDF text and tables into DOCX or XLSX. Original editing structure is not restored."],
+  ["pdf-to-document", "PDF → 문서", "PDF to Document", "PDF를 DOCX·XLSX·PPTX·HWPX 기본 문서로 변환하세요. 원본 편집 구조 복원은 보장하지 않습니다.", "Create basic DOCX, XLSX, PPTX or HWPX documents from PDF. Original editing structure is not restored."],
 ]) {
   seoByPath[`/tools/pdf-converter/${mode}`] = { title: `${koTitle} | Worklazy Tools`, description: koDescription };
   englishPageSeo[`/tools/pdf-converter/${mode}`] = { title: `${enTitle} | Worklazy Tools`, description: enDescription };

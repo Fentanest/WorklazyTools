@@ -6,7 +6,7 @@ Created by `generate-office-probe.mjs` using the repository-pinned LibreOffice W
 
 See SHA256.json for the input identities. The same controlled fixtures were tested with Pyodide 0.29.4 / Chromium, with all external requests blocked.
 
-`generate-rich.mjs` creates two-page Korean DOCX/XLSX/PDF files with tables, numeric cell 42, and a synthetic coral rectangle. The PDF embeds the full locally pinned Nanum font; the earlier subset-font fixture rendered missing glyphs and is retained only in the ignored job diagnostics. `scanned.pdf` rasterizes the corrected first page at 150 dpi. Existing OCR recognizes the page heading but failed the numeric table-cell assertion; this is an open quality finding, not a passing fixture.
+`generate-rich.mjs` creates two-page Korean DOCX/XLSX/PDF files with tables, numeric cell 42, and a synthetic coral rectangle. The PDF embeds the full locally pinned Nanum font; the earlier subset-font fixture rendered missing glyphs and is retained only in the ignored job diagnostics. `scanned.pdf` rasterizes the corrected first page at 150 dpi. The original paragraph OCR segmenter recognized the heading but omitted the numeric table cell. The converter now exposes sparse/table and paragraph segmentation; the unchanged numeric 42 assertion is rechecked with its table default. This fixture does not establish general OCR accuracy.
 
 `encrypted.docx` is a genuine encrypted Office container produced with the repository's officeCrypto helper using the test-only password `fixture-only`.
 

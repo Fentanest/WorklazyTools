@@ -1656,7 +1656,7 @@
         "createdTheFile": "{{p0}} 변환 파일을 만들었습니다.",
         "unableToCompleteThePdfConversion": "PDF 변환을 완료하지 못했습니다.",
         "chooseAPdf": "PDF 선택",
-        "convertTextOrScannedPdfsToDocxXlsx": "텍스트 PDF와 스캔 PDF를 DOCX·XLSX·TXT 또는 검색 가능한 PDF로 변환합니다.",
+        "convertTextOrScannedPdfsToDocxXlsx": "텍스트 PDF와 스캔 PDF를 DOCX·XLSX·PPTX·HWPX·TXT 또는 검색 가능한 PDF로 변환합니다.",
         "chooseOnePdfToExtractTextFromOr": "텍스트를 추출하거나 OCR할 PDF 하나를 선택하세요.",
         "reviewTheConversionRange": "변환 범위 확인",
         "embeddedTextIsUsedFirstPageImagesAre": "내장 텍스트를 먼저 사용하고, 필요할 때만 페이지 이미지를 OCR합니다.",

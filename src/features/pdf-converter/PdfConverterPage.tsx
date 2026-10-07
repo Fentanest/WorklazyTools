@@ -55,8 +55,8 @@ export function PdfConverterPage({ mode, convertPreset }: { mode: PdfConversionM
       </nav>
       {mode === "document-to-pdf" ? <DocumentPdfPanel /> : mode === "pdf-to-document" ? <>
         <UtilityNotice kind="info" className="mb-4">{language === "ko"
-          ? "텍스트·표 추출형 변환입니다. 원본의 배치·도형·서식 복원을 보장하지 않으며 PPTX·HWPX 출력은 제공하지 않습니다. 스캔 PDF는 아래 OCR 설정을 사용하세요."
-          : "This conversion extracts text and tables. It does not guarantee restoration of the original layout, shapes, or formatting. PPTX and HWPX output are not available. For scanned PDFs, use the OCR settings below."}</UtilityNotice>
+          ? "DOCX·XLSX는 텍스트·표 추출, PPTX·HWPX는 편집 가능한 글자와 별도 이미지로 기본 문서를 만듭니다. 원본 배치·표 구조·수식·도형 복원은 보장하지 않습니다. 스캔 그림은 편집 가능한 글자가 아니며, OCR 결과를 별도로 확인하세요."
+          : "DOCX / XLSX extract text and tables. PPTX / HWPX create basic documents with editable text and separate images. This does not guarantee restoration of the original layout, table structure, formulas, or shapes. Scan pictures are not editable text; check the separate OCR results."}</UtilityNotice>
         <PdfConvertPanel preset={convertPreset} />
       </> : <PdfImagePanel direction={mode} />}
       <ToolGuideWrapper slug="pdfConverter" />

@@ -49,9 +49,16 @@ export interface PdfTextLine {
   cells: PdfTextCell[];
 }
 
+export interface PdfExtractedImage {
+  data: string;
+  width: number;
+  height: number;
+}
+
 export interface PdfTextPage {
   pageNumber: number;
   lines: PdfTextLine[];
+  images?: PdfExtractedImage[];
 }
 
 export interface PdfTextDocument {

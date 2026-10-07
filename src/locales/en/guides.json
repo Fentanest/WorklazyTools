@@ -2194,7 +2194,7 @@
       {
         "title": "What PDF to Document provides",
         "paragraphs": [
-          "Produces text/table extraction as DOCX, XLSX, plain text or searchable PDF. Original layout, formulas, shapes and editing structure are not guaranteed. PPTX and HWPX output are not available. Use OCR for scans and check the result."
+          "DOCX / XLSX extract text and tables. PPTX / HWPX create basic documents with editable text and separate bitmap images. TXT and searchable PDF are also available. Original layout, table structure, formulas and vector shapes are not restored; long content continues on extra pages / slides. Scan pictures and OCR text are separate. Select Tables / scattered text or Continuous paragraphs in OCR text layout, then check numbers and reading order."
         ]
       }
     ],

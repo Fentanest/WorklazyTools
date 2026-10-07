@@ -1662,7 +1662,7 @@
         "createdTheFile": "Created the {{p0}} file.",
         "unableToCompleteThePdfConversion": "Unable to complete the PDF conversion.",
         "chooseAPdf": "Choose a PDF",
-        "convertTextOrScannedPdfsToDocxXlsx": "Convert text or scanned PDFs to DOCX, XLSX, TXT, or a searchable PDF.",
+        "convertTextOrScannedPdfsToDocxXlsx": "Convert text or scanned PDFs to DOCX, XLSX, PPTX, HWPX, TXT, or a searchable PDF.",
         "chooseOnePdfToExtractTextFromOr": "Choose one PDF to extract text from or process with OCR.",
         "reviewTheConversionRange": "Review the conversion range",
         "embeddedTextIsUsedFirstPageImagesAre": "Embedded text is used first; page images are OCRed only when needed.",

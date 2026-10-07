@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { Buffer } from "buffer";
+import { createEditableDocument } from "./pdfEditableDocument";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import process from "process";
@@ -32,7 +33,7 @@ function progress(value: number, message: string) {
 
 async function buildOfficeFile(data: {
   document: PdfTextDocument;
-  format: "docx" | "xlsx" | "txt";
+  format: "docx" | "xlsx" | "txt" | "pptx" | "hwpx";
   fileName: string;
   copy: PdfOfficeCopy;
 }): Promise<PdfWorkerResult> {
@@ -40,6 +41,9 @@ async function buildOfficeFile(data: {
     featureMessage(currentLanguage, "pdf.messages.pdfOffice.pdfsOftenOmitParagraphAndTableStructureSo"),
     featureMessage(currentLanguage, "pdf.messages.pdfOffice.complexTablesColumnsFootnotesShapesAndOriginalFormatting"),
   ];
+  if (data.format === "pptx" || data.format === "hwpx") {
+    return createEditableDocument(data.document, data.format, data.fileName, currentLanguage, progress);
+  }
   if (data.format === "txt") {
     const text = data.document.pages.map((page, index) => [data.copy.textPageTitles[index], ...page.lines.map((line) => line.text)].join("\n")).join("\n\n");
     return binaryResult(new TextEncoder().encode(`\uFEFF${text}`), ensureExtension(data.fileName, "txt"), "text/plain;charset=utf-8", warnings.slice(0, 1));

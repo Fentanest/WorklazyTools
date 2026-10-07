@@ -420,6 +420,7 @@ export async function extractPdfText(
   selectedPageIndexes?: number[],
   language: AppLanguage = "ko",
   signal?: AbortSignal,
+  options: { includeImages?: boolean; ocrLayout?: "sparse" | "paragraphs" } = {},
 ): Promise<ExtractPdfTextResult> {
   const document = await getPdfDocument(file, language, signal);
   const pages: PdfTextPage[] = [];
@@ -432,7 +433,15 @@ export async function extractPdfText(
     const pageNumber = sourcePageIndexes[index] + 1;
     const page = await waitWithAbort(document.getPage(pageNumber), signal);
     const content = await waitWithAbort(page.getTextContent(), signal);
-    pages.push(layoutPdfItems(pageNumber, (content.items as unknown[]).filter(isTextItem)));
+    const textPage = layoutPdfItems(pageNumber, (content.items as unknown[]).filter(isTextItem));
+    if (options.includeImages) {
+      const { extractPdfImages } = await import("./pdfExtractImages");
+      textPage.images = await extractPdfImages(page, (await loadPdfDisplayModule()).OPS, language, signal);
+    }
+    pages.push(textPage);
+    if (options.includeImages && pages.reduce((sum, item) => sum + (item.images ?? []).reduce((bytes, image) => bytes + image.data.length, 0), 0) > 64 * 1024 * 1024) {
+      throw new Error(language === "ko" ? "추출 이미지가 너무 큽니다. 페이지 범위를 나누어 변환해 주세요." : "Extracted images are too large. Convert a smaller page range.");
+    }
     onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, featureMessage(language, "pdf.messages.pdfPreview.embeddedTextAnalyzedForPage", { p0: index + 1, p1: sourcePageIndexes.length, p2: pageNumber }));
   }
 
@@ -470,6 +479,9 @@ export async function extractPdfText(
     signal?.addEventListener("abort", abort, { once: true });
     try {
       throwIfAborted(signal);
+      // Sparse text keeps table cells that the paragraph segmenter can omit.
+      // Users can select paragraphs for continuous prose / reading order.
+      await waitWithAbort(ocrWorker.setParameters({ tessedit_pageseg_mode: options.ocrLayout === "sparse" ? "11" as import("tesseract.js").PSM : "3" as import("tesseract.js").PSM }), signal);
       for (activePage = 0; activePage < ocrTargets.length; activePage += 1) {
         const pageIndex = ocrTargets[activePage];
         const sourcePageNumber = sourcePageIndexes[pageIndex] + 1;
@@ -482,7 +494,7 @@ export async function extractPdfText(
           { text: true, blocks: true, pdf: searchablePdf },
         ), signal);
         throwIfAborted(signal);
-        pages[pageIndex] = layoutOcrPage(sourcePageNumber, recognized.data);
+        pages[pageIndex] = { ...layoutOcrPage(sourcePageNumber, recognized.data), images: pages[pageIndex].images };
         if (searchablePdf && recognized.data.pdf) {
           const bytes = Uint8Array.from(recognized.data.pdf);
           ocrPdfBuffers.push(bytes.buffer);
