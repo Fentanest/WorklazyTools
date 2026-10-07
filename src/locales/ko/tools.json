@@ -62,24 +62,24 @@
     "document-markdown": {
       "title": "문서 → Markdown",
       "shortTitle": "문서 → Markdown",
-      "description": "Microsoft MarkItDown으로 DOCX·XLSX·XLS·PPTX·PDF의 텍스트와 표를 Markdown으로 추출합니다.",
+      "description": "워드·엑셀·PPTX·PDF의 제목, 문단과 표를 Markdown 파일로 추출하세요.",
       "eyebrow": "MARKDOWN",
       "highlights": [
-        "텍스트·제목",
-        "표 추출",
+        "워드·엑셀·PPTX",
+        "텍스트 PDF",
         "Markdown 저장"
       ]
     },
     "pdf-converter": {
       "title": "PDF 변환",
       "shortTitle": "PDF 변환",
-      "description": "이미지·Office 문서를 PDF로, PDF는 이미지·텍스트·표로 변환",
-      "eyebrow": "PDF 변환",
+      "description": "한글·워드·엑셀·PPT와 이미지를 PDF로 저장하고, PDF에서 문서·이미지를 추출하세요.",
+      "eyebrow": "문서·이미지 변환",
       "highlights": [
-        "이미지 순서 변경",
-        "A4·이미지 크기",
-        "PNG·JPG 출력",
-        "페이지 선택·ZIP"
+        "한글·오피스 → PDF",
+        "PDF → 문서",
+        "이미지 ↔ PDF",
+        "페이지 선택·OCR"
       ]
     },
     "foliotrace": {

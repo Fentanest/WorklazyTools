@@ -1573,6 +1573,18 @@
     }
   },
   "pdf": {
+    "conversionErrors": {
+      "imageDecode": "Could not decode an image on PDF page {{page}}; conversion was stopped. Check the source image or extract text as TXT / DOCX.",
+      "imageLimit": "The extracted images are too large. Reduce the page range or extract text as TXT / DOCX.",
+      "imagePrepare": "Could not prepare an image on PDF page {{page}} for conversion. Try a smaller page range or extract text as TXT / DOCX.",
+      "documentCreate": "Could not create the {{format}} document. Try again or choose another output format.",
+      "documentImage": "Could not add an image to the {{format}} document. Check the page or extract text as TXT / DOCX.",
+      "documentExport": "Could not finish creating or checking the {{format}} file. Try again or choose another output format.",
+      "invalidRange": "Enter page numbers between 1 and {{count}}. Use commas and hyphens to select a range.",
+      "conversion": "Could not complete the PDF conversion. Try again or choose another output format.",
+      "input": "Could not read the PDF. Choose an intact, unlocked copy.",
+      "preview": "Could not display the page preview. Choose the file again."
+    },
     "messages": {
       "pdfOffice": {
         "unsupportedDocumentConversionOperation": "Unsupported document conversion operation.",
@@ -1883,7 +1895,7 @@
         "unableToRenderThePdfPageImage": "Unable to render the PDF page image.",
         "imageDecodingFailed": "Failed to decode embedded images (CCITT/JBIG2) in the PDF. The image decoder may not have loaded correctly.",
         "unableToCreateTheImageFile": "Unable to create the image file.",
-        "preparingOcr": "Preparing OCR · {{p0}}",
+        "preparingOcr": "Preparing text recognition.",
         "thisPdfIsPasswordProtectedTryAgainWith": "This PDF is password-protected. Try again with an unlocked copy.",
         "unableToOpenThePdfFile": "Unable to open the PDF file."
       }

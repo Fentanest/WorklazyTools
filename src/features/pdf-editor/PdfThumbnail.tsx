@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { getCachedPdfThumbnail, renderPdfThumbnail, type CachedPdfThumbnail } from "./pdfPreview";
 import { useAppLanguage } from "../../i18n/routing";
+import { pdfConversionMessage } from "./pdfConversionMessages";
 import type { PdfPageItem } from "./types";
 import { featureMessage } from "../../i18n/featureMessages";
 
@@ -68,7 +69,7 @@ export function PdfThumbnail({
     setThumbnail(null);
     getCachedPdfThumbnail(file, item.sourcePageIndex, 172, language)
       .then((preview) => { if (active) { setDimensions(preview); setThumbnail(preview); } })
-      .catch((reason) => { if (active && !(reason instanceof DOMException && reason.name === "AbortError")) setError(reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfThumbnail.previewFailed")); });
+      .catch((reason) => { if (active && !(reason instanceof DOMException && reason.name === "AbortError")) setError(pdfConversionMessage(reason, language, "PREVIEW")); });
     return () => { active = false; };
   }, [file, item.sourcePageIndex, visible, language]);
 
@@ -76,7 +77,7 @@ export function PdfThumbnail({
     if (!expanded || !largeCanvasRef.current) return;
     const controller = new AbortController();
     void renderPdfThumbnail(file, item.sourcePageIndex, largeCanvasRef.current, Math.min(960, window.innerWidth - 48), language, controller.signal).catch((reason) => {
-      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfThumbnail.largePreviewFailed"));
+      if (!controller.signal.aborted) setError(pdfConversionMessage(reason, language, "PREVIEW"));
     });
     return () => controller.abort();
   }, [expanded, file, item.sourcePageIndex, language]);

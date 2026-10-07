@@ -72,7 +72,7 @@ export const toolCategories: ToolCategoryDefinition[] = [
 ];
 
 const allTools = [
-  { id: "document-markdown", category: "documents", path: "/tools/document-markdown", title: "문서 → Markdown", shortTitle: "문서 → Markdown", description: "Microsoft MarkItDown으로 DOCX·XLSX·XLS·PPTX·PDF를 Markdown으로 추출합니다.", eyebrow: "MARKDOWN", accent: "blue", icon: FileText, highlights: [{ icon: FileText, label: "텍스트·제목" }, { icon: Table2, label: "표 추출" }, { icon: Files, label: "Markdown 저장" }], status: "available" },
+  { id: "document-markdown", category: "documents", path: "/tools/document-markdown", title: "문서 → Markdown", shortTitle: "문서 → Markdown", description: "워드·엑셀·PPTX·PDF의 제목, 문단과 표를 Markdown 파일로 추출합니다.", eyebrow: "MARKDOWN", accent: "blue", icon: FileText, highlights: [{ icon: FileText, label: "텍스트·제목" }, { icon: Table2, label: "표 추출" }, { icon: Files, label: "Markdown 저장" }], status: "available" },
   { id: "product-banner", category: "media", path: "/tools/product-banner", title: "알리익스프레스 광고 배너 만들기", shortTitle: "알리익스프레스 광고 배너 만들기", description: "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 광고 배너를 만들고 HTML·iframe 코드를 저장하세요. 파일은 브라우저에서 처리합니다.", eyebrow: "알리익스프레스 광고 배너", accent: "pink", icon: Images, highlights: [{ icon: Images, label: "5종 디자인" }, { icon: FileSpreadsheet, label: "Excel·CSV 입력" }, { icon: Copy, label: "HTML·iframe 코드" }], status: "available" },
   { id: "foliotrace", category: "investment-research", path: "/tools/foliotrace", title: "FolioTrace", shortTitle: "FolioTrace", description: "공개 공시로 추적하는 포트폴리오 추정 자료를 살펴봅니다.", eyebrow: "공개 공시 탐색", accent: "blue", icon: WalletCards, highlights: [{ icon: FileSearch2, label: "DART 공시 근거" }, { icon: Table2, label: "추적 종목" }, { icon: CalendarDays, label: "접수일 구분" }], status: "available" },
   { id: "document-redactor", category: "security-share", path: "/tools/document-redactor", title: "개인정보 가리기", shortTitle: "개인정보 가리기", description: "PDF와 이미지에서 직접 선택한 영역을 검정으로 가리고 새 사본으로 저장합니다.", eyebrow: "문서 개인정보", accent: "violet", icon: LockKeyhole, highlights: [{icon: Scissors, label: "직접 영역 선택"}, {icon: Files, label: "모든 PDF 페이지 재생성"}, {icon: Images, label: "이미지 PNG 저장"}, {icon: FileSearch2, label: "결과 다시 확인"}], status: "available" },
@@ -154,7 +154,7 @@ const allTools = [
     path: "/tools/pdf-converter",
     title: "PDF Converter",
     shortTitle: "PDF 변환",
-    description: "JPG·PNG 이미지를 PDF로 묶거나 PDF의 선택 페이지를 PNG·JPG로 저장합니다.",
+    description: "한글·워드·엑셀·PPT와 이미지를 PDF로 저장하고, PDF에서 문서·이미지를 추출합니다.",
     eyebrow: "PDF 변환",
     accent: "coral",
     icon: ImageDown,

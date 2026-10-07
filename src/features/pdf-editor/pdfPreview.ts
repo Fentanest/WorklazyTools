@@ -10,6 +10,7 @@ import { waitWithAbort, settleOwnedPdfLoad } from "../../utils/pdfOwnedDocument.
 import { waitForPdfRender } from "./pdfRenderLifecycle";
 import { getPdfWorkerOptions, withImageDecodeCheck } from "./pdfConfig";
 import { createZipArchiveBlob } from "../../utils/zipArchive.ts";
+import { PdfConversionError } from "./pdfConversionErrors";
 
 type PdfDisplayModule = typeof import("pdfjs-dist");
 
@@ -440,7 +441,7 @@ export async function extractPdfText(
     }
     pages.push(textPage);
     if (options.includeImages && pages.reduce((sum, item) => sum + (item.images ?? []).reduce((bytes, image) => bytes + image.data.length, 0), 0) > 64 * 1024 * 1024) {
-      throw new Error(language === "ko" ? "추출 이미지가 너무 큽니다. 페이지 범위를 나누어 변환해 주세요." : "Extracted images are too large. Convert a smaller page range.");
+      throw new PdfConversionError("IMAGE_LIMIT");
     }
     onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, featureMessage(language, "pdf.messages.pdfPreview.embeddedTextAnalyzedForPage", { p0: index + 1, p1: sourcePageIndexes.length, p2: pageNumber }));
   }
@@ -640,7 +641,7 @@ function translateOcrStatus(status: string, language: AppLanguage) {
     "initializing api": "pdf.ocrStatus.initializingApi",
   };
   const label = labels[status];
-  return label ? featureMessage(language, label) : featureMessage(language, "pdf.messages.pdfPreview.preparingOcr", { p0: status });
+  return label ? featureMessage(language, label) : featureMessage(language, "pdf.messages.pdfPreview.preparingOcr");
 }
 
 function normalizePdfOpenError(error: unknown, language: AppLanguage) {

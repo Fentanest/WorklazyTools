@@ -28,30 +28,46 @@
     }
   },
   "documentMarkdown": {
-    "title": "Extracting Markdown from documents",
-    "description": "Extract DOCX, XLSX, XLS, PPTX, and PDF text and tables as Markdown with Microsoft MarkItDown.",
+    "title": "Convert Word, Excel, PowerPoint and PDF to Markdown",
+    "description": "Extract headings, paragraphs and tables into a .md file using Microsoft MarkItDown document converters.",
     "blocks": [
       {
-        "title": "Supported formats",
+        "title": "Choose a supported document",
         "paragraphs": [
-          "Processes DOCX, XLSX, XLS, PPTX and text PDFs. DOC, PPT, HWP, and HWPX are not currently supported."
+          "Select one Word DOCX, Excel XLS or XLSX, PowerPoint PPTX, or PDF with readable text, up to 50 MiB. Legacy DOC and PPT files and Hangul HWP or HWPX files are not supported by this Markdown tool."
         ]
       },
       {
-        "title": "Review the output",
+        "title": "Create and save Markdown",
         "paragraphs": [
-          "Headings, paragraphs, and tables may differ from the original. Formulas, layout, images, and scanned text recognition are not restored. Compare important content with the original."
+          "Select Create Markdown. The first run loads the required conversion files. Review the headings, paragraphs and tables, set a filename, then select Download Markdown. You can cancel loading and start again with another file."
+        ]
+      },
+      {
+        "title": "Compare with the original",
+        "paragraphs": [
+          "Visual layout, formulas, editing structure and images are not reproduced exactly. This tool does not recognize text in scanned PDFs. Check table cells, numbers and missing content against the original."
         ]
       }
     ],
     "faq": {
-      "privacy": {
-        "q": "Are documents sent to a server?",
-        "a": "No. Conversion assets are downloaded and documents are processed in this browser."
+      "0": {
+        "q": "Can I convert HWP, HWPX or older Word and PowerPoint files to Markdown?",
+        "a": "HWP, HWPX, DOC and PPT input is not currently supported. Prepare a DOCX, XLSX, XLS, PPTX or PDF copy with readable text.",
+        "question": "Can I convert HWP, HWPX or older Word and PowerPoint files to Markdown?",
+        "answer": "HWP, HWPX, DOC and PPT input is not currently supported. Prepare a DOCX, XLSX, XLS, PPTX or PDF copy with readable text."
       },
-      "scans": {
-        "q": "Are scanned or encrypted PDFs supported?",
-        "a": "OCR and encrypted documents are not supported. Use an unlocked document with extractable text."
+      "1": {
+        "q": "Can I use scanned PDFs or password-protected files?",
+        "a": "This tool does not support OCR or encrypted documents. Use an unlocked copy with extractable text.",
+        "question": "Can I use scanned PDFs or password-protected files?",
+        "answer": "This tool does not support OCR or encrypted documents. Use an unlocked copy with extractable text."
+      },
+      "2": {
+        "q": "Are documents sent to a server?",
+        "a": "Documents are processed in this browser and are not sent to a conversion server. Loading the site and conversion files, and separate advertising or analytics, can still involve network requests.",
+        "question": "Are documents sent to a server?",
+        "answer": "Documents are processed in this browser and are not sent to a conversion server. Loading the site and conversion files, and separate advertising or analytics, can still involve network requests."
       }
     }
   },
@@ -2198,52 +2214,80 @@
     }
   },
   "pdfConverter": {
-    "title": "Converting PDFs, images and documents",
-    "description": "Files are processed in this browser. Keep your originals and check the output.",
+    "title": "Convert Word, HWP, presentations and PDFs",
+    "description": "Choose a conversion direction, then check the file and page range. Compare the output with the original and keep a separate copy.",
     "blocks": [
       {
-        "title": "Image to PDF",
+        "title": "Save HWP or HWPX as PDF",
         "paragraphs": [
-          "Choose JPG or PNG files, arrange their order, then create a PDF using A4 fitting or original image dimensions. You can set the output filename."
+          "In Document → PDF, choose one Hangul document and wait for its preview. Select Save PDF using print, then Open print dialog. Choose Save as PDF as the browser print destination and select where to save the file.",
+          "Closing the print dialog does not confirm that a file was saved. Reopen the PDF and compare Korean fonts, tables, images and page counts with the original. An authorized user must unlock password-protected files first."
         ]
       },
       {
-        "title": "PDF to image",
+        "title": "Convert Word, Excel or PowerPoint to PDF",
         "paragraphs": [
-          "Choose PNG or JPG, a resolution, and a page range to download a ZIP of page images. More pages and higher resolutions require more memory and time."
+          "Choose a Word DOC or DOCX, Excel XLS or XLSX, or PowerPoint PPT or PPTX file, then select Create PDF. When conversion finishes, check the filename and download the PDF.",
+          "Office conversion downloads about 252 MiB of conversion files on the first run and accepts files up to 50 MiB. A desktop with sufficient memory is recommended. Fonts and print settings can change line breaks, tables, slides and page layout."
         ]
       },
       {
-        "title": "Document to PDF",
+        "title": "Convert PDF to Word, Excel, PowerPoint or HWPX",
         "paragraphs": [
-          "LibreOffice processes DOC, DOCX, XLS, XLSX, PPT and PPTX. The first run loads about 252 MiB; inputs may be up to 50 MiB. Fonts and print settings can change the output: check pages and tables. For HWP / HWPX, open the print dialog from the rhwp preview and choose Save as PDF in your browser. Password-protected documents are not supported."
+          "In PDF → Document, choose an output format and page range. DOCX creates text paragraphs for Word; XLSX estimates table cells from text positions. PPTX and HWPX create basic slides or paragraphs with editable text and separate images. Hangul output uses HWPX, not the older HWP format.",
+          "Original layout, table structure, formulas and vector shapes are not restored. Long content may continue on additional pages or slides. Choose TXT if you only need plain text."
         ]
       },
       {
-        "title": "What PDF to Document provides",
+        "title": "Recognize text in scanned PDFs",
         "paragraphs": [
-          "DOCX / XLSX extract text and tables. PPTX / HWPX create basic documents with editable text and separate bitmap images. TXT and searchable PDF are also available. Original layout, table structure, formulas and vector shapes are not restored; long content continues on extra pages / slides. Scan pictures and OCR text are separate. Select Tables / scattered text or Continuous paragraphs in OCR text layout, then check numbers and reading order."
+          "Use automatic OCR when a PDF has no readable text. Korean and English are supported. Choose Tables / scattered text or Continuous paragraphs to match the source. Searchable PDF applies OCR to every selected page.",
+          "Scan pictures remain images, with recognized text handled separately. Check numbers, table reading order and recognition errors. The first run downloads recognition files, so it cannot start offline."
+        ]
+      },
+      {
+        "title": "Convert images to PDF or PDF to images",
+        "paragraphs": [
+          "In Image → PDF, arrange JPG or PNG files and choose A4 fitting or original image size. In PDF → Image, choose PNG or JPG, resolution and pages to download a ZIP of page images."
+        ]
+      },
+      {
+        "title": "Cancel, recover and try again",
+        "paragraphs": [
+          "Canceling does not create a new result. Once Office conversion has started, Cancel and reset reloads the page to release its memory. Keep the original and retry with fewer pages or another output format if conversion fails."
         ]
       }
     ],
     "faq": {
       "0": {
-        "question": "Are files uploaded to a server?",
-        "answer": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests.",
         "q": "Are files uploaded to a server?",
-        "a": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests."
+        "a": "Selected documents and conversion results are processed in this browser and are not sent to a conversion server. Loading the site, conversion and OCR files, and separate advertising or analytics can still involve network requests.",
+        "question": "Are files uploaded to a server?",
+        "answer": "Selected documents and conversion results are processed in this browser and are not sent to a conversion server. Loading the site, conversion and OCR files, and separate advertising or analytics can still involve network requests."
       },
       "1": {
-        "question": "Can I process a password-protected PDF?",
-        "answer": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy.",
-        "q": "Can I process a password-protected PDF?",
-        "a": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy."
+        "q": "Do HWP and HWPX use the same PDF saving steps?",
+        "a": "Both open print guidance from the document preview, followed by the browser’s Save as PDF option. Destination names and file-location dialogs vary by browser and operating system.",
+        "question": "Do HWP and HWPX use the same PDF saving steps?",
+        "answer": "Both open print guidance from the document preview, followed by the browser’s Save as PDF option. Destination names and file-location dialogs vary by browser and operating system."
       },
       "2": {
-        "question": "Does it work on mobile?",
-        "answer": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited.",
-        "q": "Does it work on mobile?",
-        "a": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited."
+        "q": "Does PDF conversion restore the original Word, HWP or PowerPoint file?",
+        "a": "No. DOCX and XLSX extract text and tables; PPTX and HWPX create basic documents with editable text and separate images. The original editing structure and identical formatting are not guaranteed.",
+        "question": "Does PDF conversion restore the original Word, HWP or PowerPoint file?",
+        "answer": "No. DOCX and XLSX extract text and tables; PPTX and HWPX create basic documents with editable text and separate images. The original editing structure and identical formatting are not guaranteed."
+      },
+      "3": {
+        "q": "Can I convert password-protected documents?",
+        "a": "Not currently. The tool does not bypass protection. An authorized user must prepare an unlocked copy.",
+        "question": "Can I convert password-protected documents?",
+        "answer": "Not currently. The tool does not bypass protection. An authorized user must prepare an unlocked copy."
+      },
+      "4": {
+        "q": "Does conversion work on mobile?",
+        "a": "Images and short PDFs can be processed, but Office conversion, long PDFs, high-resolution images and OCR use more memory, so a desktop is recommended. Saving HWP through printing depends on browser print support.",
+        "question": "Does conversion work on mobile?",
+        "answer": "Images and short PDFs can be processed, but Office conversion, long PDFs, high-resolution images and OCR use more memory, so a desktop is recommended. Saving HWP through printing depends on browser print support."
       }
     }
   }

@@ -4,6 +4,7 @@ import initRhwp, { HwpDocument } from "@rhwp/core";
 import rhwpWasmUrl from "@rhwp/core/rhwp_bg.wasm?url";
 import type { AppLanguage } from "../../i18n/languages";
 import { ensurePdfExtension, pdfBinaryResult } from "./pdfShared";
+import { PdfConversionError } from "./pdfConversionErrors";
 
 /** Basic, reflowed documents: text objects and independent bitmap assets.
  * No page screenshot is substituted for editable text. */
@@ -37,7 +38,7 @@ export async function createEditableDocument(document: PdfTextDocument, format: 
         const ratio = Math.min(9 / image.width, 4.5 / image.height, 1 / 72);
         const width = image.width * ratio, height = image.height * ratio;
         if (y + height > 6.9) nextSlide();
-        slide.addImage({ data: image.data, x: 0.5, y, w: width, h: height, altText: `PDF page ${page.pageNumber} bitmap` });
+        slide.addImage({ data: image.data, x: 0.5, y, w: width, h: height, altText: (language === "ko" ? `PDF ${page.pageNumber}페이지 이미지` : `Image from PDF page ${page.pageNumber}`) });
         y += height + 0.2;
       }
       progress(15 + (pageIndex + 1) / document.pages.length * 70, language === "ko" ? "편집 가능한 슬라이드 생성 중" : "Creating editable slides");
@@ -49,7 +50,7 @@ export async function createEditableDocument(document: PdfTextDocument, format: 
   const hwp = HwpDocument.createEmpty();
   try {
     const blank = JSON.parse(hwp.createBlankDocument());
-    if (blank.sectionCount !== 1) throw new Error(JSON.stringify(blank));
+    if (blank.sectionCount !== 1) throw new PdfConversionError("DOCUMENT_CREATE", { format });
     let paragraph = 0;
     const style = () => {
       // The official blank template supplies font/style tables; formatting APIs
@@ -75,8 +76,8 @@ export async function createEditableDocument(document: PdfTextDocument, format: 
         style();
         const bytes = Uint8Array.from(atob(image.data.split(",")[1]), value => value.charCodeAt(0));
         const scale = Math.min(450 / image.width, 360 / image.height, 1);
-        const picture = JSON.parse(hwp.insertPicture(0, paragraph, 0, "[]", bytes, Math.round(image.width * scale * 100), Math.round(image.height * scale * 100), image.width, image.height, "png", `PDF page ${page.pageNumber} bitmap`));
-        if (!picture.ok) throw new Error(JSON.stringify(picture));
+        const picture = JSON.parse(hwp.insertPicture(0, paragraph, 0, "[]", bytes, Math.round(image.width * scale * 100), Math.round(image.height * scale * 100), image.width, image.height, "png", (language === "ko" ? `PDF ${page.pageNumber}페이지 이미지` : `Image from PDF page ${page.pageNumber}`)));
+        if (!picture.ok) throw new PdfConversionError("DOCUMENT_IMAGE", { format });
         hwp.setPictureProperties(0, paragraph, picture.controlIdx, JSON.stringify({ treatAsChar: true }));
         // rhwp 0.8.7 omits an inline picture in a completely empty paragraph
         // after HWPX reload. A real space supplies its text-flow anchor.

@@ -50,6 +50,18 @@ try {
   const { stdout: tagCommitOutput } = await execFileAsync("git", ["-C", sourceRoot, "rev-list", "-n", "1", tag], { encoding: "utf8" });
   if (commit !== tagCommitOutput.trim()) throw new Error(`${tag}의 정확한 커밋이 checkout되지 않았습니다.`);
 
+  // Build the pinned upstream with a reviewed local UI patch. Refuse unrelated
+  // tracked edits in a supplied source checkout; never overwrite a reference.
+  const patchPath = path.join(projectRoot, "scripts", "rhwp-worklazy.patch");
+  const patch = await fs.readFile(patchPath);
+  const { stdout: sourceDiff } = await execFileAsync("git", ["-C", sourceRoot, "diff", "HEAD", "--binary"], { encoding: "utf8" });
+  if (sourceDiff && sourceDiff !== patch.toString("utf8")) throw new Error("rhwp source contains unrelated tracked edits; use a clean pinned source.");
+  if (!sourceDiff) {
+    await run("git", ["-C", sourceRoot, "apply", "--check", patchPath]);
+    await run("git", ["-C", sourceRoot, "apply", patchPath]);
+  }
+  const localPatch = { path: "scripts/rhwp-worklazy.patch", sha256: createHash("sha256").update(patch).digest("hex") };
+
   const corePackageRoot = path.join(projectRoot, "node_modules", "@rhwp", "core");
   const wasmFiles = ["rhwp.js", "rhwp_bg.wasm", "rhwp.d.ts", "rhwp_bg.wasm.d.ts"];
   await fs.mkdir(path.join(sourceRoot, "pkg"), { recursive: true });
@@ -120,6 +132,7 @@ try {
     upstream: upstreamUrl.replace(/\.git$/, ""),
     tag,
     commit,
+    localPatch,
     packages: { "@rhwp/core": coreVersion, "@rhwp/editor": editorVersion },
     externalWebFonts: false,
     withoutHwpCtrl,

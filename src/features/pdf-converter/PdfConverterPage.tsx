@@ -34,12 +34,12 @@ export function PdfConverterPage({ mode, convertPreset }: { mode: PdfConversionM
     "pdf-to-document": language === "ko" ? "PDF → 문서" : "PDF → Document",
   };
   const details = mode === "document-to-pdf"
-    ? { title: labels[mode], description: language === "ko" ? "HWP·HWPX와 Word·Excel·PowerPoint 문서를 PDF로 저장하세요." : "Save HWP, HWPX, Word, Excel, and PowerPoint documents as PDF." }
+    ? { title: labels[mode], description: language === "ko" ? "한글(HWP·HWPX), 워드, 엑셀과 PPT 프레젠테이션을 PDF로 저장하세요." : "Convert Word, Excel, PowerPoint and HWP / HWPX documents to PDF." }
     : mode === "pdf-to-document"
-      ? { title: labels[mode], description: language === "ko" ? "PDF의 텍스트와 표를 문서로 추출하세요." : "Extract PDF text and tables into documents." }
+      ? { title: labels[mode], description: language === "ko" ? "PDF를 워드·엑셀·PPT·한글 문서로 바꾸고 추출한 내용과 이미지를 확인하세요." : "Convert PDF to Word, Excel, PowerPoint or HWPX and review the extracted text and images." }
       : copy.modes[mode];
   const title = language === "ko" ? "PDF 변환" : "PDF Converter";
-  return <UtilityPage toolId="pdf-converter">
+  return <UtilityPage toolId="pdf-converter" className="[--primary:var(--brand-strong)] [&_.bg-primary:hover]:bg-[var(--brand-strong)] [&_[data-ui-component=file-list]>li>span:first-child]:text-foreground [&_[data-testid=pdf-download]_small]:text-primary-foreground [&_.privacy-inline]:text-foreground [&_.ui-step-number]:bg-[var(--brand-strong)] [&_.ui-step-number]:text-primary-foreground [&_[data-slot=notice]]:text-foreground">
     <div className="pdf-tool-page" data-pdf-mode={mode}>
       <PageHeader eyebrow={title} title={details.title} description={details.description}>
         <PrivacyBanner compact />
@@ -50,7 +50,7 @@ export function PdfConverterPage({ mode, convertPreset }: { mode: PdfConversionM
           to={localizedPath(language, `/tools/pdf-converter/${itemMode}`)}
           data-active={mode === itemMode || undefined}
           aria-current={mode === itemMode ? "page" : undefined}
-          className={`flex min-h-[43px] items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold outline-none transition-[color,background-color,box-shadow] focus-visible:ring-3 focus-visible:ring-primary/30 ${mode === itemMode ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"}`}
+          className={`flex min-h-[43px] items-center justify-center gap-2 rounded-xl px-3 text-sm font-bold outline-none transition-[color,background-color,box-shadow] focus-visible:ring-3 focus-visible:ring-primary/30 ${mode === itemMode ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"}`}
         ><Icon size={17} /><span>{labels[itemMode]}</span></Link>)}
       </nav>
       {mode === "document-to-pdf" ? <DocumentPdfPanel /> : mode === "pdf-to-document" ? <>

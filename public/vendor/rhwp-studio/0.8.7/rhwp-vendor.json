@@ -4,6 +4,10 @@
   "upstream": "https://github.com/edwardkim/rhwp",
   "tag": "v0.8.7",
   "commit": "1a76570e833917d15817415a53c09ad61ab3203f",
+  "localPatch": {
+    "path": "scripts/rhwp-worklazy.patch",
+    "sha256": "496e32109eb7c1f0a44ecba49b2390800b7d639b83080e88b3009ac7b6abdb96"
+  },
   "packages": {
     "@rhwp/core": "0.8.7",
     "@rhwp/editor": "0.8.7"
@@ -12,21 +16,21 @@
   "withoutHwpCtrl": true,
   "networkPolicy": "same-origin-only",
   "files": {
-    "assets/canvaskit-renderer-C4Jx6T-v.js": {
+    "assets/canvaskit-renderer-Cf3oh6T_.js": {
       "bytes": 247511,
-      "sha256": "e8100312f4a63492df2f2f670e638771758d2ebdc510c387b1a07d4d40420f92"
+      "sha256": "e356228b5fdd63eeae114b49024076825256ac0e14afc4f2e7d39d6f6ce162be"
     },
     "assets/canvaskit-SCAxUyCS.wasm": {
       "bytes": 7317345,
       "sha256": "25ebed8e60158c5854f8dc807b936daca21354f8bfb6a2231266b0a93812f301"
     },
-    "assets/index-Dy0DTkWY.css": {
-      "bytes": 113835,
-      "sha256": "77febd44c7840da15121989e64d344123d5d353b9d7c4ecc66f44ac8d544110e"
+    "assets/index-CgwMgt94.js": {
+      "bytes": 2116869,
+      "sha256": "93936e0793bf5b940e9c72a8377bbe1f9cc93e150db1ac1faba531150130e72c"
     },
-    "assets/index-oVYSsgk_.js": {
-      "bytes": 2116169,
-      "sha256": "8ebc3b179be3be256f092160944699e504d649b2e85fbeb71bfeb6662f0bd3ac"
+    "assets/index-DaRDd4ig.css": {
+      "bytes": 113979,
+      "sha256": "a21df050f6c77ca5a34b95a69d1762af15bc49a7b8a8eab812c2074121850db1"
     },
     "assets/rhwp_bg-BkVWMBaR.wasm": {
       "bytes": 11821756,
@@ -213,8 +217,8 @@
       "sha256": "a0ac1200a41b6a75e9afb30cda5bb850276087d45c2f25870605888238ba9b39"
     },
     "index.html": {
-      "bytes": 87322,
-      "sha256": "e4c7634e22f14a66f029e0f98ade1f99005d28111abd3c5abdd077f37ae285e5"
+      "bytes": 87617,
+      "sha256": "0d5656cc008d212f07d87a74a8d4678e8942caae3d2443d15cdf134a4d82d41e"
     },
     "LICENSE.rhwp.txt": {
       "bytes": 1072,

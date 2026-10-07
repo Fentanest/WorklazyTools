@@ -79,8 +79,8 @@ export function HwpPdfPanel({ file, onClear }: { file: File; onClear: () => void
   };
   return <SectionCard step={2} title={L("HWP·HWPX PDF 저장", "Save HWP / HWPX as PDF")} description={L("문서 미리보기에서 페이지를 확인하세요.", "Check the pages in the document preview.")}>
     <UtilityNotice kind="info" className="mb-4">{L(
-      "HWP·HWPX는 rhwp의 PDF 인쇄 기능을 사용합니다. 아래 버튼과 미리보기의 ‘인쇄 창 열기’를 누른 뒤 브라우저 인쇄 대상에서 ‘PDF로 저장’을 선택하세요. 저장 여부는 이 페이지에서 확인할 수 없습니다. 원본과 글꼴·표·페이지를 비교해 주세요.",
-      "HWP / HWPX uses rhwp’s PDF print feature. Press the button below, then Open print dialog in the preview, and choose Save as PDF as the browser’s print destination. This page cannot confirm whether you saved the file. Compare fonts, tables, and pages with the original.")}</UtilityNotice>
+      "한글 HWP·HWPX는 브라우저 인쇄로 PDF를 저장합니다. 아래 버튼과 미리보기의 ‘인쇄 창 열기’를 누른 뒤 브라우저 인쇄 대상에서 ‘PDF로 저장’을 선택하세요. 저장 여부는 이 페이지에서 확인할 수 없습니다. 원본과 글꼴·표·페이지를 비교해 주세요.",
+      "HWP / HWPX documents are saved as PDF through browser printing. Press the button below, then Open print dialog in the preview, and choose Save as PDF as the browser’s print destination. This page cannot confirm whether you saved the file. Compare fonts, tables, and pages with the original.")}</UtilityNotice>
     <div className="mb-4 flex flex-wrap items-center gap-2">
       <PrimaryButton accent="coral" disabled={pages === undefined || error || printing} loading={printing} onClick={() => void print()}><Printer size={17} />{L("인쇄 창에서 PDF 저장", "Save PDF using print")}</PrimaryButton>
       <Button variant="outline" onClick={onClear}><X size={16} />{L("문서 닫기", "Close document")}</Button>

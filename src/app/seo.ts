@@ -433,26 +433,31 @@ const englishPageSeo: Record<string, SeoDefinition> = {
 };
 
 seoByPath["/tools/document-markdown"] = {
-  title: "문서 → Markdown - MarkItDown | Worklazy Tools",
-  description: "DOCX·XLSX·XLS·PPTX·PDF의 텍스트와 표를 브라우저에서 Markdown으로 추출하세요.",
-  application: { name: "문서 → Markdown", featureList: ["Microsoft MarkItDown", "DOCX·XLSX·XLS·PPTX·PDF", "텍스트·표 추출", "로컬 처리"] },
+  title: "워드·엑셀·PDF를 Markdown으로 변환 | Worklazy Tools",
+  description: "워드 DOCX, 엑셀 XLS·XLSX, PPTX와 텍스트 PDF에서 제목·문단·표를 추출해 Markdown으로 저장하세요. 스캔 OCR과 HWP 입력은 지원하지 않습니다.",
+  application: { name: "문서 → Markdown", featureList: ["워드·엑셀·PPTX·PDF 입력", "제목·문단·표 추출", "Markdown 저장"] },
 };
 englishPageSeo["/tools/document-markdown"] = {
-  title: "Document to Markdown - MarkItDown | Worklazy Tools",
-  description: "Extract DOCX, XLSX, XLS, PPTX and PDF text and tables into Markdown in your browser.",
-  application: { name: "Document to Markdown", featureList: ["Microsoft MarkItDown", "DOCX, XLSX, XLS, PPTX, PDF", "Text and table extraction", "Browser processing"] },
+  title: "Convert Word, Excel and PDF to Markdown | Worklazy Tools",
+  description: "Convert DOCX, XLS, XLSX, PPTX and text PDFs to Markdown headings, paragraphs and tables. Scanned PDF OCR and HWP input are not supported.",
+  application: { name: "Document to Markdown", featureList: ["Word, Excel, PPTX and text PDF input", "Headings, paragraphs and tables", "Markdown download"] },
 };
 seoByPath["/tools/pdf-converter"] = {
-  title: "PDF 변환 - 이미지·문서 변환 | Worklazy Tools",
-  description: "이미지·Office 문서를 PDF로 저장하고 PDF에서 이미지·텍스트·표를 추출하세요.",
-  application: { name: "PDF 변환", featureList: ["JPG·PNG를 PDF로", "PDF를 PNG·JPG로", "A4·이미지 크기", "페이지 선택·ZIP"] },
+  title: "PDF 변환 - 문서와 이미지 형식 바꾸기 | Worklazy Tools",
+  description: "한글 HWP·HWPX, 워드·엑셀·PPT와 이미지를 PDF로 저장하거나 PDF를 문서·이미지로 변환하세요. 지원 형식과 출력 차이를 확인하세요.",
+  application: { name: "PDF 변환", featureList: ["한글·오피스 문서를 PDF로", "PDF를 DOCX·XLSX·PPTX·HWPX로", "이미지와 PDF 변환", "한국어·영어 OCR"] },
+};
+englishPageSeo["/tools/pdf-converter"] = {
+  title: "PDF Converter - Documents and Images | Worklazy Tools",
+  description: "Convert HWP, Word, Excel, PowerPoint and images to PDF, or extract documents and images from PDFs. Check supported formats and output limitations.",
+  application: { name: "PDF Converter", featureList: ["HWP and Office to PDF", "PDF to DOCX, XLSX, PPTX and HWPX", "Images and PDF", "Korean and English OCR"] },
 };
 for (const [mode, koTitle, enTitle, koDescription, enDescription] of [
-  ["document-to-pdf", "문서 → PDF", "Document to PDF", "HWP·HWPX와 DOC·DOCX·XLS·XLSX·PPT·PPTX를 브라우저에서 PDF로 저장하세요.", "Save HWP, HWPX, DOC, DOCX, XLS, XLSX, PPT and PPTX as PDF in your browser."],
-  ["pdf-to-document", "PDF → 문서", "PDF to Document", "PDF를 DOCX·XLSX·PPTX·HWPX 기본 문서로 변환하세요. 원본 편집 구조 복원은 보장하지 않습니다.", "Create basic DOCX, XLSX, PPTX or HWPX documents from PDF. Original editing structure is not restored."],
+  ["document-to-pdf", "한글·워드·PPT를 PDF로 변환", "Convert Word, Excel, PowerPoint and HWP to PDF", "한글 HWP·HWPX는 브라우저 인쇄로, 워드·엑셀·PPT는 파일 변환으로 PDF를 저장하세요. 최대 50 MiB 입력과 글꼴·페이지 차이를 확인하세요.", "Save Word, Excel and PowerPoint files as PDF. Use browser printing for HWP and HWPX. Files up to 50 MiB; check fonts and page layout."],
+  ["pdf-to-document", "PDF를 워드·한글·PPT 문서로 변환", "Convert PDF to Word, Excel, PowerPoint or HWPX", "PDF에서 글자·표를 추출하거나 별도 이미지를 포함한 DOCX·XLSX·PPTX·HWPX 문서를 만드세요. 원본 편집 구조와 배치는 복원하지 않습니다.", "Extract PDF text and tables into Word or Excel, or create basic PowerPoint and HWPX documents with separate images. Original layout is not restored."],
 ]) {
-  seoByPath[`/tools/pdf-converter/${mode}`] = { title: `${koTitle} | Worklazy Tools`, description: koDescription };
-  englishPageSeo[`/tools/pdf-converter/${mode}`] = { title: `${enTitle} | Worklazy Tools`, description: enDescription };
+  seoByPath[`/tools/pdf-converter/${mode}`] = { title: `${koTitle} | Worklazy Tools`, description: koDescription, application: { name: koTitle, featureList: [koDescription] } };
+  englishPageSeo[`/tools/pdf-converter/${mode}`] = { title: `${enTitle} | Worklazy Tools`, description: enDescription, application: { name: enTitle, featureList: [enDescription] } };
 }
 seoByPath["/tools/pdf-converter/pdf-to-document/ocr"] = seoByPath["/tools/pdf-editor/ocr"];
 englishPageSeo["/tools/pdf-converter/pdf-to-document/ocr"] = englishPageSeo["/tools/pdf-editor/ocr"];

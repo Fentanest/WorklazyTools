@@ -5,10 +5,10 @@ import puppeteer from "puppeteer-core";
 const outputDirectory = path.resolve("public/social/tools");
 
 const tools = [
-  tool("document-markdown", "#d53228", "문서 → Markdown", "문서 → Markdown", "MarkItDown · 문서 텍스트와 표 추출", "Document to Markdown", "Document to Markdown", "MarkItDown · Text and table extraction"),
-  tool("document-to-pdf", "#d53228", "PDF 변환", "문서를 PDF로 변환", "HWP · Word · Excel · PowerPoint → PDF", "PDF conversion", "Document to PDF", "HWP · Word · Excel · PowerPoint to PDF"),
-  tool("pdf-to-document", "#d53228", "PDF 변환", "PDF에서 문서 추출", "텍스트·표 추출 · DOCX · XLSX", "PDF conversion", "PDF to Document", "Text and table extraction · DOCX · XLSX"),
-  tool("pdf-converter", "#d53228", "PDF 변환", "PDF 변환", "이미지·문서 → PDF · 이미지·텍스트 추출", "PDF conversion", "PDF Converter", "Images & documents to PDF · Text extraction"),
+  tool("document-markdown", "#d53228", "문서 → Markdown", "문서 → Markdown", "워드 · 엑셀 · PPTX · PDF의 글자와 표", "Document to Markdown", "Document to Markdown", "Word · Excel · PPTX · PDF text and tables"),
+  tool("document-to-pdf", "#d53228", "PDF 변환", "문서를 PDF로 변환", "한글 · 워드 · 엑셀 · PPT → PDF", "PDF conversion", "Document to PDF", "HWP · Word · Excel · PowerPoint to PDF"),
+  tool("pdf-to-document", "#d53228", "PDF 변환", "PDF에서 문서 추출", "워드 · 엑셀 · PPT · HWPX 기본 문서", "PDF conversion", "PDF to Document", "Word · Excel · PowerPoint · HWPX"),
+  tool("pdf-converter", "#d53228", "PDF 변환", "PDF 변환", "한글·오피스·이미지 변환과 PDF 추출", "PDF conversion", "PDF Converter", "HWP & Office to PDF · Document extraction"),
   tool("product-banner", "#d9548c", "알리익스프레스 제휴 광고", "알리익스프레스 광고 배너 만들기", "Excel·CSV · 5종 디자인 · HTML·iframe", "AliExpress affiliate ads", "AliExpress Ad Banner Builder", "Excel & CSV · 5 designs · HTML & iframe"),
   tool("foliotrace", "#0879d9", "투자·공시", "FolioTrace", "국민연금 공개 공시 추적", "Investment research", "FolioTrace", "NPS public filing research"),
   tool("document-redactor", "#7554d8", "문서 개인정보", "개인정보 마스킹", "직접 영역 선택 · PDF · 이미지", "Document privacy", "Document Redaction", "Manual masks · PDF · images"),

@@ -62,24 +62,24 @@
     "document-markdown": {
       "title": "Document to Markdown",
       "shortTitle": "Document to Markdown",
-      "description": "Extract DOCX, XLSX, XLS, PPTX, and PDF text and tables as Markdown with Microsoft MarkItDown.",
+      "description": "Convert Word, Excel, PowerPoint PPTX and text PDFs to Markdown headings, paragraphs and tables.",
       "eyebrow": "MARKDOWN",
       "highlights": [
-        "Text and headings",
-        "Table extraction",
+        "Word, Excel & PPTX",
+        "Text PDFs",
         "Markdown download"
       ]
     },
     "pdf-converter": {
       "title": "PDF Converter",
       "shortTitle": "PDF Converter",
-      "description": "Convert images and Office files to PDF; extract PDF images, text and tables",
-      "eyebrow": "PDF CONVERSION",
+      "description": "Convert HWP, Word, Excel, PowerPoint and images to PDF, or extract documents and images from PDFs.",
+      "eyebrow": "DOCUMENT & IMAGE CONVERSION",
       "highlights": [
-        "Image ordering",
-        "A4 or image size",
-        "PNG and JPG output",
-        "Page selection and ZIP"
+        "HWP & Office to PDF",
+        "PDF to documents",
+        "Images and PDF",
+        "Page selection & OCR"
       ]
     },
     "foliotrace": {

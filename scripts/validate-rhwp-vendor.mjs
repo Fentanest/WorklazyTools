@@ -18,6 +18,10 @@ if (!/^[0-9a-f]{40}$/.test(manifest.commit ?? "")) throw new Error("rhwp vendor 
 if (manifest.packages?.["@rhwp/core"] !== version || manifest.packages?.["@rhwp/editor"] !== version) throw new Error("rhwp vendor 패키지 버전이 일치하지 않습니다.");
 if (manifest.externalWebFonts !== false || manifest.withoutHwpCtrl !== true || manifest.networkPolicy !== "same-origin-only") throw new Error("rhwp vendor 네트워크/플러그인 격리 설정이 누락되었습니다.");
 
+const localPatchPath = "scripts/rhwp-worklazy.patch";
+const localPatchHash = createHash("sha256").update(await fs.readFile(path.join(projectRoot, localPatchPath))).digest("hex");
+if (manifest.localPatch?.path !== localPatchPath || manifest.localPatch?.sha256 !== localPatchHash) throw new Error("rhwp local UI patch provenance is missing or out of date.");
+
 const indexHtml = await fs.readFile(path.join(vendorRoot, "index.html"), "utf8");
 if (!indexHtml.includes("Content-Security-Policy") || !indexHtml.includes(`name="rhwp-version" content="${version}"`)) throw new Error("rhwp Studio CSP 또는 버전 표기가 누락되었습니다.");
 if (/vite-plugin-pwa:register-sw|rel="manifest"|edwardkim\.github\.io/i.test(indexHtml)) throw new Error("rhwp Studio에 외부/PWA 런타임 의존이 남아 있습니다.");

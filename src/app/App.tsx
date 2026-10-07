@@ -178,12 +178,14 @@ type PdfRouteProps =
   | { mode: "finish"; finishPreset: PdfFinishPreset };
 
 function ToolRouteLoading({ tool }: { tool: string }) {
-  const { t } = useTranslation("common");
+  const { t, i18n } = useTranslation("common");
   useLayoutEffect(() => {
     setAdIneligible("routePending", true);
     return () => setAdIneligible("routePending", false);
   }, []);
-  return <div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool })}</div>;
+  const koreanToolNames: Record<string, string> = { "PDF converter": "PDF 변환", "Image to PDF": "이미지 → PDF", "PDF to image": "PDF → 이미지", "Document to PDF": "문서 → PDF", "PDF to document": "PDF → 문서", "PDF OCR": "PDF 문자 인식", "Document to Markdown": "문서 → Markdown", "PDF Tools": "PDF 도구" };
+  const localizedTool = i18n.resolvedLanguage?.startsWith("ko") ? koreanToolNames[tool] ?? tool : tool;
+  return <div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: localizedTool })}</div>;
 }
 
 function PdfRoute(props: PdfRouteProps) {

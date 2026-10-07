@@ -10,6 +10,7 @@ import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage } from "../../i18n/featureMessages";
 import { throwIfAborted } from "../../utils/cooperativeCancel.ts";
 import { pdfWorkerCanceledMessage, runPdfWorker } from "./pdfWorkerLifecycle";
+import { isConversionErrorCode, PdfConversionError } from "./pdfConversionErrors";
 import { LEGACY_ORGANIZE_PDF_PRESET } from "./legacyOrganizePreset.ts";
 
 function createPdfWorker() {
@@ -203,7 +204,11 @@ export function textDocumentToOffice(
     onProgress,
     language,
     signal,
-  );
+  ).catch((error: unknown) => {
+    if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
+    const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
+    throw new PdfConversionError(isConversionErrorCode(code) ? code : "DOCUMENT_EXPORT", { format });
+  });
 }
 
 export function combineOcrPdfPages(buffers: ArrayBuffer[], fileName: string, onProgress?: WorkerProgress, language: AppLanguage = "ko", signal?: AbortSignal) {

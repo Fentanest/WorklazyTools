@@ -2,6 +2,7 @@
 
 import { Buffer } from "buffer";
 import { createEditableDocument } from "./pdfEditableDocument";
+import { PdfConversionError, conversionErrorToken } from "./pdfConversionErrors";
 import ExcelJS from "exceljs";
 import JSZip from "jszip";
 import process from "process";
@@ -22,8 +23,8 @@ worker.onmessage = async (event: MessageEvent) => {
     const result = await buildOfficeFile(event.data);
     worker.postMessage({ type: "result", result }, [result.buffer]);
   } catch (error) {
-    const message = error instanceof Error ? error.message : featureMessage(currentLanguage, "pdf.messages.pdfOffice.anErrorOccurredWhileConvertingTheDocument");
-    worker.postMessage({ type: "error", error: { message, code: "OFFICE_CONVERSION_ERROR" } });
+    const failure = error instanceof PdfConversionError ? error : new PdfConversionError("DOCUMENT_EXPORT", { format: event.data?.format });
+    worker.postMessage({ type: "error", error: { message: conversionErrorToken(failure), code: failure.code } });
   }
 };
 

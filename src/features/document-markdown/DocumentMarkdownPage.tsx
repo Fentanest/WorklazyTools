@@ -85,9 +85,9 @@ export function DocumentMarkdownPage() {
     active.current?.abort(); active.current = undefined; setLoading(false);
     operation.reset();
   };
-  return <UtilityPage toolId="document-markdown">
+  return <UtilityPage toolId="document-markdown" className="[--primary:var(--brand-strong)] [&_.bg-primary:hover]:bg-[var(--brand-strong)] [&_[data-ui-component=file-list]>li>span:first-child]:text-foreground [&_[data-testid=pdf-download]_small]:text-primary-foreground [&_.privacy-inline]:text-foreground [&_.ui-step-number]:bg-[var(--brand-strong)] [&_.ui-step-number]:text-primary-foreground [&_[data-slot=notice]]:text-foreground">
     <PageHeader eyebrow="MARKDOWN" title={L("문서 → Markdown", "Document to Markdown")}
-      description={L("문서의 텍스트·제목·표를 Markdown 파일로 추출하세요.", "Extract document text, headings, and tables into a Markdown file.")}>
+      description={L("워드·엑셀·PPTX·PDF의 제목, 문단과 표를 Markdown 파일로 추출하세요.", "Convert Word, Excel, PowerPoint PPTX and text PDFs into Markdown headings, paragraphs and tables.")}>
       <PrivacyBanner compact />
     </PageHeader>
     <SectionCard step={1} title={L("문서 선택", "Choose a document")} description="DOCX · XLSX · XLS · PPTX · PDF">
@@ -97,8 +97,8 @@ export function DocumentMarkdownPage() {
     </SectionCard>
     <UtilityNotice className="my-4" kind="info">
       <FileText className="shrink-0" size={18} /><span>{L(
-        "Microsoft MarkItDown 0.1.8의 문서 변환기를 사용합니다. 시각적 서식·수식·편집 구조의 복원은 보장하지 않으며 스캔 PDF의 문자 인식은 지원하지 않습니다.",
-        "Uses Microsoft MarkItDown 0.1.8 document converters. Visual formatting, formulas, and editing structure may not be preserved. Scanned PDF text recognition is not supported.")}</span>
+        "제목·문단·표를 추출하는 도구입니다. 시각적 서식·수식·편집 구조의 복원은 보장하지 않으며 스캔 PDF의 문자 인식은 지원하지 않습니다.",
+        "Extracts headings, paragraphs and tables. Visual formatting, formulas and editing structure may not be preserved. Scanned PDF text recognition is not supported.")}</span>
     </UtilityNotice>
     <div className="my-4 flex flex-wrap gap-2">
       <PrimaryButton accent="blue" disabled={!file || loading} loading={loading} onClick={() => void run()}>

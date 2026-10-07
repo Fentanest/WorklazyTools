@@ -1567,6 +1567,18 @@
     }
   },
   "pdf": {
+    "conversionErrors": {
+      "imageDecode": "PDF {{page}}페이지의 이미지를 읽지 못해 변환을 중단했습니다. 원본 이미지를 확인하거나 TXT·DOCX로 텍스트를 추출해 주세요.",
+      "imageLimit": "추출 이미지가 너무 큽니다. 페이지 범위를 줄이거나 TXT·DOCX로 텍스트를 추출해 주세요.",
+      "imagePrepare": "PDF {{page}}페이지의 이미지를 변환용으로 준비하지 못했습니다. 페이지 범위를 줄여 다시 시도하거나 TXT·DOCX로 텍스트를 추출해 주세요.",
+      "documentCreate": "{{format}} 문서를 만들지 못했습니다. 다시 시도하거나 다른 출력 형식을 선택해 주세요.",
+      "documentImage": "{{format}} 문서에 이미지를 넣지 못했습니다. 해당 페이지를 확인하거나 TXT·DOCX로 텍스트를 추출해 주세요.",
+      "documentExport": "{{format}} 파일 생성 또는 결과 확인을 완료하지 못했습니다. 다시 시도하거나 다른 출력 형식을 선택해 주세요.",
+      "invalidRange": "1~{{count}} 사이의 페이지 번호를 입력해 주세요. 쉼표와 하이픈으로 범위를 지정할 수 있습니다.",
+      "conversion": "PDF 변환을 완료하지 못했습니다. 다시 시도하거나 다른 출력 형식을 선택해 주세요.",
+      "input": "PDF를 읽지 못했습니다. 손상되지 않은 암호 해제 사본을 선택해 주세요.",
+      "preview": "페이지 미리보기를 표시하지 못했습니다. 파일을 다시 선택해 주세요."
+    },
     "messages": {
       "pdfOffice": {
         "unsupportedDocumentConversionOperation": "지원하지 않는 문서 변환 작업입니다.",
@@ -1877,7 +1889,7 @@
         "unableToRenderThePdfPageImage": "PDF 페이지 이미지를 만들 수 없습니다.",
         "imageDecodingFailed": "PDF 내부 이미지(CCITT/JBIG2) 디코딩에 실패했습니다. 이미지 디코더가 정상적으로 로드되지 않았을 수 있습니다.",
         "unableToCreateTheImageFile": "이미지 파일을 만들지 못했습니다.",
-        "preparingOcr": "OCR 준비 중 · {{p0}}",
+        "preparingOcr": "문자 인식을 준비하고 있습니다.",
         "thisPdfIsPasswordProtectedTryAgainWith": "암호로 보호된 PDF입니다. 보호가 해제된 사본으로 다시 시도해 주세요.",
         "unableToOpenThePdfFile": "PDF 파일을 열지 못했습니다."
       }
