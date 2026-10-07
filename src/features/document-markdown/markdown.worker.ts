@@ -62,4 +62,3 @@ scope.onmessage = async (event: MessageEvent<{ buffer: ArrayBuffer; extension: s
     try { pyodide?.FS.unlink("/tmp/input"); } catch { /* No input was installed. */ }
   }
 };
-

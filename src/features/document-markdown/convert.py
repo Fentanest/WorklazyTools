@@ -25,4 +25,3 @@ def convert_document(extension):
     if not content.strip():
         raise ValueError("NO_TEXT")
     return content
-

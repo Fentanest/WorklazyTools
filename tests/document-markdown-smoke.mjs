@@ -109,4 +109,3 @@ test("Korean mobile page remains usable and document processing makes no externa
   assert.deepEqual(external, []);
   assert.deepEqual(errors, []);
 });
-

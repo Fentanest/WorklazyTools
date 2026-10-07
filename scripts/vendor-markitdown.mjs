@@ -97,4 +97,3 @@ for (const name of Object.keys(bundle.files).sort().filter(n => /\.dist-info\/(?
 notices += "\n# Pyodide converter dependencies\n" + pyodideNotices.join("\n");
 await fs.writeFile(path.join(output, "THIRD_PARTY_LICENSES.txt"), notices);
 console.log("MarkItDown " + contract.markitdownVersion + ": " + pyodideFiles.length + " pinned Pyodide packages; converter bundle " + zip.length + " bytes.");
-

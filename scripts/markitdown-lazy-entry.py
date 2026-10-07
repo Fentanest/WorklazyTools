@@ -5,4 +5,3 @@ def __getattr__(name):
         from . import _markitdown
         return getattr(_markitdown, name)
     raise AttributeError(name)
-
