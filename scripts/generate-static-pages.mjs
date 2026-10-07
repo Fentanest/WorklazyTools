@@ -16,11 +16,11 @@ const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData
 
 const toolRoutes = [
   "foliotrace",
-  "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
+  "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "pdf-converter", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
   "document-redactor", "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
 ];
-const pdfRoutes = ["pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark", "pdf-editor/stamp"];
+const pdfRoutes = ["pdf-converter/image-to-pdf", "pdf-converter/pdf-to-image", "pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark", "pdf-editor/stamp"];
 const pageRoutes = ["about", "privacy", "terms", "contact", "licenses"];
 const videoChildRoutes = VIDEO_STUDIO_PUBLIC ? VIDEO_DIRECT_PATHS.slice(1).map(route => route.slice(1)) : [];
 const coreDirectRoutes = ["tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr", "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark", "tools/audio-studio/trim"];

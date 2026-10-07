@@ -76,6 +76,7 @@ export const toolToGuideKey: Record<string, string> = {
   "document-compare": "documentCompare",
   "pdf-compare": "pdfCompare",
   "pdf-editor": "pdfEditor.standard",
+  "pdf-converter": "pdfConverter",
   "hwp-editor": "hwpEditor",
   "office-editor": "officeEditor",
   "video-studio": "video.page",

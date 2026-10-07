@@ -5,6 +5,7 @@ import puppeteer from "puppeteer-core";
 const outputDirectory = path.resolve("public/social/tools");
 
 const tools = [
+  tool("pdf-converter", "#d53228", "PDF 변환", "PDF 변환", "JPG·PNG → PDF · PDF → 이미지", "PDF conversion", "PDF Converter", "JPG & PNG to PDF · PDF to images"),
   tool("foliotrace", "#0879d9", "투자·공시", "FolioTrace", "국민연금 공개 공시 추적", "Investment research", "FolioTrace", "NPS public filing research"),
   tool("document-redactor", "#7554d8", "문서 개인정보", "개인정보 마스킹", "직접 영역 선택 · PDF · 이미지", "Document privacy", "Document Redaction", "Manual masks · PDF · images"),
   tool("excel-merger", "#22a65a", "문서·스프레드시트", "Excel 병합기", "여러 파일 · 시트별 · 세로 · 가로 병합", "Documents & spreadsheets", "Excel Merger", "Combine files · sheets · rows · columns"),

@@ -4,8 +4,9 @@ import test from "node:test";
 import { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition } from "../../src/app/seo.ts";
 
 const toolRoutes = [
-  "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-generator", "/tools/document-compare", "/tools/pdf-compare", "/tools/pdf-editor", "/tools/pdf-editor/image-to-pdf",
-  "/tools/pdf-editor/pdf-to-image", "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
+  "/tools/pdf-converter", "/tools/pdf-converter/image-to-pdf", "/tools/pdf-converter/pdf-to-image",
+  "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/document-generator", "/tools/document-compare", "/tools/pdf-compare", "/tools/pdf-editor",
+  "/tools/pdf-editor/convert", "/tools/hwp-editor", "/tools/office-editor",
   "/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp",
   "/tools/video-studio", "/tools/audio-studio", "/tools/image-studio", "/tools/text-merger", "/tools/text-tools",
   "/tools/text-formatter", "/tools/work-calculator", "/tools/timezone-calculator", "/tools/payroll-calculator",
@@ -122,5 +123,18 @@ test("new document tools expose matching Korean and English static FAQs", () => 
   }
   for (const route of ["/tools/text-merger", "/tools/excel-merger", "/tools/excel-compare", "/tools/excel-cleaner", "/tools/pdf-editor", "/tools/video-studio", "/tools/qr-studio/bulk"] as const) {
     assert.equal(getSeoDefinition("ko", route).faq?.length, getSeoDefinition("en", route).faq?.length, `${route} FAQ counts differ between ko and en`);
+  }
+});
+
+
+test("moved image conversion URLs canonicalize to the converter and expose local image conversion metadata", () => {
+  for (const mode of ["image-to-pdf", "pdf-to-image"]) {
+    assert.equal(canonicalSeoPath(`/tools/pdf-editor/${mode}/`), `/tools/pdf-converter/${mode}`);
+    for (const language of ["ko", "en"] as const) {
+      const definition = getSeoDefinition(language, `/tools/pdf-converter/${mode}`);
+      assert.ok(definition.application);
+      assert.ok(definition.faq?.length);
+      assert.equal(definition.application.name, getSeoDefinition(language, `/tools/pdf-editor/${mode}`).application?.name);
+    }
   }
 });

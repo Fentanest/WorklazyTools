@@ -196,8 +196,12 @@ function PdfToImages() {
 
 function ImageCard({ file, index, onRemove }: { file: File; index: number; onRemove: () => void }) {
   const language = useAppLanguage();
-  const [url] = useState(() => URL.createObjectURL(file));
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const nextUrl = URL.createObjectURL(file);
+    setUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [file]);
   return <Card as="article" className="pdf-image-card min-w-0 gap-0 overflow-hidden rounded-2xl border border-border bg-white/40 py-0 shadow-sm ring-0 transition-[border-color,box-shadow,transform] dark:bg-white/[.025] [&.sortable-ghost]:opacity-35 [&.sortable-chosen]:border-primary [&.sortable-chosen]:shadow-lg"><div className="pdf-page-card-top grid h-[33px] grid-cols-[27px_1fr_auto] items-center gap-1 border-b border-border px-2 text-muted-foreground"><Button type="button" className="pdf-drag-handle size-[27px] touch-none cursor-grab rounded-lg p-0 text-muted-foreground active:cursor-grabbing max-[620px]:size-11" variant="ghost" size="icon-xs" aria-label={featureMessage(language, "pdf.messages.PdfImagePanel.reorderImage", { p0: index + 1 })}><GripVertical size={16} /></Button><strong className="text-sm text-foreground">{index + 1}</strong><Button type="button" className="pdf-image-remove size-[27px] rounded-lg p-0 text-destructive hover:bg-destructive/10 max-[620px]:size-11" variant="ghost" size="icon-xs" onClick={onRemove} aria-label={featureMessage(language, "pdf.messages.PdfImagePanel.remove", { p0: file.name })}><Trash2 size={15} /></Button></div><div className="pdf-image-preview m-2 grid aspect-4/3 place-items-center overflow-hidden rounded-lg bg-[#e9e9ed] dark:bg-[#202023]"><img className="size-full object-contain" src={url} alt="" /></div><div className="pdf-page-source flex min-w-0 flex-col px-2.5 pt-0.5 pb-2"><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-foreground">{file.name}</strong><small className="mt-1 text-xs text-muted-foreground">{Math.max(1, Math.round(file.size / 1024))} KB</small></div></Card>;
 }
 

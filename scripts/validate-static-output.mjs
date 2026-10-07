@@ -56,6 +56,7 @@ const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/
 
 const routes = [
   "", "tools", "tools/foliotrace", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare",
+  "tools/pdf-converter", "tools/pdf-converter/image-to-pdf", "tools/pdf-converter/pdf-to-image",
   "tools/pdf-editor", "tools/pdf-editor/image-to-pdf",
   "tools/pdf-editor/pdf-to-image", "tools/pdf-editor/convert",
   "tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp",
@@ -68,6 +69,7 @@ const routes = [
   "about", "privacy", "terms", "contact", "licenses",
 ];
 const socialSlugByRoute = {
+  "tools/pdf-converter": "pdf-converter", "tools/pdf-converter/image-to-pdf": "image-to-pdf", "tools/pdf-converter/pdf-to-image": "pdf-to-image",
   "tools/foliotrace": "foliotrace", "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-generator": "document-generator", "tools/document-compare": "document-compare", "tools/pdf-compare": "pdf-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
   "tools/pdf-editor/finish": "pdf-finish", "tools/pdf-editor/page-numbers": "pdf-page-numbers", "tools/pdf-editor/header-footer": "pdf-header-footer", "tools/pdf-editor/watermark": "pdf-watermark", "tools/pdf-editor/stamp": "pdf-stamp",

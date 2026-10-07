@@ -48,6 +48,18 @@
     }
   },
   "items": {
+    "pdf-converter": {
+      "title": "PDF Converter",
+      "shortTitle": "PDF Converter",
+      "description": "Combine JPG and PNG images into a PDF, or save selected PDF pages as PNG or JPG images.",
+      "eyebrow": "PDF CONVERSION",
+      "highlights": [
+        "Image ordering",
+        "A4 or image size",
+        "PNG and JPG output",
+        "Page selection and ZIP"
+      ]
+    },
     "foliotrace": {
       "title": "FolioTrace",
       "shortTitle": "FolioTrace",
@@ -111,7 +123,7 @@
       "eyebrow": "PDF EDIT & CONVERT",
       "highlights": [
         "Checkbox & continuous ranges",
-        "Image conversion",
+        "Page numbers and watermarks",
         "DOCX & TXT",
         "XLSX & OCR"
       ]

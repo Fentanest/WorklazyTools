@@ -1,6 +1,6 @@
 import type { PdfOrganizePreset } from "./pdfOrganizeDirect";
 import type { PdfConvertPreset } from "./pdfConvertDirect";
-import { BadgeCheck, FileImage, FileOutput, ImageDown, Layers3 } from "lucide-react";
+import { BadgeCheck, FileOutput, Layers3 } from "lucide-react";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
 
@@ -13,7 +13,6 @@ import { featureMessage, featureResource } from "../../i18n/featureMessages";
 import { localizedPath } from "../../i18n/languages";
 import { useAppLanguage } from "../../i18n/routing";
 import { PdfConvertPanel } from "./PdfConvertPanel";
-import { PdfImagePanel } from "./PdfImagePanel";
 import { PdfOrganizePanel } from "./PdfOrganizePanel";
 import type { PdfFinishPreset, PdfToolMode } from "./types";
 
@@ -34,15 +33,12 @@ interface PdfPageCopy {
 const navigation = [
   { mode: "organize", to: "/tools/pdf-editor", icon: Layers3 },
   { mode: "finish", to: "/tools/pdf-editor/finish", icon: BadgeCheck },
-  { mode: "image-to-pdf", to: "/tools/pdf-editor/image-to-pdf", icon: FileImage },
-  { mode: "pdf-to-image", to: "/tools/pdf-editor/pdf-to-image", icon: ImageDown },
   { mode: "convert", to: "/tools/pdf-editor/convert", icon: FileOutput },
 ] as const;
 
 type PdfEditorPageProps =
   | { mode: "organize"; organizePreset?: PdfOrganizePreset; finishPreset?: never }
   | { mode: "convert"; convertPreset?: PdfConvertPreset; finishPreset?: never }
-  | { mode: "image-to-pdf" | "pdf-to-image"; finishPreset?: never }
   | { mode: "finish"; finishPreset: PdfFinishPreset };
 
 export function PdfEditorPage(props: PdfEditorPageProps) {
@@ -65,7 +61,6 @@ export function PdfEditorPage(props: PdfEditorPageProps) {
             <ToolReady><PdfFinishPanel preset={props.finishPreset} /></ToolReady>
           </Suspense>
         )}
-        {(mode === "image-to-pdf" || mode === "pdf-to-image") && <PdfImagePanel direction={mode} />}
         {mode === "convert" && <PdfConvertPanel preset={props.convertPreset} />}
 
         <PdfGuide mode={mode} />
@@ -115,7 +110,7 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
     >
       <nav
         ref={navigationRef}
-        className="pdf-tool-navigation grid grid-cols-[repeat(5,minmax(148px,1fr))] gap-1 overflow-x-auto rounded-2xl bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="pdf-tool-navigation grid grid-cols-[repeat(3,minmax(148px,1fr))] gap-1 overflow-x-auto rounded-2xl bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         aria-label={ariaLabel}
       >
         {navigation.map((item) => {

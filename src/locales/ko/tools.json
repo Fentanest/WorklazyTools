@@ -48,6 +48,18 @@
     }
   },
   "items": {
+    "pdf-converter": {
+      "title": "PDF 변환",
+      "shortTitle": "PDF 변환",
+      "description": "JPG·PNG 이미지를 PDF로 묶거나 PDF의 선택 페이지를 PNG·JPG로 저장합니다.",
+      "eyebrow": "PDF 변환",
+      "highlights": [
+        "이미지 순서 변경",
+        "A4·이미지 크기",
+        "PNG·JPG 출력",
+        "페이지 선택·ZIP"
+      ]
+    },
     "foliotrace": {
       "title": "FolioTrace",
       "shortTitle": "FolioTrace",
@@ -111,7 +123,7 @@
       "eyebrow": "PDF 편집·변환",
       "highlights": [
         "체크 선택·연속 분할",
-        "이미지 변환",
+        "번호·워터마크",
         "DOCX·TXT",
         "XLSX·OCR"
       ]

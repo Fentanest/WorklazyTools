@@ -2140,5 +2140,43 @@
         "a": "Reopen and check the saved file. The line breaks and page layouts you saw in the browser might differ from those in the final program you use."
       }
     }
+  },
+  "pdfConverter": {
+    "title": "Converting PDFs and images",
+    "description": "Files are processed in this browser. Keep your originals and check the output.",
+    "blocks": [
+      {
+        "title": "Image to PDF",
+        "paragraphs": [
+          "Choose JPG or PNG files, arrange their order, then create a PDF using A4 fitting or original image dimensions. You can set the output filename."
+        ]
+      },
+      {
+        "title": "PDF to image",
+        "paragraphs": [
+          "Choose PNG or JPG, a resolution, and a page range to download a ZIP of page images. More pages and higher resolutions require more memory and time."
+        ]
+      }
+    ],
+    "faq": {
+      "0": {
+        "question": "Are files uploaded to a server?",
+        "answer": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests.",
+        "q": "Are files uploaded to a server?",
+        "a": "No. Selected PDFs, images, and generated results are processed in this browser. The site, ads, and OCR assets may still make ordinary network requests."
+      },
+      "1": {
+        "question": "Can I process a password-protected PDF?",
+        "answer": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy.",
+        "q": "Can I process a password-protected PDF?",
+        "a": "Not currently. The tool does not bypass protection; an authorized user must prepare an unlocked copy."
+      },
+      "2": {
+        "question": "Does it work on mobile?",
+        "answer": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited.",
+        "q": "Does it work on mobile?",
+        "a": "Yes, but desktop browsers are more reliable for long PDFs, high-resolution rendering, and large OCR jobs because mobile memory is limited."
+      }
+    }
   }
 }

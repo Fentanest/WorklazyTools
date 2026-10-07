@@ -54,6 +54,9 @@ const socialImageSlugByPath: Record<string, string> = {
   "/tools/document-compare": "document-compare",
   "/tools/pdf-compare": "pdf-compare",
   "/tools/pdf-editor": "pdf-tools",
+  "/tools/pdf-converter": "pdf-converter",
+  "/tools/pdf-converter/image-to-pdf": "image-to-pdf",
+  "/tools/pdf-converter/pdf-to-image": "pdf-to-image",
   "/tools/pdf-editor/image-to-pdf": "image-to-pdf",
   "/tools/pdf-editor/pdf-to-image": "pdf-to-image",
   "/tools/pdf-editor/convert": "pdf-convert",
@@ -363,6 +366,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "excel-cleaner": "Excel Data Cleaner - Remove Spaces, Blank Rows & Duplicates | Worklazy Tools",
   "document-generator": "Batch Word Document Generator - Excel to Word Mail Merge | Worklazy Tools",
   "pdf-editor": "PDF Editor - Reorder, Merge, Split & Convert | Worklazy Tools",
+  "pdf-converter": "PDF Converter - JPG, PNG and PDF | Worklazy Tools",
   "document-compare": "Compare Word & HWP Documents - Track Changes | Worklazy Tools",
   "pdf-compare": "Compare PDF Files - Check Visual & Text Differences | Worklazy Tools",
   "hwp-editor": "HWP Editor - Edit HWP & HWPX Online | Worklazy Tools",
@@ -420,7 +424,18 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/licenses": { title: "Licenses & Third-Party Notices | Worklazy Tools", description: "Review Worklazy Tools copyright terms and licenses for rhwp, ffmpeg.wasm and other open-source components." },
 };
 
+seoByPath["/tools/pdf-converter"] = {
+  title: "PDF 변환 - JPG·PNG·PDF | Worklazy Tools",
+  description: "이미지를 PDF로 묶거나 PDF의 선택 페이지를 PNG·JPG 이미지로 저장하세요.",
+  application: { name: "PDF 변환", featureList: ["JPG·PNG를 PDF로", "PDF를 PNG·JPG로", "A4·이미지 크기", "페이지 선택·ZIP"] },
+};
+for (const mode of ["image-to-pdf", "pdf-to-image"]) {
+  seoByPath[`/tools/pdf-converter/${mode}`] = seoByPath[`/tools/pdf-editor/${mode}`];
+  englishPageSeo[`/tools/pdf-converter/${mode}`] = englishPageSeo[`/tools/pdf-editor/${mode}`];
+}
+
 export const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
+  "/tools/pdf-converter": "pdf-converter",
   "/tools/foliotrace": "foliotrace",
   "/tools/excel-merger": "excel-merger", "/tools/excel-compare": "excel-compare", "/tools/excel-cleaner": "excel-cleaner", "/tools/document-compare": "document-compare", "/tools/pdf-compare": "pdf-compare", "/tools/pdf-editor": "pdf-editor",
   "/tools/hwp-editor": "hwp-editor", "/tools/office-editor": "office-editor", "/tools/video-studio": "video-studio",
@@ -466,6 +481,7 @@ export function normalizeSeoPath(pathname: string) {
 
 export function canonicalSeoPath(pathname: string) {
   const path = normalizeSeoPath(pathname);
+  if (path === "/tools/pdf-editor/image-to-pdf" || path === "/tools/pdf-editor/pdf-to-image") return path.replace("pdf-editor", "pdf-converter");
   return ["/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp"].includes(path)
     ? "/tools/pdf-editor/finish"
     : path;
