@@ -16,8 +16,8 @@ beforeEach(async context=>{await fs.appendFile(path.join(evidence,'progress.log'
 afterEach(async context=>{await fs.appendFile(path.join(evidence,'progress.log'),`END ${context.name}\n`);});
 before(async()=> { browser = await chromium.launch({executablePath:'/usr/bin/google-chrome', args:['--disable-dev-shm-usage'], chromiumSandbox:true}); });
 after(async()=> { await browser?.close(); console.log('Evidence:', evidence); });
-async function open(lang, route) {
- const context = await browser.newContext({viewport:{width:1280,height:900},reducedMotion:'reduce'});
+async function open(lang, route, options = {}) {
+ const context = await browser.newContext({viewport:{width:1280,height:900},reducedMotion:'reduce', ...options});
  await context.addInitScript(()=>localStorage.setItem('worklazy_privacy_consent_v2','denied'));
  const external=[]; await context.route('**/*', r=>{ const u=new URL(r.request().url()); if(u.origin===new URL(base).origin||['blob:','data:'].includes(u.protocol)) return r.continue(); external.push(u.href); return r.abort(); });
  const page=await context.newPage();page.setDefaultTimeout(180000);
@@ -43,7 +43,7 @@ for(const lang of ['ko','en']) {
    const zip=await archive(page,lang,`${lang}-pdf-hwpx.zip`);const files=Object.keys(zip.files); assert.equal(files.length,2);assert.notEqual(files[0].toLowerCase(),files[1].toLowerCase());
    for(const name of files){const hwpx=await JSZip.loadAsync(await zip.file(name).async('nodebuffer'));assert.ok(Object.keys(hwpx.files).some(n=>n.startsWith('BinData/')));assert.match(await hwpx.file('Contents/section0.xml').async('string'),/한글/);}
    await page.getByTestId('batch-row').nth(1).getByRole('button',{name:lang==='ko'?'다시 대기':'Queue again',exact:true}).click();await start(page,lang);assert.equal(await page.getByTestId('batch-download').count(),2);
-   await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+   await page.setViewportSize({width:390,height:844});await page.waitForFunction(()=>document.documentElement.scrollWidth<=innerWidth,undefined,{timeout:5000}).catch(async error=>{await page.screenshot({path:path.join(evidence,`${lang}-overflow.png`),fullPage:true});await fs.writeFile(path.join(evidence,`${lang}-overflow.json`),JSON.stringify(await page.locator('body *').evaluateAll(elements=>elements.map(e=>({tag:e.tagName,classes:e.className,text:e.textContent.slice(0,180),right:e.getBoundingClientRect().right,width:e.getBoundingClientRect().width})).filter(e=>e.right>innerWidth)),null,2));throw error;});
    const axe=await new AxeBuilder({page}).include('[data-testid=conversion-batch]').analyze();await fs.writeFile(path.join(evidence,`${lang}-batch-axe.json`),JSON.stringify(axe.violations,null,2));assert.deepEqual(axe.violations.filter(v=>['serious','critical'].includes(v.impact)),[]);
    await page.screenshot({path:path.join(evidence,`${lang}-batch-mobile.png`),fullPage:true});assert.deepEqual(external,[]);
   }finally{await context.close();}
@@ -75,10 +75,12 @@ test('Office batch converts six input formats and retains HWP as manual print on
  }finally{await context.close();}
 });
 test('active Office worker cancellation destroys the frame and workers, then next file succeeds',async()=>{
- const {page,context}=await open('en','pdf-converter/document-to-pdf');
+ const {page,context}=await open('en','pdf-converter/document-to-pdf',{serviceWorkers:'block'});
  try {
+  // This controlled request hold must bypass the production service-worker cache.
+  // The preview server still supplies the actual COOP/COEP headers.
   let held; let ready;const reached=new Promise(resolve=>{ready=resolve;});
-  await context.route('**/vendor/zetaoffice/**/office_thread.js',route=>{if(!held && route.request().resourceType()==='script'){held=route;ready();}else void route.continue();});
+  await context.route('**/vendor/zetaoffice/**/office_thread.js',route=>{if(!held && route.request().resourceType()==='other'){held=route;ready();}else void route.continue();});
   await add(page,['rich.docx','sample.xlsx']);await page.getByRole('button',{name:'Convert queued files',exact:true}).click();
   let timer; try { await Promise.race([reached,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Office worker not reached')),120000);})]); } finally { clearTimeout(timer); }
   const before=page.workers().map(worker=>worker.url());assert.ok(before.length>0);
@@ -86,7 +88,7 @@ test('active Office worker cancellation destroys the frame and workers, then nex
   await page.waitForFunction(()=>document.querySelectorAll('[data-testid=batch-row][data-state=running],[data-testid=batch-row][data-state=pending]').length===0);
   assert.deepEqual(await page.getByTestId('batch-row').evaluateAll(rows=>rows.map(row=>row.dataset.state)),['cancelled','success']);
   await page.waitForFunction(()=>document.querySelectorAll('iframe[data-office-pdf-engine]').length===0);
-  await new Promise(resolve=>setTimeout(resolve,200));assert.equal(page.workers().filter(worker=>before.includes(worker.url())).length,0);
+  for(let attempt=0;attempt<30 && page.workers().length;attempt++) await new Promise(resolve=>setTimeout(resolve,100));assert.equal(page.workers().length,0);
   const saved=await save(page,page.getByTestId('batch-download'),'office-after-cancel.pdf');assert.match(execFileSync('pdftotext',[saved,'-'],{encoding:'utf8'}),/한글/);
   await fs.writeFile(path.join(evidence,'office-worker-cancel.json'),JSON.stringify({before,after:page.workers().map(worker=>worker.url()),states:await page.getByTestId('batch-row').evaluateAll(rows=>rows.map(row=>row.dataset.state))},null,2));
  }finally{await context.close();}

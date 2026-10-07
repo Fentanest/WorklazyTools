@@ -36,11 +36,11 @@ test('batch loaded/result language switching preserves inputs, options and contr
  try{
   await add(page,['rich.pdf','sample.pdf']);await page.getByRole('combobox',{name:'출력 형식',exact:true}).selectOption('hwpx');await page.getByRole('combobox',{name:'OCR 적용',exact:true}).selectOption('off');await page.getByLabel('파일별 페이지 범위',{exact:true}).fill('2');
   for(const lang of ['en','ko']){
-   await page.locator('[data-ui-component=language-switcher]').first().selectOption(lang);await page.waitForURL(new RegExp('/'+lang+'/'));
+   await page.locator('[data-ui-component=language-switcher]:visible').first().selectOption(lang);await page.waitForURL(new RegExp('/'+lang+'/'));
    assert.equal(await page.getByTestId('batch-row').count(),2);assert.equal(await page.getByRole('combobox',{name:lang==='ko'?'출력 형식':'Output format',exact:true}).inputValue(),'hwpx');assert.equal(await page.getByLabel(lang==='ko'?'파일별 페이지 범위':'Page range in each file',{exact:true}).inputValue(),'2');
   }
   await page.getByRole('button',{name:'대기 파일 변환',exact:true}).click();await settled(page);assert.deepEqual(await page.getByTestId('batch-row').evaluateAll(rows=>rows.map(r=>r.dataset.state)),['success','failed']);assert.match(await page.getByRole('alert').innerText(),/범위/);
-  const oldUrl=await page.getByTestId('batch-download').getAttribute('href');await page.locator('[data-ui-component=language-switcher]').first().selectOption('en');await page.waitForURL(/\/en\//);assert.equal(await page.getByTestId('batch-download').getAttribute('href'),oldUrl);assert.match(await page.getByRole('alert').innerText(),/page range/);assert.doesNotMatch(await page.getByRole('alert').innerText(),/[가-힣]/u);
+  const oldUrl=await page.getByTestId('batch-download').getAttribute('href');await page.locator('[data-ui-component=language-switcher]:visible').first().selectOption('en');await page.waitForURL(/\/en\//);assert.equal(await page.getByTestId('batch-download').getAttribute('href'),oldUrl);assert.match(await page.getByRole('alert').innerText(),/page range/);assert.doesNotMatch(await page.getByRole('alert').innerText(),/[가-힣]/u);
   await page.screenshot({path:path.join(evidence,'switched-results.png'),fullPage:true});
  }finally{await context.close();}
 });
