@@ -9,6 +9,7 @@ const tools = [
   tool("document-to-pdf", "#d53228", "PDF 변환", "문서를 PDF로 변환", "HWP · Word · Excel · PowerPoint → PDF", "PDF conversion", "Document to PDF", "HWP · Word · Excel · PowerPoint to PDF"),
   tool("pdf-to-document", "#d53228", "PDF 변환", "PDF에서 문서 추출", "텍스트·표 추출 · DOCX · XLSX", "PDF conversion", "PDF to Document", "Text and table extraction · DOCX · XLSX"),
   tool("pdf-converter", "#d53228", "PDF 변환", "PDF 변환", "이미지·문서 → PDF · 이미지·텍스트 추출", "PDF conversion", "PDF Converter", "Images & documents to PDF · Text extraction"),
+  tool("product-banner", "#d9548c", "알리익스프레스 제휴 광고", "알리익스프레스 광고 배너 만들기", "Excel·CSV · 5종 디자인 · HTML·iframe", "AliExpress affiliate ads", "AliExpress Ad Banner Builder", "Excel & CSV · 5 designs · HTML & iframe"),
   tool("foliotrace", "#0879d9", "투자·공시", "FolioTrace", "국민연금 공개 공시 추적", "Investment research", "FolioTrace", "NPS public filing research"),
   tool("document-redactor", "#7554d8", "문서 개인정보", "개인정보 마스킹", "직접 영역 선택 · PDF · 이미지", "Document privacy", "Document Redaction", "Manual masks · PDF · images"),
   tool("excel-merger", "#22a65a", "문서·스프레드시트", "Excel 병합기", "여러 파일 · 시트별 · 세로 · 가로 병합", "Documents & spreadsheets", "Excel Merger", "Combine files · sheets · rows · columns"),

@@ -52,6 +52,7 @@ const interactionProfiles = Object.freeze([enDarkDesktop]);
 const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, koLightMobile320, enLightMobile320]);
 const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
+  "product-banner",
   "document-redactor",
   "document-generator",
   "text-formatter",
@@ -201,6 +202,11 @@ const bottomScenarioFor = (route) => {
 };
 
 const interactionDefinitions = Object.freeze({
+  "product-banner": Object.freeze({
+    stateId: "interaction-iframe-preview",
+    actions: [{ type: "select", selector: "[data-tool-page='product-banner'] select:is([aria-label='Preview'], [aria-label='미리보기'])", value: "iframe" }],
+    assertSelector: "[data-tool-page='product-banner'] select:is([aria-label='Preview'], [aria-label='미리보기'])",
+  }),
   "document-redactor": Object.freeze({
     stateId: "interaction-manual-mask",
     fixture: {kind: "generated-png", fileName: "visual-redactor.png", width: 320, height: 220},

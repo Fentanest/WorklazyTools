@@ -14,7 +14,7 @@ const languages = ["ko", "en"];
 const { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition, toolSlugByPath } = await import("../src/app/seo.ts");
 const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData.ts");
 
-const toolRoutes = [
+const toolRoutes = ["product-banner",
   "foliotrace",
   "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "pdf-converter", "document-markdown", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",

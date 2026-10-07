@@ -1,4 +1,27 @@
 import puppeteer from "puppeteer-core";
+import fs from "node:fs/promises";
+import assert from "node:assert/strict";
+import ts from "typescript";
+import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
+
+// Read real IDs/category/publication from the registry rather than adjusting numeric thresholds.
+const source = ts.createSourceFile("toolRegistry.ts", await fs.readFile(new URL("../src/app/toolRegistry.ts", import.meta.url), "utf8"), ts.ScriptTarget.Latest, true);
+let registry = [];
+function visit(node) {
+  if (ts.isVariableDeclaration(node) && node.name.getText(source) === "allTools") {
+    let value = node.initializer;
+    while (!ts.isArrayLiteralExpression(value)) value = value.expression;
+    registry = value.elements.map((element) => Object.fromEntries(element.properties.filter((p) => ts.isPropertyAssignment(p) && ts.isStringLiteral(p.initializer)).map((p) => [p.name.getText(source), p.initializer.text])));
+  }
+  ts.forEachChild(node, visit);
+}
+visit(source);
+assert.ok(registry.length > 0);
+assert.equal(new Set(registry.map((t) => t.id)).size, registry.length);
+assert.deepEqual(registry.find((t) => t.id === "product-banner"), { id: "product-banner", category: "media", path: "/tools/product-banner", title: "알리익스프레스 광고 배너 만들기", shortTitle: "알리익스프레스 광고 배너 만들기", description: "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 광고 배너를 만들고 HTML·iframe 코드를 저장하세요. 파일은 브라우저에서 처리합니다.", eyebrow: "알리익스프레스 광고 배너", accent: "pink", status: "available" });
+const published = registry.filter((t) => t.status === "available" && (t.id !== "video-studio" || VIDEO_STUDIO_PUBLIC));
+const expectedPaths = (language, category) => published.filter((t) => (language !== "en" || t.id !== "hwp-editor") && (!category || t.category === category)).map((t) => `/${language}${t.path}`).sort();
+const verifyPaths = (actual, language, category) => assert.deepEqual(actual.sort(), expectedPaths(language, category));
 
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
 const koBaseUrl = `${baseUrl}/ko`;
@@ -99,7 +122,7 @@ try {
   }
 
   await page.goto(`${koBaseUrl}/tools`, { waitUntil: "networkidle0" });
-  await page.waitForFunction(() => document.querySelectorAll(".all-tools-grid .ui-tool-card").length === 23);
+  await page.waitForFunction((expectedCount) => document.querySelectorAll(".all-tools-grid .ui-tool-card").length === expectedCount, {}, expectedPaths("ko").length);
   const grid = await page.$eval(".all-tools-grid", (element) => ({ columns: getComputedStyle(element).gridTemplateColumns.split(" ").length, width: element.getBoundingClientRect().width }));
   if (grid.columns !== 4 || grid.width < 900) throw new Error(`Tool grid is not four columns: ${JSON.stringify(grid)}`);
   const categoryOverview = await page.evaluate(() => ({
@@ -118,7 +141,8 @@ try {
     iconTone: card.querySelector("[data-icon-tone]")?.getAttribute("data-icon-tone"),
     href: card.getAttribute("href"),
   })));
-  if (toolCards.length !== 23 || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || !card.accent || !card.iconTone)) {
+  verifyPaths(toolCards.map((card) => card.href), "ko");
+  if (toolCards.length !== expectedPaths("ko").length || toolCards.some((card) => card.tagName !== "A" || card.slot !== "card" || !card.href || !card.accent || !card.iconTone)) {
     throw new Error(`Tool card link or accent contract failed: ${JSON.stringify(toolCards)}`);
   }
   // Manual theme drives color; OS brightness must not (covered by ui-theme-surfaces).
@@ -147,7 +171,8 @@ try {
   });
   if (darkSelectedContrast < 4.5) throw new Error(`Selected tool category contrast is below 4.5:1 in dark mode: ${darkSelectedContrast}`);
   await page.click('.tool-category-filter button[aria-label^="이미지·오디오"]');
-  await page.waitForFunction(() => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 2);
+  await page.waitForFunction((expectedCount) => new URLSearchParams(location.search).get("category") === "media" && document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === expectedCount, {}, expectedPaths("ko", "media").length);
+  verifyPaths(await page.$$eval(".ui-tool-card", (cards) => cards.map((card) => card.getAttribute("href"))), "ko", "media");
   await page.click(".tool-category-filter button:first-child");
   await page.type("[data-testid='tools-search-input']", "비밀번호");
   await page.waitForFunction(() => document.querySelectorAll(".tool-category-section").length === 1 && document.querySelectorAll(".ui-tool-card").length === 1 && document.querySelector(".tool-category-heading h2")?.textContent === "보안·공유");
@@ -200,6 +225,7 @@ try {
       title: sheet.querySelector('[data-slot="sheet-title"]')?.textContent || "",
       overlay: Boolean(document.querySelector('[data-slot="sheet-overlay"]')),
       links: sheet.querySelectorAll(".sheet-tool-item").length,
+      paths: Array.from(sheet.querySelectorAll("a.sheet-tool-item"), (a) => a.getAttribute("href")).filter((href) => href.startsWith("/ko/tools/")),
       top: rect.top,
       bottom: rect.bottom,
       overflowY: style?.overflowY,
@@ -208,8 +234,9 @@ try {
       pageOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
     };
   });
+  verifyPaths(mobileNavigationSheet.paths, "ko");
   if (mobileNavigationSheet.role !== "dialog" || mobileNavigationSheet.modal !== "true" || mobileNavigationSheet.label !== "바로가기"
-    || mobileNavigationSheet.title !== "어떤 작업을 할까요?" || !mobileNavigationSheet.overlay || mobileNavigationSheet.links !== 24
+    || mobileNavigationSheet.title !== "어떤 작업을 할까요?" || !mobileNavigationSheet.overlay || mobileNavigationSheet.links !== expectedPaths("ko").length + 1
     || mobileNavigationSheet.top < -1 || mobileNavigationSheet.bottom > 845 || mobileNavigationSheet.listOverflowY !== "auto" || !mobileNavigationSheet.listScrollable || mobileNavigationSheet.pageOverflow > 1) {
     throw new Error(`Mobile navigation drawer semantics or clipping failed: ${JSON.stringify(mobileNavigationSheet)}`);
   }
@@ -454,7 +481,8 @@ try {
   }
   await page.goto(`${baseUrl}/en/tools/`, { waitUntil: "networkidle0" });
   const englishToolCount = await page.$$eval(".all-tools-grid .ui-tool-card", (cards) => cards.length);
-  if (englishToolCount !== 21) throw new Error(`English tool catalog should hide HWP and video editors: ${englishToolCount}`);
+  verifyPaths(await page.$$eval(".all-tools-grid .ui-tool-card", (cards) => cards.map((card) => card.getAttribute("href"))), "en");
+  if (englishToolCount !== expectedPaths("en").length) throw new Error(`English tool catalog mismatch: ${englishToolCount}`);
   await page.goto(`${baseUrl}/en/tools/hwp-editor`, { waitUntil: "networkidle0" });
   if (new URL(page.url()).pathname !== "/en/tools") throw new Error(`English HWP editor was not hidden: ${page.url()}`);
 

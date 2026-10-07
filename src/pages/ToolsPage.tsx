@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { type ToolAccent, type ToolCategoryId } from "../app/toolRegistry";
+import { toolAliasesFor } from "../app/toolSearch";
 import { PrivacyBanner } from "../components/PrivacyBanner";
 import { ToolCard } from "../components/ToolCard";
 import { getToolIconTone } from "../components/toolAccentStyles";
@@ -54,6 +55,7 @@ export function ToolsPage() {
           category.label,
           category.shortLabel,
           ...tool.highlights.map((highlight) => highlight.label),
+          ...(tool.id === "product-banner" ? toolAliasesFor(tool.id) : []),
         ].join(" ").toLowerCase();
         return searchText.includes(normalizedQuery);
       }),

@@ -48,6 +48,17 @@
     }
   },
   "items": {
+    "product-banner": {
+      "title": "알리익스프레스 광고 배너 만들기",
+      "shortTitle": "알리익스프레스 광고 배너 만들기",
+      "description": "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 광고 배너를 만들고 HTML·iframe 코드를 저장하세요. 파일은 브라우저에서 처리합니다.",
+      "eyebrow": "알리익스프레스 광고 배너",
+      "highlights": [
+        "5종 디자인",
+        "Excel·CSV 입력",
+        "HTML·iframe 코드"
+      ]
+    },
     "document-markdown": {
       "title": "문서 → Markdown",
       "shortTitle": "문서 → Markdown",

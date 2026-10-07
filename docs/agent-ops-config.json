@@ -4,7 +4,7 @@
   "policy_version": "2026-09-22",
   "models": {
     "gemini": "gemini-3.1-pro",
-    "implementation": "gpt-6-sol",
+    "implementation": "gpt-6.1-sol",
     "review": "gpt-6-astra",
     "research": "gpt-6-luna",
     "muse_runtime_id": null

@@ -68,7 +68,7 @@ const rhwpEditorVersion = packageJson.dependencies?.["@rhwp/editor"];
 if (!rhwpCoreVersion || rhwpCoreVersion !== rhwpEditorVersion) throw new Error("Pinned rhwp core/editor versions do not match.");
 const stickerManifest = JSON.parse(await fs.readFile("src/features/image-studio/stickers.manifest.json", "utf8"));
 
-const routes = [
+const routes = ["tools/product-banner",
   "", "tools", "tools/foliotrace", "tools/excel-merger", "tools/excel-compare", "tools/excel-cleaner", "tools/document-generator", "tools/document-compare", "tools/pdf-compare",
   "tools/document-markdown",
   "tools/pdf-converter", "tools/pdf-converter/image-to-pdf", "tools/pdf-converter/pdf-to-image", "tools/pdf-converter/document-to-pdf", "tools/pdf-converter/pdf-to-document", "tools/pdf-converter/pdf-to-document/ocr",
@@ -87,6 +87,7 @@ const socialSlugByRoute = {
   "tools/document-markdown": "document-markdown",
   "tools/pdf-converter/document-to-pdf": "document-to-pdf", "tools/pdf-converter/pdf-to-document": "pdf-to-document", "tools/pdf-converter/pdf-to-document/ocr": "pdf-editor-ocr",
   "tools/pdf-converter": "pdf-converter", "tools/pdf-converter/image-to-pdf": "image-to-pdf", "tools/pdf-converter/pdf-to-image": "pdf-to-image",
+  "tools/product-banner": "product-banner",
   "tools/foliotrace": "foliotrace", "tools/excel-merger": "excel-merger", "tools/excel-compare": "excel-compare", "tools/excel-cleaner": "excel-cleaner", "tools/document-generator": "document-generator", "tools/document-compare": "document-compare", "tools/pdf-compare": "pdf-compare", "tools/pdf-editor": "pdf-tools",
   "tools/pdf-editor/image-to-pdf": "image-to-pdf", "tools/pdf-editor/pdf-to-image": "pdf-to-image", "tools/pdf-editor/convert": "pdf-convert",
   "tools/pdf-editor/finish": "pdf-finish", "tools/pdf-editor/page-numbers": "pdf-page-numbers", "tools/pdf-editor/header-footer": "pdf-header-footer", "tools/pdf-editor/watermark": "pdf-watermark", "tools/pdf-editor/stamp": "pdf-stamp",

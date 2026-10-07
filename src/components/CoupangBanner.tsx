@@ -65,6 +65,7 @@ export function CoupangBanner({ routeKey }: { routeKey: string }) {
   const english = /^\/en(?:\/|$)/.test(stripSiteBasePath(window.location.pathname, import.meta.env.BASE_URL) ?? "");
   return (
     <section className="coupang-banner" aria-label={english ? "Coupang Partners advertisement" : "쿠팡 파트너스 광고"}>
+      <p className="coupang-banner-disclosure" tabIndex={0}>{english ? DISCLOSURE_EN : DISCLOSURE_KO}</p>
       <iframe
         ref={frameRef}
         {...({ credentialless: "" } as { credentialless: string })}
@@ -79,7 +80,6 @@ export function CoupangBanner({ routeKey }: { routeKey: string }) {
         sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
         onError={() => setFailedKey(frameKey)}
       />
-      <p className="coupang-banner-disclosure" tabIndex={0}>{english ? DISCLOSURE_EN : DISCLOSURE_KO}</p>
     </section>
   );
 }

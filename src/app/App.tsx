@@ -34,6 +34,7 @@ const PdfComparePage = lazy(() => import("../features/pdf-compare/PdfComparePage
 const ExcelComparePage = lazy(() => import("../features/excel-compare/ExcelComparePage").then((module) => ({ default: module.ExcelComparePage })));
 const ExcelCleanerPage = lazy(() => import("../features/excel-cleaner/ExcelCleanerPage").then((module) => ({ default: module.ExcelCleanerPage })));
 const DocumentGeneratorPage = lazy(() => import("../features/document-generator/DocumentGeneratorPage").then((module) => ({ default: module.DocumentGeneratorPage })));
+const ProductBannerPage = lazy(() => import("../features/product-banner/ProductBannerPage").then((module) => ({ default: module.ProductBannerPage })));
 const AudioStudioPage = lazy(() => import("../features/audio-studio/AudioStudioPage").then((module) => ({ default: module.AudioStudioPage })));
 const ImageStudioPage = lazy(() => import("../features/image-studio/ImageStudioPage").then((module) => ({ default: module.ImageStudioPage })));
 const TextMergerPage = lazy(() => import("../features/text-merger/TextMergerPage").then((module) => ({ default: module.TextMergerPage })));
@@ -104,6 +105,7 @@ export function App() {
             <Route path="tools/video-studio/merge" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "merge", allGroupsOneFile: true, outputMode: "individual", outputFormat: "mp4", audioMode: "copy" }} /></LazyToolRoute>} />
             <Route path="tools/video-studio/extract-audio" element={<LazyToolRoute label="Video Studio"><VideoStudioPage preset={{ purpose: "extract-audio", allGroupsOneFile: false, outputMode: "individual", outputFormat: "mp3", audioMode: "copy" }} /></LazyToolRoute>} />
           </> : <Route path="tools/video-studio/*" element={<UnavailableToolPage />} />}
+          <Route path="tools/product-banner" element={<LazyToolRoute label="AliExpress Ad Banner Builder"><ProductBannerPage /></LazyToolRoute>} />
           <Route path="tools/audio-studio" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage /></LazyToolRoute>} />
           <Route path="tools/audio-studio/trim" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage preset={{ purpose: "trim" }} /></LazyToolRoute>} />
           <Route path="tools/image-studio" element={<LazyToolRoute label="Image Studio"><ImageStudioPage /></LazyToolRoute>} />
