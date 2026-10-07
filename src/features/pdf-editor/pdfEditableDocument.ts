@@ -17,17 +17,19 @@ export async function createEditableDocument(document: PdfTextDocument, format: 
     presentation.author = "Worklazy Tools";
     presentation.subject = warnings[0];
     presentation.title = document.sourceName;
+    const wrapLine = createSlideTextWrapper();
+    const lineHeight = 28 / 72; // points to inches; reserve the same height we advance
     for (const [pageIndex, page] of document.pages.entries()) {
       let slide = presentation.addSlide();
       let y = 0.6;
       const nextSlide = () => { slide = presentation.addSlide(); y = 0.6; };
       for (const line of page.lines) {
-        // Bound text boxes explicitly instead of truncating overflowing text.
-        const parts = wrapText(line.text, 70);
+        // Each box holds exactly one pre-wrapped line, including after reopening.
+        const parts = wrapLine(line.text);
         for (const part of parts) {
-          if (y + 0.3 > 6.9) nextSlide();
-          slide.addText(part, { x: 0.5, y, w: 9, h: 0.3, fontFace: "Malgun Gothic", fontSize: 14, margin: 0, breakLine: false, valign: "middle", color: "222222" });
-          y += 0.3;
+          if (y + lineHeight > 6.9) nextSlide();
+          slide.addText(part, { x: 0.5, y, w: 9, h: lineHeight, fontFace: "Malgun Gothic", fontSize: 14, margin: 0, wrap: false, fit: "none", breakLine: false, valign: "top", color: "222222" });
+          y += lineHeight;
         }
         y += 0.08;
       }
@@ -91,14 +93,25 @@ export async function createEditableDocument(document: PdfTextDocument, format: 
   } finally { hwp.free(); }
 }
 
-function wrapText(text: string, maxUnits: number) {
-  const parts: string[] = [];
-  let part = "", units = 0;
-  for (const character of text) {
-    const size = /[^\u0000-\u00ff]/.test(character) ? 2 : 1;
-    if (units + size > maxUnits) { parts.push(part); part = ""; units = 0; }
-    part += character; units += size;
-  }
-  if (part) parts.push(part);
-  return parts;
+function createSlideTextWrapper() {
+  const fontSize = 14;
+  // Canvas CSS pixels use 96 dpi; slide geometry uses 72 points per inch.
+  const context = typeof OffscreenCanvas === "undefined" ? null : new OffscreenCanvas(1, 1).getContext("2d");
+  if (context) context.font = `${fontSize * 96 / 72}px "Malgun Gothic", sans-serif`;
+  const segments = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  // Reserve two ems for viewer font substitution. A one-em minimum per grapheme
+  // also covers wide Latin / CJK glyphs when the browser measures a narrow font.
+  const maxWidth = 9 * 72 - 2 * fontSize;
+  return (text: string) => {
+    const parts: string[] = [];
+    let part = "", width = 0;
+    for (const { segment } of segments.segment(text)) {
+      if (/^[\r\n]+$/.test(segment)) { parts.push(part); part = ""; width = 0; continue; }
+      const advance = Math.max(fontSize, (context?.measureText(segment).width ?? 0) * 72 / 96);
+      if (part && width + advance > maxWidth) { parts.push(part); part = ""; width = 0; }
+      part += segment; width += advance;
+    }
+    if (part) parts.push(part);
+    return parts;
+  };
 }

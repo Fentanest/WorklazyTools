@@ -22,17 +22,21 @@ export async function extractPdfImages(page: PDFPageProxy, ops: Record<string, n
   for (let index = 0; index < list.fnArray.length; index++) {
     throwIfAborted(signal);
     const operation = list.fnArray[index];
-    let decoded: DecodedImage;
+    let decoded: DecodedImage | null;
     if (operation === ops.paintImageXObject || operation === ops.paintImageXObjectRepeat) {
       const id = list.argsArray[index][0] as string;
       if (seen.has(id)) continue;
       seen.add(id);
       const objects = id.startsWith("g_") ? page.commonObjs : page.objs;
-      decoded = await waitWithAbort(new Promise<DecodedImage>(resolve => objects.get(id, resolve)), signal);
+      decoded = await waitWithAbort(new Promise<DecodedImage | null>(resolve => objects.get(id, resolve)), signal);
     } else if (operation === ops.paintInlineImageXObject) {
       decoded = list.argsArray[index][0];
     } else continue;
-    if (!decoded) continue;
+    // PDF.js resolves a failed JPEG decode to null instead of rejecting get().
+    // Never present a document missing one of its bitmaps as a normal success.
+    if (!decoded) throw new Error(language === "ko"
+      ? `PDF ${page.pageNumber}페이지의 이미지를 디코딩하지 못해 변환을 중단했습니다. 원본 이미지를 확인하거나 TXT·DOCX로 텍스트를 추출해 주세요.`
+      : `Could not decode an image on PDF page ${page.pageNumber}; conversion was stopped. Check the source image or extract text as TXT / DOCX.`);
     pixels += decoded.width * decoded.height;
     if (decoded.width * decoded.height > 12_000_000 || pixels > 24_000_000 || images.length >= 32) {
       throw new Error(language === "ko" ? "한 페이지의 이미지가 너무 큽니다. 페이지 범위를 줄이거나 TXT·DOCX로 텍스트를 추출해 주세요." : "A page contains too much image data. Reduce the page range or extract text as TXT / DOCX.");
