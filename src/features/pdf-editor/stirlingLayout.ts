@@ -20,6 +20,8 @@ export interface PageData {
   glyphs: Glyph[]; hidden: Glyph[]; rotated: Glyph[];
   pictures: Array<{ frame: Frame; picture: Picture; order: number }>;
   annotations: number;
+  fallback?: { blob: Blob; reason: string };
+  graphicsBackground?: Blob;
 }
 export type SlideShape = { kind: "text"; frame: Frame; text: string; style: RunStyle; order: number }
   | { kind: "picture"; frame: Frame; picture: Picture; order: number };
@@ -96,7 +98,21 @@ export function buildStirlingParagraphs(lines: TextLine[]): Paragraph[] {
 
 /** SlideBuilder's page/shape model and paint ordering, fitted with PageFit. */
 export function buildStirlingSlide(page: PageData): Slide {
+  if (page.fallback) {
+    const picture: Picture = { blob: page.fallback.blob, width: page.width, height: page.height,
+      cropLeft: 0, cropTop: 0, cropRight: 0, cropBottom: 0, rotation: 0,
+      description: `PDF page ${page.index + 1}: ${page.fallback.reason}` };
+    return { page: page.index, background: 0xffffff, shapes: [{ kind: "picture",
+      frame: { x: 0, y: 0, width: page.width, height: page.height, rotation: 0 },
+      picture, order: 0 }] };
+  }
   const shapes: SlideShape[] = [];
+  if (page.graphicsBackground) {
+    shapes.push({ kind: "picture", frame: { x: 0, y: 0, width: page.width, height: page.height, rotation: 0 },
+      picture: { blob: page.graphicsBackground, width: page.width, height: page.height,
+        cropLeft: 0, cropTop: 0, cropRight: 0, cropBottom: 0, rotation: 0,
+        description: `PDF page ${page.index + 1} non-text graphics` }, order: -1 });
+  }
   const lines = buildStirlingLines(page.glyphs);
   for (const paragraph of buildStirlingParagraphs(lines)) {
     for (const line of paragraph.lines) {

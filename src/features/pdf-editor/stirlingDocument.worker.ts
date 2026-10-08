@@ -20,7 +20,9 @@ worker.onmessage = async (event: MessageEvent<Request>) => {
     }
     const bytes = request.format === "pptx" ? await writePptx(request) : await writeHwpx(request);
     worker.postMessage({ id: request.id, type: "result", buffer: bytes,
-      imagePreservedSourceIndexes: request.pages.filter(page => !page.glyphs.length && page.pictures.length).map(page => page.index),
+      imagePreservedSourceIndexes: request.pages.filter(page => page.fallback || !page.glyphs.length && (page.pictures.length || page.graphicsBackground)).map(page => page.index),
+      pageFallbacks: request.pages.filter(page => page.fallback).map(page => ({ sourceIndex: page.index, reason: page.fallback!.reason })),
+      graphicsFlattenedSourceIndexes: request.pages.filter(page => page.graphicsBackground).map(page => page.index),
       hasAnnotations: request.pages.some(page => page.annotations > 0) }, [bytes]);
   } catch (error) {
     worker.postMessage({ id: request.id, type: "error", message: error instanceof Error ? error.stack || error.message : String(error) });
@@ -80,46 +82,71 @@ async function writeHwpx(request: Request): Promise<ArrayBuffer> {
   try {
     const blank = JSON.parse(hwp.createBlankDocument());
     if (blank.sectionCount !== 1) throw new Error("HWPX blank document failed");
-    let paragraph = 0;
     const pages = request.imagePages ?? request.pages;
+    const paperWidth = Math.max(...pages.map(page => page.width));
+    const paperHeight = Math.max(...pages.map(page => page.height));
+    const margin = 18;
+    const pageDef = JSON.parse(hwp.setPageDef(0, JSON.stringify({ width: Math.round(paperWidth * 100),
+      height: Math.round(paperHeight * 100), marginLeft: margin * 100, marginRight: margin * 100,
+      marginTop: margin * 100, marginBottom: margin * 100, marginHeader: 0, marginFooter: 0, marginGutter: 0 })));
+    if (!pageDef.ok) throw new Error("HWPX page geometry failed");
+    let paragraph = 0;
     for (const [pageIndex, page] of pages.entries()) {
       if (pageIndex) {
         paragraph = hwp.getParagraphCount(0);
         hwp.insertParagraph(0, paragraph);
         paragraph = JSON.parse(hwp.insertPageBreak(0, paragraph, hwp.getParagraphLength(0, paragraph))).paraIdx;
       }
-      if (request.imagePages) {
-        const image = request.imagePages[pageIndex];
-        // rhwp's blank A4 section uses 7200 HU/100 pt. Keep a page inset and
-        // preserve each source page's aspect ratio, including rotated CropBox.
-        const scale = Math.min(480 / image.width, 680 / image.height);
+      const pageStartParagraph = paragraph;
+      if (request.imagePages || "fallback" in page && page.fallback) {
+        const fallbackPage = page as PageData;
+        const image = request.imagePages?.[pageIndex] ?? { sourceIndex: fallbackPage.index,
+          blob: fallbackPage.fallback!.blob, width: fallbackPage.width, height: fallbackPage.height };
+        const scale = Math.min((paperWidth - 2 * margin) / image.width,
+          (paperHeight - 2 * margin - 36) / image.height);
         await insertPicture(hwp, paragraph, image.blob, image.width * scale, image.height * scale,
           image.width, image.height, `PDF page ${image.sourceIndex + 1}`);
         hwp.insertText(0, paragraph, 0, " ");
       } else {
         const model = buildStirlingSlide(request.pages[pageIndex]);
         const text = model.shapes.filter(shape => shape.kind === "text").sort((a, b) => a.frame.y - b.frame.y || a.frame.x - b.frame.x);
-        const pageFit = Math.min(480 / request.pages[pageIndex].width, 680 / request.pages[pageIndex].height);
-        let previousBottom = 0;
-        for (const [lineIndex, shape] of text.entries()) {
+        const pageFit = Math.min((paperWidth - 2 * margin) / request.pages[pageIndex].width,
+          (paperHeight - 2 * margin - 36) / request.pages[pageIndex].height);
+        const background = request.pages[pageIndex].graphicsBackground;
+        if (background) {
+          await insertPicture(hwp, pageStartParagraph, background, request.pages[pageIndex].width * pageFit,
+            request.pages[pageIndex].height * pageFit, request.pages[pageIndex].width,
+            request.pages[pageIndex].height, `PDF page ${request.pages[pageIndex].index + 1} graphics`, { x: margin, y: margin });
+        }
+        for (const shape of text) {
           if (shape.kind !== "text") continue;
-          if (lineIndex) { paragraph = hwp.getParagraphCount(0); hwp.insertParagraph(0, paragraph); }
-          hwp.insertText(0, paragraph, 0, shape.text);
-          hwp.applyCharFormat(0, paragraph, 0, hwp.getParagraphLength(0, paragraph), JSON.stringify({ fontSize: Math.max(600, Math.round(shape.style.size * pageFit * 100)) }));
-          hwp.applyParaFormat(0, paragraph, JSON.stringify({ alignment: "left", lineSpacing: 100,
-            marginLeft: Math.max(0, Math.round(shape.frame.x * pageFit * 200)),
-            spacingBefore: Math.max(0, Math.round((shape.frame.y - previousBottom) * pageFit * 200)) }));
-          previousBottom = Math.max(previousBottom, shape.frame.y + shape.frame.height);
+          const left = margin + shape.frame.x * pageFit - 3;
+          const top = margin + shape.frame.y * pageFit - 3;
+          const fontPoints = shape.style.size * pageFit;
+          const textAdvance = Array.from(shape.text).reduce((sum, char) => sum + fontPoints * (/[^\u0000-\u024f]/u.test(char) ? 1 : 0.68), 0);
+          const textWidth = Math.min(paperWidth - margin - left,
+            Math.max(shape.frame.width * pageFit + 12, textAdvance + 12));
+          const textbox = JSON.parse(hwp.createShapeControl(JSON.stringify({ sectionIdx: 0,
+            paraIdx: pageStartParagraph, charOffset: 0, shapeType: "textbox", treatAsChar: false,
+            textWrap: "InFrontOfText", width: Math.max(800, Math.round(textWidth * 100)),
+            height: Math.max(800, Math.round(Math.max(shape.frame.height * pageFit + 12, fontPoints * 1.6 + 8) * 100)),
+            horzOffset: Math.max(0, Math.round(left * 100)), vertOffset: Math.max(0, Math.round(top * 100)) })));
+          if (!textbox.ok) throw new Error("HWPX text box insertion failed");
+          const shapeResult = JSON.parse(hwp.setShapeProperties(0, pageStartParagraph, textbox.controlIdx,
+            JSON.stringify({ fillType: "none", fillAlpha: 255, lineType: 0, borderWidth: 0 })));
+          if (!shapeResult.ok) throw new Error("HWPX text box style failed");
+          const inserted = JSON.parse(hwp.insertTextInCell(0, pageStartParagraph, textbox.controlIdx, 0, 0, 0, shape.text));
+          if (!inserted.ok) throw new Error("HWPX text box content failed");
+          hwp.applyCharFormatInCell(0, pageStartParagraph, textbox.controlIdx, 0, 0, 0,
+            Array.from(shape.text).length, JSON.stringify({ fontSize: Math.max(600, Math.round(shape.style.size * pageFit * 100)) }));
         }
         for (const shape of model.shapes) {
           if (shape.kind !== "picture") continue;
-          paragraph = hwp.getParagraphCount(0); hwp.insertParagraph(0, paragraph);
-          await insertPicture(hwp, paragraph, shape.picture.blob, shape.frame.width * pageFit,
+          await insertPicture(hwp, pageStartParagraph, shape.picture.blob, shape.frame.width * pageFit,
             shape.frame.height * pageFit, shape.frame.width, shape.frame.height, shape.picture.description,
-            { x: 50 + shape.frame.x * pageFit, y: 60 + shape.frame.y * pageFit });
-          hwp.insertText(0, paragraph, 0, " ");
+            { x: margin + shape.frame.x * pageFit, y: margin + shape.frame.y * pageFit });
         }
-        if (!text.length && !model.shapes.some(shape => shape.kind === "picture")) hwp.insertText(0, paragraph, 0, " ");
+        hwp.insertText(0, pageStartParagraph, 0, " ");
       }
       progress(request.id, 50 + (pageIndex + 1) / pages.length * 40);
     }
