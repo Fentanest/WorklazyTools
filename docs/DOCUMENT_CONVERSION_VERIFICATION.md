@@ -1,6 +1,6 @@
 # 문서 변환 엔진 검증 — 2026-10-08 후보
 
-이 기록은 `feat/document-converters`의 미게시 후보에 대한 실제 실행 결과다. 제품 코드는 `47a6020`에서 빌드했고, 뒤의 커밋 `ca2ad01`은 배치 회귀 테스트, `7c1246e`는 문서만 바꿨다. 원래 Worklazy 작업 위치의 미커밋 변경과 Bento/Stirling 참조 checkout은 수정하지 않았다. 원격 반영·배포는 하지 않았다.
+이 기록은 `feat/document-converters`의 미게시 후보에 대한 실제 실행 결과다. 통합 엔진 코드는 `47a6020`에서 처음 빌드했고, `692ad4a`에서 PDF.js 페이지 자원 정리까지 포함해 다시 빌드·정적 검사·단위 검사했다. 사이의 `ca2ad01`은 배치 회귀 테스트, `7c1246e`는 문서만 바꿨다. 원래 Worklazy 작업 위치의 미커밋 변경과 Bento/Stirling 참조 checkout은 수정하지 않았다. 원격 반영·배포는 하지 않았다.
 
 ## 구현과 출처
 
@@ -45,7 +45,7 @@
 
 다른 입력 조건으로 **서로 다른 4,800×6,400 스캔 이미지 6장**을 담은 `high-resolution-six-distinct.pdf`도 새 Chrome 프로필에서 독립 측정했다. 페이지 이미지 PPTX 6장 생성은 3.591초, 50ms heartbeat 최대 지연 204.960ms, 프로세스 합산 PSS 최고 **1,217.9MiB**였다. 관찰한 Worker 2/2가 종료했고 외부 요청은 0이었다. 최초 브라우저 약 511.7MiB, 명시적 해제 후 마지막 약 1,090.2MiB이며 강제 GC는 하지 않았다. 이 수치는 위의 12파일 Pyodide 세션을 먼저 적재한 공유 비트맵 실험과 시작 상태가 달라 서로의 메모리 증감률로 비교하지 않는다. fixture 생성기·해시는 인접 baseline worktree의 `docs/jobs/todo/converter-baseline-20261008/make-distinct-scan.mjs`와 `fixtures/distinct-manifest.json`, 원자료는 `memory-distinct-final/results.json`에 있다.
 
-이 표본에서 PDF.js 페이지 객체를 렌더/이미지 검사 직후 정리하도록 수정한 뒤 **같은 6장 입력**을 새 Chrome에서 다시 측정했다. 변환은 3.035초, heartbeat 최대 지연 211.490ms, PSS 최고 **992.7MiB**, 해제 후 마지막 **825.7MiB**였다. 두 실행 모두 PPTX 6슬라이드·내부 JPEG 6개이며 그 6개 이미지의 크기와 SHA-256이 각각 일치했다. 서로 다른 새 브라우저 한 번씩의 측정이라 이 차이를 일반적인 속도 개선률로 주장하지 않는다. 수정 후 실제 PPTX를 LibreOffice로 다시 열어 6페이지·이미지 6개를 확인했다. 수정 후 원자료는 작업 증거의 `memory-distinct-after-cleanup/results.json`에 있다.
+이 표본에서 PDF.js 페이지 객체를 렌더/이미지 검사 직후 정리하도록 수정한 뒤 **같은 6장 입력**(SHA-256 `91db0036fe6f3dd77bb21248b1b60fd1d2d217019dce2b3d07bb7e9152f2fbcf`)을 새 Chrome에서 다시 측정했다. 변환은 3.035초, heartbeat 최대 지연 211.490ms, PSS 최고 **992.7MiB**, 해제 후 마지막 **825.7MiB**였다. 두 실행 모두 PPTX 6슬라이드·내부 JPEG 6개이며 그 6개 이미지의 크기와 SHA-256이 각각 일치했다. 서로 다른 새 브라우저 한 번씩의 측정이라 이 차이를 일반적인 속도 개선률로 주장하지 않는다. 수정 후 실제 PPTX를 LibreOffice로 다시 열어 6페이지·이미지 6개를 확인했다. 수정 후 원자료는 작업 증거의 `memory-distinct-after-cleanup/results.json`과 `page-cleanup-comparison.json`에 있다.
 
 ## 확인된 한계
 
