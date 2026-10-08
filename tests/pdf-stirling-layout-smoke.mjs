@@ -229,6 +229,36 @@ try {
   assert.match(vectorSlide, /EDITABLE VECTOR PAGE/);
   assert.match(vectorSlide, /<p:pic>/, 'vector artwork is flattened behind editable text');
 
+  const reviewPdf = await PDFDocument.create();
+  const reviewFont = await reviewPdf.embedFont(StandardFonts.Helvetica);
+  const reviewImage = await reviewPdf.embedPng(PNG.sync.write(asymmetric));
+  const overpaint = reviewPdf.addPage([400, 400]);
+  overpaint.drawText('COVERED SHOULD STAY HIDDEN', { x: 30, y: 200, size: 16, font: reviewFont });
+  overpaint.drawRectangle({ x: 20, y: 180, width: 360, height: 60, color: rgb(1, 1, 1) });
+  const halfTurn = reviewPdf.addPage([400, 400]);
+  halfTurn.drawImage(reviewImage, { x: 300, y: 200, width: 240, height: 120, rotate: degrees(180) });
+  const vectorBeforeScan = reviewPdf.addPage([400, 400]);
+  vectorBeforeScan.drawRectangle({ x: 5, y: 5, width: 10, height: 10, color: rgb(0, 1, 0) });
+  vectorBeforeScan.drawImage(reviewImage, { x: 0, y: 0, width: 400, height: 400 });
+  vectorBeforeScan.pushOperators(setTextRenderingMode(TextRenderingMode.Invisible));
+  vectorBeforeScan.drawText('INVISIBLE OCR SHOULD NOT PRINT', { x: 30, y: 200, size: 16, font: reviewFont });
+  const reviewOutput = await page.evaluate(async bytes => {
+    const file = new File([Uint8Array.from(bytes)], 'review.pdf', { type: 'application/pdf' });
+    const mod = await import('/src/features/pdf-editor/stirlingDocumentClient.ts');
+    const result = await mod.convertStirlingEditableDocument(file, [0, 1, 2], 'pptx', 'review', 'en');
+    return { bytes: Array.from(new Uint8Array(await result.blob.arrayBuffer())), fallbacks: result.pageFallbacks };
+  }, [...await reviewPdf.save()]);
+  assert.deepEqual(reviewOutput.fallbacks.map(item => item.sourceIndex), [0, 1, 2]);
+  assert.match(reviewOutput.fallbacks[0].reason, /opaque vector overpaint/);
+  assert.match(reviewOutput.fallbacks[1].reason, /rotated or reflected image/);
+  assert.match(reviewOutput.fallbacks[2].reason, /existing invisible OCR layer/);
+  const reviewZip = await JSZip.loadAsync(Uint8Array.from(reviewOutput.bytes));
+  for (let index = 1; index <= 3; index++) {
+    const xml = await reviewZip.file(`ppt/slides/slide${index}.xml`).async('string');
+    assert.match(xml, /<p:pic>/);
+    assert.doesNotMatch(xml, /<p:sp>/, `adversarial page ${index} should not expose covered or hidden text`);
+  }
+
   const largePixels = new PNG({ width: 3500, height: 3500 });
   largePixels.data.fill(255);
   const highResPdf = await PDFDocument.create();
@@ -322,6 +352,21 @@ try {
       const difference = pixelmatch(source.data, output.data, undefined, source.width, source.height, { threshold: 0.18 });
       assert.ok(difference / (source.width * source.height) < 0.035,
         `native render of transformed/clipped page ${index} differs on ${difference} pixels`);
+    }
+    await fs.writeFile(path.join(artifacts, 'review-source.pdf'), await reviewPdf.save());
+    await fs.writeFile(path.join(artifacts, 'review.pptx'), Uint8Array.from(reviewOutput.bytes));
+    await exec('libreoffice', [`-env:UserInstallation=file://${loProfile}`, '--headless', '--convert-to', 'pdf', '--outdir', artifacts,
+      path.join(artifacts, 'review.pptx')], { timeout: 120_000 });
+    await exec('pdftoppm', ['-f', '1', '-l', '3', '-r', '72', '-png', path.join(artifacts, 'review-source.pdf'),
+      path.join(artifacts, 'review-source')], { timeout: 30_000 });
+    await exec('pdftoppm', ['-f', '1', '-l', '3', '-r', '72', '-png', path.join(artifacts, 'review.pdf'),
+      path.join(artifacts, 'review-output')], { timeout: 30_000 });
+    for (let index = 1; index <= 3; index++) {
+      const source = PNG.sync.read(await fs.readFile(path.join(artifacts, `review-source-${index}.png`)));
+      const output = PNG.sync.read(await fs.readFile(path.join(artifacts, `review-output-${index}.png`)));
+      const difference = pixelmatch(source.data, output.data, undefined, source.width, source.height, { threshold: 0.18 });
+      assert.ok(difference / (source.width * source.height) < 0.035,
+        `native render of overpaint/180-degree/hidden-OCR page ${index} differs on ${difference} pixels`);
     }
     await fs.writeFile(path.join(artifacts, 'rich.hwpx'), Uint8Array.from(richHwpxBytes));
     const richHwp = new rhwp.HwpDocument(Uint8Array.from(richHwpxBytes));

@@ -75,12 +75,15 @@ export async function readStirlingPage(page: PDFPageProxy, sourceIndex: number):
   const annotations = annotationData.length;
   const reasons = [...graphics.unsupported];
   if (annotations) reasons.push("annotations");
-  if (page.rotate % 360 !== 0 && (glyphs.length || graphics.pictures.length)) reasons.push("page rotation");
-  if (graphics.invisibleTextOperators && graphics.pictures.length) reasons.push("existing invisible OCR layer");
+  if (page.rotate % 360 !== 0 && (glyphs.length || graphics.imageFrames.length)) reasons.push("page rotation");
+  if (graphics.invisibleTextOperators && graphics.imageFrames.length) reasons.push("existing invisible OCR layer");
   if (glyphs.some(glyph => Math.abs(glyph.rotation) > 2)) reasons.push("rotated text");
-  if (graphics.pictures.some(picture => glyphs.some(glyph => overlaps(picture.frame, {
+  if (graphics.imageFrames.some(frame => glyphs.some(glyph => overlaps(frame, {
     x: glyph.x, y: glyph.baseline - glyph.ascent, width: glyph.width, height: glyph.ascent + glyph.descent,
   })))) reasons.push("overlapping text and picture paint order");
+  if (graphics.filledAfterTextFrames.some(frame => glyphs.some(glyph => overlaps(frame, {
+    x: glyph.x, y: glyph.baseline - glyph.ascent, width: glyph.width, height: glyph.ascent + glyph.descent,
+  })))) reasons.push("opaque vector overpaint");
   // Vector table rules and decorations can be flattened into a text-free
   // backdrop while the PDF.js text runs stay editable at source positions.
   const uniqueReasons = [...new Set(reasons)];
@@ -108,10 +111,13 @@ async function extractPlacedImages(page: PDFPageProxy, viewport: ReturnType<PDFP
   const { OPS } = await import("pdfjs-dist");
   const list = await page.getOperatorList();
   const result: ImagePlacement[] = [];
+  const imageFrames: Frame[] = [];
+  const filledAfterTextFrames: Frame[] = [];
   const stack: number[][] = [];
   let matrix = [1, 0, 0, 1, 0, 0];
   let totalPixels = 0;
   let textMode = 0, invisibleTextOperators = 0, visibleTextOperators = 0;
+  let visibleTextPainted = false;
   const unsupported = new Set<string>();
   let clipped = false;
   const vectorPaint = new Set([OPS.constructPath, OPS.stroke, OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke,
@@ -120,6 +126,20 @@ async function extractPlacedImages(page: PDFPageProxy, viewport: ReturnType<PDFP
     const op = list.fnArray[index];
     if (vectorPaint.has(op)) {
       unsupported.add("vector artwork or table rules");
+      if (op === OPS.constructPath && visibleTextPainted) {
+        const args = list.argsArray[index];
+        const paint = args?.[0] as number | undefined;
+        const bounds = args?.[2] as ArrayLike<number> | undefined;
+        if ((paint === OPS.fill || paint === OPS.eoFill || paint === OPS.fillStroke || paint === OPS.eoFillStroke)
+          && bounds?.length === 4 && Array.from(bounds).every(Number.isFinite)) {
+          const corners = [[bounds[0], bounds[1]], [bounds[2], bounds[1]], [bounds[0], bounds[3]], [bounds[2], bounds[3]]]
+            .map(([u, v]) => viewport.convertToViewportPoint(matrix[0] * u + matrix[2] * v + matrix[4],
+              matrix[1] * u + matrix[3] * v + matrix[5]));
+          const x = Math.min(...corners.map(point => point[0])), y = Math.min(...corners.map(point => point[1]));
+          filledAfterTextFrames.push({ x, y, width: Math.max(0, Math.max(...corners.map(point => point[0])) - x),
+            height: Math.max(0, Math.max(...corners.map(point => point[1])) - y), rotation: 0 });
+        }
+      }
     }
     if (op === OPS.clip || op === OPS.eoClip) clipped = true;
     if (op === OPS.beginGroup || op === OPS.paintImageXObjectRepeat || op === OPS.paintImageMaskXObject
@@ -128,16 +148,25 @@ async function extractPlacedImages(page: PDFPageProxy, viewport: ReturnType<PDFP
     if (op === OPS.setTextRenderingMode) { textMode = Number(list.argsArray[index][0]); continue; }
     if (op === OPS.showText || op === OPS.showSpacedText || op === OPS.nextLineShowText || op === OPS.nextLineSetSpacingShowText) {
       if (textMode === 3 || textMode === 7) invisibleTextOperators++;
-      else visibleTextOperators++;
+      else { visibleTextOperators++; visibleTextPainted = true; }
     }
     if (op === OPS.save) { stack.push([...matrix]); continue; }
     if (op === OPS.restore) { matrix = stack.pop() ?? [1, 0, 0, 1, 0, 0]; continue; }
     if (op === OPS.transform) { matrix = multiply(matrix, list.argsArray[index] as number[]); continue; }
     if (op !== OPS.paintImageXObject && op !== OPS.paintInlineImageXObject) continue;
     if (clipped) unsupported.add("clipped image");
-    if (Math.abs(matrix[1]) > 0.01 || Math.abs(matrix[2]) > 0.01 || matrix[0] * matrix[3] - matrix[1] * matrix[2] < 0) {
+    if (Math.abs(matrix[1]) > 0.01 || Math.abs(matrix[2]) > 0.01
+      || matrix[0] < -0.01 || matrix[3] < -0.01 || matrix[0] * matrix[3] - matrix[1] * matrix[2] < 0) {
       unsupported.add("rotated or reflected image");
     }
+    const corners = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([u, v]) => {
+      const pdfX = matrix[0] * u + matrix[2] * v + matrix[4];
+      const pdfY = matrix[1] * u + matrix[3] * v + matrix[5];
+      return viewport.convertToViewportPoint(pdfX, pdfY);
+    });
+    const x = Math.min(...corners.map(p => p[0])), y = Math.min(...corners.map(p => p[1]));
+    const width = Math.max(...corners.map(p => p[0])) - x, height = Math.max(...corners.map(p => p[1])) - y;
+    if (width >= 0.5 && height >= 0.5) imageFrames.push({ x, y, width, height, rotation: 0 });
     const decoded: DecodedImage | null = op === OPS.paintInlineImageXObject
       ? list.argsArray[index][0]
       : await new Promise(resolve => {
@@ -149,13 +178,6 @@ async function extractPlacedImages(page: PDFPageProxy, viewport: ReturnType<PDFP
     if (decoded.width * decoded.height > 12_000_000 || totalPixels > 24_000_000 || result.length >= 64) {
       unsupported.add("high-resolution image extraction"); continue;
     }
-    const corners = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([u, v]) => {
-      const pdfX = matrix[0] * u + matrix[2] * v + matrix[4];
-      const pdfY = matrix[1] * u + matrix[3] * v + matrix[5];
-      return viewport.convertToViewportPoint(pdfX, pdfY);
-    });
-    const x = Math.min(...corners.map(p => p[0])), y = Math.min(...corners.map(p => p[1]));
-    const width = Math.max(...corners.map(p => p[0])) - x, height = Math.max(...corners.map(p => p[1])) - y;
     if (width < 0.5 || height < 0.5) continue;
     if (unsupported.size) continue;
     const blob = await encodeImage(decoded);
@@ -164,7 +186,8 @@ async function extractPlacedImages(page: PDFPageProxy, viewport: ReturnType<PDFP
       description: `PDF page ${page.pageNumber} image` };
     result.push({ frame: { x, y, width, height, rotation: picture.rotation }, picture, order: index });
   }
-  return { pictures: result, invisibleTextOperators, visibleTextOperators, unsupported: [...unsupported] };
+  return { pictures: result, imageFrames, filledAfterTextFrames,
+    invisibleTextOperators, visibleTextOperators, unsupported: [...unsupported] };
 }
 
 async function renderPageFallback(page: PDFPageProxy, annotations: Array<{ annotationType?: number; subtype?: string; rect?: number[] }>, omitText = false): Promise<Blob> {
