@@ -2132,7 +2132,7 @@
         "title": "DOCX and XLSX conversion limits",
         "paragraphs": [
           "DOCX carries over PDF text and pictures; XLSX extracts tables visible in the PDF. Original formulas and charts cannot be restored if they are no longer in the PDF.",
-          "Complex tables, columns and fonts can differ. A PDF without tables or a scan whose cells cannot be identified returns a reason instead of an empty XLSX."
+          "Complex tables, columns and fonts can differ. If no table can be found in the PDF, it cannot be converted to XLSX."
         ]
       },
       {
@@ -2346,7 +2346,7 @@
       },
       "6": {
         "q": "Can I turn a scanned table into XLSX?",
-        "a": "Even with OCR, the table cell boundaries may not be detectable. If no reliable table is found, the tool explains why instead of creating an empty XLSX."
+        "a": "Even with OCR, cell boundaries may not be detectable. If no table can be found, it cannot be converted to XLSX."
       },
       "7": {
         "q": "Can I make a scanned PDF searchable?",
