@@ -2,7 +2,7 @@ import { createUniqueSafeFileName, SafeFileNameRegistry, validateSafeFileName } 
 
 export const BATCH_LIMITS = { files: 20, fileBytes: 50 * 1024 ** 2, inputBytes: 200 * 1024 ** 2, resultBytes: 128 * 1024 ** 2, zipBytes: 64 * 1024 ** 2 };
 export type BatchStatus = "pending" | "running" | "success" | "failed" | "cancelled" | "print-needed" | "print-reviewed";
-export type BatchError = "unsupported" | "input-limit" | "output-limit" | "page-limit" | "range" | "encrypted" | "no-text" | "unavailable" | "timeout" | "conversion";
+export type BatchError = "unsupported" | "input-limit" | "output-limit" | "page-limit" | "range" | "encrypted" | "no-text" | "no-tables" | "ocr-required-for-tables" | "scan-table-unavailable" | "unavailable" | "timeout" | "conversion";
 export interface BatchOutput { blob: Blob; fileName: string; warningCount?: number }
 export interface BatchItem {
   id: number; file: File; status: BatchStatus; progress: number; error?: BatchError;

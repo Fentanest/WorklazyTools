@@ -36,6 +36,7 @@ import pymupdf
 from pdf2docx import Converter
 from pdf2docx.image.ImagesExtractor import ImagesExtractor
 _wl_orig_to_raw_dict = ImagesExtractor._to_raw_dict
+_wl_orig_descriptor = vars(ImagesExtractor)['_to_raw_dict']
 def _wl_rgb_image(image, bbox):
     pix = image
     if getattr(pix, 'colorspace', None) and pix.colorspace.name.upper() not in ('DEVICEGRAY', 'GRAY', 'DEVICERGB', 'RGB', 'SRGB'):
@@ -49,7 +50,10 @@ try:
     finally:
         cv.close()
 finally:
-    ImagesExtractor._to_raw_dict = _wl_orig_to_raw_dict
+    ImagesExtractor._to_raw_dict = _wl_orig_descriptor
+    for _wl_name in ('cv', '_wl_orig_to_raw_dict', '_wl_orig_descriptor', '_wl_rgb_image'):
+        globals().pop(_wl_name, None)
+    globals().pop('_wl_name', None)
 \`);
       return new Blob([new Uint8Array(pyodide.FS.readFile(output))], {
         type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -87,7 +91,7 @@ for _wl_index, _wl_page in enumerate(_wl_pages):
     _wl_section.bottom_margin = Pt(0)
     _wl_section.left_margin = Pt(0)
     _wl_section.right_margin = Pt(0)
-    _wl_paragraph = _wl_doc.paragraphs[0] if _wl_index == 0 else _wl_doc.add_paragraph()
+    _wl_paragraph = _wl_doc.add_paragraph()
     _wl_paragraph.paragraph_format.space_before = Pt(0)
     _wl_paragraph.paragraph_format.space_after = Pt(0)
     _wl_paragraph.paragraph_format.line_spacing = 1
@@ -102,6 +106,45 @@ del _wl_pages, _wl_doc, _wl_index, _wl_page, _wl_section, _wl_paragraph, _wl_sca
     } finally {
       for (const entry of records) { try { pyodide.FS.unlink(entry.input); } catch { /* absent */ } }
       try { pyodide.FS.unlink(output); } catch { /* absent */ }
+    }
+  }
+  async inspectTextLayers(pdf, pages) {
+    const pyodide = await this.getPyodide();
+    const job = ++this.docCounter;
+    const input = \`/layer_profile_\${job}.pdf\`;
+    pyodide.FS.writeFile(input, new Uint8Array(await pdf.arrayBuffer()));
+    try {
+      const requested = pages ? JSON.stringify(pages) : "None";
+      pyodide.runPython(\`
+import pymupdf, json
+_wl_profile = []
+with pymupdf.open(\${JSON.stringify(input)}) as _wl_document:
+    for _wl_index in (\${requested} if \${requested} is not None else range(len(_wl_document))):
+        _wl_page = _wl_document[_wl_index]
+        _wl_area = max(1, _wl_page.rect.width * _wl_page.rect.height)
+        _wl_images = _wl_page.get_image_info()
+        _wl_coverage = max((max(0, (image['bbox'][2]-image['bbox'][0]) * (image['bbox'][3]-image['bbox'][1])) / _wl_area for image in _wl_images), default=0)
+        _wl_hidden = []
+        _wl_visible = []
+        _wl_visible_chars = 0
+        for _wl_span in _wl_page.get_texttrace():
+            _wl_text = ''.join(chr(char[0]) for char in _wl_span['chars'] if 0 < char[0] <= 0x10ffff)
+            _wl_box = list(pymupdf.Rect(_wl_span['bbox']) * _wl_page.rotation_matrix)
+            if _wl_span['type'] == 3 or _wl_span.get('opacity', 1) < 0.05:
+                if _wl_text.strip():
+                    _wl_hidden.append({'text': _wl_text, 'bbox': _wl_box, 'type': _wl_span['type']})
+            else:
+                _wl_visible_chars += len(_wl_text.strip())
+                if _wl_text.strip():
+                    _wl_visible.append({'text': _wl_text, 'bbox': _wl_box, 'type': _wl_span['type']})
+        _wl_profile.append({'pageIndex': _wl_index, 'rotation': _wl_page.rotation, 'width': _wl_page.rect.width, 'height': _wl_page.rect.height, 'imageCoverage': _wl_coverage, 'visibleCharacters': _wl_visible_chars, 'hiddenSpans': _wl_hidden, 'visibleSpans': _wl_visible})
+_wl_profile_json = json.dumps(_wl_profile, ensure_ascii=False)
+_wl_profile.clear()
+\`);
+      return JSON.parse(pyodide.runPython("_wl_profile_json"));
+    } finally {
+      try { pyodide.FS.unlink(input); } catch { /* absent */ }
+      try { pyodide.runPython("globals().pop('_wl_profile_json', None)"); } catch { /* absent */ }
     }
   }
 ` + wrapper.slice(end);
@@ -130,6 +173,20 @@ const newClose = `  close() {
   }`;
 if (!wrapper.includes(oldClose)) throw new Error("Bento PyMuPDF document close layout changed");
 wrapper = wrapper.replace(oldClose, newClose);
+const oldOpen = `    pyodide.FS.writeFile(inputPath, new Uint8Array(buf));
+    pyodide.runPython(\`\${docVar} = pymupdf.open("\${inputPath}")\`);
+    return new PyMuPDFDocument(pyodide, docVar, inputPath);`;
+const newOpen = `    pyodide.FS.writeFile(inputPath, new Uint8Array(buf));
+    try {
+      pyodide.runPython(\`\${docVar} = pymupdf.open("\${inputPath}")\`);
+      return new PyMuPDFDocument(pyodide, docVar, inputPath);
+    } catch (error) {
+      try { pyodide.runPython(\`globals().pop(\${JSON.stringify(docVar)}, None)\`); } catch { /* no binding */ }
+      try { pyodide.FS.unlink(inputPath); } catch { /* no input file */ }
+      throw error;
+    }`;
+if (!wrapper.includes(oldOpen)) throw new Error("Bento PyMuPDF document open layout changed");
+wrapper = wrapper.replace(oldOpen, newOpen);
 await fs.mkdir(path.join(destination, "dist"), { recursive: true });
 await fs.writeFile(path.join(destination, "dist", "index.js"), wrapper);
 await fs.writeFile(path.join(destination, "manifest.json"), JSON.stringify({ version: manifest.version, originalSha256, patchedSha256: createHash("sha256").update(wrapper).digest("hex") }, null, 2));

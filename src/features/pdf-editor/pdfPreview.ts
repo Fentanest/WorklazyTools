@@ -416,6 +416,7 @@ export interface ExtractPdfTextResult {
   ocrPdfBuffers: ArrayBuffer[];
   ocrPageCount: number;
   ocrSourceIndexes: number[];
+  ocrHocrBySourceIndex: Map<number, string>;
 }
 
 export async function extractPdfText(
@@ -426,7 +427,7 @@ export async function extractPdfText(
   selectedPageIndexes?: number[],
   language: AppLanguage = "ko",
   signal?: AbortSignal,
-  options: { includeImages?: boolean; ocrLayout?: "sparse" | "paragraphs"; ocrLanguage?: "kor" | "eng" | "kor+eng" } = {},
+  options: { includeImages?: boolean; ocrLayout?: "sparse" | "paragraphs"; ocrLanguage?: "kor" | "eng" | "kor+eng"; skipOcrSourceIndexes?: ReadonlySet<number> } = {},
 ): Promise<ExtractPdfTextResult> {
   const document = await getPdfDocument(file, language, signal);
   const pages: PdfTextPage[] = [];
@@ -452,18 +453,19 @@ export async function extractPdfText(
   }
 
   const ocrTargets: number[] = [];
-  if (searchablePdf || ocrMode === "all") ocrTargets.push(...pages.map((_, index) => index));
+  if (searchablePdf || ocrMode === "all") ocrTargets.push(...pages.flatMap((_, index) => options.skipOcrSourceIndexes?.has(sourcePageIndexes[index]) ? [] : [index]));
   else if (ocrMode === "auto") {
     const ops = (await loadPdfDisplayModule()).OPS;
     for (const [index, textPage] of pages.entries()) {
+      if (options.skipOcrSourceIndexes?.has(sourcePageIndexes[index])) continue;
       const characters = textPage.lines.reduce((sum, line) => sum + line.text.trim().length, 0);
-      if (characters < 8) { ocrTargets.push(index); continue; }
-      if (characters >= 100) continue;
+      if (characters >= 300) continue;
       const pdfPage = await waitWithAbort(document.getPage(sourcePageIndexes[index] + 1), signal);
       if (await getDominantImageCoverage(pdfPage, ops, signal) >= 0.55) ocrTargets.push(index);
     }
   }
   const ocrPdfBuffers: ArrayBuffer[] = [];
+  const ocrHocrBySourceIndex = new Map<number, string>();
 
   if (ocrTargets.length) {
     const { createWorker } = await waitWithAbort(import("tesseract.js"), signal);
@@ -505,9 +507,10 @@ export async function extractPdfText(
         const recognized = await waitWithAbort(Promise.race([ocrWorker.recognize(
           canvas,
           searchablePdf ? { pdfTitle: file.name, pdfTextOnly: false } : {},
-          { text: true, blocks: true, pdf: searchablePdf },
+          { text: true, blocks: true, hocr: true, pdf: searchablePdf },
         ), new Promise<never>((_, reject) => { timeout = setTimeout(() => { void terminate(); reject(new Error("OCR_TIMEOUT")); }, 5 * 60_000); })]), signal).finally(() => { if (timeout) clearTimeout(timeout); });
         throwIfAborted(signal);
+        if (recognized.data.hocr) ocrHocrBySourceIndex.set(sourcePageNumber - 1, recognized.data.hocr);
         const recognizedPage = layoutOcrPage(sourcePageNumber, recognized.data);
         const existing = pages[pageIndex];
         const known = new Set(existing.lines.map(line => line.text.trim()).filter(Boolean));
@@ -535,6 +538,7 @@ export async function extractPdfText(
     ocrPdfBuffers,
     ocrPageCount: ocrTargets.length,
     ocrSourceIndexes: ocrTargets.map(index => sourcePageIndexes[index]),
+    ocrHocrBySourceIndex,
   };
 }
 
@@ -546,6 +550,10 @@ async function renderPageForOcr(document: PDFDocumentProxy, pageNumber: number, 
   const pixelLimit = mobileDevice ? 8_000_000 : 12_000_000;
   const limitedScale = Math.min(requestedScale, Math.sqrt(pixelLimit / (natural.width * natural.height)));
   return renderPageForExport(document, pageNumber, limitedScale, language, signal);
+}
+
+export async function renderPdfPageForOcrCanvas(file: File, pageIndex: number, language: AppLanguage, signal?: AbortSignal) {
+  return renderPageForOcr(await getPdfDocument(file, language, signal), pageIndex + 1, language, signal);
 }
 
 async function renderPageForExport(document: PDFDocumentProxy, pageNumber: number, scale: number, language: AppLanguage, signal?: AbortSignal) {

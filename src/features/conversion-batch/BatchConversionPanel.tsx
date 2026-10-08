@@ -52,6 +52,9 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
     range: L("이 파일의 페이지 수에 맞는 범위를 입력해 주세요.", "Enter a page range that exists in this file."),
     encrypted: L("암호를 해제한 사본을 선택해 주세요.", "Choose an unlocked copy."),
     "no-text": L("텍스트를 추출하지 못했습니다. 스캔 PDF는 PDF→문서에서 OCR을 사용하세요.", "No text was extracted. For scanned PDFs, use OCR in PDF to document."),
+    "no-tables": L("PDF에서 표를 찾지 못했습니다. 일반 글은 TXT·DOCX를 선택해 주세요.", "No table was found in the PDF. Choose TXT or DOCX for prose."),
+    "ocr-required-for-tables": L("스캔 PDF의 표 셀을 찾지 못했습니다. 검색 가능한 PDF를 먼저 만들어 다시 시도해 주세요.", "Table cells could not be found in this scan. Make a searchable PDF first and retry."),
+    "scan-table-unavailable": L("OCR로 글자를 인식했지만 표 셀은 찾지 못했습니다. DOCX·TXT로 인식 결과를 확인해 주세요.", "OCR recognized text but found no reliable table cells. Review the result as DOCX or TXT."),
     unavailable: L("변환 준비를 완료하지 못했습니다. 연결 상태와 데스크톱 브라우저를 확인해 주세요.", "Conversion could not be prepared. Check your connection and use a current desktop browser."),
     timeout: L("변환 시간이 초과됐습니다. 더 작은 파일로 다시 시도해 주세요.", "Conversion timed out. Retry with a smaller file."),
     conversion: L("변환하지 못했습니다. 파일 형식·손상·암호 여부를 확인한 뒤 다시 시도해 주세요.", "Conversion failed. Check the file format, damage or password protection, then retry."),
@@ -82,7 +85,7 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
         {mode === "pdf-document" && <>
           <label className="grid gap-1 text-sm">{L("출력 형식", "Output format")}<UtilitySelect value={options.format} onChange={event => update("format", event.target.value as BatchOptions["format"])}>{["docx", "xlsx", "pptx", "hwpx", "txt", "searchable-pdf"].map(format => <option key={format} value={format}>{format === "searchable-pdf" ? L("검색 가능한 PDF", "Searchable PDF") : format.toUpperCase()}</option>)}</UtilitySelect></label>
-          <label className="grid gap-1 text-sm">{L("OCR 적용", "OCR scope")}<UtilitySelect disabled={options.format === "searchable-pdf"} value={options.format === "searchable-pdf" ? "all" : options.ocrMode} onChange={event => update("ocrMode", event.target.value as BatchOptions["ocrMode"])}><option value="auto">{L("자동", "Auto")}</option><option value="off">{L("끄기", "Off")}</option><option value="all">{L("모든 페이지", "All pages")}</option></UtilitySelect></label>
+          <label className="grid gap-1 text-sm">{L("OCR 적용", "OCR scope")}<UtilitySelect value={options.ocrMode} onChange={event => update("ocrMode", event.target.value as BatchOptions["ocrMode"])}><option value="auto">{L("자동", "Auto")}</option><option value="off">{L("끄기", "Off")}</option><option value="all">{L("모든 페이지", "All pages")}</option></UtilitySelect></label>
           <label className="grid gap-1 text-sm">{L("OCR 글 배치", "OCR text layout")}<UtilitySelect value={options.ocrLayout} onChange={event => update("ocrLayout", event.target.value as BatchOptions["ocrLayout"])}><option value="sparse">{L("표·흩어진 글자", "Tables / scattered text")}</option><option value="paragraphs">{L("연속된 문단", "Continuous paragraphs")}</option></UtilitySelect></label>
           {(["docx", "pptx", "hwpx"] as BatchOptions["format"][]).includes(options.format) && <label className="grid gap-1 text-sm">{L("출력 방식", "Output mode")}<UtilitySelect value={options.outputMode} onChange={event => update("outputMode", event.target.value as BatchOptions["outputMode"])}><option value="editable">{L("편집 가능한 내용", "Editable content")}</option><option value="page-image">{L("페이지 모양 유지 · 글자 편집 불가", "Preserve pages · text not editable")}</option></UtilitySelect></label>}
         </>}

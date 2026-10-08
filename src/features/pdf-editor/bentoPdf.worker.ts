@@ -2,7 +2,7 @@
 
 import type { PyMuPDF } from "@bentopdf/pymupdf-wasm";
 
-type Request = { id: number; type: "docx" | "xlsx"; pdf: Blob; fileName: string } | { id: number; type: "page-image-docx"; pages: Array<{ blob: Blob; width: number; height: number }> };
+type Request = { id: number; type: "docx" | "xlsx"; pdf: Blob; fileName: string } | { id: number; type: "page-image-docx"; pages: Array<{ blob: Blob; width: number; height: number }> } | { id: number; type: "select-pages" | "profile-pages"; pdf: Blob; pages: number[] };
 const scope = self as DedicatedWorkerGlobalScope;
 let runtime: PyMuPDF | undefined;
 let loading: Promise<PyMuPDF> | undefined;
@@ -28,7 +28,16 @@ scope.onmessage = (event: MessageEvent<Request>) => {
       scope.postMessage({ id: request.id, type: "progress", value: 5 });
       const pdf = await engine();
       scope.postMessage({ id: request.id, type: "progress", value: 28 });
-      if (request.type === "page-image-docx") {
+      if (request.type === "profile-pages") {
+        const profiles = await (pdf as PyMuPDF & { inspectTextLayers(input: Blob, pages: number[]): Promise<unknown[]> }).inspectTextLayers(request.pdf, request.pages);
+        scope.postMessage({ id: request.id, type: "result", blob: new Blob(), profiles });
+      } else if (request.type === "select-pages") {
+        const doc = await pdf.open(request.pdf);
+        try {
+          doc.selectPages(request.pages);
+          scope.postMessage({ id: request.id, type: "result", blob: doc.saveAsBlob() });
+        } finally { doc.close(); }
+      } else if (request.type === "page-image-docx") {
         const blob = await (pdf as PyMuPDF & { pageImagesToDocx(pages: Array<{ blob: Blob; width: number; height: number }>): Promise<Blob> }).pageImagesToDocx(request.pages);
         scope.postMessage({ id: request.id, type: "result", blob });
       } else if (request.type === "docx") {
