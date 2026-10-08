@@ -532,24 +532,32 @@ export async function renderPdfPageForOcrCanvas(file: File, pageIndex: number, l
 async function renderPageForExport(document: PDFDocumentProxy, pageNumber: number, scale: number, language: AppLanguage, signal?: AbortSignal) {
   throwIfAborted(signal);
   const page = await document.getPage(pageNumber);
-  throwIfAborted(signal);
-  const viewport = page.getViewport({ scale });
-  const canvas = documentCanvas(viewport.width, viewport.height);
-  const context = canvas.getContext("2d", { alpha: false });
-  if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToRenderThePdfPageImage"));
-  const renderTask = page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" });
-  const { failedImages } = await withImageDecodeCheck(() => waitForPdfRender(renderTask, page, { signal }));
-  if (failedImages.length > 0) {
-    canvas.width = 1;
-    canvas.height = 1;
-    throw new Error(featureMessage(language, "pdf.messages.pdfPreview.imageDecodingFailed") ?? `이미지 디코딩에 실패했습니다 (${failedImages.join(", ")}). CCITT/JBIG2 디코더가 로드되지 않았을 수 있습니다.`);
+  let canvas: HTMLCanvasElement | undefined;
+  try {
+    throwIfAborted(signal);
+    const viewport = page.getViewport({ scale });
+    canvas = documentCanvas(viewport.width, viewport.height);
+    const context = canvas.getContext("2d", { alpha: false });
+    if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToRenderThePdfPageImage"));
+    const renderTask = page.render({ canvas, canvasContext: context, viewport, background: "#ffffff" });
+    const { failedImages } = await withImageDecodeCheck(() => waitForPdfRender(renderTask, page, { signal }));
+    if (failedImages.length > 0) {
+      throw new Error(featureMessage(language, "pdf.messages.pdfPreview.imageDecodingFailed") ?? `이미지 디코딩에 실패했습니다 (${failedImages.join(", ")}). CCITT/JBIG2 디코더가 로드되지 않았을 수 있습니다.`);
+    }
+    // PDF.js puts Text annotation icons in a DOM layer, outside page.render().
+    // Port the marker placement from Stirling's PDF.js fallback adapter so a
+    // pictured page includes the visible note rather than silently omitting it.
+    const annotations = await waitWithAbort(page.getAnnotations({ intent: "display" }), signal);
+    drawTextNoteMarkers(context, viewport, annotations);
+    return canvas;
+  } catch (error) {
+    if (canvas) { canvas.width = 1; canvas.height = 1; }
+    throw error;
+  } finally {
+    // The canvas owns the finished pixels; PDF.js can release this page's
+    // decoded image/operator data before its caller encodes the canvas.
+    page.cleanup();
   }
-  // PDF.js puts Text annotation icons in a DOM layer, outside page.render().
-  // Port the marker placement from Stirling's PDF.js fallback adapter so a
-  // pictured page includes the visible note rather than silently omitting it.
-  const annotations = await waitWithAbort(page.getAnnotations({ intent: "display" }), signal);
-  drawTextNoteMarkers(context, viewport, annotations);
-  return canvas;
 }
 
 function drawTextNoteMarkers(context: CanvasRenderingContext2D, viewport: ReturnType<PDFPageProxy["getViewport"]>, annotations: Array<{ annotationType?: number; subtype?: string; rect?: number[] }>) {
@@ -589,18 +597,22 @@ export async function validatePdfImages(file: File, pageIndexes: readonly number
   for (const index of pageIndexes) {
     throwIfAborted(signal);
     const page = await waitWithAbort(document.getPage(index + 1), signal);
-    const list = await waitWithAbort(page.getOperatorList(), signal);
-    if (!list.fnArray.some(operation => operation === ops.paintImageXObject || operation === ops.paintImageXObjectRepeat || operation === ops.paintInlineImageXObject)) continue;
-    const { validatePdfImageObjects } = await import("./pdfExtractImages");
-    await validatePdfImageObjects(page, ops, signal);
-    const viewport = page.getViewport({ scale: 1 });
-    const scale = Math.min(.25, Math.sqrt(1_000_000 / (viewport.width * viewport.height)));
     try {
-      const canvas = await renderPageForExport(document, index + 1, scale, language, signal);
-      canvas.width = 1; canvas.height = 1;
-    } catch (error) {
-      if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
-      throw new PdfConversionError("IMAGE_DECODE", { page: index + 1 });
+      const list = await waitWithAbort(page.getOperatorList(), signal);
+      if (!list.fnArray.some(operation => operation === ops.paintImageXObject || operation === ops.paintImageXObjectRepeat || operation === ops.paintInlineImageXObject)) continue;
+      const { validatePdfImageObjects } = await import("./pdfExtractImages");
+      await validatePdfImageObjects(page, ops, signal);
+      const viewport = page.getViewport({ scale: 1 });
+      const scale = Math.min(.25, Math.sqrt(1_000_000 / (viewport.width * viewport.height)));
+      try {
+        const canvas = await renderPageForExport(document, index + 1, scale, language, signal);
+        canvas.width = 1; canvas.height = 1;
+      } catch (error) {
+        if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
+        throw new PdfConversionError("IMAGE_DECODE", { page: index + 1 });
+      }
+    } finally {
+      page.cleanup();
     }
   }
 }

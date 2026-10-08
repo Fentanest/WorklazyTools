@@ -10,7 +10,9 @@ BentoPDF `3a5f146d`의 lockfile에 있던 `@matbee/libreoffice-converter` 2.6.0�
 
 PDF 코어는 Bento PyMuPDF wrapper 0.11.16과 PyMuPDF 1.26.3/pdf2docx 0.5.8/python-docx 1.2.0 자산을 짝지었고, Stirling-Office-Convert `v0.2.2`를 사용한다. `pdf2docx`의 `ocr=0`은 렌더 모드 3 숨김 글자를 버리고 `ocr=2`는 일반 글자·그림까지 버리므로 혼합 문서 전체에 `ocr=2`를 적용하지 않았다. OCR이 필요한 원본 페이지만 글자·배경을 조합하고, 회전 글자나 색 도장과 겹친 글자의 편집 복원을 보증할 수 없으면 원본 페이지 이미지를 보존하며 이유를 남긴다. PDF로부터 원래 Excel 수식·차트를 복원한다는 표시는 하지 않는다. — Codx
 
-고정 PDF 코어의 실제 브라우저 시나리오 41/41과 별도 혼합 OCR-off 1/1이 통과했다. 생성 DOCX/PPTX를 LibreOffice PDF로, XLSX/ZIP/HWPX의 내용과 이미지 관계를 다시 열어 확인했다. 통합 후보 `47a6020`에서 build/정적 검사, 공개 단위 706/706, 문서→PDF 프로덕션 화면 12/12, 한영 배치 화면 8/8이 통과했다. Office 직접 브라우저 smoke 첫 시도는 Vite 의존성 최적화에 따른 navigation으로 변환 전에 중단됐고, 서버가 준비된 다음 같은 고정 소스로 재실행한 결과 12개 PDF와 취소·초기화 실패·재시도가 통과했다. 정확한 입력 해시·부분 실패 로그·출력 파일은 gitignored `docs/jobs/todo/document-conversion-engines-20261008/`에 보존했다. 같은 입력의 성능·PSS 최종 측정과 정식 통합 판정은 아직 완료로 표시하지 않는다. — Codx
+고정 PDF 코어의 실제 브라우저 시나리오 41/41과 별도 혼합 OCR-off 1/1이 통과했다. 생성 DOCX/PPTX를 LibreOffice PDF로, XLSX/ZIP/HWPX의 내용과 이미지 관계를 다시 열어 확인했다. 통합 후보 `47a6020`에서 build/정적 검사, 공개 단위 706/706, 문서→PDF 프로덕션 화면 12/12, 한영 배치 화면 8/8이 통과했다. Office 직접 브라우저 smoke 첫 시도는 Vite 의존성 최적화에 따른 navigation으로 변환 전에 중단됐고, 서버가 준비된 다음 같은 고정 소스로 재실행한 결과 12개 PDF와 취소·초기화 실패·재시도가 통과했다. 정확한 입력 해시·부분 실패 로그·출력 파일은 gitignored `docs/jobs/todo/document-conversion-engines-20261008/`에 보존했다. 같은 입력 성능·PSS 수치는 다음 단락과 `DOCUMENT_CONVERSION_VERIFICATION.md`에 기록하고, 뒤의 페이지 객체 정리 수정에 대한 영향 범위 재검수는 별도로 구분한다. — Codx
+
+6장의 서로 다른 4,800×6,400 스캔 이미지를 페이지 이미지 PPTX로 만드는 독립 메모리 표본에서, PDF.js 페이지별 렌더와 손상 이미지 사전 검사 뒤 `PDFPageProxy.cleanup()`을 호출하지 않아 디코딩 객체가 문서 수명 동안 남는 경로를 확인했다. 완료/오류 양쪽에서 페이지 자원을 정리한 뒤 같은 입력의 별도 새 브라우저 PSS 최고치는 1,217.9→992.7MiB, 해제 후 마지막 값은 1,090.2→825.7MiB였다. 출력 PPTX의 내부 JPEG 6개는 전후 SHA-256이 일치했고 실제 재열기에서도 6페이지를 확인했다. 단일 국소 표본이며 Chrome GC와 다른 작업 부하의 결과를 일반화하지 않는다. — Codx
 
 ## 2026-10-08 — 다중 문서 변환 검증 및 한계
 
