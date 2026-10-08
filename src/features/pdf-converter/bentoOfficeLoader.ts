@@ -2,7 +2,7 @@ import { WorkerBrowserConverter, type InputFormat } from "@matbee/libreoffice-co
 
 // Adapted from BentoPDF src/js/utils/libreoffice-loader.ts at
 // 3a5f146d1b89d54dc7ca576aa6797c8bd3e42b97. The package is pinned to
-// @matbee/libreoffice-converter 2.6.0 and all runtime assets come from that
+// @matbee/libreoffice-converter 2.3.1 and all runtime assets come from that
 // package. This variant owns its Blob URLs and supports aborting initialization.
 export class BentoOfficeLoader {
   private converter: WorkerBrowserConverter | undefined;
@@ -10,11 +10,9 @@ export class BentoOfficeLoader {
   private readonly urls = new Set<string>();
   private readonly controller = new AbortController();
   private lastProgress = 0;
-  private warmingUp = false;
 
   constructor(
     private readonly assetBase: string,
-    private readonly fontUrl: string,
     private report: (percent: number) => void,
   ) {}
 
@@ -35,24 +33,18 @@ export class BentoOfficeLoader {
   private async initializeOnce() {
     const wasm = this.objectUrl("soffice.wasm.gz", "application/wasm");
     const data = this.objectUrl("soffice.data.gz", "application/octet-stream");
-    const font = fetch(this.fontUrl, { signal: this.controller.signal }).then(async response => {
-      if (!response.ok) throw new Error("asset-download-failed");
-      const bytes = new Uint8Array(await response.arrayBuffer());
-      if (bytes.byteLength !== 2054744) throw new Error("asset-download-failed");
-      return bytes;
-    });
     let wasmUrl: string;
     let dataUrl: string;
-    let fontBytes: Uint8Array;
     try {
-      [wasmUrl, dataUrl, fontBytes] = await Promise.all([wasm, data, font]);
+      [wasmUrl, dataUrl] = await Promise.all([wasm, data]);
     } catch (error) {
       this.controller.abort();
-      await Promise.allSettled([wasm, data, font]);
+      await Promise.allSettled([wasm, data]);
       throw error;
     }
     this.controller.signal.throwIfAborted();
     this.emit(60);
+    this.controller.signal.throwIfAborted();
     const base = new URL(this.assetBase);
     const converter = new WorkerBrowserConverter({
       sofficeJs: new URL("soffice.js", base).href,
@@ -60,27 +52,15 @@ export class BentoOfficeLoader {
       sofficeData: dataUrl,
       sofficeWorkerJs: new URL("soffice.worker.js", base).href,
       browserWorkerJs: new URL("browser.worker.global.js", base).href,
-      fonts: [{ filename: "NanumGothic-Regular.ttf", data: fontBytes }],
-      onProgress: info => this.emit(info.phase === "converting" && this.converter?.isReady() && !this.warmingUp
+      onProgress: info => this.emit(info.phase === "converting" && this.converter?.isReady()
         ? Math.min(99, 91 + Math.round(info.percent * .08))
         : Math.min(89, 60 + Math.round(info.percent * .29))),
     });
     this.converter = converter;
     await converter.initialize();
     this.controller.signal.throwIfAborted();
-    // The first Writer export initializes its font/layout services. A rich
-    // DOCX as that first export intermittently stalled inside documentSaveAs;
-    // a fixed local DOCX export makes the user's document the second export.
-    // This output is discarded and its virtual files are cleaned by the
-    // package worker's handleConvert finally block.
-    this.warmingUp = true;
-    const warmup = await fetch(new URL("warmup.docx", this.assetBase), { signal: this.controller.signal });
-    if (!warmup.ok) throw new Error("asset-download-failed");
-    const warmupResult = await converter.convert(new Uint8Array(await warmup.arrayBuffer()), { outputFormat: "pdf", inputFormat: "docx" }, "warmup.docx");
-    if (new TextDecoder().decode(warmupResult.data.subarray(0, 5)) !== "%PDF-") throw new Error("office-warmup-failed");
-    this.controller.signal.throwIfAborted();
-    this.warmingUp = false;
     this.emit(90);
+    this.controller.signal.throwIfAborted();
   }
 
   async convert(file: File): Promise<Uint8Array> {
@@ -94,13 +74,38 @@ export class BentoOfficeLoader {
     if (result.data.length < 5 || new TextDecoder().decode(result.data.subarray(0, 5)) !== "%PDF-") {
       throw new Error("office-convert-verification-failed");
     }
+    // Upstream sends the result before its `finally` destroys the LOK document.
+    // A queued ping is handled only after that cleanup returns.
+    if (!await this.waitForCleanup(10_000)) throw new Error("office-operation-timeout");
     return result.data;
+  }
+
+  private async waitForCleanup(timeoutMs: number): Promise<boolean> {
+    const pending = (this.converter as unknown as {
+      sendMessage(type: string): Promise<unknown>;
+    }).sendMessage("worklazy-ping").then(() => true, () => false);
+    let timer: number | undefined;
+    const timeout = new Promise<boolean>(resolve => {
+      timer = window.setTimeout(() => resolve(false), timeoutMs);
+    });
+    try { return await Promise.race([pending, timeout]); }
+    finally { if (timer !== undefined) clearTimeout(timer); }
   }
 
   dispose() {
     this.controller.abort();
     // WorkerBrowserConverter.destroy() awaits a worker message and cannot be
-    // used for a forced cancellation. The owning iframe terminates its Worker.
+    // used for a forced cancellation. Terminate its actual owned Worker.
+    const runtime = this.converter as unknown as {
+      worker?: Worker | null;
+      pendingRequests?: Map<number, { reject: (error: Error) => void }>;
+    } | undefined;
+    if (runtime?.pendingRequests) {
+      for (const pending of runtime.pendingRequests.values()) pending.reject(new DOMException("Cancelled", "AbortError"));
+      runtime.pendingRequests.clear();
+    }
+    try { runtime?.worker?.terminate(); }
+    catch { /* The Worker may already be gone after an initialization error. */ }
     this.converter = undefined;
     for (const url of this.urls) URL.revokeObjectURL(url);
     this.urls.clear();
@@ -119,7 +124,7 @@ export class BentoOfficeLoader {
     let blob = await response.blob();
     const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
     if (head[0] === 0x1f && head[1] === 0x8b) {
-      blob = await new Response(blob.stream().pipeThrough(new DecompressionStream("gzip"))).blob();
+      blob = await new Response(blob.stream().pipeThrough(new DecompressionStream("gzip"), { signal: this.controller.signal })).blob();
     }
     this.controller.signal.throwIfAborted();
     const url = URL.createObjectURL(new Blob([blob], { type: mimeType }));

@@ -5,18 +5,23 @@ import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
 
-// BentoPDF 3a5f146d1b89d54dc7ca576aa6797c8bd3e42b97 resolves this exact
-// package version. Its checked-in public WASM files have different hashes, so
-// the package's JS, worker, WASM and data must be deployed as a single set.
-const VERSION = "2.6.0";
+// BentoPDF's checked-in public WASM files match its asset-introduction lock at
+// @matbee/libreoffice-converter 2.3.1, even though its later HEAD lock advanced.
+// Keep browser API, Worker, JS, WASM and data from that same actual build.
+const VERSION = "2.3.1";
 const assets = [
-  ["wasm/soffice.js", "b67acadcb30171e6ec018754fcbe5b527443a3ef1c84f352e29aecff6d210e43"],
+  ["wasm/soffice.js", "ec4925ebc12832e7da56fe406a4a804265e58dfcb2c9cdcf5a3790c20ff8aad2"],
   ["wasm/soffice.worker.js", "458bc142e7f837baf44a2d186a0b65b0a11ece760e5dab79ebca2789c9feeef5"],
-  ["dist/browser.worker.global.js", "ae38107967ee690140f0e64d228e0947bb46a4e1d0385484b172f0844ad051c9"],
-  ["wasm/soffice.wasm", "ea3d8f3b69bd1e586a8ea973e0dfa61c758612fcc529dc94ac2e30519f8b4f7b"],
-  ["wasm/soffice.data", "8f4e98aa67e108e161cecc7906d7ac0dd3941ef9347f999c3b9dbc049f165020"],
+  ["dist/browser.worker.global.js", "9fffabd06765f4915ff20e2a659bd7d47db26c11509ceb3291d801502576c86e"],
+  ["wasm/soffice.wasm", "2d23fd5845e169e16e3979db37ba11aefa77e474c6db38815531800a63a3c5d5"],
+  ["wasm/soffice.data", "c837ad74b017f5226eb5d027f7c2dcbff913eea2eb762e875f875ca992f57a3e"],
 ];
-const warmupSha256 = "eb6fe465ec5887efe4955e9316b3a99d59368c35e14417f4534fd4882c5ca76a";
+const workerPingAnchor = 'self.onmessage=async l=>{let e=l.data;switch(e.type){case "init":';
+const workerPingReplacement = 'self.onmessage=async l=>{let e=l.data;switch(e.type){case "worklazy-ping":self.postMessage({type:"ready",id:e.id});break;case "init":';
+const moduleStartAnchor = 'self.Module={mainScriptUrlOrBlob:e';
+const moduleStartReplacement = 'self.__worklazyFont=await(async()=>{const r=await fetch(new URL("NanumGothic-Regular.ttf",e));if(!r.ok)throw new Error("Office font download failed");const b=new Uint8Array(await r.arrayBuffer());if(b.byteLength!==2054744)throw new Error("Office font size mismatch");return b})(),self.Module={noInitialRun:!0,preRun:[()=>{for(const d of ["/instdir","/instdir/share","/instdir/share/fonts","/instdir/share/fonts/truetype"])try{self.Module.FS.mkdir(d)}catch{}self.Module.FS.writeFile("/instdir/share/fonts/truetype/NanumGothic-Regular.ttf",self.__worklazyFont)}],mainScriptUrlOrBlob:e';
+const patchedWorkerSha256 = "9396e0969f4d37001f00bbff6957aa9009e623a1c1e51d99707cdeb548dda999";
+const fontSha256 = "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31";
 const root = path.resolve(new URL("..", import.meta.url).pathname);
 const source = path.join(root, "node_modules", "@matbee", "libreoffice-converter");
 const packageInfo = JSON.parse(await fs.readFile(path.join(source, "package.json"), "utf8"));
@@ -34,15 +39,30 @@ try {
     const name = path.basename(relative);
     if (name.endsWith(".wasm") || name.endsWith(".data")) {
       await pipeline(createReadStream(input), createGzip({ level: 9, mtime: 0 }), createWriteStream(path.join(staging, `${name}.gz`)));
+    } else if (name === "browser.worker.global.js") {
+      const original = await fs.readFile(input, "utf8");
+      if (original.split(workerPingAnchor).length !== 2) throw new Error("LibreOffice worker cleanup probe anchor changed");
+      if (original.split(moduleStartAnchor).length !== 2) throw new Error("LibreOffice module startup anchor changed");
+      // Fetch the fixed TTF before importScripts; preRun installs it before
+      // LibreOffice main/LOK/fontconfig. noInitialRun prevents a second native
+      // main from racing LOK while the font is scanned.
+      const patched = original.replace(workerPingAnchor, workerPingReplacement)
+        .replace(moduleStartAnchor, moduleStartReplacement);
+      if (createHash("sha256").update(patched).digest("hex") !== patchedWorkerSha256) throw new Error("LibreOffice worker cleanup probe hash mismatch");
+      await fs.writeFile(path.join(staging, name), patched);
     } else {
       await fs.copyFile(input, path.join(staging, name));
     }
   }
-  const warmupSource = path.join(root, "tests", "fixtures", "document-converters", "sample.docx");
-  const warmupBytes = await fs.readFile(warmupSource);
-  if (createHash("sha256").update(warmupBytes).digest("hex") !== warmupSha256) throw new Error("LibreOffice warmup input mismatch");
-  await fs.writeFile(path.join(staging, "warmup.docx"), warmupBytes);
-  await fs.writeFile(path.join(staging, "manifest.json"), `${JSON.stringify({ version: VERSION, package: "@matbee/libreoffice-converter", upstreamCommit: "1bfae4a495b9fb17a0e6b20a13d0ad30ad58d343", sourceSha256: Object.fromEntries(assets), warmup: { source: "tests/fixtures/document-converters/sample.docx", sha256: warmupSha256 } }, null, 2)}\n`);
+  // The existing pinned font snapshot is generated before this converter step.
+  // Only its TTF is copied; the Bento runtime never loads another Office engine.
+  const fontSource = path.join(root, "public", "vendor", "zetaoffice", "2026-10-07", "NanumGothic-Regular.ttf");
+  const fontBytes = await fs.readFile(fontSource);
+  if (fontBytes.length !== 2054744 || createHash("sha256").update(fontBytes).digest("hex") !== fontSha256) {
+    throw new Error("Office font snapshot mismatch");
+  }
+  await fs.writeFile(path.join(staging, "NanumGothic-Regular.ttf"), fontBytes);
+  await fs.writeFile(path.join(staging, "manifest.json"), `${JSON.stringify({ version: VERSION, package: "@matbee/libreoffice-converter", upstreamCommit: "b94b8a6887d223be93b082543f5fd32bbd8dc646", sourceSha256: Object.fromEntries(assets), workerPatch: { fontPreRun: true, noInitialRun: true, cleanupProbe: "worklazy-ping", outputSha256: patchedWorkerSha256 }, font: { name: "NanumGothic-Regular.ttf", sha256: fontSha256 } }, null, 2)}\n`);
   await fs.rm(destination, { recursive: true, force: true });
   await fs.rename(staging, destination);
 } catch (error) {

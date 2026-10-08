@@ -1,5 +1,4 @@
-// Run against `vite --host 127.0.0.1 --port 4271 --strictPort`.
-// Synthetic inputs only; the browser blocks all external network requests.
+// Synthetic inputs; run against a local Vite server with pinned static assets.
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -18,26 +17,37 @@ await context.route('**/*', route => {
   external.push(url.href); return route.abort();
 });
 const page = await context.newPage();
+await page.routeWebSocket('**', socket => socket.close());
+const workers = [];
+const closed = new Set();
+page.on('worker', worker => {
+  if (!worker.url().includes('browser.worker.global.js')) return;
+  workers.push(worker);
+  worker.on('close', () => closed.add(worker));
+});
+await page.exposeFunction('__officeWorkerStarts', () => workers.length);
+const liveWorkers = () => workers.filter(worker => !closed.has(worker));
 const results = [];
 try {
   await page.goto(base + '/en/tools/pdf-converter/document-to-pdf/');
   await page.waitForFunction(() => crossOriginIsolated);
   await page.waitForTimeout(500);
-  for (const fileName of ['sample.doc', 'sample.docx', 'sample.xls', 'sample.xlsx', 'sample.ppt', 'sample.pptx', 'rich.xlsx', 'rich.docx']) {
+  const fileNames = ['sample.doc', 'sample.docx', 'sample.xls', 'sample.xlsx', 'sample.ppt', 'sample.pptx',
+    'rich.xlsx', 'rich.docx', 'rich.xlsx', 'rich.docx', 'sample.pptx', 'sample.xlsx'];
+  for (const [index, fileName] of fileNames.entries()) {
     const input = await fs.readFile(path.join('tests/fixtures/document-converters', fileName));
     const result = await page.evaluate(async ({ input, fileName }) => {
       const { convertOfficePdf } = await import('/src/features/pdf-converter/officePdfClient.ts');
-      const file = new File([new Uint8Array(input)], fileName);
       const controller = new AbortController();
       const progress = [];
       const started = performance.now();
-      const timeout = setTimeout(() => controller.abort(), 60000);
+      const timeout = setTimeout(() => controller.abort(), 90000);
       try {
-        const output = await convertOfficePdf(file, controller.signal, value => progress.push(value));
-        return { ms: performance.now() - started, bytes: Array.from(output.bytes), progress, frames: document.querySelectorAll('iframe[data-office-pdf-engine]').length };
+        const output = await convertOfficePdf(new File([new Uint8Array(input)], fileName), controller.signal, value => progress.push(value));
+        return { ms: performance.now() - started, bytes: Array.from(output.bytes), progress };
       } finally { clearTimeout(timeout); }
     }, { input: [...input], fileName });
-    const pdfPath = path.join(outputDir, fileName + '.pdf');
+    const pdfPath = path.join(outputDir, `${index}-${fileName}.pdf`);
     await fs.writeFile(pdfPath, Buffer.from(result.bytes));
     const info = execFileSync('pdfinfo', [pdfPath], { encoding: 'utf8' });
     const pages = Number(info.match(/^Pages:\s*(\d+)/m)?.[1]);
@@ -46,17 +56,18 @@ try {
     assert.ok(text.trim().length > 0, `${fileName}: no text`);
     if (fileName === 'rich.xlsx') {
       assert.ok(pages >= 2, 'Calc print area or sheet output was lost');
-      assert.match(text, /FIRST SHEET/);
-      assert.match(text, /SECOND SHEET/);
+      assert.match(text, /FIRST SHEET/); assert.match(text, /SECOND SHEET/);
       assert.match(execFileSync('pdfimages', ['-list', pdfPath], { encoding: 'utf8' }), /\bimage\b/);
+      assert.match(execFileSync('pdffonts', [pdfPath], { encoding: 'utf8' }), /NanumGothic/, 'Korean glyph font was not embedded');
     }
     if (fileName === 'rich.docx') {
       assert.ok(pages >= 2, 'Writer page break was lost');
-      assert.match(text, /FIRST PAGE/);
-      assert.match(text, /SECOND PAGE/);
+      assert.match(text, /FIRST PAGE/); assert.match(text, /SECOND PAGE/);
       assert.match(execFileSync('pdfimages', ['-list', pdfPath], { encoding: 'utf8' }), /\bimage\b/);
+      assert.match(execFileSync('pdffonts', [pdfPath], { encoding: 'utf8' }), /NanumGothic/, 'Korean glyph font was not embedded');
     }
-    assert.equal(result.frames, 1, `${fileName}: engine was not reused`);
+    assert.equal(workers.length, 1, `${fileName}: LibreOffice initialized more than once`);
+    assert.equal(liveWorkers()[0], workers[0], `${fileName}: LibreOffice worker changed`);
     results.push({ fileName, ms: result.ms, progress: result.progress, pages, text: text.trim().slice(0, 100), bytes: result.bytes.length });
     console.log(JSON.stringify(results.at(-1)));
   }
@@ -72,54 +83,59 @@ try {
         queuedController.abort();
       }
     });
-    const queuedError = await queued;
-    return { activePdf: new TextDecoder().decode(active.bytes.subarray(0, 5)) === '%PDF-', queuedError, frames: document.querySelectorAll('iframe[data-office-pdf-engine]').length };
+    return { activePdf: new TextDecoder().decode(active.bytes.subarray(0, 5)) === '%PDF-', queuedError: await queued };
   }, { input: [...queueInput], nextInput: [...nextInput] });
-  assert.deepEqual(queuedCancel, { activePdf: true, queuedError: 'AbortError', frames: 1 });
+  assert.deepEqual(queuedCancel, { activePdf: true, queuedError: 'AbortError' });
+  assert.equal(workers.length, 1);
+  assert.equal(liveWorkers()[0], workers[0]);
   const cancelInput = await fs.readFile('tests/fixtures/document-converters/sample.pptx');
   const lifecycle = await page.evaluate(async ({ input, nextInput }) => {
     const { convertOfficePdf, releaseOfficePdfSession } = await import('/src/features/pdf-converter/officePdfClient.ts');
-    const file = new File([new Uint8Array(input)], 'cancel.pptx');
     const controller = new AbortController();
-    const pending = convertOfficePdf(file, controller.signal, value => { if (value >= 93) controller.abort(); });
-    let error;
-    try { await pending; } catch (caught) { error = caught.name; }
+    let conversionError;
+    try {
+      await convertOfficePdf(new File([new Uint8Array(input)], 'cancel.pptx'), controller.signal,
+        value => { if (value >= 93) controller.abort(); });
+    } catch (error) { conversionError = error.name; }
     const resumed = await convertOfficePdf(new File([new Uint8Array(nextInput)], 'after-cancel.docx'), new AbortController().signal, () => {});
-    const resumedPdf = resumed.bytes.length > 5 && new TextDecoder().decode(resumed.bytes.subarray(0, 5)) === '%PDF-';
     releaseOfficePdfSession();
+    const beforeLoadingWorkers = await window.__officeWorkerStarts();
     const loadingController = new AbortController();
     let loadingError;
     try {
       await convertOfficePdf(new File([new Uint8Array(nextInput)], 'cancel-loading.docx'), loadingController.signal,
         value => { if (value >= 60) loadingController.abort(); });
-    } catch (caught) { loadingError = caught.name; }
+    } catch (error) { loadingError = error.name; }
+    const afterLoadingWorkers = await window.__officeWorkerStarts();
     const afterLoading = await convertOfficePdf(new File([new Uint8Array(nextInput)], 'after-loading.docx'), new AbortController().signal, () => {});
-    const afterLoadingPdf = new TextDecoder().decode(afterLoading.bytes.subarray(0, 5)) === '%PDF-';
     releaseOfficePdfSession();
-    return { error, resumedPdf, loadingError, afterLoadingPdf, frames: document.querySelectorAll('iframe[data-office-pdf-engine]').length };
+    return { conversionError, resumedPdf: new TextDecoder().decode(resumed.bytes.subarray(0, 5)) === '%PDF-',
+      loadingError, beforeLoadingWorkers, afterLoadingWorkers,
+      afterLoadingPdf: new TextDecoder().decode(afterLoading.bytes.subarray(0, 5)) === '%PDF-' };
   }, { input: [...cancelInput], nextInput: [...nextInput] });
-  assert.equal(lifecycle.error, 'AbortError');
+  assert.equal(lifecycle.conversionError, 'AbortError');
   assert.equal(lifecycle.resumedPdf, true);
   assert.equal(lifecycle.loadingError, 'AbortError');
   assert.equal(lifecycle.afterLoadingPdf, true);
-  assert.equal(lifecycle.frames, 0);
-  await page.route('**/vendor/libreoffice-converter/2.6.0/warmup.docx', route => route.abort('failed'));
+  assert.equal(lifecycle.beforeLoadingWorkers, lifecycle.afterLoadingWorkers, 'loading cancellation started a Worker');
+  for (let retry = 0; retry < 20 && liveWorkers().length; retry++) await page.waitForTimeout(100);
+  assert.equal(liveWorkers().length, 0, 'Office worker survived explicit release');
+  await page.route('**/vendor/libreoffice-converter/2.3.1/soffice.wasm.gz', route => route.fulfill({ status: 503, body: 'unavailable' }));
   const initFailure = await page.evaluate(async input => {
     const { convertOfficePdf } = await import('/src/features/pdf-converter/officePdfClient.ts');
     try { await convertOfficePdf(new File([new Uint8Array(input)], 'init-fail.docx'), new AbortController().signal, () => {}); }
-    catch (error) { return { code: error.message, frames: document.querySelectorAll('iframe[data-office-pdf-engine]').length }; }
-    return { code: 'unexpected-success', frames: -1 };
+    catch (error) { return error.message; }
+    return 'unexpected-success';
   }, [...nextInput]);
-  assert.equal(initFailure.code, 'office-init-failed');
-  assert.equal(initFailure.frames, 0);
-  await page.unroute('**/vendor/libreoffice-converter/2.6.0/warmup.docx');
+  assert.equal(initFailure, 'asset-download-failed');
+  await page.unroute('**/vendor/libreoffice-converter/2.3.1/soffice.wasm.gz');
   const afterFailure = await page.evaluate(async input => {
     const { convertOfficePdf, releaseOfficePdfSession } = await import('/src/features/pdf-converter/officePdfClient.ts');
     const output = await convertOfficePdf(new File([new Uint8Array(input)], 'after-init-fail.docx'), new AbortController().signal, () => {});
     releaseOfficePdfSession();
-    return { valid: new TextDecoder().decode(output.bytes.subarray(0, 5)) === '%PDF-', frames: document.querySelectorAll('iframe[data-office-pdf-engine]').length };
+    return new TextDecoder().decode(output.bytes.subarray(0, 5)) === '%PDF-';
   }, [...nextInput]);
-  assert.deepEqual(afterFailure, { valid: true, frames: 0 });
+  assert.equal(afterFailure, true);
   const damagedFile = await page.evaluate(async input => {
     const { convertOfficePdf, releaseOfficePdfSession } = await import('/src/features/pdf-converter/officePdfClient.ts');
     let code;
@@ -127,9 +143,12 @@ try {
     catch (error) { code = error.message; }
     const next = await convertOfficePdf(new File([new Uint8Array(input)], 'after-damaged.docx'), new AbortController().signal, () => {});
     releaseOfficePdfSession();
-    return { code, nextValid: new TextDecoder().decode(next.bytes.subarray(0, 5)) === '%PDF-', frames: document.querySelectorAll('iframe[data-office-pdf-engine]').length };
+    return { code, nextValid: new TextDecoder().decode(next.bytes.subarray(0, 5)) === '%PDF-' };
   }, [...nextInput]);
-  assert.deepEqual(damagedFile, { code: 'invalid-office-file', nextValid: true, frames: 0 });
+  assert.deepEqual(damagedFile, { code: 'invalid-office-file', nextValid: true });
+  for (let retry = 0; retry < 20 && liveWorkers().length; retry++) await page.waitForTimeout(100);
+  assert.equal(liveWorkers().length, 0);
   assert.deepEqual(external, []);
-  await fs.writeFile(path.join(outputDir, 'result.json'), JSON.stringify({ results, queuedCancel, lifecycle, initFailure, afterFailure, damagedFile, external }, null, 2));
+  await fs.writeFile(path.join(outputDir, 'result.json'), JSON.stringify({ results, workerStarts: workers.length,
+    workerCloses: closed.size, queuedCancel, lifecycle, initFailure, afterFailure, damagedFile, external }, null, 2));
 } finally { await browser.close(); }
