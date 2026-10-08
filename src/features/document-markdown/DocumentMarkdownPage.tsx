@@ -90,7 +90,7 @@ export function DocumentMarkdownPage() {
   };
   return <UtilityPage toolId="document-markdown" className="[--primary:var(--brand-strong)] [&_.bg-primary:hover]:bg-[var(--brand-strong)] [&_[data-ui-component=file-list]>li>span:first-child]:text-foreground [&_[data-testid=pdf-download]_small]:text-primary-foreground [&_.privacy-inline]:text-foreground [&_.ui-step-number]:bg-[var(--brand-strong)] [&_.ui-step-number]:text-primary-foreground [&_[data-slot=notice]]:text-foreground">
     <PageHeader eyebrow="MARKDOWN" title={L("문서 → Markdown", "Document to Markdown")}
-      description={L("워드·엑셀·PPTX·PDF의 제목, 문단과 표를 Markdown 파일로 추출하세요.", "Convert Word, Excel, PowerPoint PPTX and text PDFs into Markdown headings, paragraphs and tables.")}>
+      description={L("워드·엑셀·PPTX와 글자를 선택할 수 있는 PDF를 Markdown으로 저장하세요.", "Save text and tables from Word, Excel, PPTX and text PDFs as Markdown.")}>
       <PrivacyBanner compact />
     </PageHeader>
     {batchFiles ? <BatchConversionPanel mode="markdown" files={batchFiles} onClose={() => setBatchFiles(undefined)} /> : <>
@@ -101,8 +101,8 @@ export function DocumentMarkdownPage() {
     </SectionCard>
     <UtilityNotice className="my-4" kind="info">
       <FileText className="shrink-0" size={18} /><span>{L(
-        "제목·문단·표를 추출하는 도구입니다. 시각적 서식·수식·편집 구조의 복원은 보장하지 않으며 스캔 PDF의 문자 인식은 지원하지 않습니다.",
-        "Extracts headings, paragraphs and tables. Visual formatting, formulas and editing structure may not be preserved. Scanned PDF text recognition is not supported.")}</span>
+        "문서의 글자와 표를 Markdown으로 옮깁니다. 원본의 화면 모양·수식은 남지 않습니다. 스캔 PDF의 글자를 읽으려면 PDF → 문서에서 OCR을 사용하세요.",
+        "Move text and tables into Markdown. The original layout and formulas are not kept. To read text in scanned PDFs, use OCR in PDF → Document.")}</span>
     </UtilityNotice>
     <div className="my-4 flex flex-wrap gap-2">
       <PrimaryButton accent="blue" disabled={!file || loading} loading={loading} onClick={() => void run()}>

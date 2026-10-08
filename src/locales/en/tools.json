@@ -62,7 +62,7 @@
     "document-markdown": {
       "title": "Document to Markdown",
       "shortTitle": "Document to Markdown",
-      "description": "Convert Word, Excel, PowerPoint PPTX and text PDFs to Markdown headings, paragraphs and tables.",
+      "description": "Save text and tables from Word, Excel, PPTX and PDFs with selectable text as Markdown.",
       "eyebrow": "MARKDOWN",
       "highlights": [
         "Word, Excel & PPTX",
@@ -73,11 +73,11 @@
     "pdf-converter": {
       "title": "PDF Converter",
       "shortTitle": "PDF Converter",
-      "description": "Convert HWP, Word, Excel, PowerPoint and images to PDF, or extract documents and images from PDFs.",
+      "description": "Convert Word, Excel and PowerPoint to PDF, or PDFs to DOCX, XLSX, PPTX, HWPX and images. HWP input uses browser printing.",
       "eyebrow": "DOCUMENT & IMAGE CONVERSION",
       "highlights": [
-        "HWP & Office to PDF",
-        "PDF to documents",
+        "Word, Excel & PowerPoint to PDF",
+        "PDF to DOCX, XLSX, PPTX & HWPX",
         "Images and PDF",
         "Page selection & OCR"
       ]

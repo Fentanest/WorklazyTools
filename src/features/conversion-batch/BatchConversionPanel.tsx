@@ -57,9 +57,9 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
     "page-limit": L("일괄 변환은 파일당 선택한 200페이지까지 처리합니다. 페이지 범위를 줄여 주세요.", "Batch conversion processes up to 200 selected pages per file. Reduce the page range."),
     range: L("이 파일의 페이지 수에 맞는 범위를 입력해 주세요.", "Enter a page range that exists in this file."),
     encrypted: L("암호를 해제한 사본을 선택해 주세요.", "Choose an unlocked copy."),
-    "no-text": L("텍스트를 추출하지 못했습니다. 스캔 PDF는 PDF→문서에서 OCR을 사용하세요.", "No text was extracted. For scanned PDFs, use OCR in PDF to document."),
+    "no-text": L("읽을 수 있는 글자가 없습니다. 스캔 PDF라면 OCR을 켜고 다시 시도하세요.", "No readable text was found. If this is a scan, turn on OCR and try again."),
     "no-tables": L("PDF에서 표를 찾지 못했습니다. 일반 글은 TXT·DOCX를 선택해 주세요.", "No table was found in the PDF. Choose TXT or DOCX for prose."),
-    "ocr-required-for-tables": L("스캔 PDF의 표 셀을 찾지 못했습니다. 검색 가능한 PDF를 먼저 만들어 다시 시도해 주세요.", "Table cells could not be found in this scan. Make a searchable PDF first and retry."),
+    "ocr-required-for-tables": L("스캔 PDF의 표를 읽으려면 OCR을 자동으로 설정해 다시 시도하세요.", "To read tables in this scan, turn on automatic OCR and try again."),
     "scan-table-unavailable": L("OCR로 글자를 인식했지만 표 셀은 찾지 못했습니다. DOCX·TXT로 인식 결과를 확인해 주세요.", "OCR recognized text but found no reliable table cells. Review the result as DOCX or TXT."),
     "image-decode": L("PDF의 그림을 읽지 못해 이 파일 변환을 중단했습니다. 원본 파일을 확인해 주세요.", "An image in this PDF could not be decoded. Check the source file and retry."),
     unavailable: L("변환 준비를 완료하지 못했습니다. 연결 상태와 데스크톱 브라우저를 확인해 주세요.", "Conversion could not be prepared. Check your connection and use a current desktop browser."),
@@ -84,10 +84,10 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
       {admissionError && <UtilityNotice kind="error" role="alert" className="mt-3">{L("선택한 묶음이 파일 수 또는 합계 용량 제한을 넘어서 추가되지 않았습니다. 더 작은 묶음을 선택하세요.", "The selected group was not added because it exceeds the file count or total size limit. Choose a smaller group.")}</UtilityNotice>}
     </SectionCard>
     <UtilityNotice kind="info">{L("변환 결과는 합계 128 MiB까지 보관하고, 전체 ZIP은 결과 합계 64 MiB까지 만듭니다. 변환 중 메모리는 파일 용량보다 커질 수 있습니다. 큰 문서는 작은 묶음으로 처리하세요.", "Up to 128 MiB of results are retained. A combined ZIP is available for results totaling up to 64 MiB. Conversion may use much more memory than the input size. Process large documents in smaller groups.")}</UtilityNotice>
-    {mode === "document-pdf" && <UtilityNotice kind="info">{L("Office 변환은 첫 실행 시 큰 정적 자산을 불러옵니다. HWP·HWPX는 자동 변환이 끝난 뒤 한 문서씩 인쇄 창에서 PDF로 저장하세요. 저장 여부를 확인할 수 없으며 전체 ZIP에 포함되지 않습니다.", "Office conversion loads substantial static assets on the first run. After automatic conversions finish, save HWP / HWPX documents individually through the print dialog. Save status cannot be verified, and these files are not included in the combined ZIP.")}</UtilityNotice>}
-    {mode === "markdown" && <UtilityNotice kind="info">{L("MarkItDown으로 제목·문단·표를 추출합니다. 원본 서식·수식 복원과 스캔 PDF OCR은 지원하지 않습니다.", "MarkItDown extracts headings, paragraphs and tables. Original formatting, formula reconstruction and scanned PDF OCR are not supported.")}</UtilityNotice>}
+    {mode === "document-pdf" && <UtilityNotice kind="info">{L("워드·엑셀·PPT는 변환 후 ZIP으로 받을 수 있습니다. HWP·HWPX는 파일마다 브라우저 인쇄에서 PDF로 저장해야 하며 ZIP에 포함되지 않습니다. 첫 변환은 준비 시간이 더 걸릴 수 있습니다.", "Word, Excel and PowerPoint results can be downloaded together as a ZIP. HWP and HWPX need Save as PDF in the print dialog for each file and are not included in the ZIP. The first conversion may take longer to prepare.")}</UtilityNotice>}
+    {mode === "markdown" && <UtilityNotice kind="info">{L("문서의 제목·문단·표를 Markdown으로 저장합니다. 원본 서식과 수식은 유지되지 않으며 스캔 PDF의 글자는 인식하지 않습니다.", "Save headings, paragraphs and tables as Markdown. Original formatting and formulas are not kept, and text in scanned PDFs is not recognized.")}</UtilityNotice>}
     {mode === "pdf-images" && <UtilityNotice kind="info">{L("PDF마다 페이지 이미지 ZIP을 만듭니다. 전체 다운로드 ZIP에는 이 문서별 ZIP들이 들어갑니다.", "Each PDF produces a ZIP of page images. The combined download contains these per-document ZIPs.")}</UtilityNotice>}
-    {mode === "pdf-document" && <UtilityNotice kind="info">{L("텍스트·이미지 위치에서 편집 문서를 재구성합니다. 원본 문단·표·글꼴의 완전한 복원은 보장하지 않습니다. OCR 결과의 숫자와 읽기 순서를 확인하세요.", "Editable documents are reconstructed from text and image positions. Original paragraphs, tables and fonts may not be fully restored. Check numbers and reading order in OCR results.")}</UtilityNotice>}
+    {mode === "pdf-document" && <UtilityNotice kind="info">{L("편집 가능한 내용과 페이지 모양 유지 중 선택하세요. 스캔 페이지의 글자를 편집하려면 OCR을 사용하고, 결과의 숫자·표·읽기 순서를 원본과 비교하세요.", "Choose editable content or preserve page appearance. Use OCR for editable text from scans, then compare numbers, tables and reading order with the original.")}</UtilityNotice>}
     {(mode === "pdf-document" || mode === "pdf-images") && <SectionCard step={2} title={L("공통 변환 설정", "Shared conversion settings")} description={L("이후 시작·재시도하는 파일에 적용합니다. 완료된 결과는 유지합니다.", "Applies to files started or retried next. Existing results are kept.")}>
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
         {mode === "pdf-document" && <>

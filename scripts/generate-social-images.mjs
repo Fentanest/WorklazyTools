@@ -5,10 +5,10 @@ import puppeteer from "puppeteer-core";
 const outputDirectory = path.resolve("public/social/tools");
 
 const tools = [
-  tool("document-markdown", "#d53228", "문서 → Markdown", "문서 → Markdown", "워드 · 엑셀 · PPTX · PDF의 글자와 표", "Document to Markdown", "Document to Markdown", "Word · Excel · PPTX · PDF text and tables"),
-  tool("document-to-pdf", "#d53228", "PDF 변환", "문서를 PDF로 변환", "한글 · 워드 · 엑셀 · PPT → PDF", "PDF conversion", "Document to PDF", "HWP · Word · Excel · PowerPoint to PDF"),
-  tool("pdf-to-document", "#d53228", "PDF 변환", "PDF에서 문서 추출", "워드 · 엑셀 · PPT · HWPX 기본 문서", "PDF conversion", "PDF to Document", "Word · Excel · PowerPoint · HWPX"),
-  tool("pdf-converter", "#d53228", "PDF 변환", "PDF 변환", "한글·오피스·이미지 변환과 PDF 추출", "PDF conversion", "PDF Converter", "HWP & Office to PDF · Document extraction"),
+  tool("document-markdown", "#d53228", "문서 → Markdown", "문서 → Markdown", "워드 · 엑셀 · PPTX · 텍스트 PDF", "Document to Markdown", "Document to Markdown", "Word · Excel · PPTX · text PDF"),
+  tool("document-to-pdf", "#d53228", "PDF 변환", "문서를 PDF로 변환", "워드·엑셀·PPT 변환 · 한글 인쇄", "PDF conversion", "Document to PDF", "Word, Excel & PPT · HWP via print"),
+  tool("pdf-to-document", "#d53228", "PDF 변환", "PDF를 문서로 변환", "DOCX · XLSX · PPTX · HWPX · OCR", "PDF conversion", "PDF to Document", "DOCX · XLSX · PPTX · HWPX · OCR"),
+  tool("pdf-converter", "#d53228", "PDF 변환", "PDF 변환", "문서↔PDF · 이미지 변환 · OCR", "PDF conversion", "PDF Converter", "Documents & PDF · images · OCR"),
   tool("product-banner", "#d9548c", "알리익스프레스 제휴 광고", "알리익스프레스 광고 배너 만들기", "Excel·CSV · 5종 디자인 · HTML·iframe", "AliExpress affiliate ads", "AliExpress Ad Banner Builder", "Excel & CSV · 5 designs · HTML & iframe"),
   tool("foliotrace", "#0879d9", "투자·공시", "FolioTrace", "국민연금 공개 공시 추적", "Investment research", "FolioTrace", "NPS public filing research"),
   tool("document-redactor", "#7554d8", "문서 개인정보", "개인정보 마스킹", "직접 영역 선택 · PDF · 이미지", "Document privacy", "Document Redaction", "Manual masks · PDF · images"),
@@ -21,7 +21,7 @@ const tools = [
   tool("pdf-tools", "#7554d8", "PDF 편집·변환", "PDF 도구", "페이지 편집 · 병합 · 변환 · OCR", "PDF editing & conversion", "PDF Tools", "Edit · merge · convert · OCR"),
   tool("image-to-pdf", "#7554d8", "PDF 편집·변환", "이미지를 PDF로 변환", "JPG·PNG · 순서 변경 · A4 맞춤", "PDF editing & conversion", "Image to PDF", "JPG & PNG · reorder · A4 fit"),
   tool("pdf-to-image", "#7554d8", "PDF 편집·변환", "PDF를 이미지로 변환", "PNG·JPG · 해상도 선택 · ZIP 저장", "PDF editing & conversion", "PDF to Image", "PNG & JPG · resolution · ZIP download"),
-  tool("pdf-convert", "#7554d8", "PDF 편집·변환", "PDF 문서 변환·OCR", "DOCX·XLSX·TXT · 한국어·영어 OCR", "PDF editing & conversion", "PDF Conversion & OCR", "DOCX · XLSX · TXT · Korean & English OCR"),
+  tool("pdf-convert", "#7554d8", "PDF 편집·변환", "PDF 문서 변환·OCR", "DOCX · XLSX · PPTX · HWPX", "PDF editing & conversion", "PDF Conversion & OCR", "DOCX · XLSX · PPTX · HWPX"),
   tool("pdf-finish", "#7554d8", "PDF 마무리", "번호·워터마크·도장", "여러 PDF · 장식 함께 적용 · ZIP", "PDF finishing", "PDF Finish", "Multiple PDFs · combined finishing · ZIP"),
   tool("pdf-page-numbers", "#7554d8", "PDF 마무리", "PDF 페이지 번호", "시작 번호 · 표지 제외 · 홀짝·범위 선택", "PDF finishing", "PDF Page Numbers", "Starting number · cover exclusion · exact pages"),
   tool("pdf-header-footer", "#7554d8", "PDF 마무리", "PDF 머리글·바닥글", "파일명·날짜 토큰 · 6개 위치 · 미리보기", "PDF finishing", "PDF Headers & Footers", "Filename & date tokens · six positions · preview"),
@@ -31,7 +31,7 @@ const tools = [
   tool("pdf-editor-split", "#7554d8", "PDF 편집·변환", "PDF 나누기", "나누기 위치 · 범위별 저장", "PDF editing & conversion", "Split PDF", "Split positions · save by range"),
   tool("pdf-editor-delete", "#7554d8", "PDF 편집·변환", "PDF 페이지 삭제", "선택 페이지 삭제 · 나머지 저장", "PDF editing & conversion", "Delete PDF Pages", "Selected pages · save the rest"),
   tool("pdf-editor-rotate", "#7554d8", "PDF 편집·변환", "PDF 페이지 회전", "선택 페이지 · 방향 바로잡기", "PDF editing & conversion", "Rotate PDF Pages", "Selected pages · correct orientation"),
-  tool("pdf-editor-ocr", "#7554d8", "PDF 편집·변환", "PDF OCR", "전체 페이지 · 검색 가능한 PDF", "PDF editing & conversion", "PDF OCR", "Full pages · searchable PDF"),
+  tool("pdf-editor-ocr", "#7554d8", "PDF 편집·변환", "PDF OCR", "스캔 페이지 · 검색 가능한 PDF", "PDF editing & conversion", "PDF OCR", "Scanned pages · searchable PDF"),
   tool("image-studio-resize", "#0b91c9", "미디어", "이미지 크기 조절", "픽셀 크기 지정 · 저장", "Media", "Resize Image", "Exact pixels · save"),
   tool("image-studio-mosaic", "#0b91c9", "미디어", "이미지 모자이크", "선택 영역 · 모자이크", "Media", "Image Mosaic", "Selected area · mosaic"),
   tool("image-studio-watermark", "#0b91c9", "미디어", "이미지 워터마크", "글자 넣기 · 저장", "Media", "Image Watermark", "Text · save"),

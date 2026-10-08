@@ -29,7 +29,7 @@
   },
   "documentMarkdown": {
     "title": "Convert Word, Excel, PowerPoint and PDF to Markdown",
-    "description": "Extract headings, paragraphs and tables into a .md file using Microsoft MarkItDown document converters.",
+    "description": "Save headings, paragraphs and tables from DOCX, XLS, XLSX, PPTX and PDFs with selectable text as .md files.",
     "blocks": [
       {
         "title": "Choose a supported document",
@@ -2118,28 +2118,28 @@
     }
   },
   "pdfEditor.convert": {
-    "title": "PDF text conversion and browser OCR",
-    "description": "Selected files stay in this browser's memory and are not uploaded to a processing server. Keep your originals and review every downloaded result.",
+    "title": "PDF to document and OCR",
+    "description": "Choose PDF pages to save as a document or recognize scanned text. Your file and result are processed in this browser.",
     "blocks": [
       {
         "title": "Text PDFs and scanned PDFs",
         "paragraphs": [
-          "Text PDFs contain selectable characters, so extraction is fast and accurate. Scanned PDFs store each page like a photo and require OCR.",
-          "Automatic OCR runs Korean and English recognition only on pages with little usable embedded text. A drawing or photo with no text may correctly produce an empty result."
+          "PDFs with selectable text use the existing characters. Scanned PDFs store pages as images and need OCR to read the text.",
+          "With OCR off, you can still save scanned pages in DOCX, PPTX or HWPX by preserving page appearance. Text inside those images is not editable."
         ]
       },
       {
         "title": "DOCX and XLSX conversion limits",
         "paragraphs": [
-          "PDFs often preserve positions rather than the original paragraphs, tables, and cells. DOCX reconstructs lines as paragraphs, while XLSX estimates cells from spacing.",
-          "Complex tables, columns, vertical text, footnotes, formulas, fonts, and formatting may not be reproduced exactly. Treat the output as an editable draft and compare it with the source."
+          "DOCX carries over PDF text and pictures; XLSX extracts tables visible in the PDF. Original formulas and charts cannot be restored if they are no longer in the PDF.",
+          "Complex tables, columns and fonts can differ. A PDF without tables or a scan whose cells cannot be identified returns a reason instead of an empty XLSX."
         ]
       },
       {
         "title": "OCR data and privacy",
         "paragraphs": [
-          "Korean and English OCR and its language data are served from the same GitHub Pages deployment. No external OCR server or CDN receives your document pages.",
-          "OCR cannot start on a first offline visit or when the required OCR data is not cached. Reopen the site online after clearing storage, using private browsing, or running low on browser storage."
+          "Your PDF and result stay in this browser and are not sent to an OCR server. The site downloads recognition files when you first use OCR.",
+          "OCR needs those files to be downloaded before it can work offline. Reopen the site online and try again."
         ]
       },
       {
@@ -2178,11 +2178,11 @@
       },
       "faq_3": {
         "q": "Does rotation reduce PDF quality?",
-        "a": "Page-editor rotation changes page properties without recompressing content. Image and OCR-PDF modes do rerender pages."
+        "a": "Page-editor rotation does not turn PDF content into a new image. Applying OCR to a scanned page may rebuild that page as an image."
       },
       "faq_4": {
         "q": "Can it perfectly restore Word or Excel structure?",
-        "a": "Usually not. PDFs often lack the original paragraph and table structure, so the output is an editable reconstruction based on coordinates and spacing."
+        "a": "Not always. DOCX fonts and layout may differ, and XLSX extracts only tables visible in the PDF. Preserving page appearance produces images whose text is not editable."
       },
       "faq_5": {
         "q": "Why is the first OCR run slower?",
@@ -2190,11 +2190,11 @@
       },
       "faq_19": {
         "q": "Can I make the whole PDF searchable?",
-        "a": "Yes. Every page is read with Korean and English OCR to create a searchable PDF."
+        "a": "Yes. Leave the full range selected. Automatic OCR reads scanned pages that need it and keeps existing text. Turning OCR off adds no new searchable text."
       },
       "faq_20": {
         "q": "Do I need to specify pages?",
-        "a": "No. The full range is processed without extra settings."
+        "a": "No. Leaving the range blank processes every page. Enter page numbers if you need only part of the PDF."
       },
       "new_faq_0": {
         "q": "Can I edit the PDF body text directly in page editing?",
@@ -2222,7 +2222,7 @@
         {
           "title": "Why can't I search for words in a scanned PDF?",
           "paragraphs": [
-            "Use OCR when you want to find words in scanned documents where text cannot be selected. After processing, try actually searching for a few common body words and numbers. Recognition may be inaccurate in blurry or skewed originals, so do not blindly rely on automatic recognition results for names, dates, or amounts."
+            "Use OCR to search words in scanned PDFs where text cannot be selected. After saving, search a few words and numbers; compare names, dates and amounts with the original."
           ]
         }
       ]
@@ -2258,54 +2258,54 @@
     }
   },
   "pdfConverter": {
-    "title": "Convert Word, HWP, presentations and PDFs",
-    "description": "Choose a conversion direction, then check the file and page range. Compare the output with the original and keep a separate copy.",
+    "title": "Convert documents and PDFs",
+    "description": "Choose the output format and pages you need. Editable documents and page images preserve different parts of the original.",
     "blocks": [
       {
-        "title": "Save HWP or HWPX as PDF",
+        "title": "Save HWP or HWPX input as PDF",
         "paragraphs": [
-          "In Document → PDF, choose one Hangul document and wait for its preview. Select Save PDF using print, then Open print dialog. Choose Save as PDF as the browser print destination and select where to save the file.",
-          "Closing the print dialog does not confirm that a file was saved. Reopen the PDF and compare Korean fonts, tables, images and page counts with the original. An authorized user must unlock password-protected files first."
+          "HWP and HWPX input cannot be converted automatically. Open the file under Document → PDF and use Save as PDF in the browser print dialog.",
+          "Closing the print dialog does not confirm a save. Open the PDF to check fonts, tables and pages."
         ]
       },
       {
         "title": "Convert Word, Excel or PowerPoint to PDF",
         "paragraphs": [
-          "Choose a Word DOC or DOCX, Excel XLS or XLSX, or PowerPoint PPT or PPTX file, then select Create PDF. When conversion finishes, check the filename and download the PDF.",
-          "Office conversion downloads about 252 MiB of conversion files on the first run and accepts files up to 50 MiB. A desktop with sufficient memory is recommended. Fonts and print settings can change line breaks, tables, slides and page layout."
+          "Choose a DOC, DOCX, XLS, XLSX, PPT or PPTX file and select Create PDF. Download the result when conversion finishes.",
+          "The first run may take longer while conversion files download. Compare fonts, tables and page breaks with the original."
         ]
       },
       {
-        "title": "Convert PDF to Word, Excel, PowerPoint or HWPX",
+        "title": "Convert PDF to a document",
         "paragraphs": [
-          "In PDF → Document, choose an output format and page range. DOCX creates text paragraphs for Word; XLSX estimates table cells from text positions. PPTX and HWPX create basic slides or paragraphs with editable text and separate images. Hangul output uses HWPX, not the older HWP format.",
-          "Original layout, table structure, formulas and vector shapes are not restored. Long content may continue on additional pages or slides. Choose TXT if you only need plain text."
+          "Under PDF → Document, choose DOCX, XLSX, PPTX, HWPX, TXT or searchable PDF. For DOCX, PPTX and HWPX, choose editable content or preserve page appearance.",
+          "Preserved pages are pictures, so their text is not editable. XLSX extracts tables visible in the PDF; original formulas and charts cannot be restored."
         ]
       },
       {
-        "title": "Recognize text in scanned PDFs",
+        "title": "Scanned PDFs and OCR",
         "paragraphs": [
-          "Use automatic OCR when a PDF has no readable text. Korean and English are supported. Choose Tables / scattered text or Continuous paragraphs to match the source. Searchable PDF applies OCR to every selected page.",
-          "Scan pictures remain images, with recognized text handled separately. Check numbers, table reading order and recognition errors. The first run downloads recognition files, so it cannot start offline."
+          "Automatic OCR reads Korean and English text only on scanned pages that need it. With OCR off, scanned pages can be saved as images, but text in the pictures is not editable.",
+          "A searchable PDF keeps existing text and adds searchable text to scanned pages where needed. Check names, amounts and table reading order in the result."
         ]
       },
       {
         "title": "Convert images to PDF or PDF to images",
         "paragraphs": [
-          "In Image → PDF, arrange JPG or PNG files and choose A4 fitting or original image size. In PDF → Image, choose PNG or JPG, resolution and pages to download a ZIP of page images."
+          "Arrange JPG or PNG images and choose A4 fit or original image size. For PDF → Image, choose PNG or JPG, resolution and pages, then download the page images as a ZIP."
         ]
       },
       {
-        "title": "Cancel, recover and try again",
+        "title": "Cancel and retry",
         "paragraphs": [
-          "Canceling creates no new result. Office conversion ends that document’s engine so the next file can run without reloading the page. Queue a failed file again to retry. Keep the original and, if needed, change the page range or output format."
+          "Canceling stops the current conversion. A failed file can be queued again in the batch list."
         ]
       },
       {
-        "title": "Convert several documents or PDFs at once",
+        "title": "Convert several files",
         "paragraphs": [
-          "Choose or drop multiple files to open the batch queue. Add up to 20 files, 50 MiB each and 200 MiB total input; files run one at a time. PDFs process up to 200 selected pages per file, applying the chosen page range to each file. Failed files can be queued again.",
-          "Download results individually or in a combined ZIP. For PDF to image, that ZIP contains the per-document image ZIPs. Up to 128 MiB of results are retained, and combined ZIP creation supports up to 64 MiB of results. HWP / HWPX require individual printing after automatic conversions finish and are excluded from the ZIP. Image to PDF continues to combine multiple images into one PDF."
+          "Select several files to convert them one at a time, with a result or error for each. Add up to 20 files of 50 MiB each; PDF batches process up to 200 selected pages per file.",
+          "Download successful results individually or as a ZIP. HWP and HWPX input needs Save as PDF in the print dialog for each file and is not included in the ZIP."
         ]
       }
     ],
@@ -2323,10 +2323,10 @@
         "answer": "Both open print guidance from the document preview, followed by the browser’s Save as PDF option. Destination names and file-location dialogs vary by browser and operating system."
       },
       "2": {
-        "q": "Does PDF conversion restore the original Word, HWP or PowerPoint file?",
-        "a": "No. DOCX and XLSX extract text and tables; PPTX and HWPX create basic documents with editable text and separate images. The original editing structure and identical formatting are not guaranteed.",
-        "question": "Does PDF conversion restore the original Word, HWP or PowerPoint file?",
-        "answer": "No. DOCX and XLSX extract text and tables; PPTX and HWPX create basic documents with editable text and separate images. The original editing structure and identical formatting are not guaranteed."
+        "q": "Will PDF conversion reproduce my original Word, HWP or PowerPoint file exactly?",
+        "a": "Not always. Fonts, tables and line breaks can differ in editable output. Preserving page appearance keeps the visible page but its text is not editable.",
+        "question": "Will PDF conversion reproduce my original Word, HWP or PowerPoint file exactly?",
+        "answer": "Not always. Fonts, tables and line breaks can differ in editable output. Preserving page appearance keeps the visible page but its text is not editable."
       },
       "3": {
         "q": "Can I convert password-protected documents?",
@@ -2339,7 +2339,53 @@
         "a": "Images and short PDFs can be processed, but Office conversion, long PDFs, high-resolution images and OCR use more memory, so a desktop is recommended. Saving HWP through printing depends on browser print support.",
         "question": "Does conversion work on mobile?",
         "answer": "Images and short PDFs can be processed, but Office conversion, long PDFs, high-resolution images and OCR use more memory, so a desktop is recommended. Saving HWP through printing depends on browser print support."
+      },
+      "5": {
+        "q": "Can I save a scanned PDF as DOCX, PPTX or HWPX with OCR off?",
+        "a": "Yes. Choose to preserve page appearance to include the scan as an image. Text inside that image cannot be edited or searched."
+      },
+      "6": {
+        "q": "Can I turn a scanned table into XLSX?",
+        "a": "Even with OCR, the table cell boundaries may not be detectable. If no reliable table is found, the tool explains why instead of creating an empty XLSX."
+      },
+      "7": {
+        "q": "Can I make a scanned PDF searchable?",
+        "a": "Yes. Choose searchable PDF with automatic OCR to add text to scanned pages that need it while keeping existing text."
       }
+    },
+    "pathFaqs": {
+      "/tools/pdf-converter": [
+        "0",
+        "1",
+        "2",
+        "5",
+        "6",
+        "7"
+      ],
+      "/tools/pdf-converter/image-to-pdf": [
+        "0"
+      ],
+      "/tools/pdf-converter/pdf-to-image": [
+        "0"
+      ],
+      "/tools/pdf-converter/document-to-pdf": [
+        "0",
+        "1",
+        "3",
+        "4"
+      ],
+      "/tools/pdf-converter/pdf-to-document": [
+        "0",
+        "2",
+        "5",
+        "6",
+        "7"
+      ],
+      "/tools/pdf-converter/pdf-to-document/ocr": [
+        "0",
+        "7",
+        "5"
+      ]
     }
   }
 }

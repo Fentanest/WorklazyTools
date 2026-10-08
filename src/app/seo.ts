@@ -173,9 +173,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "PDF를 이미지로", featureList: ["PDF PNG 변환", "PDF JPG 변환", "해상도 선택", "ZIP 일괄 다운로드"] },
   },
   "/tools/pdf-editor/convert": {
-    title: "PDF 워드·엑셀 변환 - DOCX·XLSX·TXT | Worklazy Tools",
-    description: "원하는 PDF 페이지를 OCR 기술을 이용해 DOCX, XLSX, TXT 파일로 변환하세요.",
-    application: { name: "PDF 파일 변환", featureList: ["처리 페이지 범위 선택", "PDF DOCX 변환", "PDF XLSX 변환", "PDF TXT 변환", "로컬 한국어·영어 OCR", "검색 가능한 PDF"] },
+    title: "PDF 워드·엑셀·PPT·HWPX 변환 | Worklazy Tools",
+    description: "PDF를 DOCX·PPTX·HWPX 문서로 바꾸고 보이는 표를 XLSX로 추출하세요. 스캔 PDF는 OCR을 사용하거나 페이지 모양을 그림으로 보존할 수 있습니다.",
+    application: { name: "PDF 문서 변환", featureList: ["페이지 선택", "PDF를 DOCX·XLSX로", "PDF를 PPTX·HWPX로", "스캔 PDF OCR", "페이지 모양 유지"] },
   },
   "/tools/pdf-editor/finish": {
     title: "PDF 페이지 번호·워터마크·도장 넣기 | Worklazy Tools",
@@ -223,9 +223,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "PDF 회전", featureList: ["페이지 선택 회전", "向き 바로잡기", "첫 작업 안내", "자동 회전 없음"] },
   },
   "/tools/pdf-editor/ocr": {
-    title: "PDF OCR - 스캔 문서를 검색 가능한 PDF로 | Worklazy Tools",
-    description: "스캔된 PDF 문서를 한국어 및 영어 OCR로 분석하여 텍스트 검색이 가능한 PDF로 변환하세요.",
-    application: { name: "PDF OCR", featureList: ["전체 페이지 OCR", "한국어·영어", "검색 가능한 PDF", "브라우저 처리"] },
+    title: "스캔 PDF OCR - 검색 가능한 PDF 만들기 | Worklazy Tools",
+    description: "스캔 PDF의 한국어·영어 글자를 인식해 검색·복사할 수 있는 PDF로 저장하세요. 기존 글자는 그대로 사용합니다.",
+    application: { name: "스캔 PDF OCR", featureList: ["필요한 스캔 페이지 인식", "한국어·영어", "검색 가능한 PDF", "브라우저에서 처리"] },
   },
   "/tools/image-studio/resize": {
     title: "사진 크기 조절 - 이미지 픽셀·비율 변경 | Worklazy Tools",
@@ -407,7 +407,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/qr-studio/bulk": { title: "Bulk QR Code Generator - Excel & CSV | Worklazy Tools", description: "Create a massive number of QR codes all at once using data lists from Excel or CSV files.", application: { name: "Bulk QR Generator", featureList: ["Excel and CSV row mapping", "Seven standard payload types", "Header templates", "Logo and transparent PNG", "Read-back verification", "Incremental ZIP", "A4 and Letter label PDF", "XLSX manifest and failures"] } },
   "/tools/pdf-editor/image-to-pdf": { title: "Image to PDF - Convert JPG & PNG to PDF | Worklazy Tools", description: "Arrange multiple JPG or PNG images and combine them into a single, clean PDF file.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "PDF to JPG & PNG - Save Pages as Images | Worklazy Tools", description: "Convert every page of a PDF into high-resolution PNG or JPG images, and download them all at once in a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
-  "/tools/pdf-editor/convert": { title: "Convert PDF to Word & Excel - DOCX, XLSX, TXT | Worklazy Tools", description: "Use OCR technology to convert selected PDF pages into editable DOCX, XLSX, or TXT files.", application: { name: "Convert PDF", featureList: ["Page-range selection", "PDF to DOCX", "PDF to XLSX", "PDF to TXT", "Local OCR", "Searchable PDF"] } },
+  "/tools/pdf-editor/convert": { title: "PDF to Word, Excel, PowerPoint & HWPX | Worklazy Tools", description: "Convert PDF to DOCX, PPTX or HWPX, and extract visible tables to XLSX. Use OCR for scans or preserve each page's appearance as an image.", application: { name: "PDF to documents", featureList: ["Choose pages", "PDF to DOCX and XLSX", "PDF to PPTX and HWPX", "Scanned PDF OCR", "Preserve page appearance"] } },
   "/tools/pdf-editor/finish": { title: "PDF Page Numbers, Watermarks & Stamps | Worklazy Tools", description: "Batch apply page numbers, headers, footers, watermarks, and stamp images across multiple PDFs.", application: { name: "PDF Finish", featureList: ["Page numbers", "Headers and footers", "Text and image watermarks", "Stamp and signature images", "Multiple PDF processing", "ZIP download"] } },
   "/tools/pdf-editor/page-numbers": { title: "Add PDF Page Numbers - Skip Cover & Set Start | Worklazy Tools", description: "Insert page numbers in your preferred format, with options to skip the cover page or set a custom starting number.", application: { name: "PDF Page Numbers", featureList: ["Starting number", "Starting page", "Cover exclusion", "Page ranges", "Parity filter", "Thumbnail selection"] } },
   "/tools/pdf-editor/header-footer": { title: "Add PDF Header & Footer - Filename & Date | Worklazy Tools", description: "Add text such as filenames, dates, or page numbers to desired header or footer positions in your PDF.", application: { name: "PDF Header & Footer", featureList: ["Filename token", "Batch-start date", "Page-number tokens", "Six positions", "Size and color", "Overlay preview"] } },
@@ -417,7 +417,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/pdf-editor/split": { title: "Split PDF & Extract Pages - Save Needed Sections | Worklazy Tools", description: "Select specific page ranges to extract from your PDF, and save only the sections you need.", application: { name: "Split PDF", featureList: ["Split positions", "Save by range", "Initial full range", "Browser processing"] } },
   "/tools/pdf-editor/delete": { title: "Delete PDF Pages - Remove Unwanted Pages | Worklazy Tools", description: "Select and remove unwanted pages from a PDF, then save the remaining pages as a single document.", application: { name: "Delete PDF Pages", featureList: ["Select pages to delete", "Save the rest merged", "First-task guidance", "No automatic deletion"] } },
   "/tools/pdf-editor/rotate": { title: "Rotate PDF - Change Page Orientation | Worklazy Tools", description: "Select PDF pages that are facing the wrong way, rotate them to the correct orientation, and save the file.", application: { name: "Rotate PDF", featureList: ["Select pages to rotate", "Correct orientation", "First-task guidance", "No automatic rotation"] } },
-  "/tools/pdf-editor/ocr": { title: "PDF OCR - Make Scanned PDFs Searchable | Worklazy Tools", description: "Analyze scanned PDF documents using Korean and English OCR to transform them into text-searchable PDFs.", application: { name: "PDF OCR", featureList: ["Full-page OCR", "Korean and English", "Searchable PDF", "Browser processing"] } },
+  "/tools/pdf-editor/ocr": { title: "Scanned PDF OCR - Make PDFs Searchable | Worklazy Tools", description: "Recognize Korean and English text in scanned PDFs and save a PDF you can search and copy from. Existing text is kept.", application: { name: "Scanned PDF OCR", featureList: ["Recognize scanned pages as needed", "Korean and English", "Searchable PDF", "Browser processing"] } },
   "/tools/image-studio/resize": { title: "Resize Image - Change Photo Pixels & Ratio | Worklazy Tools", description: "Adjust your photos to exact pixel dimensions while maintaining the original aspect ratio.", application: { name: "Resize Image", featureList: ["Exact pixel size", "Keep aspect ratio", "Size panel opens directly", "Browser processing"] } },
   "/tools/image-studio/mosaic": { title: "Image Mosaic - Blur Specific Areas | Worklazy Tools", description: "Select and apply a mosaic blur to personal information or sensitive areas you want to hide in a photo.", application: { name: "Image Mosaic", featureList: ["Selected-area mosaic", "Effect panel opens directly", "Browser processing"] } },
   "/tools/image-studio/watermark": { title: "Add Image Watermark - Text & Copyright | Worklazy Tools", description: "Easily insert text watermarks into your photos to indicate copyright or source information.", application: { name: "Image Watermark", featureList: ["Text watermark", "Text panel opens directly", "No automatic insertion", "Browser processing"] } },
@@ -433,28 +433,28 @@ const englishPageSeo: Record<string, SeoDefinition> = {
 };
 
 seoByPath["/tools/document-markdown"] = {
-  title: "워드·엑셀·PDF를 Markdown으로 변환 | Worklazy Tools",
-  description: "워드 DOCX, 엑셀 XLS·XLSX, PPTX와 텍스트 PDF에서 제목·문단·표를 추출해 Markdown으로 저장하세요. 스캔 OCR과 HWP 입력은 지원하지 않습니다.",
+  title: "워드·엑셀·PPT·PDF를 Markdown으로 | Worklazy Tools",
+  description: "DOCX·XLS·XLSX·PPTX와 글자를 선택할 수 있는 PDF에서 제목·문단·표를 Markdown으로 저장하세요. 스캔 PDF OCR과 HWP 입력은 지원하지 않습니다.",
   application: { name: "문서 → Markdown", featureList: ["워드·엑셀·PPTX·PDF 입력", "제목·문단·표 추출", "Markdown 저장"] },
 };
 englishPageSeo["/tools/document-markdown"] = {
-  title: "Convert Word, Excel and PDF to Markdown | Worklazy Tools",
-  description: "Convert DOCX, XLS, XLSX, PPTX and text PDFs to Markdown headings, paragraphs and tables. Scanned PDF OCR and HWP input are not supported.",
+  title: "Word, Excel, PPTX & PDF to Markdown | Worklazy Tools",
+  description: "Save headings, paragraphs and tables from DOCX, XLS, XLSX, PPTX and text PDFs as Markdown. Scanned PDF OCR and HWP input are not supported.",
   application: { name: "Document to Markdown", featureList: ["Word, Excel, PPTX and text PDF input", "Headings, paragraphs and tables", "Markdown download"] },
 };
 seoByPath["/tools/pdf-converter"] = {
-  title: "PDF 변환 - 문서와 이미지 형식 바꾸기 | Worklazy Tools",
-  description: "한글 HWP·HWPX, 워드·엑셀·PPT와 이미지를 PDF로 저장하거나 PDF를 문서·이미지로 변환하세요. 지원 형식과 출력 차이를 확인하세요.",
-  application: { name: "PDF 변환", featureList: ["한글·오피스 문서를 PDF로", "PDF를 DOCX·XLSX·PPTX·HWPX로", "이미지와 PDF 변환", "한국어·영어 OCR"] },
+  title: "PDF·문서 변환 - 워드·엑셀·PPT·이미지 | Worklazy Tools",
+  description: "워드·엑셀·PPT를 PDF로 변환하고, PDF를 DOCX·XLSX·PPTX·HWPX 또는 이미지로 저장하세요. HWP·HWPX 원본은 브라우저 인쇄로 PDF를 저장합니다.",
+  application: { name: "PDF 변환", featureList: ["워드·엑셀·PPT를 PDF로", "HWP·HWPX 인쇄 저장", "PDF를 DOCX·XLSX·PPTX·HWPX로", "이미지와 PDF 변환", "스캔 페이지 OCR"] },
 };
 englishPageSeo["/tools/pdf-converter"] = {
-  title: "PDF Converter - Documents and Images | Worklazy Tools",
-  description: "Convert HWP, Word, Excel, PowerPoint and images to PDF, or extract documents and images from PDFs. Check supported formats and output limitations.",
-  application: { name: "PDF Converter", featureList: ["HWP and Office to PDF", "PDF to DOCX, XLSX, PPTX and HWPX", "Images and PDF", "Korean and English OCR"] },
+  title: "PDF Converter - Word, Excel, PowerPoint & Images | Worklazy Tools",
+  description: "Convert Word, Excel and PowerPoint to PDF, or save PDFs as DOCX, XLSX, PPTX, HWPX and images. HWP and HWPX input uses the browser's Save as PDF print option.",
+  application: { name: "PDF Converter", featureList: ["Word, Excel and PowerPoint to PDF", "HWP and HWPX via print", "PDF to DOCX, XLSX, PPTX and HWPX", "Images and PDF", "Scanned-page OCR"] },
 };
 for (const [mode, koTitle, enTitle, koDescription, enDescription] of [
-  ["document-to-pdf", "한글·워드·PPT를 PDF로 변환", "Convert Word, Excel, PowerPoint and HWP to PDF", "한글 HWP·HWPX는 브라우저 인쇄로, 워드·엑셀·PPT는 파일 변환으로 PDF를 저장하세요. 최대 50 MiB 입력과 글꼴·페이지 차이를 확인하세요.", "Save Word, Excel and PowerPoint files as PDF. Use browser printing for HWP and HWPX. Files up to 50 MiB; check fonts and page layout."],
-  ["pdf-to-document", "PDF를 워드·한글·PPT 문서로 변환", "Convert PDF to Word, Excel, PowerPoint or HWPX", "PDF에서 글자·표를 추출하거나 별도 이미지를 포함한 DOCX·XLSX·PPTX·HWPX 문서를 만드세요. 원본 편집 구조와 배치는 복원하지 않습니다.", "Extract PDF text and tables into Word or Excel, or create basic PowerPoint and HWPX documents with separate images. Original layout is not restored."],
+  ["document-to-pdf", "워드·엑셀·PPT·한글을 PDF로 저장", "Word, Excel, PowerPoint & HWP to PDF", "워드·엑셀·PPT 파일은 PDF로 바로 변환하세요. HWP·HWPX는 브라우저 인쇄에서 PDF로 저장해야 합니다.", "Convert Word, Excel and PowerPoint files to PDF. HWP and HWPX require Save as PDF in the browser print dialog."],
+  ["pdf-to-document", "PDF 워드·엑셀·PPT·HWPX 변환", "PDF to Word, Excel, PowerPoint & HWPX", "PDF를 DOCX·PPTX·HWPX로 바꾸고 보이는 표를 XLSX로 추출하세요. 스캔 페이지는 OCR하거나 모양을 그림으로 보존할 수 있습니다.", "Convert PDF to DOCX, PPTX or HWPX and extract visible tables to XLSX. Use OCR for scans or preserve page appearance as an image."],
 ]) {
   seoByPath[`/tools/pdf-converter/${mode}`] = { title: `${koTitle} | Worklazy Tools`, description: koDescription, application: { name: koTitle, featureList: [koDescription] } };
   englishPageSeo[`/tools/pdf-converter/${mode}`] = { title: `${enTitle} | Worklazy Tools`, description: enDescription, application: { name: enTitle, featureList: [enDescription] } };

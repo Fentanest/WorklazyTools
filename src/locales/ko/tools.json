@@ -62,7 +62,7 @@
     "document-markdown": {
       "title": "문서 → Markdown",
       "shortTitle": "문서 → Markdown",
-      "description": "워드·엑셀·PPTX·PDF의 제목, 문단과 표를 Markdown 파일로 추출하세요.",
+      "description": "워드·엑셀·PPTX와 글자를 선택할 수 있는 PDF를 Markdown으로 저장하세요.",
       "eyebrow": "MARKDOWN",
       "highlights": [
         "워드·엑셀·PPTX",
@@ -73,11 +73,11 @@
     "pdf-converter": {
       "title": "PDF 변환",
       "shortTitle": "PDF 변환",
-      "description": "한글·워드·엑셀·PPT와 이미지를 PDF로 저장하고, PDF에서 문서·이미지를 추출하세요.",
+      "description": "워드·엑셀·PPT를 PDF로, PDF를 DOCX·XLSX·PPTX·HWPX나 이미지로 변환하세요. HWP 원본은 인쇄로 저장합니다.",
       "eyebrow": "문서·이미지 변환",
       "highlights": [
-        "한글·오피스 → PDF",
-        "PDF → 문서",
+        "워드·엑셀·PPT → PDF",
+        "PDF → DOCX·XLSX·PPTX·HWPX",
         "이미지 ↔ PDF",
         "페이지 선택·OCR"
       ]

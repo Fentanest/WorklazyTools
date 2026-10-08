@@ -34,9 +34,9 @@ export function PdfConverterPage({ mode, convertPreset }: { mode: PdfConversionM
     "pdf-to-document": language === "ko" ? "PDF → 문서" : "PDF → Document",
   };
   const details = mode === "document-to-pdf"
-    ? { title: labels[mode], description: language === "ko" ? "한글(HWP·HWPX), 워드, 엑셀과 PPT 프레젠테이션을 PDF로 저장하세요." : "Convert Word, Excel, PowerPoint and HWP / HWPX documents to PDF." }
+    ? { title: labels[mode], description: language === "ko" ? "워드·엑셀·PPT는 PDF로 변환하고, HWP·HWPX는 브라우저 인쇄에서 PDF로 저장하세요." : "Convert Word, Excel and PowerPoint to PDF. For HWP or HWPX, use Save as PDF in the browser print dialog." }
     : mode === "pdf-to-document"
-      ? { title: labels[mode], description: language === "ko" ? "PDF를 워드·엑셀·PPT·한글 문서로 바꾸고 추출한 내용과 이미지를 확인하세요." : "Convert PDF to Word, Excel, PowerPoint or HWPX and review the extracted text and images." }
+      ? { title: labels[mode], description: language === "ko" ? "PDF를 DOCX·XLSX·PPTX·HWPX로 변환하세요. 스캔 페이지는 OCR하거나 원래 모양을 그림으로 보존할 수 있습니다." : "Convert PDF to DOCX, XLSX, PPTX or HWPX. Recognize scanned text with OCR or keep page appearance as an image." }
       : copy.modes[mode];
   const title = language === "ko" ? "PDF 변환" : "PDF Converter";
   return <UtilityPage toolId="pdf-converter" className="[--primary:var(--brand-strong)] [&_.bg-primary:hover]:bg-[var(--brand-strong)] [&_[data-ui-component=file-list]>li>span:first-child]:text-foreground [&_[data-testid=pdf-download]_small]:text-primary-foreground [&_.privacy-inline]:text-foreground [&_.ui-step-number]:bg-[var(--brand-strong)] [&_.ui-step-number]:text-primary-foreground [&_[data-slot=notice]]:text-foreground">
@@ -55,8 +55,8 @@ export function PdfConverterPage({ mode, convertPreset }: { mode: PdfConversionM
       </nav>
       {mode === "document-to-pdf" ? <DocumentPdfPanel /> : mode === "pdf-to-document" ? <>
         <UtilityNotice kind="info" className="mb-4">{language === "ko"
-          ? "DOCX·XLSX는 텍스트·표 추출, PPTX·HWPX는 편집 가능한 글자와 별도 이미지로 기본 문서를 만듭니다. 원본 배치·표 구조·수식·도형 복원은 보장하지 않습니다. 스캔 그림은 편집 가능한 글자가 아니며, OCR 결과를 별도로 확인하세요."
-          : "DOCX / XLSX extract text and tables. PPTX / HWPX create basic documents with editable text and separate images. This does not guarantee restoration of the original layout, table structure, formulas, or shapes. Scan pictures are not editable text; check the separate OCR results."}</UtilityNotice>
+          ? "편집 가능한 내용과 페이지 모양 유지 중 선택하세요. 모양을 유지하면 스캔 문서도 저장할 수 있지만 그림 속 글자는 편집할 수 없습니다. 편집형 결과의 표·글꼴·배치는 원본과 달라질 수 있습니다."
+          : "Choose editable content or preserve page appearance. Preserved scan pages keep their look, but text in the image is not editable. Tables, fonts and layout in editable results may differ from the original."}</UtilityNotice>
         <PdfConvertPanel preset={convertPreset} />
       </> : <PdfImagePanel direction={mode} />}
       <ToolGuideWrapper slug="pdfConverter" />

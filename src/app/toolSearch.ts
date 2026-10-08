@@ -25,7 +25,7 @@ const TOOL_ALIASES: Record<string, string[]> = {
   "document-compare": ["문서", "워드", "한글", "docx", "hwp"],
   "hwp-editor": ["한글", "hwp", "hwpx", "한글 편집"],
   "pdf-editor": ["피디에프", "pdf"],
-  "pdf-converter": ["피디에프 변환", "한글 PDF", "HWP", "HWPX", "워드", "Word", "오피스", "Office", "엑셀", "Excel", "프레젠테이션", "PPT", "PPTX", "PowerPoint", "JPG", "PNG", "image to pdf", "pdf to image", "convert word to pdf", "pdf to word", "pdf to powerpoint", "hwp to pdf"],
+  "pdf-converter": ["피디에프 변환", "PDF 워드 변환", "PDF 엑셀 변환", "PDF PPT 변환", "PDF 한글 변환", "스캔 PDF OCR", "검색 가능한 PDF", "HWP", "HWPX", "워드", "Word", "오피스", "Office", "엑셀", "Excel", "프레젠테이션", "PPT", "PPTX", "PowerPoint", "JPG", "PNG", "image to pdf", "pdf to image", "convert word to pdf", "pdf to word", "pdf to powerpoint", "word to pdf", "pdf to docx", "pdf to xlsx", "pdf to pptx", "pdf to hwpx", "searchable pdf", "scanned pdf ocr", "hwp to pdf"],
   "document-markdown": ["워드 마크다운", "엑셀 마크다운", "프레젠테이션", "Word to Markdown", "Excel to Markdown", "PowerPoint to Markdown", "PDF to Markdown", "DOCX", "XLSX", "XLS", "PPTX", "MarkItDown"],
   "image-studio": ["사진", "이미지", "png", "jpg"],
   "document-generator": ["워드 메일머지", "메일머지", "mail merge", "문서 일괄 생성", "양식 자동 채우기", "DOCX", "Word"],

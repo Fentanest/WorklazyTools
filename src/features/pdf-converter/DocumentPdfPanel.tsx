@@ -90,8 +90,8 @@ export function DocumentPdfPanel() {
       {file && <FileList files={[file]} accent="coral" onRemove={() => choose([])} />}
     </SectionCard>
     {!isHwp && <UtilityNotice kind="info" className="my-4"><FileText className="shrink-0" size={18} /><span>{L(
-      "첫 실행 시 약 252 MiB의 변환 파일을 브라우저에 불러옵니다. 메모리가 충분한 데스크톱을 권장합니다. 원본 글꼴과 인쇄 설정에 따라 줄바꿈·표·페이지가 달라질 수 있습니다. 암호 파일은 지원하지 않습니다. HWP·HWPX는 파일 선택 후 브라우저 인쇄로 PDF를 저장합니다.",
-      "The first run loads about 252 MiB of conversion files into your browser. A desktop with sufficient memory is recommended. Fonts and print settings can change line breaks, tables, and pages. Password-protected files are not supported. HWP / HWPX saves PDF through browser printing after file selection.")}</span></UtilityNotice>}
+      "첫 변환에는 파일을 내려받아 준비하므로 시간이 걸릴 수 있습니다. 워드·엑셀·PPT는 PDF를 바로 내려받을 수 있고, HWP·HWPX는 브라우저 인쇄에서 PDF로 저장해야 합니다. 암호 파일은 지원하지 않습니다.",
+      "The first conversion downloads files needed in your browser and may take longer. Word, Excel and PowerPoint produce a downloadable PDF; HWP and HWPX require Save as PDF in the browser print dialog. Password-protected files are not supported.")}</span></UtilityNotice>}
     {!isHwp && <div className="my-4 flex flex-wrap gap-2">
       <PrimaryButton accent="coral" disabled={!file || loading} loading={loading} onClick={() => void run()}>{L("PDF 만들기", "Create PDF")}</PrimaryButton>
       {loading && <Button variant="outline" onClick={cancel}><X size={16} />{L("취소 및 초기화", "Cancel and reset")}</Button>}
