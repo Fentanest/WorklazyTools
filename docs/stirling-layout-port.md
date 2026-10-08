@@ -1,0 +1,18 @@
+# Stirling page layout port for PDF document conversion
+
+Source: `Stirling-Office-Convert` release `0.2.2`, commit `673aab8d6ac784524cd1d90141c95e74b9fd26ae`, used by the checked Stirling-PDF checkout at `973bff865`. The implementation below is connected to the active PPTX/HWPX conversion client, not a standalone copy.
+
+| Upstream source | Worklazy implementation | Adaptation |
+| --- | --- | --- |
+| `core/src/main/java/stirling/software/officeconvert/extract/{PageData,Glyph,FontInfo}.java` | `src/features/pdf-editor/stirlingLayout.ts` | TypeScript page, glyph and font records; PDF.js viewport coordinates replace PDFBox. |
+| `core/src/main/java/stirling/software/officeconvert/layout/{LineBuilder,ParagraphBuilder}.java` | `src/features/pdf-editor/stirlingLayout.ts` | Row/segment spacing and paragraph pitch/look thresholds retained for text frame placement. Java's larger word/column/table pipeline is not yet ported. |
+| `core/src/main/java/stirling/software/officeconvert/slides/{Slide,Frame,PictureShape,SlideBuilder,PageFit}.java` | `src/features/pdf-editor/stirlingLayout.ts`, `stirlingPageFit.ts` | Page and shape model, paint ordering and page fitting feed PptxGenJS and the existing HWPX SDK. |
+| `core/src/main/java/stirling/software/officeconvert/model/{Paragraph,Picture,RunStyle}.java` | `src/features/pdf-editor/stirlingLayout.ts` | Only fields consumed by the browser writers are represented. |
+| PDFBox `PageReader`/`GlyphCollector` | `src/features/pdf-editor/stirlingPdfAdapter.ts` | PDF.js text transforms, CropBox/rotation-aware viewport, image operation CTMs and decoded bitmaps. |
+| Java `PptxWriter` | `src/features/pdf-editor/stirlingDocument.worker.ts` | Existing PptxGenJS OOXML writer consumes the ported slide model; Java streams and temp files are not used. HWPX uses `@rhwp/core` and source page coordinates for paragraph indents, vertical spacing and floating pictures. |
+
+`stirlingDocumentClient.ts` queues conversions on one Worker, reuses its loaded runtime across sequential files, and terminates it on cancellation or writer failure. An idle Worker exits after 60 seconds. The Worker analyzes the PDF and writes the output, so cancellation interrupts both phases. `pdfPageImageDocument.ts` passes encoded page Blobs to the same writer. This keeps JPEG pages out of main-thread Base64 arrays and uses the original page ratio for each slide/HWPX image.
+
+Known limits in this port: PDF.js text content does not expose all PDFBox glyph styling or reliably distinguish a pre-existing invisible OCR layer; color and hidden-text classification need further source-aware work. The port does not yet perform Stirling's table/cell, vector art, or multi-column detection. PptxGenJS currently places bitmap images and editable text; HWPX remains a paginated document, and its text can reflow. These outputs should be described with those limits rather than as exact editable reconstructions.
+
+Focused verification: `npx tsc -b --pretty false`, `npx vite build`, and `node tests/pdf-stirling-layout-smoke.mjs` (Vite on port 4273). The browser test reopens PPTX/HWPX ZIP content and checks reversed Korean/English text order, embedded PDF pictures, page positions, a scan page bitmap in both outputs, a mixed rotated/blank/different-size PDF, Worker reuse, in-flight cancellation and retry. The HWPX writer also reopens each result through `@rhwp/core` and rejects any result whose page count is below the requested source page count.
