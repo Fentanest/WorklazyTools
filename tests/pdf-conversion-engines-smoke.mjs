@@ -42,6 +42,7 @@ const tests=[
  {id:'auto-short-title-docx',input:'short-title-scan.pdf',format:'docx',ocrMode:'auto',expectedText:['SHORT TITLE','FIRST PAGE','42']},
  {id:'auto-two-tile-docx',input:'two-tile-scan.pdf',format:'docx',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42'],expectedPageStatus:'ocr'},
  {id:'auto-sparse-layer-docx',input:'two-tile-sparse-ocr.pdf',format:'docx',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42'],expectedPageStatus:'ocr',expectedOnce:'SCAN BODY'},
+ {id:'mixed-off-docx',input:'mixed-five.pdf',format:'docx',expectedText:['한글','FIRST PAGE','42'],expectedOrder:[0,1,2,3,4],expectedPageStatuses:['converted','image-preserved','blank-preserved','image-preserved','image-preserved'],expectedRenderedPageCount:5,minImages:3},
  {id:'auto-mixed-docx',input:'mixed-five.pdf',format:'docx',ocrMode:'auto',expectedText:['한글','FIRST PAGE','SHORT TITLE','42'],expectedImageText:'SECOND PAGE',expectedFallbackPage:4,expectedOrder:[0,1,2,3,4]},
  {id:'searchable-scan-auto',input:'scan-none.pdf',format:'searchable-pdf',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42']},
  {id:'digital-searchable-auto',input:'rich.pdf',format:'searchable-pdf',ocrMode:'auto',expectedText:['FIRST PAGE','SECOND PAGE','42'],expectedNoBento:true},
@@ -101,6 +102,7 @@ for(const test of selected){
  const dest=path.join(out,'reopened');await fs.mkdir(dest,{recursive:true});
  execFileSync('libreoffice',[`-env:UserInstallation=file://${path.resolve(out,'lo-profile')}`,'--headless','--convert-to','pdf','--outdir',dest,path.join(out,`${test.id}.${test.format}`)],{timeout:90000,stdio:'pipe'});
  const pdf=path.join(dest,`${test.id}.pdf`);assert.ok((await fs.stat(pdf)).size>0);
+ if(test.expectedRenderedPageCount!==undefined)assert.equal((await PDFDocument.load(await fs.readFile(pdf))).getPageCount(),test.expectedRenderedPageCount,'rendered mixed document dropped or added a page');
  if(test.outputMode==='page-image'){const expected=test.selectedPageIndexes?new Set(test.selectedPageIndexes).size:(await PDFDocument.load(source)).getPageCount();const actual=(await PDFDocument.load(await fs.readFile(pdf))).getPageCount();assert.equal(actual,expected,'page-image output adds/drops a page');}
  if(test.expectedText){const reopened=execFileSync('pdftotext',[pdf,'-'],{encoding:'utf8'});for(const word of test.expectedText)assert.ok(reopened.includes(word),`reopened missing ${word}`);if(test.expectedOnce)assert.equal(reopened.split(test.expectedOnce).length-1,1,`duplicate ${test.expectedOnce}`);}
  if(test.expectedImageText){const image=path.join(dest,`${test.id}-fallback`);execFileSync('pdftoppm',['-f',String(test.expectedFallbackPage+1),'-l',String(test.expectedFallbackPage+1),'-singlefile','-scale-to','1000','-png',pdf,image]);const recognized=execFileSync('tesseract',[`${image}.png`,'stdout','-l','eng','--psm','1'],{encoding:'utf8',stdio:['ignore','pipe','ignore']});assert.match(recognized,/SECOND PAGE/i,'rendered fallback lost rotated source text');}
