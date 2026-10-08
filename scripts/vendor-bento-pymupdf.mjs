@@ -125,12 +125,35 @@ del _wl_pages, _wl_doc, _wl_index, _wl_page, _wl_section, _wl_paragraph, _wl_sca
       pyodide.runPython(\`
 import pymupdf, json
 _wl_profile = []
+def _wl_image_union(images, page):
+    boxes = []
+    for image in images:
+        box = pymupdf.Rect(image['bbox']) * page.rotation_matrix
+        x0 = max(0, box.x0)
+        y0 = max(0, box.y0)
+        x1 = min(page.rect.width, box.x1)
+        y1 = min(page.rect.height, box.y1)
+        if x1 > x0 and y1 > y0:
+            boxes.append((x0, y0, x1, y1))
+    if not boxes:
+        return 0
+    edges = sorted({x for box in boxes for x in (box[0], box[2])})
+    area = 0
+    for left, right in zip(edges, edges[1:]):
+        rows = sorted((box[1], box[3]) for box in boxes if box[0] < right and box[2] > left)
+        end = float('-inf')
+        height = 0
+        for top, bottom in rows:
+            if bottom > end:
+                height += bottom - max(top, end)
+                end = bottom
+        area += (right - left) * height
+    return min(1, area / max(1, page.rect.width * page.rect.height))
 with pymupdf.open(\${JSON.stringify(input)}) as _wl_document:
     for _wl_index in (\${requested} if \${requested} is not None else range(len(_wl_document))):
         _wl_page = _wl_document[_wl_index]
-        _wl_area = max(1, _wl_page.rect.width * _wl_page.rect.height)
         _wl_images = _wl_page.get_image_info()
-        _wl_coverage = max((max(0, (image['bbox'][2]-image['bbox'][0]) * (image['bbox'][3]-image['bbox'][1])) / _wl_area for image in _wl_images), default=0)
+        _wl_coverage = _wl_image_union(_wl_images, _wl_page)
         _wl_hidden = []
         _wl_visible = []
         _wl_visible_chars = 0
@@ -146,7 +169,7 @@ with pymupdf.open(\${JSON.stringify(input)}) as _wl_document:
                     _wl_visible.append({'text': _wl_text, 'bbox': _wl_box, 'type': _wl_span['type']})
         _wl_profile.append({'pageIndex': _wl_index, 'rotation': _wl_page.rotation, 'width': _wl_page.rect.width, 'height': _wl_page.rect.height, 'imageCoverage': _wl_coverage, 'visibleCharacters': _wl_visible_chars, 'hiddenSpans': _wl_hidden, 'visibleSpans': _wl_visible})
 _wl_profile_json = json.dumps(_wl_profile, ensure_ascii=False)
-for _wl_name in ('_wl_profile', '_wl_document', '_wl_index', '_wl_page', '_wl_area', '_wl_images', '_wl_coverage', '_wl_hidden', '_wl_visible', '_wl_visible_chars', '_wl_span', '_wl_text', '_wl_box'):
+for _wl_name in ('_wl_profile', '_wl_image_union', '_wl_document', '_wl_index', '_wl_page', '_wl_images', '_wl_coverage', '_wl_hidden', '_wl_visible', '_wl_visible_chars', '_wl_span', '_wl_text', '_wl_box'):
     globals().pop(_wl_name, None)
 globals().pop('_wl_name', None)
 \`);

@@ -1,7 +1,7 @@
 import type { AppLanguage } from "../../i18n/languages";
-import { convertWithBentoPdf, profilePagesWithBento, selectPagesWithBento } from "./bentoPdfClient";
+import { convertWithBentoPdf, hasAdequateOcrLayer, profilePagesWithBento, selectPagesWithBento } from "./bentoPdfClient";
 import { createPageImageDocument } from "./pdfPageImageDocument";
-import { extractPdfText, inspectPdf, releasePdf, validatePdfImages, type PdfOcrMode } from "./pdfPreview";
+import { extractPdfText, getPdfImageCoverages, inspectPdf, releasePdf, validatePdfImages, type PdfOcrMode } from "./pdfPreview";
 import { textDocumentToOffice } from "./pdfWorkerClient";
 import { PdfConversionError } from "./pdfConversionErrors";
 import type { PdfTextDocument, WorkerProgress } from "./types";
@@ -24,7 +24,7 @@ export interface PdfDocumentConversionRequest {
 export interface PdfPageConversionResult {
   sourcePageIndex: number;
   inputPageIndex: number;
-  status: "converted" | "image-preserved" | "ocr" | "existing-ocr" | "blank-preserved" | "no-table";
+  status: "converted" | "image-preserved" | "ocr" | "ocr-skipped" | "existing-ocr" | "blank-preserved" | "no-table";
   warnings: string[];
 }
 export interface PdfDocumentConversionResult {
@@ -89,22 +89,36 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
         const blob = identity ? file : await selectPagesWithBento(file, selection, signal);
         return { blob, fileName: `${stem}.pdf`, mimeType: MIME[format], warnings: [language === "ko" ? "OCR을 끈 상태로 원본 PDF 페이지만 저장했습니다. 이미지 속 글자는 검색할 수 없습니다." : "OCR was off; the original PDF pages were saved without recognizing text in images."], pages: pageResults };
       }
-      const profiles = await profilePagesWithBento(file, selection, signal);
-      const existingLayerPages = new Set(profiles.filter(page => page.imageCoverage >= .55 && page.hiddenSpans.length > 0).map(page => page.pageIndex));
+      const coverage = await getPdfImageCoverages(file, selection, language, signal);
+      const profiles = [...coverage.values()].some(value => value >= .55) ? await profilePagesWithBento(file, selection, signal) : [];
+      const existingLayerPages = new Set(profiles.filter(hasAdequateOcrLayer).map(page => page.pageIndex));
       const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
       const { createSearchablePdf } = await import("./pdfSearchableOcr");
-      const output = await createSearchablePdf(file, selection, extracted.ocrHocrBySourceIndex, language, signal);
+      const output = await createSearchablePdf(file, selection, inspected.pageCount, extracted.ocrHocrBySourceIndex, profiles, language, signal);
+      const added = new Set(output.addedSourceIndexes);
+      const scanned = new Set(profiles.filter(profile => profile.imageCoverage >= .55).map(profile => profile.pageIndex));
       for (const page of pageResults) {
-        if (extracted.ocrHocrBySourceIndex.has(page.sourcePageIndex)) page.status = "ocr";
+        if (added.has(page.sourcePageIndex)) page.status = "ocr";
         else if (existingLayerPages.has(page.sourcePageIndex)) page.status = "existing-ocr";
+        else if (extracted.ocrHocrBySourceIndex.has(page.sourcePageIndex)) {
+          page.status = "ocr-skipped";
+          const warning = language === "ko" ? `원본 ${page.sourcePageIndex + 1}페이지에서 OCR 글자를 배치하지 못해 원본 모양을 보존했습니다.` : `OCR text could not be placed on source page ${page.sourcePageIndex + 1}; its appearance was preserved.`;
+          page.warnings.push(warning); output.warnings.push(warning);
+        }
+        else if (scanned.has(page.sourcePageIndex)) {
+          page.status = "ocr-skipped";
+          const warning = language === "ko" ? `원본 ${page.sourcePageIndex + 1}페이지에서 OCR 글자를 인식하지 못해 원본 페이지를 보존했습니다.` : `No OCR text was recognized on source page ${page.sourcePageIndex + 1}; the original page was preserved.`;
+          page.warnings.push(warning); output.warnings.push(warning);
+        }
         else if (!extracted.document.pages[page.inputPageIndex]?.lines.length) page.status = "blank-preserved";
       }
       return { blob: output.blob, fileName: `${stem}.pdf`, mimeType: MIME[format], warnings: output.warnings, pages: pageResults };
     }
     if (format === "pptx" || format === "hwpx") {
       const { convertStirlingEditableDocument } = await import("./stirlingDocumentClient");
-      const profiles = await profilePagesWithBento(file, selection, signal);
-      const existingLayerPages = new Set(profiles.filter(page => page.imageCoverage >= .55 && page.hiddenSpans.length > 0).map(page => page.pageIndex));
+      const coverage = await getPdfImageCoverages(file, selection, language, signal);
+      const profiles = [...coverage.values()].some(value => value >= .55) ? await profilePagesWithBento(file, selection, signal) : [];
+      const existingLayerPages = new Set(profiles.filter(hasAdequateOcrLayer).map(page => page.pageIndex));
       const extracted = request.ocrMode === "off" ? undefined : await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
       let documentFile = file;
       let inputIndexes = selection;
@@ -157,7 +171,7 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
       if (format === "docx") {
         onProgress?.(3, language === "ko" ? "원본 글자와 이미지 확인 중" : "Inspecting original text and images");
         const profiles = await profilePagesWithBento(file, selection, signal);
-        const existingLayerPages = new Set(profiles.filter(page => page.imageCoverage >= .55 && page.hiddenSpans.length > 0).map(page => page.pageIndex));
+        const existingLayerPages = new Set(profiles.filter(hasAdequateOcrLayer).map(page => page.pageIndex));
         const rotatedTextPages = new Set(profiles.filter(page => page.rotation % 360 !== 0 && page.visibleCharacters > 0).map(page => page.pageIndex));
         for (const page of pageResults) {
           const profile = profiles.find(item => item.pageIndex === page.sourcePageIndex);
@@ -165,7 +179,8 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
         }
         const extracted = request.ocrMode === "off" ? undefined : await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
         if (extracted) auditDocument = extracted.document;
-        if (extracted?.ocrHocrBySourceIndex.size || existingLayerPages.size || rotatedTextPages.size) {
+        const scanFallbackPages = profiles.filter(page => page.imageCoverage >= .55 && !hasAdequateOcrLayer(page) && !extracted?.ocrHocrBySourceIndex.has(page.pageIndex));
+        if (extracted?.ocrHocrBySourceIndex.size || existingLayerPages.size || rotatedTextPages.size || scanFallbackPages.length) {
           const { prepareOcrPdfForDocx } = await import("./pdfOcrDocxPreparation");
           const prepared = await prepareOcrPdfForDocx(file, selection, profiles, extracted?.ocrHocrBySourceIndex ?? new Map(), language, signal, value => onProgress?.(value, language === "ko" ? "OCR 글자와 원본 페이지 결합 중" : "Combining OCR text and source pages"));
           input = prepared.pdf;
@@ -186,7 +201,7 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
       failIfCanceled();
       let converted: Awaited<ReturnType<typeof convertWithBentoPdf>>;
       try {
-        converted = await convertWithBentoPdf(input, format, stem, signal, value => onProgress?.(8 + value * 0.9, language === "ko" ? "문서 변환 중" : "Converting document"));
+        converted = await convertWithBentoPdf(input, format, stem, signal, value => onProgress?.(8 + value * 0.9, language === "ko" ? "문서 변환 중" : "Converting document"), selection);
       } catch (error) {
         if (format !== "xlsx" || !(error instanceof Error) || error.message !== "NO_TABLES") throw error;
         const text = await extractPdfText(file, "off", false, undefined, selection, language, signal);
@@ -195,13 +210,13 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
         if (!scanned) throw new PdfConversionError("NO_TABLES");
         if (request.ocrMode === "off" && !text.document.characterCount) throw new PdfConversionError("OCR_REQUIRED_FOR_TABLES");
         if (request.ocrMode === "off") throw new PdfConversionError("SCAN_TABLE_UNAVAILABLE");
-        const existingLayerPages = new Set(profiles.filter(page => page.imageCoverage >= .55 && page.hiddenSpans.length > 0).map(page => page.pageIndex));
+        const existingLayerPages = new Set(profiles.filter(hasAdequateOcrLayer).map(page => page.pageIndex));
         const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
         if (!extracted.document.characterCount) throw new PdfConversionError("SCAN_TABLE_UNAVAILABLE");
         const { prepareOcrPdfForDocx } = await import("./pdfOcrDocxPreparation");
         const prepared = await prepareOcrPdfForDocx(file, selection, profiles, extracted.ocrHocrBySourceIndex, language, signal);
         try {
-          converted = await convertWithBentoPdf(prepared.pdf, "xlsx", stem, signal, value => onProgress?.(8 + value * .9, language === "ko" ? "표 셀 확인 중" : "Checking table cells"));
+          converted = await convertWithBentoPdf(prepared.pdf, "xlsx", stem, signal, value => onProgress?.(8 + value * .9, language === "ko" ? "표 셀 확인 중" : "Checking table cells"), selection);
           for (const [index, page] of prepared.pages.entries()) if (page.method === "ocr" || page.method === "existing-ocr") pageResults[index].status = "ocr";
         } catch (retryError) {
           if (retryError instanceof Error && retryError.message === "NO_TABLES") throw new PdfConversionError("SCAN_TABLE_UNAVAILABLE");
@@ -224,13 +239,13 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
           scannedIndexes = new Set(profiles.filter(page => page.imageCoverage >= .55).map(page => page.pageIndex));
           if (scannedIndexes.size && request.ocrMode !== "off") {
             const allProfiles = await profilePagesWithBento(file, selection, signal);
-            const existingLayerPages = new Set(allProfiles.filter(page => page.imageCoverage >= .55 && page.hiddenSpans.length > 0).map(page => page.pageIndex));
+            const existingLayerPages = new Set(allProfiles.filter(hasAdequateOcrLayer).map(page => page.pageIndex));
             const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
             if (extracted.document.characterCount) {
               const { prepareOcrPdfForDocx } = await import("./pdfOcrDocxPreparation");
               const prepared = await prepareOcrPdfForDocx(file, selection, allProfiles, extracted.ocrHocrBySourceIndex, language, signal);
               try {
-                const retry = await convertWithBentoPdf(prepared.pdf, "xlsx", stem, signal);
+                const retry = await convertWithBentoPdf(prepared.pdf, "xlsx", stem, signal, undefined, selection);
                 const retryPages = new Set(retry.tablePages ?? []);
                 if ([...tablePages].every(index => retryPages.has(index)) && retryPages.size > tablePages.size) { converted = retry; tablePages = retryPages; }
               } catch (error) { if (!(error instanceof Error) || error.message !== "NO_TABLES") throw error; }
@@ -248,11 +263,27 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
       }
       return { blob: converted.blob, fileName: `${stem}.${format}`, mimeType: MIME[format], warnings, pages: pageResults };
     }
-    const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage });
+    const coverage = request.ocrMode === "off" ? undefined : await getPdfImageCoverages(file, selection, language, signal);
+    const existingLayerPages = !coverage || ![...coverage.values()].some(value => value >= .55) ? new Set<number>()
+      : new Set((await profilePagesWithBento(file, selection, signal)).filter(hasAdequateOcrLayer).map(page => page.pageIndex));
+    const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
     failIfCanceled();
-    for (const [index, page] of extracted.document.pages.entries()) if (!page.lines.length) pageResults[index].status = "blank-preserved";
+    const recognized = new Set(extracted.ocrSourceIndexes);
+    for (const [index, page] of extracted.document.pages.entries()) {
+      const result = pageResults[index];
+      if (recognized.has(result.sourcePageIndex)) result.status = "ocr";
+      else if (existingLayerPages.has(result.sourcePageIndex)) result.status = "existing-ocr";
+      else if ((coverage?.get(result.sourcePageIndex) ?? 0) >= .55) {
+        result.status = "ocr-skipped";
+        result.warnings.push(language === "ko" ? `원본 ${result.sourcePageIndex + 1}페이지의 스캔 글자를 인식하지 못했습니다.` : `Scan text on source page ${result.sourcePageIndex + 1} was not recognized.`);
+      }
+      else if (!page.lines.length) result.status = "blank-preserved";
+    }
     if (!extracted.document.characterCount) throw new PdfConversionError("NO_TEXT");
     const output = await textDocumentToOffice(extracted.document, format, stem, onProgress, language, signal);
-    return { blob: new Blob([output.buffer], { type: MIME[format] }), fileName: output.fileName, mimeType: MIME[format], warnings: output.warnings, pages: pageResults };
+    const warnings = [...output.warnings];
+    if (recognized.size) warnings.push(language === "ko" ? `${recognized.size}개 원본 페이지에 OCR 글자를 사용했습니다.` : `OCR text was used on ${recognized.size} source pages.`);
+    warnings.push(...pageResults.flatMap(page => page.warnings));
+    return { blob: new Blob([output.buffer], { type: MIME[format] }), fileName: output.fileName, mimeType: MIME[format], warnings, pages: pageResults };
   } finally { if (ownsPdfCache) await releasePdf(file); }
 }

@@ -4,7 +4,7 @@ import type { AppLanguage } from "../../i18n/languages";
 import { parseHocrDocument, calculateWordTransform, scaleOcrPageToPdfPoints } from "./bentoHocrTransform";
 import type { OcrPage, OcrWord } from "./bentoOcrTypes";
 import type { BentoPageProfile } from "./bentoPdfClient";
-import { selectPagesWithBento } from "./bentoPdfClient";
+import { hasAdequateOcrLayer, selectPagesWithBento } from "./bentoPdfClient";
 import { renderPdfPageForOcrCanvas } from "./pdfPreview";
 
 interface PreparedPage { sourcePageIndex: number; method: "ocr" | "existing-ocr" | "image-fallback" | "digital"; warnings: string[] }
@@ -32,9 +32,10 @@ export async function prepareOcrPdfForDocx(
     if (signal?.aborted) throw new DOMException("Conversion cancelled", "AbortError");
     const profile = bySource.get(sourcePageIndex);
     const hocr = hocrBySourceIndex.get(sourcePageIndex);
-    const existing = !hocr && profile && profile.imageCoverage >= 0.55 && profile.hiddenSpans.length > 0;
-    const rebuildVisible = !hocr && !existing && profile && profile.rotation % 360 !== 0 && (profile.visibleSpans?.length ?? 0) > 0;
-    if (!hocr && !existing && !rebuildVisible) {
+    const existing = !hocr && profile && hasAdequateOcrLayer(profile);
+    const scanFallback = !hocr && profile && profile.imageCoverage >= .55 && !existing;
+    const rebuildVisible = !hocr && !existing && !scanFallback && profile && profile.rotation % 360 !== 0 && (profile.visibleSpans?.length ?? 0) > 0;
+    if (!hocr && !existing && !scanFallback && !rebuildVisible) {
       output.addPage((await output.copyPages(original, [index]))[0]);
       pageResults.push({ sourcePageIndex, method: "digital", warnings: [] });
       continue;
@@ -44,14 +45,16 @@ export async function prepareOcrPdfForDocx(
     try {
       const width = profile?.width ?? canvas.width;
       const height = profile?.height ?? canvas.height;
-      if (rebuildVisible) {
+      if (rebuildVisible || scanFallback) {
         // pdf2docx 0.5.8 omits text on a rotated digital page even after
         // PyMuPDF.remove_rotation(). Keep the complete displayed source page,
         // including annotations, rather than claiming dropped text succeeded.
         const image = await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("PDF_PAGE_ENCODE_FAILED")), "image/jpeg", .95));
         const page = output.addPage([width, height]);
         page.drawImage(await output.embedJpg(await image.arrayBuffer()), { x: 0, y: 0, width, height });
-        pageResults.push({ sourcePageIndex, method: "image-fallback", warnings: [language === "ko" ? "회전된 원본 페이지를 이미지로 보존했습니다. 이 페이지의 글자는 편집할 수 없습니다." : "The rotated source page was preserved as an image. Text on this page is not editable."] });
+        pageResults.push({ sourcePageIndex, method: "image-fallback", warnings: [scanFallback
+          ? language === "ko" ? "인식된 본문 글자가 없어 원본 스캔 페이지를 이미지로 보존했습니다. 글자는 편집할 수 없습니다." : "No body text was recognized; the source scan page was preserved as an image and its text is not editable."
+          : language === "ko" ? "회전된 원본 페이지를 이미지로 보존했습니다. 이 페이지의 글자는 편집할 수 없습니다." : "The rotated source page was preserved as an image. Text on this page is not editable."] });
         continue;
       }
       let ocrPage: OcrPage;
@@ -67,8 +70,8 @@ export async function prepareOcrPdfForDocx(
           }),
         };
       }
-      if (hocr && profile?.visibleSpans?.length) {
-        for (const span of profile.visibleSpans) {
+      if (hocr && profile && (profile.visibleSpans.length || profile.hiddenSpans.length)) {
+        for (const span of [...profile.visibleSpans, ...profile.hiddenSpans]) {
           const normalized = span.text.replace(/\s+/g, "").toLocaleLowerCase();
           const recognized = ocrPage.lines.some(line => line.words.map(word => word.text).join("").replace(/\s+/g, "").toLocaleLowerCase() === normalized || line.words.some(word => word.text.replace(/\s+/g, "").toLocaleLowerCase() === normalized));
           if (recognized) continue;
@@ -86,6 +89,15 @@ export async function prepareOcrPdfForDocx(
       // Bento hOCR boxes are in the same canvas coordinates used for recognition.
       const effectiveScaleX = canvas.width / Math.max(1, ocrPage.width);
       const effectiveScaleY = canvas.height / Math.max(1, ocrPage.height);
+      const coloredOverlap = ocrPage.lines.some(line => line.words.some(word => hasColoredOverlap(context,
+        word.bbox.x0 * effectiveScaleX, word.bbox.y0 * effectiveScaleY, word.bbox.x1 * effectiveScaleX, word.bbox.y1 * effectiveScaleY)));
+      if (coloredOverlap) {
+        const image = await new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("PDF_PAGE_ENCODE_FAILED")), "image/jpeg", .95));
+        const page = output.addPage([width, height]);
+        page.drawImage(await output.embedJpg(await image.arrayBuffer()), { x: 0, y: 0, width, height });
+        pageResults.push({ sourcePageIndex, method: "image-fallback", warnings: [language === "ko" ? "OCR 글자 영역이 색상 그림·도장과 겹쳐 원본 페이지 이미지를 보존했습니다. 글자는 편집할 수 없습니다." : "OCR text overlaps a colored picture or stamp; the source page was preserved as an image and its text is not editable."] });
+        continue;
+      }
       for (const line of ocrPage.lines) for (const word of line.words) {
         clearNeutralInk(context, word.bbox.x0 * effectiveScaleX, word.bbox.y0 * effectiveScaleY, word.bbox.x1 * effectiveScaleX, word.bbox.y1 * effectiveScaleY);
       }
@@ -121,6 +133,22 @@ export async function prepareOcrPdfForDocx(
   return { pdf: new Blob([new Uint8Array(await output.save())], { type: "application/pdf" }), pages: pageResults };
 }
 
+function hasColoredOverlap(context: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) {
+  const left = Math.max(0, Math.floor(x0));
+  const top = Math.max(0, Math.floor(y0));
+  const width = Math.min(context.canvas.width - left, Math.ceil(x1 - x0));
+  const height = Math.min(context.canvas.height - top, Math.ceil(y1 - y0));
+  if (width <= 0 || height <= 0) return false;
+  const pixels = context.getImageData(left, top, width, height).data;
+  let colored = 0;
+  const limit = Math.max(12, width * height * .005);
+  for (let index = 0; index < pixels.length; index += 4) {
+    const red = pixels[index], green = pixels[index + 1], blue = pixels[index + 2];
+    if (Math.max(red, green, blue) - Math.min(red, green, blue) > 45 && Math.min(red, green, blue) < 210 && ++colored >= limit) return true;
+  }
+  return false;
+}
+
 function clearNeutralInk(context: CanvasRenderingContext2D, x0: number, y0: number, x1: number, y1: number) {
   const left = Math.max(0, Math.floor(x0 - 3));
   const top = Math.max(0, Math.floor(y0 - 3));
@@ -128,13 +156,8 @@ function clearNeutralInk(context: CanvasRenderingContext2D, x0: number, y0: numb
   const height = Math.min(context.canvas.height - top, Math.ceil(y1 - y0 + 6));
   if (width <= 0 || height <= 0) return;
   const pixels = context.getImageData(left, top, width, height);
-  const corners = [0, (width - 1) * 4, (height - 1) * width * 4, ((height - 1) * width + width - 1) * 4];
-  const whiteCorners = corners.filter(offset => pixels.data[offset] > 238 && pixels.data[offset + 1] > 238 && pixels.data[offset + 2] > 238).length;
-  if (whiteCorners >= 3) {
-    context.fillStyle = "#ffffff";
-    context.fillRect(left, top, width, height);
-    return;
-  }
+  // Preserve colored picture/stamp pixels even when OCR boxes overlap them.
+  // Only neutral ink and its light antialias fringes are removed.
   for (let i = 0; i < pixels.data.length; i += 4) {
     const r = pixels.data[i], g = pixels.data[i + 1], b = pixels.data[i + 2];
     if (Math.max(r, g, b) - Math.min(r, g, b) <= 32 && (r + g + b) / 3 < 250) {

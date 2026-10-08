@@ -1,4 +1,9 @@
 {
+  "blank-scan.pdf": {
+    "bytes": 2717,
+    "sha256": "11b2aae6f8f8ab5a9f1dc2df786046caaa7f4b2b1d0fde110883042dcaf9f6cf",
+    "pages": 1
+  },
   "high-resolution-six.pdf": {
     "bytes": 181505,
     "sha256": "7f4ee73088d872f1addf5a8345e66db60b230766fdcff539431fad67e3cbf57e",
@@ -24,6 +29,11 @@
     "sha256": "644f8c087dad123d221a188056b05cb1a334e03d9002a96b5514072402db3a89",
     "pages": 1
   },
+  "rotated-upright-scan.pdf": {
+    "bytes": 26800,
+    "sha256": "ccbe0768e5262268704518e261ae250f4c1322a87e544764401e48fe70661f31",
+    "pages": 1
+  },
   "scan-none.pdf": {
     "bytes": 26753,
     "sha256": "5d7e732885a1511ecf624e2944a06b2819560503e4a4b73eccf5458da9ce053d",
@@ -42,6 +52,26 @@
   "short-title-scan.pdf": {
     "bytes": 20721,
     "sha256": "5b9d61ab9b21527d1532daf3798f821b9bcead254282a8767afdc7987fcfb149",
+    "pages": 1
+  },
+  "text-note.pdf": {
+    "bytes": 1015,
+    "sha256": "855abdeff8883d5e1f19c67516202e9cdc81a268cede18314d7cc341ffd08aea",
+    "pages": 1
+  },
+  "two-table-pages.pdf": {
+    "bytes": 2625,
+    "sha256": "d0a21e2318b1ed119600a604f6456f700a4c5756498289b2608fbcb939861f34",
+    "pages": 2
+  },
+  "two-tile-scan.pdf": {
+    "bytes": 27001,
+    "sha256": "dd727902a8b00c8b5709aebc0aa19084f4269fec2ee4f48bcc53f21ef5aac24d",
+    "pages": 1
+  },
+  "two-tile-sparse-ocr.pdf": {
+    "bytes": 27229,
+    "sha256": "17359c10b64d3a7eb1d99c89a140a8d1f14336bff79f530f98e4129f752f871e",
     "pages": 1
   }
 }

@@ -1,5 +1,13 @@
 type Format = "docx" | "xlsx";
 export interface BentoPageProfile { pageIndex: number; rotation: number; width: number; height: number; imageCoverage: number; visibleCharacters: number; hiddenSpans: Array<{ text: string; bbox: [number, number, number, number]; type: number }>; visibleSpans: Array<{ text: string; bbox: [number, number, number, number]; type: number }> }
+export function hasAdequateOcrLayer(page: BentoPageProfile) {
+  if (page.imageCoverage < .55 || !page.hiddenSpans.length) return false;
+  const characters = page.hiddenSpans.reduce((sum, span) => sum + span.text.trim().length, 0);
+  const top = Math.min(...page.hiddenSpans.map(span => span.bbox[1]));
+  const bottom = Math.max(...page.hiddenSpans.map(span => span.bbox[3]));
+  // A short existing title is not evidence that a scanned body was recognized.
+  return characters >= 8 && (bottom - top) / Math.max(1, page.height) >= .18;
+}
 type Reply = { id: number; type: "progress"; value: number } | { id: number; type: "result"; blob: Blob; tableCount?: number; tablePages?: number[]; profiles?: BentoPageProfile[] } | { id: number; type: "error"; code: string };
 let worker: Worker | undefined;
 let current: { id: number; reject: (error: Error) => void; cleanup: () => void } | undefined;
@@ -22,8 +30,8 @@ function getWorker() {
   return worker;
 }
 
-export function convertWithBentoPdf(pdf: Blob, format: Format, fileName: string, signal?: AbortSignal, onProgress?: (value: number) => void) {
-  const job = queue.catch(() => undefined).then(() => run({ type: format, pdf, fileName }, signal, onProgress));
+export function convertWithBentoPdf(pdf: Blob, format: Format, fileName: string, signal?: AbortSignal, onProgress?: (value: number) => void, sourcePages?: number[]) {
+  const job = queue.catch(() => undefined).then(() => run({ type: format, pdf, fileName, sourcePages }, signal, onProgress));
   queue = job.then(() => undefined, () => undefined);
   return job;
 }
@@ -46,7 +54,7 @@ export function profilePagesWithBento(pdf: Blob, pages: number[], signal?: Abort
   return job.then(result => result.profiles ?? []);
 }
 
-function run(request: { type: Format; pdf: Blob; fileName: string } | { type: "page-image-docx"; pages: Array<{ blob: Blob; width: number; height: number }> } | { type: "select-pages" | "profile-pages"; pdf: Blob; pages: number[] }, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<{ blob: Blob; tableCount?: number; tablePages?: number[]; profiles?: BentoPageProfile[] }> {
+function run(request: { type: Format; pdf: Blob; fileName: string; sourcePages?: number[] } | { type: "page-image-docx"; pages: Array<{ blob: Blob; width: number; height: number }> } | { type: "select-pages" | "profile-pages"; pdf: Blob; pages: number[] }, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<{ blob: Blob; tableCount?: number; tablePages?: number[]; profiles?: BentoPageProfile[] }> {
   if (signal?.aborted) return Promise.reject(new DOMException("Conversion cancelled", "AbortError"));
   if (idleTimer) clearTimeout(idleTimer);
   const activeWorker = getWorker();

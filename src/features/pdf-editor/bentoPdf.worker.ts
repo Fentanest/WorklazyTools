@@ -2,7 +2,7 @@
 
 import type { PyMuPDF } from "@bentopdf/pymupdf-wasm";
 
-type Request = { id: number; type: "docx" | "xlsx"; pdf: Blob; fileName: string } | { id: number; type: "page-image-docx"; pages: Array<{ blob: Blob; width: number; height: number }> } | { id: number; type: "select-pages" | "profile-pages"; pdf: Blob; pages: number[] };
+type Request = { id: number; type: "docx" | "xlsx"; pdf: Blob; fileName: string; sourcePages?: number[] } | { id: number; type: "page-image-docx"; pages: Array<{ blob: Blob; width: number; height: number }> } | { id: number; type: "select-pages" | "profile-pages"; pdf: Blob; pages: number[] };
 const scope = self as DedicatedWorkerGlobalScope;
 let runtime: PyMuPDF | undefined;
 let loading: Promise<PyMuPDF> | undefined;
@@ -60,7 +60,8 @@ scope.onmessage = (event: MessageEvent<Request>) => {
         const workbook = XLSX.utils.book_new();
         for (const [index, table] of tables.entries()) {
           const worksheet = XLSX.utils.aoa_to_sheet(table.rows);
-          XLSX.utils.book_append_sheet(workbook, worksheet, tables.length === 1 ? "Table" : `Table ${index + 1} (Page ${table.page})`.slice(0, 31));
+          const sourcePage = "sourcePages" in request ? request.sourcePages?.[table.page - 1] : undefined;
+          XLSX.utils.book_append_sheet(workbook, worksheet, tables.length === 1 ? "Table" : `Table ${index + 1} (Source ${sourcePage === undefined ? table.page : sourcePage + 1})`.slice(0, 31));
         }
         const blob = new Blob([XLSX.write(workbook, { bookType: "xlsx", type: "array" })], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

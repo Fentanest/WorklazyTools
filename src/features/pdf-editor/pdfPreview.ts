@@ -458,7 +458,7 @@ export async function extractPdfText(
       const characters = textPage.lines.reduce((sum, line) => sum + line.text.trim().length, 0);
       if (characters >= 300) continue;
       const pdfPage = await waitWithAbort(document.getPage(sourcePageIndexes[index] + 1), signal);
-      if (await getDominantImageCoverage(pdfPage, ops, signal) >= 0.55) ocrTargets.push(index);
+      if (await getPageImageCoverage(pdfPage, ops, signal) >= 0.55) ocrTargets.push(index);
     }
   }
   const ocrPdfBuffers: ArrayBuffer[] = [];
@@ -538,7 +538,28 @@ async function renderPageForExport(document: PDFDocumentProxy, pageNumber: numbe
     canvas.height = 1;
     throw new Error(featureMessage(language, "pdf.messages.pdfPreview.imageDecodingFailed") ?? `이미지 디코딩에 실패했습니다 (${failedImages.join(", ")}). CCITT/JBIG2 디코더가 로드되지 않았을 수 있습니다.`);
   }
+  // PDF.js puts Text annotation icons in a DOM layer, outside page.render().
+  // Port the marker placement from Stirling's PDF.js fallback adapter so a
+  // pictured page includes the visible note rather than silently omitting it.
+  const annotations = await waitWithAbort(page.getAnnotations({ intent: "display" }), signal);
+  drawTextNoteMarkers(context, viewport, annotations);
   return canvas;
+}
+
+function drawTextNoteMarkers(context: CanvasRenderingContext2D, viewport: ReturnType<PDFPageProxy["getViewport"]>, annotations: Array<{ annotationType?: number; subtype?: string; rect?: number[] }>) {
+  for (const note of annotations) {
+    if ((note.annotationType !== 1 && note.subtype !== "Text") || !note.rect || note.rect.length < 4) continue;
+    const [x1, y1] = viewport.convertToViewportPoint(note.rect[0], note.rect[1]);
+    const [x2, y2] = viewport.convertToViewportPoint(note.rect[2], note.rect[3]);
+    const x = Math.min(x1, x2), y = Math.min(y1, y2);
+    const width = Math.max(12, Math.abs(x2 - x1)), height = Math.max(12, Math.abs(y2 - y1));
+    context.save();
+    context.fillStyle = "#ffff00"; context.strokeStyle = "#000000"; context.lineWidth = Math.max(1, width / 32);
+    context.fillRect(x, y, width, height); context.strokeRect(x, y, width, height);
+    context.fillStyle = "#000000";
+    for (const ratio of [.23, .43, .63, .82]) context.fillRect(x + width * .12, y + height * ratio, width * .76, Math.max(1, height / 32));
+    context.restore();
+  }
 }
 
 /** Render one displayed PDF page at a bounded pixel budget. The PDF.js viewport
@@ -579,12 +600,13 @@ export async function validatePdfImages(file: File, pageIndexes: readonly number
 }
 
 // PDF.js image paint operations use a unit-square image under the graphics CTM.
-// A large image with a short selectable title still needs OCR of its body.
-async function getDominantImageCoverage(page: PDFPageProxy, ops: PdfDisplayModule["OPS"], signal?: AbortSignal) {
+// Sum their clipped union so two half-page scan tiles count as one scanned page.
+async function getPageImageCoverage(page: PDFPageProxy, ops: PdfDisplayModule["OPS"], signal?: AbortSignal) {
   const list = await waitWithAbort(page.getOperatorList(), signal);
   const stack: number[][] = [];
   let matrix = [1, 0, 0, 1, 0, 0];
-  let largest = 0;
+  const viewport = page.getViewport({ scale: 1 });
+  const boxes: Array<{ x0: number; y0: number; x1: number; y1: number }> = [];
   for (let index = 0; index < list.fnArray.length; index += 1) {
     const fn = list.fnArray[index];
     if (fn === ops.save) stack.push([...matrix]);
@@ -594,11 +616,42 @@ async function getDominantImageCoverage(page: PDFPageProxy, ops: PdfDisplayModul
       const [x, y, z, w, tx, ty] = matrix;
       matrix = [x * a + z * b, y * a + w * b, x * c + z * d, y * c + w * d, x * e + z * f + tx, y * e + w * f + ty];
     } else if (fn === ops.paintImageXObject || fn === ops.paintInlineImageXObject) {
-      largest = Math.max(largest, Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2]));
+      const corners = [[0, 0], [1, 0], [0, 1], [1, 1]].map(([u, v]) => viewport.convertToViewportPoint(matrix[0] * u + matrix[2] * v + matrix[4], matrix[1] * u + matrix[3] * v + matrix[5]));
+      const x0 = Math.max(0, Math.min(...corners.map(point => point[0]))), y0 = Math.max(0, Math.min(...corners.map(point => point[1])));
+      const x1 = Math.min(viewport.width, Math.max(...corners.map(point => point[0]))), y1 = Math.min(viewport.height, Math.max(...corners.map(point => point[1])));
+      if (x1 > x0 && y1 > y0) boxes.push({ x0, y0, x1, y1 });
     }
   }
-  const viewport = page.getViewport({ scale: 1 });
-  return Math.min(1, largest / Math.max(1, viewport.width * viewport.height));
+  return Math.min(1, imageRectangleUnionArea(boxes) / Math.max(1, viewport.width * viewport.height));
+}
+
+export async function getPdfImageCoverages(file: File, pageIndexes: readonly number[], language: AppLanguage = "ko", signal?: AbortSignal) {
+  const document = await getPdfDocument(file, language, signal);
+  const ops = (await loadPdfDisplayModule()).OPS;
+  const coverage = new Map<number, number>();
+  for (const index of pageIndexes) {
+    throwIfAborted(signal);
+    coverage.set(index, await getPageImageCoverage(await waitWithAbort(document.getPage(index + 1), signal), ops, signal));
+  }
+  return coverage;
+}
+
+function imageRectangleUnionArea(boxes: Array<{ x0: number; y0: number; x1: number; y1: number }>) {
+  if (!boxes.length) return 0;
+  const edges = [...new Set(boxes.flatMap(box => [box.x0, box.x1]))].sort((left, right) => left - right);
+  let area = 0;
+  for (let index = 0; index < edges.length - 1; index++) {
+    const left = edges[index], right = edges[index + 1];
+    const rows = boxes.filter(box => box.x0 < right && box.x1 > left).sort((a, b) => a.y0 - b.y0);
+    let height = 0, end = -Infinity;
+    for (const row of rows) {
+      if (row.y1 <= end) continue;
+      height += row.y1 - Math.max(row.y0, end);
+      end = row.y1;
+    }
+    area += (right - left) * height;
+  }
+  return area;
 }
 
 interface PdfJsTextItem {
