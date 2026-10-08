@@ -4,6 +4,14 @@
 
 검토 과정에서 산출된 사고의 결과물 정본 — 판정·기각 사유·실측 수치·가설 검증을 작업 단위로 기록한다(「작업 기록」 규칙). 코드에 일어난 변경 자체는 `CHANGELOG.md`에 간결히 기록하고, 여기에는 "왜 그렇게 했고 무엇을 기각했나"를 남긴다. 같은 길을 다시 제안하기 전에 이 파일을 먼저 확인한다.
 
+## 2026-10-08 — Bento·Stirling 문서 변환 엔진 후보 검증
+
+BentoPDF `3a5f146d`의 lockfile에 있던 `@matbee/libreoffice-converter` 2.6.0은 공개 Bento 정적 자산과 npm 엔진 바이트가 달랐고, 일치하는 npm 2.6.0 자산으로도 새 세션의 Calc `documentLoad`가 멈추는 재현이 있었다. 공식 upstream tag `v2.3.1`/커밋 `b94b8a6`에 대응하는 npm 2.3.1의 JS·Worker·WASM·data 5개 원본 해시를 함께 고정했다. 이 버전의 원본 Worker에 `noInitialRun`과 NanumGothic 시작 전 등록을 제한적으로 적용한 결과, 독립 3세션×12파일=36개 PDF의 한글·표·그림·페이지·슬라이드 비율을 다시 열어 확인했다. 같은 배치에서 Worker 시작/종료는 세션마다 1회였고 외부 변환 요청은 없었다. 이전 엔진으로 자동 우회하지 않는다. Office 고정 소스의 정식 묶음 검수는 별도 진행 중이다. — Codx
+
+PDF 코어는 Bento PyMuPDF wrapper 0.11.16과 PyMuPDF 1.26.3/pdf2docx 0.5.8/python-docx 1.2.0 자산을 짝지었고, Stirling-Office-Convert `v0.2.2`를 사용한다. `pdf2docx`의 `ocr=0`은 렌더 모드 3 숨김 글자를 버리고 `ocr=2`는 일반 글자·그림까지 버리므로 혼합 문서 전체에 `ocr=2`를 적용하지 않았다. OCR이 필요한 원본 페이지만 글자·배경을 조합하고, 회전 글자나 색 도장과 겹친 글자의 편집 복원을 보증할 수 없으면 원본 페이지 이미지를 보존하며 이유를 남긴다. PDF로부터 원래 Excel 수식·차트를 복원한다는 표시는 하지 않는다. — Codx
+
+고정 PDF 코어의 실제 브라우저 시나리오 41/41과 별도 혼합 OCR-off 1/1이 통과했다. 생성 DOCX/PPTX를 LibreOffice PDF로, XLSX/ZIP/HWPX의 내용과 이미지 관계를 다시 열어 확인했다. 통합 후보 `47a6020`에서 build/정적 검사, 공개 단위 706/706, 문서→PDF 프로덕션 화면 12/12, 한영 배치 화면 8/8이 통과했다. Office 직접 브라우저 smoke 첫 시도는 Vite 의존성 최적화에 따른 navigation으로 변환 전에 중단됐고, 서버가 준비된 다음 같은 고정 소스로 재실행한 결과 12개 PDF와 취소·초기화 실패·재시도가 통과했다. 정확한 입력 해시·부분 실패 로그·출력 파일은 gitignored `docs/jobs/todo/document-conversion-engines-20261008/`에 보존했다. 같은 입력의 성능·PSS 최종 측정과 정식 통합 판정은 아직 완료로 표시하지 않는다. — Codx
+
 ## 2026-10-08 — 다중 문서 변환 검증 및 한계
 
 제품 소스 `6acf890`에서 build/static/i18n과 unit 706건, 기존 단일 변환 24건을 확인했다. 일괄 변환·취소·언어 전환·OCR의 12개 시나리오는 최초 9건 통과 뒤 실패한 3건을 국소 재검증해 모두 통과했다. 실제 Office 6형식→PDF의 한글 텍스트, 편집형 HWPX의 이미지·텍스트, 문서별 이미지 ZIP과 합본 ZIP을 다시 열었다. Office 취소는 서비스 워커 캐시를 검사 환경에서만 차단하고 실행 중인 worker를 확인한 뒤 취소했으며, 종료 후 worker 0개와 다음 XLSX→PDF 성공을 확인했다.
