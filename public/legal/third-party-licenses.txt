@@ -3881,7 +3881,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ==============================================================================
-@matbee/libreoffice-converter 2.6.0
+@matbee/libreoffice-converter 2.3.1
 Declared license: MPL-2.0
 Homepage: https://github.com/matbeedotcom/libreoffice-document-converter#readme
 No top-level license/notice text was present in the installed package. Consult the package source and metadata above.
