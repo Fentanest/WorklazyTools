@@ -6,6 +6,12 @@ import { textDocumentToOffice } from "./pdfWorkerClient";
 import { PdfConversionError } from "./pdfConversionErrors";
 import type { PdfTextDocument, WorkerProgress } from "./types";
 
+// A conversion caller that owns a File also owns its cached preview session.
+// Export the same release binding used by this core so development-module URLs
+// cannot accidentally create a second PDF.js cache for that File.
+export { releasePdf as releasePdfConversionSource };
+export { profilePagesWithBento as profileConvertedPdfPages };
+
 export type PdfDocumentFormat = "docx" | "xlsx" | "txt" | "pptx" | "hwpx" | "searchable-pdf";
 export type PdfOutputMode = "editable" | "page-image";
 export interface PdfDocumentConversionRequest {
