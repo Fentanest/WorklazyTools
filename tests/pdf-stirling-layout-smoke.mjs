@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import JSZip from 'jszip';
-import { PDFDocument, StandardFonts, degrees } from 'pdf-lib';
+import { PDFDocument, StandardFonts, degrees, setTextRenderingMode, TextRenderingMode } from 'pdf-lib';
+import { PNG } from 'pngjs';
 
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4273';
 const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
@@ -113,6 +114,26 @@ try {
   assert.ok(mixedZip.file('ppt/slides/slide1.xml'), 'rotated blank source page retained');
   assert.match(await mixedZip.file('ppt/slides/slide2.xml').async('string'), /WIDE SECOND/);
   assert.match(await mixedZip.file('ppt/slides/slide3.xml').async('string'), /PORTRAIT FIRST/);
+
+  const scanRaster = new PNG({ width: 20, height: 20 });
+  scanRaster.data.fill(255);
+  const layeredPdf = await PDFDocument.create();
+  const layeredPage = layeredPdf.addPage([612, 792]);
+  const layeredImage = await layeredPdf.embedPng(PNG.sync.write(scanRaster));
+  layeredPage.drawImage(layeredImage, { x: 0, y: 0, width: 612, height: 792 });
+  layeredPage.pushOperators(setTextRenderingMode(TextRenderingMode.Invisible));
+  layeredPage.drawText('HIDDEN OCR WORDS', { x: 80, y: 640, size: 18 });
+  const layeredOutput = await page.evaluate(async bytes => {
+    const file = new File([Uint8Array.from(bytes)], 'layered.pdf', { type: 'application/pdf' });
+    const mod = await import('/src/features/pdf-editor/stirlingDocumentClient.ts');
+    const result = await mod.convertStirlingEditableDocument(file, [0], 'pptx', 'layered', 'en');
+    return { bytes: Array.from(new Uint8Array(await result.blob.arrayBuffer())), preserved: result.imagePreservedSourceIndexes };
+  }, [...await layeredPdf.save()]);
+  const layeredZip = await JSZip.loadAsync(Uint8Array.from(layeredOutput.bytes));
+  const layeredSlide = await layeredZip.file('ppt/slides/slide1.xml').async('string');
+  assert.deepEqual(layeredOutput.preserved, [0]);
+  assert.match(layeredSlide, /<p:pic>/);
+  assert.doesNotMatch(layeredSlide, /HIDDEN OCR WORDS/, 'existing invisible OCR layer does not double printed text');
 
   assert.deepEqual(external, []);
   assert.deepEqual(errors, []);

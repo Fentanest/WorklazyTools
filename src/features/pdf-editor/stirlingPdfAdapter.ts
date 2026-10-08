@@ -45,24 +45,38 @@ export async function readStirlingPage(page: PDFPageProxy, sourceIndex: number):
       size, ascent: Math.max(0.1, (style?.ascent ?? 0.8) * size), descent: Math.max(0.1, Math.abs(style?.descent ?? -0.2) * size),
       font, rgb: 0x222222, seq: glyphs.length, spaceWidth: Math.max(size * 0.25, width / count), invisible: false, rotation });
   }
-  const pictures = await extractPlacedImages(page, viewport);
+  const graphics = await extractPlacedImages(page, viewport);
+  // A pre-existing Tesseract layer commonly uses PDF text rendering mode 3.
+  // On a scan backdrop, exposing that hidden layer as visible PowerPoint text
+  // would print the words twice. Keep it searchable in the PDF source and use
+  // the raster page appearance until OCR preparation supplies visible text.
+  const scanBackdrop = graphics.pictures.some(item => item.frame.width * item.frame.height >= viewport.width * viewport.height * 0.8);
+  const hiddenOcr = scanBackdrop && graphics.invisibleTextOperators > 0
+    && graphics.invisibleTextOperators >= graphics.visibleTextOperators;
   const annotations = (await page.getAnnotations({ intent: "display" })).length;
   return { index: sourceIndex, width: viewport.width, height: viewport.height, direction: page.rotate,
-    glyphs, hidden: [], rotated: glyphs.filter(g => Math.abs(g.rotation) > 2), pictures, annotations };
+    glyphs: hiddenOcr ? [] : glyphs, hidden: hiddenOcr ? glyphs : [],
+    rotated: hiddenOcr ? [] : glyphs.filter(g => Math.abs(g.rotation) > 2), pictures: graphics.pictures, annotations };
 }
 
 interface DecodedImage { width: number; height: number; kind?: number; bitmap?: ImageBitmap; data?: Uint8Array | Uint8ClampedArray }
 type ImagePlacement = { frame: Frame; picture: Picture; order: number };
 
-async function extractPlacedImages(page: PDFPageProxy, viewport: ReturnType<PDFPageProxy["getViewport"]>): Promise<ImagePlacement[]> {
+async function extractPlacedImages(page: PDFPageProxy, viewport: ReturnType<PDFPageProxy["getViewport"]>) {
   const { OPS } = await import("pdfjs-dist");
   const list = await page.getOperatorList();
   const result: ImagePlacement[] = [];
   const stack: number[][] = [];
   let matrix = [1, 0, 0, 1, 0, 0];
   let totalPixels = 0;
+  let textMode = 0, invisibleTextOperators = 0, visibleTextOperators = 0;
   for (let index = 0; index < list.fnArray.length; index++) {
     const op = list.fnArray[index];
+    if (op === OPS.setTextRenderingMode) { textMode = Number(list.argsArray[index][0]); continue; }
+    if (op === OPS.showText || op === OPS.showSpacedText || op === OPS.nextLineShowText || op === OPS.nextLineSetSpacingShowText) {
+      if (textMode === 3 || textMode === 7) invisibleTextOperators++;
+      else visibleTextOperators++;
+    }
     if (op === OPS.save) { stack.push([...matrix]); continue; }
     if (op === OPS.restore) { matrix = stack.pop() ?? [1, 0, 0, 1, 0, 0]; continue; }
     if (op === OPS.transform) { matrix = multiply(matrix, list.argsArray[index] as number[]); continue; }
@@ -90,7 +104,7 @@ async function extractPlacedImages(page: PDFPageProxy, viewport: ReturnType<PDFP
       description: `PDF page ${page.pageNumber} image` };
     result.push({ frame: { x, y, width, height, rotation: picture.rotation }, picture, order: index });
   }
-  return result;
+  return { pictures: result, invisibleTextOperators, visibleTextOperators };
 }
 
 function multiply(m: number[], n: number[]) {
