@@ -77,9 +77,9 @@ test('long extracted text continues on additional editable slides without loss',
  await page.locator('input[type=file]').setInputFiles({name:'long.pdf',mimeType:'application/pdf',buffer:Buffer.from(await doc.save())});
  const zip=await JSZip.loadAsync(await convert('pptx'));const slides=Object.keys(zip.files).filter(n=>/^ppt\/slides\/slide\d+\.xml$/.test(n));assert.ok(slides.length>1);const xml=(await Promise.all(slides.map(n=>zip.file(n).async('string')))).join('');for(let i=0;i<100;i++)assert.ok(xml.includes(`EDITABLE_LINE_${String(i).padStart(3,'0')}`));
 });
-test('image-only PDF with OCR off is not advertised as editable text',async()=>{
+test('image-only PDF with OCR off reopens as a pictured HWPX page',async()=>{
  await page.locator('input[type=file]').setInputFiles(path.join(fixture,'scanned.pdf'));await page.getByRole('button',{name:'Off',exact:true}).click();
- await page.getByRole('radio',{name:/^HWPX/}).click();await page.getByRole('button',{name:'Convert to HWPX',exact:true}).click();await page.getByRole('alert').first().waitFor();assert.equal(await page.getByTestId('pdf-download').count(),0);
+ const bytes=await convert('hwpx');const doc=new HwpDocument(bytes);try{assert.ok(JSON.parse(doc.getPageSourceImageKeys(0)).keys.length>0);assert.match(await page.locator('[data-pdf-mode=pdf-to-document]').innerText(),/not editable/);}finally{doc.free();}
 });
 test('scanned HWPX contains separate OCR text including 42 and a visible scan image',async()=>{
  await page.getByRole('button',{name:'Auto',exact:true}).click();const bytes=await convert('hwpx');const doc=new HwpDocument(bytes);try{assert.match(doc.getTextFileText(),/FIRST PAGE/);assert.match(doc.getTextFileText(),/42/);assert.ok(JSON.parse(doc.getPageSourceImageKeys(0)).keys.length>0);}finally{doc.free();}

@@ -41,13 +41,13 @@ export function batchProcessor(mode: BatchMode, options: BatchOptions, language:
         if ((selected?.length ?? inspected.pageCount) > 200) throw new BatchFailure("page-limit");
         if (mode === "pdf-images") return await pdfToImageArchive(file, options.imageFormat, options.dpi, .9, progress, language, selected, signal, 64 * 1024 ** 2);
         const output = await convertPdfDocument({ source: file, fileName: stem, format: options.format, selectedPageIndexes: selected, ocrMode: options.ocrMode, ocrLanguage: "kor+eng", ocrLayout: options.ocrLayout, outputMode: options.outputMode, language, signal, onProgress: value => progress(value) });
-        return { blob: output.blob, fileName: output.fileName, warningCount: output.warnings.length + output.pages.filter(page => page.warnings.length > 0).length };
+        return { blob: output.blob, fileName: output.fileName, warningCount: output.warnings.length + output.pages.filter(page => page.warnings.length > 0).length, warnings: output.warnings, warningLanguage: language, pageResults: output.pages };
       } finally { await releasePdf(file); }
     } catch (error) {
       if (signal.aborted || error instanceof BatchFailure) throw error;
       const code = error && typeof error === "object" && "code" in error ? error.code : error instanceof Error ? error.message : "";
       throw new BatchFailure(code === "ENCRYPTED" || code === "encrypted-document" ? "encrypted"
-        : code === "NO_TEXT" ? "no-text" : code === "NO_TABLES" ? "no-tables" : code === "OCR_REQUIRED_FOR_TABLES" ? "ocr-required-for-tables" : code === "SCAN_TABLE_UNAVAILABLE" ? "scan-table-unavailable" : code === "BATCH_IMAGE_LIMIT" ? "output-limit"
+        : code === "NO_TEXT" ? "no-text" : code === "NO_TABLES" ? "no-tables" : code === "OCR_REQUIRED_FOR_TABLES" ? "ocr-required-for-tables" : code === "SCAN_TABLE_UNAVAILABLE" ? "scan-table-unavailable" : code === "IMAGE_DECODE" ? "image-decode" : code === "BATCH_IMAGE_LIMIT" ? "output-limit"
         : code === "RUNTIME_UNAVAILABLE" || code === "isolation-required" ? "unavailable"
         : ["WORKER_TIMEOUT", "CONVERSION_TIMEOUT", "office-operation-timeout"].includes(String(code)) ? "timeout" : "conversion");
     }

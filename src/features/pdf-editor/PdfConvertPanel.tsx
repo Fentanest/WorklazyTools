@@ -116,7 +116,12 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
       const output = await convertPdfDocument({ source: file, fileName: normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfConvertPanel.worklazyPdfConversion")), format, selectedPageIndexes, ocrMode, ocrLanguage: "kor+eng", ocrLayout, outputMode, language, signal: controller.signal, onProgress: update });
       if (controller.signal.aborted) return;
       download.makeBlobResult(output.blob, output.fileName, output.warnings);
-      operation.succeed(searchable ? featureMessage(language, "pdf.messages.PdfConvertPanel.createdASearchablePdfWithSelectableText") : featureMessage(language, "pdf.messages.PdfConvertPanel.createdTheFile", { p0: format.toUpperCase() }));
+      operation.succeed(searchable
+        ? ocrMode === "off" ? featureMessage(language, "pdf.messages.PdfConvertPanel.savedPdfWithoutOcr")
+          : output.pages.some(page => page.status === "ocr" || page.status === "existing-ocr" || page.status === "converted")
+            ? featureMessage(language, "pdf.messages.PdfConvertPanel.createdASearchablePdfWithSelectableText")
+            : featureMessage(language, "pdf.messages.PdfConvertPanel.savedPdfWithoutRecognizedText")
+        : featureMessage(language, "pdf.messages.PdfConvertPanel.createdTheFile", { p0: format.toUpperCase() }));
     } catch (reason) {
       if (controller.signal.aborted) return;
       const message = pdfConversionMessage(reason, language);
@@ -132,7 +137,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   return (
     <>
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
-      {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? (direct.acceptedPreset.purpose === "ocr" ? "PDF OCR" : "PDF 변환") : (direct.acceptedPreset.purpose === "ocr" ? "Make a searchable PDF" : "Convert a PDF")} description={language === "ko" ? (direct.acceptedPreset.purpose === "ocr" ? "모든 페이지에 문자 인식을 적용하여 검색 가능한 PDF를 만드세요." : "PDF를 DOCX 등 다른 형식으로 저장하세요.") : (direct.acceptedPreset.purpose === "ocr" ? "Recognize text on all pages and create a searchable PDF." : "Save a PDF as DOCX or another format.")} />}
+      {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? (direct.acceptedPreset.purpose === "ocr" ? "PDF OCR" : "PDF 변환") : (direct.acceptedPreset.purpose === "ocr" ? "Make a searchable PDF" : "Convert a PDF")} description={language === "ko" ? (direct.acceptedPreset.purpose === "ocr" ? "스캔 페이지를 자동으로 인식하고 원본 페이지를 보존해 검색 가능한 PDF를 만드세요." : "PDF를 DOCX 등 다른 형식으로 저장하세요.") : (direct.acceptedPreset.purpose === "ocr" ? "Recognize scanned pages automatically while preserving source pages." : "Save a PDF as DOCX or another format.")} />}
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
         <div>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfConvertPanel.chooseAPdf")} description={featureMessage(language, "pdf.messages.PdfConvertPanel.convertTextOrScannedPdfsToDocxXlsx")} className="">

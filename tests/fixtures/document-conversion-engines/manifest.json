@@ -1,0 +1,47 @@
+{
+  "high-resolution-six.pdf": {
+    "bytes": 181505,
+    "sha256": "7f4ee73088d872f1addf5a8345e66db60b230766fdcff539431fad67e3cbf57e",
+    "pages": 6
+  },
+  "mixed-five.pdf": {
+    "bytes": 1629844,
+    "sha256": "a2cecd076cfcdfeead254a708d6565885ad8c4571beaa8baaf29e850dcb1803f",
+    "pages": 5
+  },
+  "ocr-oracle-digital.pdf": {
+    "bytes": 1685,
+    "sha256": "be5e15c466340eb821de61be2e46c496de0eb28f3ebc0a1cebe5daace84d0ff8",
+    "pages": 1
+  },
+  "restricted-rich.pdf": {
+    "bytes": 797298,
+    "sha256": "fd5a72b11586db1deadf10e21658fd22349cf57ef760b19ea6819f96bac13a2e",
+    "pages": 2
+  },
+  "rotated-cropped-annotation.pdf": {
+    "bytes": 1552,
+    "sha256": "644f8c087dad123d221a188056b05cb1a334e03d9002a96b5514072402db3a89",
+    "pages": 1
+  },
+  "scan-none.pdf": {
+    "bytes": 26753,
+    "sha256": "5d7e732885a1511ecf624e2944a06b2819560503e4a4b73eccf5458da9ce053d",
+    "pages": 1
+  },
+  "scan-opacity0.pdf": {
+    "bytes": 27533,
+    "sha256": "c162bedd2099a9e3d36f7c3d70d629752ae524a922c7d57ac5e4b5d07fb99f87",
+    "pages": 1
+  },
+  "scan-type3.pdf": {
+    "bytes": 27234,
+    "sha256": "4471bd64d29c58a05e55a5a811543c2baa931a71673f986718579c11fd37e1b6",
+    "pages": 1
+  },
+  "short-title-scan.pdf": {
+    "bytes": 20721,
+    "sha256": "5b9d61ab9b21527d1532daf3798f821b9bcead254282a8767afdc7987fcfb149",
+    "pages": 1
+  }
+}

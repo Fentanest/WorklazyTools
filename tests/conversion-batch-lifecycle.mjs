@@ -46,6 +46,6 @@ test('batch loaded/result language switching preserves inputs, options and contr
 });
 test('OCR direct entry starts batch with searchable PDF and manual OCR options stay available',async()=>{
  const {page,context}=await open('pdf-converter/pdf-to-document/ocr');
- try {await add(page,['scanned.pdf','sample.pdf']);assert.equal(await page.getByRole('combobox',{name:'Output format',exact:true}).inputValue(),'searchable-pdf');assert.equal(await page.getByRole('combobox',{name:'OCR scope',exact:true}).inputValue(),'all');await page.getByRole('combobox',{name:'OCR text layout',exact:true}).selectOption('paragraphs');await page.getByLabel('Page range in each file',{exact:true}).fill('1');await page.getByRole('button',{name:'Convert queued files',exact:true}).click();await settled(page);assert.equal(await page.getByTestId('batch-download').count(),2);}
+ try {await add(page,['scanned.pdf','sample.pdf']);assert.equal(await page.getByRole('combobox',{name:'Output format',exact:true}).inputValue(),'searchable-pdf');assert.equal(await page.getByRole('combobox',{name:'OCR scope',exact:true}).inputValue(),'auto');await page.getByRole('combobox',{name:'OCR text layout',exact:true}).selectOption('paragraphs');await page.getByLabel('Page range in each file',{exact:true}).fill('1');await page.getByRole('button',{name:'Convert queued files',exact:true}).click();await settled(page);assert.equal(await page.getByTestId('batch-download').count(),2);}
  finally{await context.close();}
 });

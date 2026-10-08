@@ -9,12 +9,19 @@ const source = path.join(root, "node_modules", "@bentopdf", "pymupdf-wasm");
 const manifest = JSON.parse(await fs.readFile(path.join(source, "package.json"), "utf8"));
 const destination = path.join(root, "public", "vendor", "bento-pymupdf", manifest.version);
 if (manifest.version !== "0.11.16") throw new Error(`Unexpected Bento PyMuPDF version: ${manifest.version}`);
+const requiredAssets = [
+  "pyodide.js", "pyodide.asm.js", "pyodide.asm.wasm", "python_stdlib.zip",
+  "pymupdf-1.26.3-cp313-none-pyodide_2025_0_wasm32.whl",
+  "pdf2docx-0.5.8-py3-none-any.whl", "python_docx-1.2.0-py3-none-any.whl",
+];
+for (const name of requiredAssets) await fs.access(path.join(source, "assets", name));
 await fs.rm(destination, { recursive: true, force: true });
 await fs.mkdir(destination, { recursive: true });
 await fs.cp(path.join(source, "assets"), path.join(destination, "assets"), { recursive: true });
 
 let wrapper = await fs.readFile(path.join(source, "dist", "index.js"), "utf8");
 const originalSha256 = createHash("sha256").update(wrapper).digest("hex");
+if (originalSha256 !== "8dccc58daed71e6898edf99200334e1db665a39265c93ff7cc1ca46101b4eab7") throw new Error("Bento PyMuPDF wrapper source hash changed");
 const begin = wrapper.indexOf("  async pdfToDocx(pdf, pages) {");
 const end = wrapper.indexOf("  async merge(pdfs) {", begin);
 if (begin < 0 || end < 0 || !wrapper.slice(begin, end).includes('cv.convert("/output.docx", pages=${pagesArg})')) {
@@ -139,7 +146,9 @@ with pymupdf.open(\${JSON.stringify(input)}) as _wl_document:
                     _wl_visible.append({'text': _wl_text, 'bbox': _wl_box, 'type': _wl_span['type']})
         _wl_profile.append({'pageIndex': _wl_index, 'rotation': _wl_page.rotation, 'width': _wl_page.rect.width, 'height': _wl_page.rect.height, 'imageCoverage': _wl_coverage, 'visibleCharacters': _wl_visible_chars, 'hiddenSpans': _wl_hidden, 'visibleSpans': _wl_visible})
 _wl_profile_json = json.dumps(_wl_profile, ensure_ascii=False)
-_wl_profile.clear()
+for _wl_name in ('_wl_profile', '_wl_document', '_wl_index', '_wl_page', '_wl_area', '_wl_images', '_wl_coverage', '_wl_hidden', '_wl_visible', '_wl_visible_chars', '_wl_span', '_wl_text', '_wl_box'):
+    globals().pop(_wl_name, None)
+globals().pop('_wl_name', None)
 \`);
       return JSON.parse(pyodide.runPython("_wl_profile_json"));
     } finally {
@@ -187,6 +196,24 @@ const newOpen = `    pyodide.FS.writeFile(inputPath, new Uint8Array(buf));
     }`;
 if (!wrapper.includes(oldOpen)) throw new Error("Bento PyMuPDF document open layout changed");
 wrapper = wrapper.replace(oldOpen, newOpen);
+const oldTables = `json.dumps(result)
+\`);
+    return JSON.parse(result);
+  }
+  tablesToMarkdown(options)`;
+const newTables = `_wl_table_json = json.dumps(result)
+for _wl_name in ('page', 'tables', 'result', 'table', 'bbox', 'header', 'header_data', 'header_bbox', 'rows', 'markdown'):
+    globals().pop(_wl_name, None)
+globals().pop('_wl_name', None)
+_wl_table_json
+\`);
+    try { return JSON.parse(result); }
+    finally { this.runPython("globals().pop('_wl_table_json', None)"); }
+  }
+  tablesToMarkdown(options)`;
+if (!wrapper.includes(oldTables)) throw new Error("Bento PyMuPDF table extraction layout changed");
+wrapper = wrapper.replace(oldTables, newTables);
 await fs.mkdir(path.join(destination, "dist"), { recursive: true });
 await fs.writeFile(path.join(destination, "dist", "index.js"), wrapper);
-await fs.writeFile(path.join(destination, "manifest.json"), JSON.stringify({ version: manifest.version, originalSha256, patchedSha256: createHash("sha256").update(wrapper).digest("hex") }, null, 2));
+const assetHashes = Object.fromEntries(await Promise.all((await fs.readdir(path.join(source, "assets"))).map(async name => [name, createHash("sha256").update(await fs.readFile(path.join(source, "assets", name))).digest("hex")])));
+await fs.writeFile(path.join(destination, "manifest.json"), JSON.stringify({ version: manifest.version, originalSha256, patchedSha256: createHash("sha256").update(wrapper).digest("hex"), assetHashes }, null, 2));

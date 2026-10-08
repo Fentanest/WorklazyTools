@@ -13,6 +13,27 @@ interface DecodedImage {
   data?: Uint8Array | Uint8ClampedArray;
 }
 
+/** Fast integrity check for a conversion that otherwise uses a different PDF
+ * engine. PDF.js reports failed JPEG objects as null while rendering can still
+ * complete, so render success alone cannot prove all pictures survived. */
+export async function validatePdfImageObjects(page: PDFPageProxy, ops: Record<string, number>, signal?: AbortSignal) {
+  const list = await waitWithAbort(page.getOperatorList(), signal);
+  const seen = new Set<string>();
+  for (let index = 0; index < list.fnArray.length; index++) {
+    throwIfAborted(signal);
+    const operation = list.fnArray[index];
+    let decoded: DecodedImage | null;
+    if (operation === ops.paintImageXObject || operation === ops.paintImageXObjectRepeat) {
+      const id = list.argsArray[index][0] as string;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      decoded = await waitWithAbort(new Promise<DecodedImage | null>(resolve => (id.startsWith("g_") ? page.commonObjs : page.objs).get(id, resolve)), signal);
+    } else if (operation === ops.paintInlineImageXObject) decoded = list.argsArray[index][0];
+    else continue;
+    if (!decoded || !decoded.width || !decoded.height || (!decoded.data && !decoded.bitmap)) throw new PdfConversionError("IMAGE_DECODE", { page: page.pageNumber });
+  }
+}
+
 /** Extract bitmap assets, not a screenshot of the PDF page. Vector shapes and masks
  * are deliberately not represented as editable drawings. Placement is rebuilt. */
 export async function extractPdfImages(page: PDFPageProxy, ops: Record<string, number>, _language: AppLanguage, signal?: AbortSignal): Promise<PdfExtractedImage[]> {

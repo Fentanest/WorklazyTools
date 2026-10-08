@@ -89,13 +89,6 @@ const thumbnailCache = new Map<File, Map<string, PdfThumbnailCacheEntry>>();
 const thumbnailRenderQueue: Array<() => void> = [];
 const THUMBNAIL_RENDER_CONCURRENCY = 3;
 let activeThumbnailRenders = 0;
-const TESSERACT_BASE_URL = new URL(
-  "vendor/tesseract/7.0.0/",
-  new URL(import.meta.env.BASE_URL, window.location.origin),
-).href;
-
-
-
 export async function getPdfDocument(file: File, language: AppLanguage = "ko", signal?: AbortSignal) {
   throwIfAborted(signal, "PDF loading cancelled");
   const cached = documentCache.get(file);
@@ -259,12 +252,16 @@ async function renderPdfThumbnailOffMainThread(file: File, pageIndex: number, ca
 
 export async function renderPdfThumbnail(file: File, pageIndex: number, canvas: HTMLCanvasElement, targetWidth = 172, language: AppLanguage = "ko", signal?: AbortSignal) {
   throwIfAborted(signal, "Thumbnail rendering cancelled");
-  try {
-    const workerResult = await renderPdfThumbnailOffMainThread(file, pageIndex, canvas, targetWidth, signal);
-    if (workerResult) return workerResult;
-  } catch (error) {
-    if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
-    // Browsers without a usable worker canvas retain the established compatibility renderer below.
+  // Conversion inspection already owns one PDF.js document. Reuse it across
+  // thumbnails instead of cloning and parsing the entire File in each worker.
+  if (!documentCache.has(file)) {
+    try {
+      const workerResult = await renderPdfThumbnailOffMainThread(file, pageIndex, canvas, targetWidth, signal);
+      if (workerResult) return workerResult;
+    } catch (error) {
+      if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
+      // Browsers without a usable worker canvas retain the compatibility renderer.
+    }
   }
   const pdfDocument = await getPdfDocument(file, language, signal);
   throwIfAborted(signal, "Thumbnail rendering cancelled");
@@ -468,55 +465,29 @@ export async function extractPdfText(
   const ocrHocrBySourceIndex = new Map<number, string>();
 
   if (ocrTargets.length) {
-    const { createWorker } = await waitWithAbort(import("tesseract.js"), signal);
+    const { recognizePdfPage } = await waitWithAbort(import("./pdfOcrClient"), signal);
     throwIfAborted(signal);
-    let activePage = 0;
     onProgress?.(19, featureMessage(language, "pdf.messages.pdfPreview.preparingTheBundledKoreanAndEnglishOcrModels"));
-    const workerPromise = createWorker((options.ocrLanguage ?? "kor+eng").split("+"), undefined, {
-      workerPath: `${TESSERACT_BASE_URL}worker.min.js`,
-      corePath: `${TESSERACT_BASE_URL}core/`,
-      langPath: `${TESSERACT_BASE_URL}lang/`,
-      logger: (message) => {
-        if (signal?.aborted) return;
-        if (message.status === "recognizing text") {
-          const value = 22 + ((activePage + message.progress) / ocrTargets.length) * 68;
-          onProgress?.(value, featureMessage(language, "pdf.messages.pdfPreview.recognizingText", { p0: activePage + 1, p1: ocrTargets.length, p2: Math.round(message.progress * 100) }));
-        } else {
-          onProgress?.(19 + message.progress * 3, translateOcrStatus(message.status, language));
-        }
-      },
-    });
-    void workerPromise.then(worker => { if (signal?.aborted) void worker.terminate(); }, () => undefined);
-    const ocrWorker = await waitWithAbort(workerPromise, signal);
-    let termination: Promise<unknown> | undefined;
-    const terminate = () => { termination ??= ocrWorker.terminate(); return termination; };
-    const abort = () => { void terminate(); };
-    signal?.addEventListener("abort", abort, { once: true });
-    try {
-      throwIfAborted(signal);
-      // Sparse text keeps table cells that the paragraph segmenter can omit.
-      // Users can select paragraphs for continuous prose / reading order.
-      await waitWithAbort(ocrWorker.setParameters({ tessedit_pageseg_mode: options.ocrLayout === "sparse" ? "11" as import("tesseract.js").PSM : "3" as import("tesseract.js").PSM }), signal);
-      for (activePage = 0; activePage < ocrTargets.length; activePage += 1) {
+    for (let activePage = 0; activePage < ocrTargets.length; activePage += 1) {
         const pageIndex = ocrTargets[activePage];
         const sourcePageNumber = sourcePageIndexes[pageIndex] + 1;
         onProgress?.(22 + (activePage / ocrTargets.length) * 68, featureMessage(language, "pdf.messages.pdfPreview.renderingPageForOcr", { p0: activePage + 1, p1: ocrTargets.length, p2: sourcePageNumber }));
         const canvas = await renderPageForOcr(document, sourcePageNumber, language, signal);
         try {
-        let timeout: ReturnType<typeof setTimeout> | undefined;
-        const recognized = await waitWithAbort(Promise.race([ocrWorker.recognize(
-          canvas,
-          searchablePdf ? { pdfTitle: file.name, pdfTextOnly: false } : {},
-          { text: true, blocks: true, hocr: true, pdf: searchablePdf },
-        ), new Promise<never>((_, reject) => { timeout = setTimeout(() => { void terminate(); reject(new Error("OCR_TIMEOUT")); }, 5 * 60_000); })]), signal).finally(() => { if (timeout) clearTimeout(timeout); });
+        const encoded = await canvasToBlob(canvas, "image/png", undefined, language);
+        const recognized = await recognizePdfPage(encoded, options.ocrLanguage ?? "kor+eng", options.ocrLayout ?? "sparse", searchablePdf, signal, (status, value) => {
+          if (signal?.aborted) return;
+          if (status === "recognizing text") onProgress?.(22 + ((activePage + value) / ocrTargets.length) * 68, featureMessage(language, "pdf.messages.pdfPreview.recognizingText", { p0: activePage + 1, p1: ocrTargets.length, p2: Math.round(value * 100) }));
+          else onProgress?.(19 + value * 3, translateOcrStatus(status, language));
+        });
         throwIfAborted(signal);
-        if (recognized.data.hocr) ocrHocrBySourceIndex.set(sourcePageNumber - 1, recognized.data.hocr);
-        const recognizedPage = layoutOcrPage(sourcePageNumber, recognized.data);
+        const recognizedPage = layoutOcrPage(sourcePageNumber, recognized);
+        if (recognized.hocr && recognizedPage.lines.some(line => line.text.trim())) ocrHocrBySourceIndex.set(sourcePageNumber - 1, recognized.hocr);
         const existing = pages[pageIndex];
         const known = new Set(existing.lines.map(line => line.text.trim()).filter(Boolean));
         pages[pageIndex] = { ...existing, lines: [...existing.lines, ...recognizedPage.lines.filter(line => !known.has(line.text.trim()))] };
-        if (searchablePdf && recognized.data.pdf) {
-          const bytes = Uint8Array.from(recognized.data.pdf);
+        if (searchablePdf && recognized.pdf) {
+          const bytes = Uint8Array.from(recognized.pdf);
           ocrPdfBuffers.push(bytes.buffer);
         }
         } finally {
@@ -524,10 +495,6 @@ export async function extractPdfText(
         canvas.height = 1;
         }
         await yieldToBrowser();
-      }
-    } finally {
-      signal?.removeEventListener("abort", abort);
-      await terminate();
     }
   }
 
@@ -585,6 +552,30 @@ export async function renderPdfPageForDocument(file: File, pageIndex: number, la
   try {
     return { blob: await canvasToBlob(canvas, "image/jpeg", 0.9, language), width: viewport.width, height: viewport.height };
   } finally { canvas.width = 1; canvas.height = 1; }
+}
+
+/** Check embedded image decoding without retaining page bitmaps. A damaged
+ * image must not disappear silently from an otherwise valid DOCX/PPTX/HWPX. */
+export async function validatePdfImages(file: File, pageIndexes: readonly number[], language: AppLanguage = "ko", signal?: AbortSignal) {
+  const document = await getPdfDocument(file, language, signal);
+  const ops = (await loadPdfDisplayModule()).OPS;
+  for (const index of pageIndexes) {
+    throwIfAborted(signal);
+    const page = await waitWithAbort(document.getPage(index + 1), signal);
+    const list = await waitWithAbort(page.getOperatorList(), signal);
+    if (!list.fnArray.some(operation => operation === ops.paintImageXObject || operation === ops.paintImageXObjectRepeat || operation === ops.paintInlineImageXObject)) continue;
+    const { validatePdfImageObjects } = await import("./pdfExtractImages");
+    await validatePdfImageObjects(page, ops, signal);
+    const viewport = page.getViewport({ scale: 1 });
+    const scale = Math.min(.25, Math.sqrt(1_000_000 / (viewport.width * viewport.height)));
+    try {
+      const canvas = await renderPageForExport(document, index + 1, scale, language, signal);
+      canvas.width = 1; canvas.height = 1;
+    } catch (error) {
+      if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
+      throw new PdfConversionError("IMAGE_DECODE", { page: index + 1 });
+    }
+  }
 }
 
 // PDF.js image paint operations use a unit-square image under the graphics CTM.

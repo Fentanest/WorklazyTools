@@ -41,12 +41,13 @@ test('page range keeps only requested page in the exported document',async()=>{
  const zip=await JSZip.loadAsync(await convert('docx'));const xml=await zip.file('word/document.xml').async('string');
  assert.match(xml,/SECOND PAGE/);assert.doesNotMatch(xml,/FIRST PAGE/);
 });
-test('scanned PDF fails clearly with OCR off and yields text with OCR on',async()=>{
+test('scanned PDF with OCR off keeps its page image, and automatic OCR adds editable text',async()=>{
  await page.locator('input[type=file]').setInputFiles(path.join(fixture,'scanned.pdf'));
  await page.getByTestId('pdf-output-card').locator('input').first().fill('');
  await page.getByRole('button',{name:'Off',exact:true}).click();
- await page.getByRole('button',{name:'Convert to DOCX',exact:true}).click();
- await page.getByRole('alert').first().waitFor();assert.equal(await page.getByTestId('pdf-download').count(),0);
+ const imageDoc=await JSZip.loadAsync(await convert('docx'));
+ assert.ok(Object.keys(imageDoc.files).some(name=>/^word\/media\/.*\.jpe?g$/i.test(name)),'scan image must be embedded');
+ assert.match(await page.locator('[data-pdf-mode=pdf-to-document]').innerText(),/not editable/);
  await page.getByRole('button',{name:'Auto',exact:true}).click();
  const zip=await JSZip.loadAsync(await convert('docx'));const xml=await zip.file('word/document.xml').async('string');
  assert.match(xml,/FIRST PAGE/);assert.match(xml,/42/);

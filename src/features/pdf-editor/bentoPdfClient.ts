@@ -1,6 +1,6 @@
 type Format = "docx" | "xlsx";
 export interface BentoPageProfile { pageIndex: number; rotation: number; width: number; height: number; imageCoverage: number; visibleCharacters: number; hiddenSpans: Array<{ text: string; bbox: [number, number, number, number]; type: number }>; visibleSpans: Array<{ text: string; bbox: [number, number, number, number]; type: number }> }
-type Reply = { id: number; type: "progress"; value: number } | { id: number; type: "result"; blob: Blob; tableCount?: number; profiles?: BentoPageProfile[] } | { id: number; type: "error"; code: string };
+type Reply = { id: number; type: "progress"; value: number } | { id: number; type: "result"; blob: Blob; tableCount?: number; tablePages?: number[]; profiles?: BentoPageProfile[] } | { id: number; type: "error"; code: string };
 let worker: Worker | undefined;
 let current: { id: number; reject: (error: Error) => void; cleanup: () => void } | undefined;
 let sequence = 0;
@@ -46,12 +46,12 @@ export function profilePagesWithBento(pdf: Blob, pages: number[], signal?: Abort
   return job.then(result => result.profiles ?? []);
 }
 
-function run(request: { type: Format; pdf: Blob; fileName: string } | { type: "page-image-docx"; pages: Array<{ blob: Blob; width: number; height: number }> } | { type: "select-pages" | "profile-pages"; pdf: Blob; pages: number[] }, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<{ blob: Blob; tableCount?: number; profiles?: BentoPageProfile[] }> {
+function run(request: { type: Format; pdf: Blob; fileName: string } | { type: "page-image-docx"; pages: Array<{ blob: Blob; width: number; height: number }> } | { type: "select-pages" | "profile-pages"; pdf: Blob; pages: number[] }, signal?: AbortSignal, onProgress?: (value: number) => void): Promise<{ blob: Blob; tableCount?: number; tablePages?: number[]; profiles?: BentoPageProfile[] }> {
   if (signal?.aborted) return Promise.reject(new DOMException("Conversion cancelled", "AbortError"));
   if (idleTimer) clearTimeout(idleTimer);
   const activeWorker = getWorker();
   const id = ++sequence;
-  return new Promise<{ blob: Blob; tableCount?: number; profiles?: BentoPageProfile[] }>((resolve, reject) => {
+  return new Promise<{ blob: Blob; tableCount?: number; tablePages?: number[]; profiles?: BentoPageProfile[] }>((resolve, reject) => {
     let settled = false;
     const cleanup = () => {
       signal?.removeEventListener("abort", abort);
@@ -68,7 +68,7 @@ function run(request: { type: Format; pdf: Blob; fileName: string } | { type: "p
       if (reply?.id !== id) return;
       if (reply.type === "progress") { onProgress?.(reply.value); return; }
       if (reply.type === "error") finish(() => reject(new Error(reply.code)));
-      else finish(() => resolve({ blob: reply.blob, tableCount: reply.tableCount, profiles: reply.profiles }));
+      else finish(() => resolve({ blob: reply.blob, tableCount: reply.tableCount, tablePages: reply.tablePages, profiles: reply.profiles }));
     };
     const timeout = setTimeout(() => { activeWorker.terminate(); if (worker === activeWorker) worker = undefined; finish(() => reject(new Error("CONVERSION_TIMEOUT"))); }, 10 * 60_000);
     current = { id, reject, cleanup };

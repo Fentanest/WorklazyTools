@@ -1,7 +1,7 @@
 import type { AppLanguage } from "../../i18n/languages";
 import { convertWithBentoPdf, profilePagesWithBento, selectPagesWithBento } from "./bentoPdfClient";
 import { createPageImageDocument } from "./pdfPageImageDocument";
-import { extractPdfText, inspectPdf, releasePdf, type PdfOcrMode } from "./pdfPreview";
+import { extractPdfText, inspectPdf, releasePdf, validatePdfImages, type PdfOcrMode } from "./pdfPreview";
 import { textDocumentToOffice } from "./pdfWorkerClient";
 import { PdfConversionError } from "./pdfConversionErrors";
 import type { PdfTextDocument, WorkerProgress } from "./types";
@@ -24,7 +24,7 @@ export interface PdfDocumentConversionRequest {
 export interface PdfPageConversionResult {
   sourcePageIndex: number;
   inputPageIndex: number;
-  status: "converted" | "image-preserved" | "ocr" | "existing-ocr" | "blank-preserved";
+  status: "converted" | "image-preserved" | "ocr" | "existing-ocr" | "blank-preserved" | "no-table";
   warnings: string[];
 }
 export interface PdfDocumentConversionResult {
@@ -70,6 +70,7 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
     const stem = fileName.trim().replace(/\.[^.]+$/, "") || "worklazy-result";
     let imageMode = request.outputMode === "page-image" && (format === "docx" || format === "pptx" || format === "hwpx");
     let auditDocument: PdfTextDocument | undefined;
+    if (!imageMode && (format === "docx" || format === "pptx" || format === "hwpx")) await validatePdfImages(file, selection, language, signal);
     if (!imageMode && request.ocrMode === "off" && (format === "docx" || format === "pptx" || format === "hwpx")) {
       const text = await extractPdfText(file, "off", false, undefined, selection, language, signal);
       auditDocument = text.document;
@@ -99,6 +100,54 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
         else if (!extracted.document.pages[page.inputPageIndex]?.lines.length) page.status = "blank-preserved";
       }
       return { blob: output.blob, fileName: `${stem}.pdf`, mimeType: MIME[format], warnings: output.warnings, pages: pageResults };
+    }
+    if (format === "pptx" || format === "hwpx") {
+      const { convertStirlingEditableDocument } = await import("./stirlingDocumentClient");
+      const profiles = await profilePagesWithBento(file, selection, signal);
+      const existingLayerPages = new Set(profiles.filter(page => page.imageCoverage >= .55 && page.hiddenSpans.length > 0).map(page => page.pageIndex));
+      const extracted = request.ocrMode === "off" ? undefined : await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
+      let documentFile = file;
+      let inputIndexes = selection;
+      const warnings: string[] = [];
+      if (extracted?.ocrHocrBySourceIndex.size || existingLayerPages.size) {
+        const { prepareOcrPdfForDocx } = await import("./pdfOcrDocxPreparation");
+        const prepared = await prepareOcrPdfForDocx(file, selection, profiles, extracted?.ocrHocrBySourceIndex ?? new Map(), language, signal);
+        documentFile = new File([prepared.pdf], `${stem}-ocr.pdf`, { type: "application/pdf" });
+        inputIndexes = selection.map((_, index) => index);
+        for (const [index, page] of prepared.pages.entries()) {
+          if (page.method === "ocr") pageResults[index].status = "ocr";
+          else if (page.method === "existing-ocr") pageResults[index].status = "existing-ocr";
+          else if (page.method === "image-fallback") pageResults[index].status = "image-preserved";
+          pageResults[index].warnings.push(...page.warnings);
+          warnings.push(...page.warnings);
+        }
+      }
+      const output = await convertStirlingEditableDocument(documentFile, inputIndexes, format, stem, language, onProgress, signal);
+      const sourceIndexOf = (index: number) => documentFile === file ? index : selection[index];
+      for (const index of output.imagePreservedSourceIndexes ?? []) {
+        const sourcePageIndex = sourceIndexOf(index);
+        const result = pageResults.find(page => page.sourcePageIndex === sourcePageIndex);
+        if (result) { result.status = "image-preserved"; result.warnings.push(language === "ko" ? "원본 모양을 그림으로 보존했습니다. 이 페이지의 글자는 편집할 수 없습니다." : "The source appearance was preserved as a picture. Text on this page is not editable."); }
+      }
+      for (const fallback of output.pageFallbacks ?? []) {
+        const sourcePageIndex = sourceIndexOf(fallback.sourceIndex);
+        const detail = /rotation|rotated/.test(fallback.reason) ? language === "ko" ? "페이지 회전" : "page rotation"
+          : /annotation/.test(fallback.reason) ? language === "ko" ? "주석" : "annotations"
+          : /OCR/.test(fallback.reason) ? language === "ko" ? "기존 OCR 글자" : "an existing OCR layer"
+          : language === "ko" ? "겹친 개체나 복잡한 그림" : "overlapping or complex graphics";
+        const warning = language === "ko" ? `원본 ${sourcePageIndex + 1}페이지는 ${detail} 때문에 그림으로 보존했습니다.` : `Source page ${sourcePageIndex + 1} was preserved as a picture because of ${detail}.`;
+        warnings.push(warning);
+        const result = pageResults.find(page => page.sourcePageIndex === sourcePageIndex);
+        if (result) { result.status = "image-preserved"; result.warnings.push(warning); }
+      }
+      for (const index of output.graphicsFlattenedSourceIndexes ?? []) {
+        const sourcePageIndex = sourceIndexOf(index);
+        const warning = language === "ko" ? `원본 ${sourcePageIndex + 1}페이지의 표 선·도형은 그림으로 보존하고 글자는 편집 가능한 개체로 배치했습니다.` : `Table rules and shapes on source page ${sourcePageIndex + 1} were preserved as pictures; text remains editable.`;
+        warnings.push(warning);
+        pageResults.find(page => page.sourcePageIndex === sourcePageIndex)?.warnings.push(warning);
+      }
+      const generalWarnings = output.warnings.filter(warning => !/^(Pages preserved for source layout:|원본 배치 보존이 필요한 페이지:|Pages with shapes and table rules flattened as pictures:|도형·표 선을 그림으로 보존한 페이지:)/.test(warning));
+      return { blob: output.blob, fileName: output.fileName, mimeType: output.mimeType, warnings: [...generalWarnings, ...warnings], pages: pageResults };
     }
     if (format === "docx" || format === "xlsx") {
       const identity = selection.length === inspected.pageCount && selection.every((index, position) => index === position);
@@ -166,9 +215,40 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
         const missing = await missingDocxSourceText(converted.blob, { ...auditDocument, pages: editablePages });
         if (missing.length) throw new PdfConversionError("DOCUMENT_EXPORT", { page: missing[0].pageNumber, format });
       }
-      return { blob: converted.blob, fileName: `${stem}.${format}`, mimeType: MIME[format], warnings: format === "xlsx" ? [language === "ko" ? "PDF에 보이는 표만 추출했습니다. 원래 수식과 차트는 복원되지 않습니다." : "Only tables visible in the PDF were extracted. Original formulas and charts are unavailable."] : warnings, pages: pageResults };
+      if (format === "xlsx") {
+        let tablePages = new Set(converted.tablePages ?? []);
+        const missingPages = pageResults.filter(page => !tablePages.has(page.inputPageIndex));
+        let scannedIndexes = new Set<number>();
+        if (missingPages.length) {
+          const profiles = await profilePagesWithBento(file, missingPages.map(page => page.sourcePageIndex), signal);
+          scannedIndexes = new Set(profiles.filter(page => page.imageCoverage >= .55).map(page => page.pageIndex));
+          if (scannedIndexes.size && request.ocrMode !== "off") {
+            const allProfiles = await profilePagesWithBento(file, selection, signal);
+            const existingLayerPages = new Set(allProfiles.filter(page => page.imageCoverage >= .55 && page.hiddenSpans.length > 0).map(page => page.pageIndex));
+            const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
+            if (extracted.document.characterCount) {
+              const { prepareOcrPdfForDocx } = await import("./pdfOcrDocxPreparation");
+              const prepared = await prepareOcrPdfForDocx(file, selection, allProfiles, extracted.ocrHocrBySourceIndex, language, signal);
+              try {
+                const retry = await convertWithBentoPdf(prepared.pdf, "xlsx", stem, signal);
+                const retryPages = new Set(retry.tablePages ?? []);
+                if ([...tablePages].every(index => retryPages.has(index)) && retryPages.size > tablePages.size) { converted = retry; tablePages = retryPages; }
+              } catch (error) { if (!(error instanceof Error) || error.message !== "NO_TABLES") throw error; }
+            }
+          }
+        }
+        for (const page of pageResults) if (!tablePages.has(page.inputPageIndex)) {
+          page.status = "no-table";
+          const warning = scannedIndexes.has(page.sourcePageIndex)
+            ? language === "ko" ? `원본 ${page.sourcePageIndex + 1}페이지의 스캔 표 셀을 찾지 못했습니다.` : `No reliable scan table cells were found on source page ${page.sourcePageIndex + 1}.`
+            : language === "ko" ? `원본 ${page.sourcePageIndex + 1}페이지에 추출할 표가 없습니다.` : `No extractable table was found on source page ${page.sourcePageIndex + 1}.`;
+          page.warnings.push(warning); warnings.push(warning);
+        }
+        warnings.unshift(language === "ko" ? "PDF에 보이는 표만 추출했습니다. 원래 수식과 차트는 복원되지 않습니다." : "Only tables visible in the PDF were extracted. Original formulas and charts are unavailable.");
+      }
+      return { blob: converted.blob, fileName: `${stem}.${format}`, mimeType: MIME[format], warnings, pages: pageResults };
     }
-    const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { includeImages: format === "pptx" || format === "hwpx", ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage });
+    const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage });
     failIfCanceled();
     for (const [index, page] of extracted.document.pages.entries()) if (!page.lines.length) pageResults[index].status = "blank-preserved";
     if (!extracted.document.characterCount) throw new PdfConversionError("NO_TEXT");

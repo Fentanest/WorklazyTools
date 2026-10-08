@@ -1,3 +1,4 @@
 tests/fixtures/pdf-finish/**/*.pdf binary
 tests/fixtures/pdf-watermark-performance/**/*.pdf binary
 tests/fixtures/pdf-raster-benchmark/**/*.pdf binary
+tests/fixtures/document-conversion-engines/*.pdf binary

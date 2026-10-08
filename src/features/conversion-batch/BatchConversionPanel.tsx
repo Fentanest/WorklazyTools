@@ -11,6 +11,12 @@ import { createZipArchiveBlob } from "../../utils/zipArchive";
 import { HwpPdfPanel } from "../pdf-converter/HwpPdfPanel";
 import { BATCH_LIMITS, BatchQueue, type BatchError, type BatchStatus } from "./batchQueue";
 import { batchProcessor, defaultBatchOptions, validateBatchFile, type BatchMode, type BatchOptions } from "./batchProcessors";
+import { releaseOfficePdfSession } from "../pdf-converter/officePdfClient";
+import { releaseBentoPdfSession } from "../pdf-editor/bentoPdfClient";
+import { releasePdfOcrSession } from "../pdf-editor/pdfOcrClient";
+import { releaseStirlingDocumentSession } from "../pdf-editor/stirlingDocumentClient";
+
+function releasePdfDocumentSessions() { releaseBentoPdfSession(); void releasePdfOcrSession(); releaseStirlingDocumentSession(); }
 
 export function BatchConversionPanel({ mode, files, initialOptions, onFilesChange, onClose }: { mode: BatchMode; files: File[]; initialOptions?: Partial<BatchOptions>; onFilesChange?: (files: File[]) => void; onClose: () => void }) {
   const language = useAppLanguage();
@@ -29,7 +35,7 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
     const next = new BatchQueue(file => validateBatchFile(mode, file));
     const unsubscribe = next.subscribe(() => refresh(value => value + 1));
     setAdmissionError(!next.add(files)); setQueue(next);
-    return () => { unsubscribe(); next.dispose(); zipTask.current?.abort(); };
+    return () => { unsubscribe(); next.dispose(); zipTask.current?.abort(); if (mode === "document-pdf") releaseOfficePdfSession(); if (mode === "pdf-document") releasePdfDocumentSessions(); };
   }, [files, mode]);
   const items = queue?.items ?? [];
   useEffect(() => { if (queue) onFilesChange?.(queue.items.map(item => item.file)); });
@@ -55,6 +61,7 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
     "no-tables": L("PDF에서 표를 찾지 못했습니다. 일반 글은 TXT·DOCX를 선택해 주세요.", "No table was found in the PDF. Choose TXT or DOCX for prose."),
     "ocr-required-for-tables": L("스캔 PDF의 표 셀을 찾지 못했습니다. 검색 가능한 PDF를 먼저 만들어 다시 시도해 주세요.", "Table cells could not be found in this scan. Make a searchable PDF first and retry."),
     "scan-table-unavailable": L("OCR로 글자를 인식했지만 표 셀은 찾지 못했습니다. DOCX·TXT로 인식 결과를 확인해 주세요.", "OCR recognized text but found no reliable table cells. Review the result as DOCX or TXT."),
+    "image-decode": L("PDF의 그림을 읽지 못해 이 파일 변환을 중단했습니다. 원본 파일을 확인해 주세요.", "An image in this PDF could not be decoded. Check the source file and retry."),
     unavailable: L("변환 준비를 완료하지 못했습니다. 연결 상태와 데스크톱 브라우저를 확인해 주세요.", "Conversion could not be prepared. Check your connection and use a current desktop browser."),
     timeout: L("변환 시간이 초과됐습니다. 더 작은 파일로 다시 시도해 주세요.", "Conversion timed out. Retry with a smaller file."),
     conversion: L("변환하지 못했습니다. 파일 형식·손상·암호 여부를 확인한 뒤 다시 시도해 주세요.", "Conversion failed. Check the file format, damage or password protection, then retry."),
@@ -77,7 +84,7 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
       {admissionError && <UtilityNotice kind="error" role="alert" className="mt-3">{L("선택한 묶음이 파일 수 또는 합계 용량 제한을 넘어서 추가되지 않았습니다. 더 작은 묶음을 선택하세요.", "The selected group was not added because it exceeds the file count or total size limit. Choose a smaller group.")}</UtilityNotice>}
     </SectionCard>
     <UtilityNotice kind="info">{L("변환 결과는 합계 128 MiB까지 보관하고, 전체 ZIP은 결과 합계 64 MiB까지 만듭니다. 변환 중 메모리는 파일 용량보다 커질 수 있습니다. 큰 문서는 작은 묶음으로 처리하세요.", "Up to 128 MiB of results are retained. A combined ZIP is available for results totaling up to 64 MiB. Conversion may use much more memory than the input size. Process large documents in smaller groups.")}</UtilityNotice>
-    {mode === "document-pdf" && <UtilityNotice kind="info">{L("Office 변환은 첫 실행 시 약 252 MiB를 불러옵니다. HWP·HWPX는 자동 변환이 끝난 뒤 한 문서씩 인쇄 창에서 PDF로 저장하세요. 저장 여부를 확인할 수 없으며 전체 ZIP에 포함되지 않습니다.", "Office conversion loads about 252 MiB on the first run. After automatic conversions finish, save HWP / HWPX documents individually through the print dialog. Save status cannot be verified, and these files are not included in the combined ZIP.")}</UtilityNotice>}
+    {mode === "document-pdf" && <UtilityNotice kind="info">{L("Office 변환은 첫 실행 시 큰 정적 자산을 불러옵니다. HWP·HWPX는 자동 변환이 끝난 뒤 한 문서씩 인쇄 창에서 PDF로 저장하세요. 저장 여부를 확인할 수 없으며 전체 ZIP에 포함되지 않습니다.", "Office conversion loads substantial static assets on the first run. After automatic conversions finish, save HWP / HWPX documents individually through the print dialog. Save status cannot be verified, and these files are not included in the combined ZIP.")}</UtilityNotice>}
     {mode === "markdown" && <UtilityNotice kind="info">{L("MarkItDown으로 제목·문단·표를 추출합니다. 원본 서식·수식 복원과 스캔 PDF OCR은 지원하지 않습니다.", "MarkItDown extracts headings, paragraphs and tables. Original formatting, formula reconstruction and scanned PDF OCR are not supported.")}</UtilityNotice>}
     {mode === "pdf-images" && <UtilityNotice kind="info">{L("PDF마다 페이지 이미지 ZIP을 만듭니다. 전체 다운로드 ZIP에는 이 문서별 ZIP들이 들어갑니다.", "Each PDF produces a ZIP of page images. The combined download contains these per-document ZIPs.")}</UtilityNotice>}
     {mode === "pdf-document" && <UtilityNotice kind="info">{L("텍스트·이미지 위치에서 편집 문서를 재구성합니다. 원본 문단·표·글꼴의 완전한 복원은 보장하지 않습니다. OCR 결과의 숫자와 읽기 순서를 확인하세요.", "Editable documents are reconstructed from text and image positions. Original paragraphs, tables and fonts may not be fully restored. Check numbers and reading order in OCR results.")}</UtilityNotice>}
@@ -97,7 +104,7 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
       </fieldset>
     </SectionCard>}
     <div className="flex flex-wrap gap-2">
-      <PrimaryButton accent="coral" disabled={busy || !items.some(item => item.status === "pending")} onClick={() => void queue?.run(batchProcessor(mode, { ...options }, language))}>{L("대기 파일 변환", "Convert queued files")}</PrimaryButton>
+      <PrimaryButton accent="coral" disabled={busy || !items.some(item => item.status === "pending")} onClick={() => { void (async () => { try { await queue?.run(batchProcessor(mode, { ...options }, language)); } finally { if (mode === "document-pdf") releaseOfficePdfSession(); if (mode === "pdf-document") releasePdfDocumentSessions(); } })(); }}>{L("대기 파일 변환", "Convert queued files")}</PrimaryButton>
       {queue?.running && <Button variant="outline" onClick={() => queue.cancelAll()}><X size={16} />{L("남은 변환 모두 취소", "Cancel all remaining")}</Button>}
       {!items.length && <Button variant="outline" onClick={onClose}>{L("단일 파일 화면", "Single-file view")}</Button>}
     </div>
@@ -107,7 +114,9 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
         <p role="status" className="my-2 text-sm">{status[item.status]}{item.status === "running" ? ` · ${item.progress}%` : ""}</p>
         {item.status === "running" && <progress aria-label={L("파일 변환 진행률", "File conversion progress")} className="w-full accent-primary" max={100} value={item.progress} />}
         {item.error && <UtilityNotice kind="error" role="alert" className="my-2">{errors[item.error]}</UtilityNotice>}
-        {Boolean(item.output?.warningCount) && <p className="my-2 text-sm">{L("추출·OCR 결과에 주의 사항이 있습니다. 원본과 텍스트·이미지·표를 대조하세요.", "Extraction or OCR requires review. Compare text, images and tables with the original.")}</p>}
+        {Boolean(item.output?.warningCount) && <div className="my-2 text-sm">{item.output?.warningLanguage === language && item.output.warnings?.length
+          ? <ul className="list-disc space-y-1 pl-5">{item.output.warnings.slice(0, 8).map((warning, index) => <li key={`${index}-${warning}`}>{warning}</li>)}</ul>
+          : <p>{L("추출·OCR 결과에 주의 사항이 있습니다. 원본과 텍스트·이미지·표를 대조하세요.", "Extraction or OCR requires review. Compare text, images and tables with the original.")}</p>}</div>}
         <div className="flex flex-wrap gap-2">
           {item.output && <Button render={<a data-testid="batch-download" href={item.output.url} download={item.output.fileName} onClick={() => queue?.saved(item.id)} />}><Download size={16} /><span className="break-all whitespace-normal">{item.output.fileName}</span></Button>}
           {["pending", "running"].includes(item.status) && <Button variant="outline" onClick={() => queue?.cancel(item.id)}><X size={16} />{L("취소", "Cancel")}</Button>}

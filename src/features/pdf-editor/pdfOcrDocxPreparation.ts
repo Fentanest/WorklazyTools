@@ -70,7 +70,7 @@ export async function prepareOcrPdfForDocx(
       if (hocr && profile?.visibleSpans?.length) {
         for (const span of profile.visibleSpans) {
           const normalized = span.text.replace(/\s+/g, "").toLocaleLowerCase();
-          const recognized = ocrPage.lines.some(line => line.words.some(word => word.text.replace(/\s+/g, "").toLocaleLowerCase() === normalized));
+          const recognized = ocrPage.lines.some(line => line.words.map(word => word.text).join("").replace(/\s+/g, "").toLocaleLowerCase() === normalized || line.words.some(word => word.text.replace(/\s+/g, "").toLocaleLowerCase() === normalized));
           if (recognized) continue;
           const bbox = { x0: span.bbox[0] * canvas.width / width, y0: span.bbox[1] * canvas.height / height, x1: span.bbox[2] * canvas.width / width, y1: span.bbox[3] * canvas.height / height };
           ocrPage.lines.push({ bbox, words: [{ text: span.text, bbox, confidence: 100 }], baseline: { slope: 0, intercept: 0 }, textangle: 0, direction: "ltr", injectWordBreaks: false });

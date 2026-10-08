@@ -65,7 +65,7 @@ scope.onmessage = (event: MessageEvent<Request>) => {
         const blob = new Blob([XLSX.write(workbook, { bookType: "xlsx", type: "array" })], {
           type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
-        scope.postMessage({ id: request.id, type: "result", blob, tableCount: tables.length });
+        scope.postMessage({ id: request.id, type: "result", blob, tableCount: tables.length, tablePages: [...new Set(tables.map(table => table.page - 1))] });
       }
     } catch (error) {
       scope.postMessage({ id: request.id, type: "error", code: error instanceof Error ? error.message : String(error) });
