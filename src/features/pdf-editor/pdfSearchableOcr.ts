@@ -34,13 +34,21 @@ export async function createSearchablePdf(
     if (signal?.aborted) throw new DOMException("Conversion cancelled", "AbortError");
     const hocr = hocrBySourceIndex.get(sourcePageIndex);
     const sourcePage = source.getPage(inputIndex);
+    const originalSpans = profileBySource.get(sourcePageIndex);
     let page: ReturnType<PDFDocument["getPage"]>;
     let crop: { x: number; y: number; width: number; height: number };
-    if (hocr && sourcePage.getRotation().angle % 360) {
+    const rasterized = Boolean(hocr && sourcePage.getRotation().angle % 360);
+    if (rasterized) {
       const rendered = await renderPdfPageForDocument(file, sourcePageIndex, language, signal);
       page = pdf.addPage([rendered.width, rendered.height]);
       page.drawImage(await pdf.embedJpg(await rendered.blob.arrayBuffer()), { x: 0, y: 0, width: rendered.width, height: rendered.height });
       crop = { x: 0, y: 0, width: rendered.width, height: rendered.height };
+      let omitted = 0;
+      for (const span of [...(originalSpans?.visibleSpans ?? []), ...(originalSpans?.hiddenSpans ?? [])]) {
+        try { drawPreservedSpan(page, span, crop.height, font); }
+        catch { omitted += 1; }
+      }
+      if (omitted) warnings.push(language === "ko" ? `원본 ${sourcePageIndex + 1}페이지의 기존 글자 ${omitted}개를 다시 배치하지 못했습니다.` : `${omitted} existing text spans could not be retained on source page ${sourcePageIndex + 1}.`);
       warnings.push(language === "ko" ? `원본 ${sourcePageIndex + 1}페이지는 회전된 스캔 모양을 보존해 OCR 글자를 배치했습니다.` : `Rotated scan appearance was preserved while placing OCR text on source page ${sourcePageIndex + 1}.`);
     } else {
       page = pdf.addPage((await pdf.copyPages(source, [inputIndex]))[0]);
@@ -50,7 +58,7 @@ export async function createSearchablePdf(
     const ocrPage = parseHocrDocument(hocr);
     scaleOcrPageToPdfPoints(ocrPage, crop.width, crop.height);
     let dropped = 0, added = 0;
-    const hidden = profileBySource.get(sourcePageIndex)?.hiddenSpans ?? [];
+    const retained = [...(originalSpans?.hiddenSpans ?? []), ...(originalSpans?.visibleSpans ?? [])];
     // Ported placement from BentoPDF src/js/utils/ocr.ts drawOcrTextLayer,
     // commit 3a5f146d1b89d54dc7ca576aa6797c8bd3e42b97.
     for (const line of ocrPage.lines) {
@@ -59,7 +67,7 @@ export async function createSearchablePdf(
       for (const [wordIndex, word] of words.entries()) {
         const text = word.text.replace(/[\p{Cc}\p{Cf}]/gu, "").trim();
         if (!text) continue;
-        if (hidden.some(span => sameHiddenWord(span, word))) continue;
+        if (retained.some(span => sameOriginalWord(span, word))) continue;
         try {
           const placement = calculateWordTransform(word, line, crop.height, (value, size) => font.widthOfTextAtSize(value, size));
           page.drawText(text, { x: crop.x + placement.x, y: crop.y + placement.y, font, size: placement.fontSize, color: rgb(0, 0, 0), opacity: 0, rotate: rotation });
@@ -75,7 +83,18 @@ export async function createSearchablePdf(
   return { blob: new Blob([new Uint8Array(await pdf.save())], { type: "application/pdf" }), warnings, addedSourceIndexes };
 }
 
-function sameHiddenWord(span: BentoPageProfile["hiddenSpans"][number], word: Parameters<typeof calculateWordTransform>[0]) {
+function drawPreservedSpan(page: ReturnType<PDFDocument["getPage"]>, span: BentoPageProfile["hiddenSpans"][number], pageHeight: number, font: PDFFont) {
+  const text = span.text.replace(/[\p{Cc}\p{Cf}]/gu, "").trim();
+  if (!text) return;
+  const [x0, y0, x1, y1] = span.bbox;
+  const bbox = { x0, y0, x1, y1 };
+  const word = { text, bbox, confidence: 100 };
+  const line = { bbox, baseline: { slope: 0, intercept: 0 }, textangle: 0, words: [word], direction: "ltr" as const, injectWordBreaks: false };
+  const placement = calculateWordTransform(word, line, pageHeight, (value, size) => font.widthOfTextAtSize(value, size));
+  page.drawText(text, { x: placement.x, y: placement.y, font, size: placement.fontSize, opacity: 0, color: rgb(0, 0, 0) });
+}
+
+function sameOriginalWord(span: BentoPageProfile["hiddenSpans"][number], word: Parameters<typeof calculateWordTransform>[0]) {
   const text = word.text.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase();
   const existing = span.text.normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase();
   if (!text || !existing.includes(text)) return false;

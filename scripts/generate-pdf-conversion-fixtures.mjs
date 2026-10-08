@@ -27,6 +27,7 @@ const twoTables=await PDFDocument.create();twoTables.addPage((await twoTables.co
 execFileSync('pdftoppm',['-png','-singlefile','-scale-to','1600',path.join(out,'ocr-oracle-digital.pdf'),path.join(out,'oracle')]);
 const png=await fs.readFile(path.join(out,'oracle.png'));
 const blankBitmap=new PNG({width:600,height:800});blankBitmap.data.fill(255);const blankScan=await PDFDocument.create();blankScan.addPage([600,800]).drawImage(await blankScan.embedPng(PNG.sync.write(blankBitmap)),{x:0,y:0,width:600,height:800});await write('blank-scan.pdf',blankScan);
+const mixedBlank=await PDFDocument.create();mixedBlank.addPage((await mixedBlank.copyPages(rich,[0]))[0]);mixedBlank.addPage((await mixedBlank.copyPages(blankScan,[0]))[0]);await write('mixed-digital-blank-scan.pdf',mixedBlank);
 const sourcePng=PNG.sync.read(png), halfHeight=Math.floor(sourcePng.height/2), stride=sourcePng.width*4;
 const splitPng=offset=>{const part=new PNG({width:sourcePng.width,height:halfHeight});part.data.set(sourcePng.data.subarray(offset*stride,(offset+halfHeight)*stride));return PNG.sync.write(part);};
 const upper=splitPng(0),lower=splitPng(halfHeight);
@@ -48,6 +49,7 @@ for(const mode of['none','type3','opacity0']){
  await write(`scan-${mode}.pdf`,d);
 }
 const rotatedScan=await PDFDocument.create(),rotatedPage=rotatedScan.addPage([800,600]);rotatedPage.setRotation(degrees(90));rotatedPage.drawImage(await rotatedScan.embedPng(png),{x:800,y:0,width:600,height:800,rotate:degrees(90)});await write('rotated-upright-scan.pdf',rotatedScan);
+const rotatedSparse=await PDFDocument.load(await fs.readFile(path.join(out,'rotated-upright-scan.pdf'))),sparsePage=rotatedSparse.getPage(0),rotatedFont=await rotatedSparse.embedFont(StandardFonts.Helvetica);sparsePage.pushOperators(pushGraphicsState(),setTextRenderingMode(TextRenderingMode.Invisible));sparsePage.drawText('SCAN BODY',{x:80,y:50,size:24,font:rotatedFont,rotate:degrees(90)});sparsePage.pushOperators(popGraphicsState());await write('rotated-sparse-ocr.pdf',rotatedSparse);
 const geom=await PDFDocument.create();const g=geom.addPage([600,800]);const gf=await geom.embedFont(StandardFonts.Helvetica);g.setCropBox(40,60,500,660);g.setRotation(degrees(90));
 g.drawRectangle({x:40,y:60,width:500,height:660,borderColor:rgb(1,0,0),borderWidth:8});g.drawText('CROP TOP',{x:65,y:675,font:gf,size:26});g.drawText('CROP BOTTOM',{x:65,y:85,font:gf,size:20});
 const ann=geom.context.obj({Type:'Annot',Subtype:'Square',Rect:[440,630,520,700],C:[0,0,1],BS:{W:5,S:'S'},F:4});g.node.set(PDFName.of('Annots'),geom.context.obj([geom.context.register(ann)]));await write('rotated-cropped-annotation.pdf',geom);

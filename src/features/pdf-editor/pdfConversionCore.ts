@@ -268,7 +268,7 @@ export async function convertPdfDocument(request: PdfDocumentConversionRequest):
       : new Set((await profilePagesWithBento(file, selection, signal)).filter(hasAdequateOcrLayer).map(page => page.pageIndex));
     const extracted = await extractPdfText(file, request.ocrMode, false, onProgress, selection, language, signal, { ocrLayout: request.ocrLayout, ocrLanguage: request.ocrLanguage, skipOcrSourceIndexes: existingLayerPages });
     failIfCanceled();
-    const recognized = new Set(extracted.ocrSourceIndexes);
+    const recognized = new Set(extracted.ocrRecognizedSourceIndexes);
     for (const [index, page] of extracted.document.pages.entries()) {
       const result = pageResults[index];
       if (recognized.has(result.sourcePageIndex)) result.status = "ocr";

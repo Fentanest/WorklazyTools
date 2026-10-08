@@ -413,6 +413,7 @@ export interface ExtractPdfTextResult {
   ocrPdfBuffers: ArrayBuffer[];
   ocrPageCount: number;
   ocrSourceIndexes: number[];
+  ocrRecognizedSourceIndexes: number[];
   ocrHocrBySourceIndex: Map<number, string>;
 }
 
@@ -463,6 +464,7 @@ export async function extractPdfText(
   }
   const ocrPdfBuffers: ArrayBuffer[] = [];
   const ocrHocrBySourceIndex = new Map<number, string>();
+  const ocrRecognizedSourceIndexes: number[] = [];
 
   if (ocrTargets.length) {
     const { recognizePdfPage } = await waitWithAbort(import("./pdfOcrClient"), signal);
@@ -482,7 +484,10 @@ export async function extractPdfText(
         });
         throwIfAborted(signal);
         const recognizedPage = layoutOcrPage(sourcePageNumber, recognized);
-        if (recognized.hocr && recognizedPage.lines.some(line => line.text.trim())) ocrHocrBySourceIndex.set(sourcePageNumber - 1, recognized.hocr);
+        if (recognizedPage.lines.some(line => line.text.trim())) {
+          ocrRecognizedSourceIndexes.push(sourcePageNumber - 1);
+          if (recognized.hocr) ocrHocrBySourceIndex.set(sourcePageNumber - 1, recognized.hocr);
+        }
         const existing = pages[pageIndex];
         const known = new Set(existing.lines.map(line => line.text.trim()).filter(Boolean));
         pages[pageIndex] = { ...existing, lines: [...existing.lines, ...recognizedPage.lines.filter(line => !known.has(line.text.trim()))] };
@@ -505,6 +510,7 @@ export async function extractPdfText(
     ocrPdfBuffers,
     ocrPageCount: ocrTargets.length,
     ocrSourceIndexes: ocrTargets.map(index => sourcePageIndexes[index]),
+    ocrRecognizedSourceIndexes,
     ocrHocrBySourceIndex,
   };
 }

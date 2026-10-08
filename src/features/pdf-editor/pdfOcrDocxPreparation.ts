@@ -140,11 +140,20 @@ function hasColoredOverlap(context: CanvasRenderingContext2D, x0: number, y0: nu
   const height = Math.min(context.canvas.height - top, Math.ceil(y1 - y0));
   if (width <= 0 || height <= 0) return false;
   const pixels = context.getImageData(left, top, width, height).data;
-  let colored = 0;
-  const limit = Math.max(12, width * height * .005);
-  for (let index = 0; index < pixels.length; index += 4) {
-    const red = pixels[index], green = pixels[index + 1], blue = pixels[index + 2];
-    if (Math.max(red, green, blue) - Math.min(red, green, blue) > 45 && Math.min(red, green, blue) < 210 && ++colored >= limit) return true;
+  // PDF.js can color-fringe black digital glyph edges. Require a solid 4×4
+  // patch of one dominant hue, which identifies picture/stamp paint while
+  // leaving isolated subpixel fringes alone.
+  for (let y = 0; y <= height - 4; y += 2) for (let x = 0; x <= width - 4; x += 2) {
+    const counts = [0, 0, 0];
+    for (let row = 0; row < 4; row++) for (let column = 0; column < 4; column++) {
+      const index = ((y + row) * width + x + column) * 4;
+      const channels = [pixels[index], pixels[index + 1], pixels[index + 2]];
+      const max = Math.max(...channels), min = Math.min(...channels);
+      if (max - min <= 70 || max < 130 || min > 190) continue;
+      const dominant = channels.indexOf(max);
+      counts[dominant] += 1;
+    }
+    if (Math.max(...counts) >= 13) return true;
   }
   return false;
 }

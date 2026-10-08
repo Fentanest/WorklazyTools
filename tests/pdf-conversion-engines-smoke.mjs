@@ -35,6 +35,7 @@ const tests=[
  {id:'scan-txt-off-reject',input:'scan-none.pdf',format:'txt',expectError:'NO_TEXT'},
  {id:'auto-sparse-layer-txt',input:'two-tile-sparse-ocr.pdf',format:'txt',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42'],expectedPageStatus:'ocr',expectedOnce:'SCAN BODY'},
  {id:'auto-existing-layer-txt',input:'scan-type3.pdf',format:'txt',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42'],expectedPageStatus:'existing-ocr',expectedOnce:'SCAN BODY'},
+ {id:'auto-mixed-blank-scan-txt',input:'mixed-digital-blank-scan.pdf',format:'txt',ocrMode:'auto',expectedText:['FIRST PAGE','42'],expectedPageStatuses:['converted','ocr-skipped'],expectedWarning:/not recognized/},
  {id:'empty-selection-reject',input:'rich.pdf',format:'docx',selectedPageIndexes:[],expectError:'INVALID_RANGE'},
  {id:'auto-scan-docx',input:'scan-none.pdf',format:'docx',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','42'],minImages:1},
  {id:'auto-blank-scan-docx',input:'blank-scan.pdf',format:'docx',ocrMode:'auto',expectedPageStatus:'image-preserved',expectedWarning:/No body text/,minImages:1},
@@ -47,6 +48,8 @@ const tests=[
  {id:'searchable-existing-auto',input:'scan-type3.pdf',format:'searchable-pdf',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42'],expectedPageStatus:'existing-ocr'},
  {id:'searchable-sparse-layer-auto',input:'two-tile-sparse-ocr.pdf',format:'searchable-pdf',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42'],expectedPageStatus:'ocr',expectedOnce:'SCAN BODY'},
  {id:'searchable-rotated-scan-auto',input:'rotated-upright-scan.pdf',format:'searchable-pdf',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42'],expectedPageStatus:'ocr'},
+ {id:'searchable-rotated-hidden-title-auto',input:'rotated-sparse-ocr.pdf',format:'searchable-pdf',ocrMode:'auto',expectedText:['SCAN BODY','FIRST PAGE','Apples','42'],expectedPageStatus:'ocr',expectedOnce:'SCAN BODY',expectedTrace:{term:'SCAN BODY',visible:0,hidden:1}},
+ {id:'searchable-short-digital-title-auto',input:'short-title-scan.pdf',format:'searchable-pdf',ocrMode:'auto',expectedText:['SHORT TITLE','FIRST PAGE','42'],expectedPageStatus:'ocr',expectedOnce:'SHORT TITLE',expectedTrace:{term:'SHORT TITLE',visible:1,hidden:0}},
  {id:'searchable-scan-off',input:'scan-none.pdf',format:'searchable-pdf'},
  {id:'searchable-blank-scan-auto',input:'blank-scan.pdf',format:'searchable-pdf',ocrMode:'auto',expectedPageStatus:'ocr-skipped',expectedWarning:/No OCR text/},
  {id:'highres-pptx-image',input:'high-resolution-six.pdf',format:'pptx',outputMode:'page-image',minImages:6},
@@ -63,7 +66,7 @@ for(const test of selected){
  const data=await page.evaluate(async({input,test})=>{
  const {convertPdfDocument}=await import('/src/features/pdf-editor/pdfConversionCore.ts');const source=new File([new Uint8Array(input)],test.input,{type:'application/pdf'});const controller=new AbortController();const start=performance.now();let last=start,maxDelay=0;const progress=[];
  const beat=setInterval(()=>{const now=performance.now();maxDelay=Math.max(maxDelay,now-last-50);last=now;},50);const timeout=setTimeout(()=>controller.abort(),240000);
- try {const r=await convertPdfDocument({source,fileName:test.id,format:test.format,selectedPageIndexes:test.selectedPageIndexes,ocrMode:test.ocrMode||'off',ocrLanguage:'kor+eng',ocrLayout:'sparse',outputMode:test.outputMode||'editable',language:'en',signal:controller.signal,onProgress:(value,message)=>progress.push({value,message,ms:performance.now()-start})});return {ok:true,fileName:r.fileName,mimeType:r.mimeType,warnings:r.warnings,pages:r.pages,bytes:Array.from(new Uint8Array(await r.blob.arrayBuffer())),ms:performance.now()-start,maxDelay,heap:performance.memory?.usedJSHeapSize,progress};}
+ try {const r=await convertPdfDocument({source,fileName:test.id,format:test.format,selectedPageIndexes:test.selectedPageIndexes,ocrMode:test.ocrMode||'off',ocrLanguage:'kor+eng',ocrLayout:'sparse',outputMode:test.outputMode||'editable',language:'en',signal:controller.signal,onProgress:(value,message)=>progress.push({value,message,ms:performance.now()-start})});const trace=test.expectedTrace?(await(await import('/src/features/pdf-editor/bentoPdfClient.ts')).profilePagesWithBento(r.blob,[0],controller.signal))[0]:undefined;return {ok:true,fileName:r.fileName,mimeType:r.mimeType,warnings:r.warnings,pages:r.pages,trace,bytes:Array.from(new Uint8Array(await r.blob.arrayBuffer())),ms:performance.now()-start,maxDelay,heap:performance.memory?.usedJSHeapSize,progress};}
  catch(e){return {ok:false,error:String(e),ms:performance.now()-start,progress,maxDelay};}finally{clearInterval(beat);clearTimeout(timeout);const {releasePdf}=await import('/src/features/pdf-editor/pdfPreview.ts');await releasePdf(source);}
  },{input:[...source],test});
  let text='',media=[],tables=0;
@@ -72,6 +75,8 @@ for(const test of selected){
  else{
  assert.equal(data.ok,true,data.error);const bytes=Buffer.from(data.bytes);await fs.writeFile(path.join(out,`${test.id}.${test.format}`),bytes);
  if(test.expectedPageStatus)assert.equal(data.pages[0]?.status,test.expectedPageStatus);
+ if(test.expectedTrace){const count=spans=>{const content=(spans||[]).map(span=>span.text).join('').replace(/\s+/g,'').toLowerCase(),term=test.expectedTrace.term.replace(/\s+/g,'').toLowerCase();return content.split(term).length-1;};assert.equal(count(data.trace?.visibleSpans),test.expectedTrace.visible,'visible texttrace count');assert.equal(count(data.trace?.hiddenSpans),test.expectedTrace.hidden,'hidden texttrace count');}
+ if(test.expectedPageStatuses)assert.deepEqual(data.pages.map(page=>page.status),test.expectedPageStatuses);
  if(test.expectedWarning)assert.match(data.warnings.join(' '),test.expectedWarning);
  if(test.expectedPartialPage!==undefined){assert.equal(data.pages[test.expectedPartialPage]?.status,'no-table');assert.ok(data.pages[test.expectedPartialPage]?.warnings.length,'partial XLSX page needs warning');}
  if(test.expectedFallbackPage!==undefined){assert.equal(data.pages[test.expectedFallbackPage]?.status,'image-preserved');assert.ok(data.pages[test.expectedFallbackPage]?.warnings.length,'page fallback needs a warning');}

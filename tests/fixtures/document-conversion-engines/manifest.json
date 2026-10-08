@@ -9,6 +9,11 @@
     "sha256": "7f4ee73088d872f1addf5a8345e66db60b230766fdcff539431fad67e3cbf57e",
     "pages": 6
   },
+  "mixed-digital-blank-scan.pdf": {
+    "bytes": 797522,
+    "sha256": "3f8eac82d22ac92c6487d5ff9067d7a0e79910183202573424c0b042b749fc09",
+    "pages": 2
+  },
   "mixed-five.pdf": {
     "bytes": 1629844,
     "sha256": "a2cecd076cfcdfeead254a708d6565885ad8c4571beaa8baaf29e850dcb1803f",
@@ -27,6 +32,11 @@
   "rotated-cropped-annotation.pdf": {
     "bytes": 1552,
     "sha256": "644f8c087dad123d221a188056b05cb1a334e03d9002a96b5514072402db3a89",
+    "pages": 1
+  },
+  "rotated-sparse-ocr.pdf": {
+    "bytes": 27387,
+    "sha256": "f1ea6d49fff46b8511162aa04071a3d9180a72f2f450c3f7ffb8c1ffb3b6e5b6",
     "pages": 1
   },
   "rotated-upright-scan.pdf": {
