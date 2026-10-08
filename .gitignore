@@ -28,6 +28,7 @@ docs/jobs/
 dummyfortest/
 tests/visual-artifacts/
 public/vendor/pdfjs/
+public/vendor/bento-pymupdf/
 
 public/vendor/markitdown/
 .cache/markitdown/

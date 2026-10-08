@@ -11,9 +11,9 @@ import { cn } from "../../lib/utils";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage } from "../../i18n/routing";
 import { PdfThumbnail } from "./PdfThumbnail";
-import { extractPdfText, inspectPdf, parsePageRange, releasePdf, type PdfOcrMode } from "./pdfPreview";
+import { inspectPdf, parsePageRange, releasePdf, type PdfOcrMode } from "./pdfPreview";
 import { PdfDownloadCard, PdfError, normalizeOutputName, useDownloadResult } from "./pdfUi";
-import { combineOcrPdfPages, textDocumentToOffice } from "./pdfWorkerClient";
+import { convertPdfDocument, type PdfOutputMode } from "./pdfConversionCore";
 import type { PdfPageItem } from "./types";
 import { featureMessage } from "../../i18n/featureMessages";
 import { PdfConversionError } from "./pdfConversionErrors";
@@ -34,6 +34,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   const [format, setFormat] = useState<OutputFormat>("docx");
   const [ocrLayout, setOcrLayout] = useState<"sparse" | "paragraphs">("sparse");
   const [ocrMode, setOcrMode] = useState<PdfOcrMode>("auto");
+  const [outputMode, setOutputMode] = useState<PdfOutputMode>("editable");
   const [outputName, setOutputName] = useState(featureMessage(language, "pdf.messages.PdfConvertPanel.worklazyPdfConversion"));
   const [pageRange, setPageRange] = useState("");
   const [error, setError] = useState("");
@@ -112,22 +113,9 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
       let selectedPageIndexes: number[] | undefined;
       try { selectedPageIndexes = pageRange.trim() ? parsePageRange(pageRange, pageCount, language) : undefined; }
       catch { throw new PdfConversionError("INVALID_RANGE", { count: pageCount }); }
-      const selectedPageCount = selectedPageIndexes?.length || pageCount;
-      const extracted = await extractPdfText(file, searchable ? "all" : ocrMode, searchable, update, selectedPageIndexes, language, controller.signal, { includeImages: format === "pptx" || format === "hwpx", ocrLayout });
-      if (searchable) {
-        if (extracted.ocrPdfBuffers.length !== selectedPageCount) throw new PdfConversionError("OCR_OUTPUT");
-        update(91, featureMessage(language, "pdf.messages.PdfConvertPanel.combiningPagesWithOcrTextLayers"));
-        const output = await combineOcrPdfPages(extracted.ocrPdfBuffers, normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfConvertPanel.worklazySearchablePdf")), (value, message) => update(91 + value * 0.08, message), language, controller.signal);
-        if (controller.signal.aborted) return;
-        download.makeResult(output);
-      } else {
-        if (!extracted.document.characterCount) throw new PdfConversionError("NO_TEXT");
-        update(91, featureMessage(language, "pdf.messages.PdfConvertPanel.buildingAStructureFromCharacters", { p0: extracted.document.characterCount.toLocaleString(), p1: format.toUpperCase() }));
-        const output = await textDocumentToOffice(extracted.document, format, normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfConvertPanel.worklazyPdfConversion")), (value, message) => update(91 + value * 0.08, message), language, controller.signal);
-        if (extracted.ocrPageCount) output.warnings.push(featureMessage(language, "pdf.messages.PdfConvertPanel.pagesUsedKoreanAndEnglishOcrResults", { p0: extracted.ocrPageCount }));
-        if (controller.signal.aborted) return;
-        download.makeResult(output);
-      }
+      const output = await convertPdfDocument({ source: file, fileName: normalizeOutputName(outputName, featureMessage(language, "pdf.messages.PdfConvertPanel.worklazyPdfConversion")), format, selectedPageIndexes, ocrMode: searchable ? "all" : ocrMode, ocrLanguage: "kor+eng", ocrLayout, outputMode, language, signal: controller.signal, onProgress: update });
+      if (controller.signal.aborted) return;
+      download.makeBlobResult(output.blob, output.fileName, output.warnings);
       operation.succeed(searchable ? featureMessage(language, "pdf.messages.PdfConvertPanel.createdASearchablePdfWithSelectableText") : featureMessage(language, "pdf.messages.PdfConvertPanel.createdTheFile", { p0: format.toUpperCase() }));
     } catch (reason) {
       if (controller.signal.aborted) return;
@@ -140,7 +128,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   const extension = format === "searchable-pdf" ? "pdf" : format;
   const previewItems: PdfPageItem[] = file ? Array.from({ length: pageCount }, (_, index) => ({ id: `convert-${index}`, sourceId: "convert-source", sourceName: file.name, sourcePageIndex: index, rotation: 0 })) : [];
 
-  if (batchFiles) return <><DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} /><BatchConversionPanel key={batchGeneration} mode="pdf-document" files={batchFiles} onFilesChange={files => { batchInputs.current = files; }} initialOptions={{ format, ocrMode, ocrLayout, pageRange }} onClose={() => setBatchFiles(undefined)} /></>;
+  if (batchFiles) return <><DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} /><BatchConversionPanel key={batchGeneration} mode="pdf-document" files={batchFiles} onFilesChange={files => { batchInputs.current = files; }} initialOptions={{ format, ocrMode, ocrLayout, outputMode, pageRange }} onClose={() => setBatchFiles(undefined)} /></>;
   return (
     <>
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
@@ -173,6 +161,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
               ] as Array<[OutputFormat, string, string]>).map(([value, label, hint]) => { const selected = format === value; return <Button key={value} type="button" disabled={operation.status === "running"} role="radio" aria-checked={selected} data-selected={selected || undefined} variant="outline" className={cn("min-h-[52px] flex-col items-start justify-center gap-1 rounded-xl px-2.5 py-2 text-left", selected ? "border-primary bg-primary/10 text-foreground hover:bg-primary/15 " : "border-transparent bg-muted text-muted-foreground")} onClick={() => { setFormat(value); download.clearResult(); }}><strong className="text-sm">{label}</strong><small className="text-xs text-muted-foreground">{hint}</small></Button>; })}
             </div>
             {format !== "searchable-pdf" && <div className="pdf-summary-control mt-4 mb-1.5"><span className="mx-0.5 mb-2 flex items-center gap-1.5 text-[13px] font-bold text-muted-foreground"><Languages size={13} /> {featureMessage(language, "pdf.messages.PdfConvertPanel.scannedPageOcr")}</span><SegmentedControl value={ocrMode} onChange={setOcrMode} label={featureMessage(language, "pdf.messages.PdfConvertPanel.ocrScope")} options={[{ value: "auto", label: featureMessage(language, "pdf.messages.PdfConvertPanel.auto") }, { value: "off", label: featureMessage(language, "pdf.messages.PdfConvertPanel.off") }, { value: "all", label: featureMessage(language, "pdf.messages.PdfConvertPanel.all") }]} /></div>}
+            {(["docx", "pptx", "hwpx"] as OutputFormat[]).includes(format) && <label className="mt-3 grid gap-2 text-sm text-muted-foreground">{language === "ko" ? "출력 방식" : "Output mode"}<select disabled={operation.status === "running"} aria-label={language === "ko" ? "출력 방식" : "Output mode"} className="min-h-10 rounded-lg border border-border bg-background px-2 text-foreground" value={outputMode} onChange={event => { setOutputMode(event.target.value as PdfOutputMode); download.clearResult(); }}><option value="editable">{language === "ko" ? "편집 가능한 내용" : "Editable content"}</option><option value="page-image">{language === "ko" ? "페이지 모양 유지 · 글자 편집 불가" : "Preserve page appearance · text not editable"}</option></select></label>}
             {format === "searchable-pdf" && <p className="mt-3 rounded-xl bg-primary/10 p-2.5 text-xs leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfConvertPanel.aSearchablePdfAppliesKoreanAndEnglishOcr")}</p>}
             {(format === "searchable-pdf" || ocrMode !== "off") && <label className="mt-3 grid gap-2 text-sm text-muted-foreground">{language === "ko" ? "OCR 글 배치" : "OCR text layout"}<select disabled={operation.status === "running"} aria-label={language === "ko" ? "OCR 글 배치" : "OCR text layout"} className="min-h-10 rounded-lg border border-border bg-background px-2 text-foreground" value={ocrLayout} onChange={event => { setOcrLayout(event.target.value as "sparse" | "paragraphs"); download.clearResult(); }}><option value="sparse">{language === "ko" ? "표·흩어진 글자" : "Tables / scattered text"}</option><option value="paragraphs">{language === "ko" ? "연속된 문단" : "Continuous paragraphs"}</option></select><span className="text-xs">{language === "ko" ? "인식한 숫자·읽기 순서를 원본과 대조하세요. 누락되면 다른 배치로 다시 시도하세요." : "Check numbers and reading order against the original. Try the other layout if text is missing."}</span></label>}
             <dl className="my-5">

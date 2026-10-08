@@ -6,6 +6,7 @@ const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
 const publicVendorRoot = path.join(projectRoot, "public", "vendor");
 
 await copyPyodide();
+await import("./vendor-bento-pymupdf.mjs");
 await import("./vendor-markitdown.mjs");
 await copyTesseract();
 await copySharedAudioRuntime();

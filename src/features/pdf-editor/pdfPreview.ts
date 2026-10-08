@@ -1,4 +1,4 @@
-import type { PDFDocumentLoadingTask, PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentLoadingTask, PDFDocumentProxy, PDFPageProxy } from "pdfjs-dist";
 import pdfDisplayUrl from "pdfjs-dist/build/pdf.mjs?url";
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
@@ -415,6 +415,7 @@ export interface ExtractPdfTextResult {
   document: PdfTextDocument;
   ocrPdfBuffers: ArrayBuffer[];
   ocrPageCount: number;
+  ocrSourceIndexes: number[];
 }
 
 export async function extractPdfText(
@@ -425,7 +426,7 @@ export async function extractPdfText(
   selectedPageIndexes?: number[],
   language: AppLanguage = "ko",
   signal?: AbortSignal,
-  options: { includeImages?: boolean; ocrLayout?: "sparse" | "paragraphs" } = {},
+  options: { includeImages?: boolean; ocrLayout?: "sparse" | "paragraphs"; ocrLanguage?: "kor" | "eng" | "kor+eng" } = {},
 ): Promise<ExtractPdfTextResult> {
   const document = await getPdfDocument(file, language, signal);
   const pages: PdfTextPage[] = [];
@@ -450,11 +451,18 @@ export async function extractPdfText(
     onProgress?.(2 + ((index + 1) / sourcePageIndexes.length) * 16, featureMessage(language, "pdf.messages.pdfPreview.embeddedTextAnalyzedForPage", { p0: index + 1, p1: sourcePageIndexes.length, p2: pageNumber }));
   }
 
-  const ocrTargets = searchablePdf || ocrMode === "all"
-    ? pages.map((_, index) => index)
-    : ocrMode === "auto"
-      ? pages.flatMap((page, index) => page.lines.reduce((sum, line) => sum + line.text.length, 0) < 8 ? [index] : [])
-      : [];
+  const ocrTargets: number[] = [];
+  if (searchablePdf || ocrMode === "all") ocrTargets.push(...pages.map((_, index) => index));
+  else if (ocrMode === "auto") {
+    const ops = (await loadPdfDisplayModule()).OPS;
+    for (const [index, textPage] of pages.entries()) {
+      const characters = textPage.lines.reduce((sum, line) => sum + line.text.trim().length, 0);
+      if (characters < 8) { ocrTargets.push(index); continue; }
+      if (characters >= 100) continue;
+      const pdfPage = await waitWithAbort(document.getPage(sourcePageIndexes[index] + 1), signal);
+      if (await getDominantImageCoverage(pdfPage, ops, signal) >= 0.55) ocrTargets.push(index);
+    }
+  }
   const ocrPdfBuffers: ArrayBuffer[] = [];
 
   if (ocrTargets.length) {
@@ -462,7 +470,7 @@ export async function extractPdfText(
     throwIfAborted(signal);
     let activePage = 0;
     onProgress?.(19, featureMessage(language, "pdf.messages.pdfPreview.preparingTheBundledKoreanAndEnglishOcrModels"));
-    const workerPromise = createWorker(["kor", "eng"], undefined, {
+    const workerPromise = createWorker((options.ocrLanguage ?? "kor+eng").split("+"), undefined, {
       workerPath: `${TESSERACT_BASE_URL}worker.min.js`,
       corePath: `${TESSERACT_BASE_URL}core/`,
       langPath: `${TESSERACT_BASE_URL}lang/`,
@@ -493,13 +501,17 @@ export async function extractPdfText(
         onProgress?.(22 + (activePage / ocrTargets.length) * 68, featureMessage(language, "pdf.messages.pdfPreview.renderingPageForOcr", { p0: activePage + 1, p1: ocrTargets.length, p2: sourcePageNumber }));
         const canvas = await renderPageForOcr(document, sourcePageNumber, language, signal);
         try {
-        const recognized = await waitWithAbort(ocrWorker.recognize(
+        let timeout: ReturnType<typeof setTimeout> | undefined;
+        const recognized = await waitWithAbort(Promise.race([ocrWorker.recognize(
           canvas,
           searchablePdf ? { pdfTitle: file.name, pdfTextOnly: false } : {},
           { text: true, blocks: true, pdf: searchablePdf },
-        ), signal);
+        ), new Promise<never>((_, reject) => { timeout = setTimeout(() => { void terminate(); reject(new Error("OCR_TIMEOUT")); }, 5 * 60_000); })]), signal).finally(() => { if (timeout) clearTimeout(timeout); });
         throwIfAborted(signal);
-        pages[pageIndex] = { ...layoutOcrPage(sourcePageNumber, recognized.data), images: pages[pageIndex].images };
+        const recognizedPage = layoutOcrPage(sourcePageNumber, recognized.data);
+        const existing = pages[pageIndex];
+        const known = new Set(existing.lines.map(line => line.text.trim()).filter(Boolean));
+        pages[pageIndex] = { ...existing, lines: [...existing.lines, ...recognizedPage.lines.filter(line => !known.has(line.text.trim()))] };
         if (searchablePdf && recognized.data.pdf) {
           const bytes = Uint8Array.from(recognized.data.pdf);
           ocrPdfBuffers.push(bytes.buffer);
@@ -522,6 +534,7 @@ export async function extractPdfText(
     document: { sourceName: file.name, pages, characterCount },
     ocrPdfBuffers,
     ocrPageCount: ocrTargets.length,
+    ocrSourceIndexes: ocrTargets.map(index => sourcePageIndexes[index]),
   };
 }
 
@@ -551,6 +564,42 @@ async function renderPageForExport(document: PDFDocumentProxy, pageNumber: numbe
     throw new Error(featureMessage(language, "pdf.messages.pdfPreview.imageDecodingFailed") ?? `이미지 디코딩에 실패했습니다 (${failedImages.join(", ")}). CCITT/JBIG2 디코더가 로드되지 않았을 수 있습니다.`);
   }
   return canvas;
+}
+
+/** Render one displayed PDF page at a bounded pixel budget. The PDF.js viewport
+ * includes the crop box and page rotation; callers retain only the encoded page. */
+export async function renderPdfPageForDocument(file: File, pageIndex: number, language: AppLanguage = "ko", signal?: AbortSignal, maxPixels = 12_000_000) {
+  const document = await getPdfDocument(file, language, signal);
+  const page = await waitWithAbort(document.getPage(pageIndex + 1), signal);
+  const viewport = page.getViewport({ scale: 1 });
+  const scale = Math.min(2, Math.sqrt(maxPixels / (viewport.width * viewport.height)));
+  const canvas = await renderPageForExport(document, pageIndex + 1, scale, language, signal);
+  try {
+    return { blob: await canvasToBlob(canvas, "image/jpeg", 0.9, language), width: viewport.width, height: viewport.height };
+  } finally { canvas.width = 1; canvas.height = 1; }
+}
+
+// PDF.js image paint operations use a unit-square image under the graphics CTM.
+// A large image with a short selectable title still needs OCR of its body.
+async function getDominantImageCoverage(page: PDFPageProxy, ops: PdfDisplayModule["OPS"], signal?: AbortSignal) {
+  const list = await waitWithAbort(page.getOperatorList(), signal);
+  const stack: number[][] = [];
+  let matrix = [1, 0, 0, 1, 0, 0];
+  let largest = 0;
+  for (let index = 0; index < list.fnArray.length; index += 1) {
+    const fn = list.fnArray[index];
+    if (fn === ops.save) stack.push([...matrix]);
+    else if (fn === ops.restore) matrix = stack.pop() ?? [1, 0, 0, 1, 0, 0];
+    else if (fn === ops.transform) {
+      const [a, b, c, d, e, f] = list.argsArray[index] as number[];
+      const [x, y, z, w, tx, ty] = matrix;
+      matrix = [x * a + z * b, y * a + w * b, x * c + z * d, y * c + w * d, x * e + z * f + tx, y * e + w * f + ty];
+    } else if (fn === ops.paintImageXObject || fn === ops.paintInlineImageXObject) {
+      largest = Math.max(largest, Math.abs(matrix[0] * matrix[3] - matrix[1] * matrix[2]));
+    }
+  }
+  const viewport = page.getViewport({ scale: 1 });
+  return Math.min(1, largest / Math.max(1, viewport.width * viewport.height));
 }
 
 interface PdfJsTextItem {
