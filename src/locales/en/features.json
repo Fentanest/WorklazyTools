@@ -1574,14 +1574,14 @@
   },
   "pdf": {
     "conversionErrors": {
-      "imageDecode": "Could not decode an image on PDF page {{page}}; conversion was stopped. Check the source image or extract text as TXT / DOCX.",
+      "imageDecode": "Could not read an image on PDF page {{page}}. Check whether the image opens in the original PDF.",
       "imageLimit": "The extracted images are too large. Reduce the page range or extract text as TXT / DOCX.",
-      "imagePrepare": "Could not prepare an image on PDF page {{page}} for conversion. Try a smaller page range or extract text as TXT / DOCX.",
+      "imagePrepare": "Could not prepare an image on PDF page {{page}}. Exclude that page or check the original PDF.",
       "documentCreate": "Could not create the {{format}} document. Try again or choose another output format.",
-      "documentImage": "Could not add an image to the {{format}} document. Check the page or extract text as TXT / DOCX.",
+      "documentImage": "Could not add an image to the {{format}} document. Check that page in the original PDF.",
       "documentExport": "Could not finish creating or checking the {{format}} file. Try again or choose another output format.",
       "noTables": "No table was found in this PDF. XLSX extracts visible tables only; choose TXT or DOCX for prose.",
-      "ocrRequiredForTables": "This PDF contains scanned pages without selectable text. OCR is needed before table cells can be extracted; try a searchable PDF first.",
+      "ocrRequiredForTables": "To read tables in this scanned PDF, turn on automatic OCR and try again.",
       "scanTableUnavailable": "OCR recognized scan text, but no reliable table cells were found. Try DOCX or TXT to review the recognized text.",
       "invalidRange": "Enter page numbers between 1 and {{count}}. Use commas and hyphens to select a range.",
       "conversion": "Could not complete the PDF conversion. Try again or choose another output format.",
