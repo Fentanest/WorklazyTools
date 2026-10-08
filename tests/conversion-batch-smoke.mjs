@@ -74,20 +74,19 @@ test('Office batch converts six input formats and retains HWP as manual print on
   assert.deepEqual(external,[]);
  }finally{await context.close();}
 });
-test('active Office worker cancellation destroys the frame and workers, then next file succeeds',async()=>{
+test('canceling held Bento Office WASM loading releases work and converts the next file',async()=>{
  const {page,context}=await open('en','pdf-converter/document-to-pdf',{serviceWorkers:'block'});
  try {
   // This controlled request hold must bypass the production service-worker cache.
   // The preview server still supplies the actual COOP/COEP headers.
   let held; let ready;const reached=new Promise(resolve=>{ready=resolve;});
-  await context.route('**/vendor/zetaoffice/**/office_thread.js',route=>{if(!held && route.request().resourceType()==='other'){held=route;ready();}else void route.continue();});
+  await context.route('**/vendor/libreoffice-converter/2.3.1/soffice.wasm.gz',route=>{if(!held){held=route;ready();}else void route.continue();});
   await add(page,['rich.docx','sample.xlsx']);await page.getByRole('button',{name:'Convert queued files',exact:true}).click();
-  let timer; try { await Promise.race([reached,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Office worker not reached')),120000);})]); } finally { clearTimeout(timer); }
-  const before=page.workers().map(worker=>worker.url());assert.ok(before.length>0);
-  await page.getByTestId('batch-row').first().getByRole('button',{name:'Cancel',exact:true}).click();await context.unroute('**/vendor/zetaoffice/**/office_thread.js');await held.abort().catch(()=>{});
+  let timer; try { await Promise.race([reached,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Bento Office WASM request not reached')),30000);})]); } finally { clearTimeout(timer); }
+  const before=page.workers().map(worker=>worker.url());
+  await page.getByTestId('batch-row').first().getByRole('button',{name:'Cancel',exact:true}).click();await context.unroute('**/vendor/libreoffice-converter/2.3.1/soffice.wasm.gz');await held.abort().catch(()=>{});
   await page.waitForFunction(()=>document.querySelectorAll('[data-testid=batch-row][data-state=running],[data-testid=batch-row][data-state=pending]').length===0);
   assert.deepEqual(await page.getByTestId('batch-row').evaluateAll(rows=>rows.map(row=>row.dataset.state)),['cancelled','success']);
-  await page.waitForFunction(()=>document.querySelectorAll('iframe[data-office-pdf-engine]').length===0);
   for(let attempt=0;attempt<30 && page.workers().length;attempt++) await new Promise(resolve=>setTimeout(resolve,100));assert.equal(page.workers().length,0);
   const saved=await save(page,page.getByTestId('batch-download'),'office-after-cancel.pdf');assert.match(execFileSync('pdftotext',[saved,'-'],{encoding:'utf8'}),/한글/);
   await fs.writeFile(path.join(evidence,'office-worker-cancel.json'),JSON.stringify({before,after:page.workers().map(worker=>worker.url()),states:await page.getByTestId('batch-row').evaluateAll(rows=>rows.map(row=>row.dataset.state))},null,2));
