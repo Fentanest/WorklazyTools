@@ -1,0 +1,11 @@
+[Unit]
+Description=Retry DART source downloads at 18:05 KST after scheduled maintenance
+
+[Timer]
+OnCalendar=2026-10-11 18:05:00 Asia/Seoul
+AccuracySec=1s
+Persistent=true
+Unit=dart-nps-collection-resume-20261011.service
+
+[Install]
+WantedBy=timers.target
