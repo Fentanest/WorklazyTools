@@ -153,8 +153,9 @@ def load_config(root: Path) -> dict:
     config = read_json(root / "docs/agent-ops-config.json")
     if not isinstance(config, dict) or config.get("schema_version") != VERSION:
         raise OpsError("MISSING_OR_INVALID_AGENT_OPS_CONFIG")
-    if config["models"].get("gemini") != "gemini-3.1-pro":
-        raise OpsError("GEMINI_MUST_BE_3_1_PRO")
+    gemini = config["models"].get("gemini")
+    if gemini is not None and (not isinstance(gemini, str) or not gemini.strip()):
+        raise OpsError("INVALID_GEMINI_MODEL")
     for key in ("max_tasks", "max_lines"):
         value = config["review"][key]
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:

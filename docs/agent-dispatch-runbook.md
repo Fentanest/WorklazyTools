@@ -54,22 +54,22 @@ python3 scripts/codex_direct.py --repo "$WORKTREE" cancel "$JOB"
 
 발주 예약은 실제 호출 전 저장하고 잡 ID·실제 실행값은 직후 보존한다. 응답을 잃어 발주 여부가 불명확한 경우 자동 재시도하지 않는다. 같은 worktree의 살아 있는 잡과 미확정 예약을 먼저 확인한다. 원인이 확인된 실패도 취소·종료·diff 보존 뒤에만 재발주한다.
 
-## 3. Gemini — 단일 모델, 셸 허용, 결과 회수
+## 3. Gemini — 모델 고정 없음, 셸 허용, 결과 회수
 
-모든 호출은 **`--model gemini-3.1-pro`**를 명시한다. `--mode plan`, Flash 선택, 모델 생략을 기본값으로 쓰지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
+Gemini 모델은 고정하지 않는다(2026-10-13). 사용 가능한 모델은 `agy models`로 확인하고, `--model`은 필요할 때만 지정한다(생략 시 agy 기본값). 실제 사용 모델을 기록한다. `--mode plan`은 기본값으로 쓰지 않는다. 모델에 따라 `--effort`를 거부하므로 붙이지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
 
 ```bash
-agy --add-dir "$WORKTREE" --model gemini-3.1-pro \
-  --effort high --print-timeout 15m --log-file "$JOB_DIR/gemini.log" \
+agy --add-dir "$WORKTREE" \
+  --print-timeout 15m --log-file "$JOB_DIR/gemini.log" \
   -p "$(cat "$PROMPT_FILE")" < /dev/null \
   > "$JOB_DIR/gemini-out.md" 2> "$JOB_DIR/gemini-err.log"
 ```
 
-호스트의 duration·옵션 지원은 설치본으로 확인한다. 모든 작업의 시간을 15분으로 고정하라는 뜻이 아니다. 간단한 외부 실행 형태를 쓸 때도 모델은 빠뜨리지 않는다.
+호스트의 duration·옵션 지원은 설치본으로 확인한다. 모든 작업의 시간을 15분으로 고정하라는 뜻이 아니다. 
 
 ```bash
 (cd "$WORKTREE" && nohup timeout "$SECONDS_LIMIT" \
-  agy --model gemini-3.1-pro -p "$(cat "$PROMPT_FILE")" \
+  agy -p "$(cat "$PROMPT_FILE")" \
   < /dev/null > "$JOB_DIR/gemini.log" 2>&1 &)
 ```
 
@@ -84,7 +84,7 @@ agy --add-dir "$WORKTREE" --model gemini-3.1-pro \
 - 수집 → Jev → 부족한 자료 재수집은 **외부의 명시적인 순차 단계**로 연결한다. 첫 agy 호출의 실제 결과를 저장하고 `agent_ops.py check` 결과를 읽은 후, 필요 항목과 기존 증거 경로를 다음 agy 호출에 전달한다. 인쇄 모드의 가상의 ‘다음 턴’에 의존하지 않는다.
 - 결과가 완결됐는데 agy가 유휴 상태로 남는 경우는 실제 최종 산출물을 확인한 뒤 소유한 실행만 종료한다. 출력 0바이트·타임아웃·부분 출력은 미확인이다. 회수되지 않은 내부 배경 작업을 완료로 간주하지 않는다.
 
-셸·git 읽기·검색·조사 스크립트는 허용한다. 과거 ‘셸 전면 금지’·특정 allowlist 개수·일괄 짧은 인자 제한은 폐기한다. 비밀값·실주문·운영 데이터/서비스 변경·다른 작업트리 변경 금지는 유지한다. 실제 환경 거부는 stderr·현재 설정·해당 대화 로그로 진단하고, 고칠 수 있는 원인을 고친 뒤 **같은 Gemini 3.1 Pro**로 재실행한다. 한도 초과가 아닌 오류를 Luna 전환으로 처리하지 않는다.
+셸·git 읽기·검색·조사 스크립트는 허용한다. 과거 ‘셸 전면 금지’·특정 allowlist 개수·일괄 짧은 인자 제한은 폐기한다. 비밀값·실주문·운영 데이터/서비스 변경·다른 작업트리 변경 금지는 유지한다. 실제 환경 거부는 stderr·현재 설정·해당 대화 로그로 진단하고, 고칠 수 있는 원인을 고친 뒤 Gemini로 재실행한다. 한도 초과가 아닌 오류를 Luna 전환으로 처리하지 않는다.
 
 ## 4. Jev 연결과 정식 검수 발주
 
