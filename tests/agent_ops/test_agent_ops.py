@@ -210,9 +210,11 @@ class EvidenceAndQueueTests(RepoFixture):
     def test_reserved_question_id(self):
         self.task['requirements'][0]['id']='impact'
         with self.assertRaisesRegex(ops.OpsError,'RESERVED'):ops.validate_task(self.root,self.task)
-    def test_gemini_cannot_be_flash(self):
-        self.config['models']['gemini']='gemini-3.8-flash';self.write_config()
-        with self.assertRaisesRegex(ops.OpsError,'GEMINI_MUST'):ops.load_config(self.root)
+    def test_gemini_model_not_pinned(self):
+        for value in ('gemini-3.8-flash-high',None):
+            self.config['models']['gemini']=value;self.write_config();ops.load_config(self.root)
+        self.config['models']['gemini']='';self.write_config()
+        with self.assertRaisesRegex(ops.OpsError,'INVALID_GEMINI_MODEL'):ops.load_config(self.root)
     def test_missing_required_test_prevents_api_spend(self):
         self.task['tests']=[{'id':'u1','input_paths':['src/search.py']}]
         t=MockTransport();r=ops.check_task(self.root,self.task,JevClient(transport=t))
@@ -288,9 +290,11 @@ class DispatchContractTests(RepoFixture):
         rec={'request':{'model':'gpt-6-astra'},'workspaceRoot':str(self.root),'write':True,'threadId':'abcdef-1234'}
         with patch.object(cd,'job_data',return_value=rec),patch.object(cd,'observed_turn',return_value={'model':'gpt-6-astra','cwd':str(self.root),'sandbox_policy':{'type':'danger-full-access'}}):
             with self.assertRaisesRegex(cd.DispatchError,'SANDBOX'):cd.verify_job(Path('/plugin'),self.root,'task-1','gpt-6-astra',True,{},timeout=0)
-    def test_gemini_model_always_explicit(self):
+    def test_gemini_model_optional(self):
         cmd=gr.build_argv(self.root,'abc',90,Path('/log'))
-        self.assertEqual(cmd[cmd.index('--model')+1],'gemini-3.1-pro');self.assertNotIn('--mode',cmd)
+        self.assertNotIn('--model',cmd);self.assertNotIn('--mode',cmd);self.assertNotIn('--effort',cmd)
+        cmd=gr.build_argv(self.root,'abc',90,Path('/log'),'gemini-3.8-flash-high')
+        self.assertEqual(cmd[cmd.index('--model')+1],'gemini-3.8-flash-high')
     def test_gemini_shell_allowed(self):
         self.assertIn('셸·git 읽기·검색',gr.HEADER);self.assertIn('운영',gr.HEADER)
     def test_no_plaintext_key_in_generated_config(self):

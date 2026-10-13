@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the existing agy subscription connection with Gemini 3.1 Pro.
+"""Run the existing agy subscription connection with Gemini (model optional, see agent-ops-config).
 
 The process is synchronous so its output can feed Jev and a subsequent agy
 invocation. An outer harness may run this helper asynchronously, but must
@@ -18,7 +18,6 @@ import time
 from codex_direct import DispatchError, atomic_json, digest, repo_root, state_home
 from jev_client import JevError, reject_secrets
 
-MODEL = "gemini-3.1-pro"
 HEADER = """조사 작업이다. 제품 코드·테스트·설정 수정, 커밋·push·배포는 금지한다.
 셸·git 읽기·검색·조사 스크립트·공식 자료 조회는 사용할 수 있다.
 비밀 파일·키·계좌 식별값을 읽거나 출력·전송하지 말고 운영 데이터/서비스/실주문과 다른 잡의 worktree는 변경하지 마라.
@@ -30,9 +29,19 @@ HEADER = """조사 작업이다. 제품 코드·테스트·설정 수정, 커밋
 \n"""
 
 
-def build_argv(root: Path, prompt: str, seconds: int, log_path: Path) -> list[str]:
-    return ["agy", "--add-dir", str(root), "--model", MODEL, "--effort", "high",
-            "--print-timeout", str(seconds) + "s", "--log-file", str(log_path), "-p", prompt]
+def configured_model(root: Path) -> str | None:
+    """Model from docs/agent-ops-config.json; None means the agy default (no pin)."""
+    try:
+        return json.loads((root / "docs/agent-ops-config.json").read_text(encoding="utf-8"))["models"].get("gemini")
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def build_argv(root: Path, prompt: str, seconds: int, log_path: Path, model: str | None = None) -> list[str]:
+    argv = ["agy", "--add-dir", str(root)]
+    if model:
+        argv += ["--model", model]
+    return argv + ["--print-timeout", str(seconds) + "s", "--log-file", str(log_path), "-p", prompt]
 
 
 def execute(root: Path, prompt_file: Path, task_id: str, seconds: int = 900) -> dict:
@@ -47,7 +56,8 @@ def execute(root: Path, prompt_file: Path, task_id: str, seconds: int = 900) -> 
     folder = state_home(root) / "gemini" / (task_id + "-" + str(time.time_ns()))
     folder.mkdir(parents=True, mode=0o700)
     prompt = HEADER + "작업 공간: " + str(root) + "\n\n" + raw
-    argv = build_argv(root, prompt, seconds, folder / "native.log")
+    model = configured_model(root)
+    argv = build_argv(root, prompt, seconds, folder / "native.log", model)
     status = "execution_unavailable"
     stdout = stderr = b""
     code = None
@@ -84,7 +94,7 @@ def execute(root: Path, prompt_file: Path, task_id: str, seconds: int = 900) -> 
         except JevError:
             native.write_text("SENSITIVE_NATIVE_LOG_REDACTED\n", encoding="utf-8")
             status = "sensitive_output_blocked"
-    record = {"task_id": task_id, "model": MODEL, "workspace": str(root), "status": status,
+    record = {"task_id": task_id, "model": model or "agy-default", "workspace": str(root), "status": status,
               "exit_code": code, "stdout_path": str(folder / "stdout.md"), "stderr_path": str(folder / "stderr.log"),
               "prompt_sha256": digest(prompt.encode()), "completion": "validate_outputs_before_the_next_dependent_stage",
               "automatic_fallback": False}
