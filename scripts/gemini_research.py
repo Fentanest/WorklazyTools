@@ -38,7 +38,10 @@ def configured_model(root: Path) -> str | None:
 
 
 def build_argv(root: Path, prompt: str, seconds: int, log_path: Path, model: str | None = None) -> list[str]:
-    argv = ["agy", "--add-dir", str(root)]
+    # Always run inside a memory-capped scope: on 2026-10-13 an unbounded agy
+    # diffed ~1M untracked files, grew to 85 GB and took the editor session down.
+    argv = ["systemd-run", "--user", "--scope", "--collect", "--quiet", "-p", "MemoryMax=8G",
+            "-p", "MemorySwapMax=0", "agy", "--add-dir", str(root)]
     if model:
         argv += ["--model", model]
     return argv + ["--print-timeout", str(seconds) + "s", "--log-file", str(log_path), "-p", prompt]

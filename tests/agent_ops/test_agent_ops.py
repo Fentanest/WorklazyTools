@@ -295,6 +295,10 @@ class DispatchContractTests(RepoFixture):
         self.assertNotIn('--model',cmd);self.assertNotIn('--mode',cmd);self.assertNotIn('--effort',cmd)
         cmd=gr.build_argv(self.root,'abc',90,Path('/log'),'gemini-3.8-flash-high')
         self.assertEqual(cmd[cmd.index('--model')+1],'gemini-3.8-flash-high')
+    def test_gemini_runs_memory_capped(self):
+        cmd=gr.build_argv(self.root,'abc',90,Path('/log'))
+        self.assertEqual(cmd[:3],['systemd-run','--user','--scope']);self.assertIn('MemoryMax=8G',cmd)
+        self.assertLess(cmd.index('MemoryMax=8G'),cmd.index('agy'))
     def test_gemini_shell_allowed(self):
         self.assertIn('셸·git 읽기·검색',gr.HEADER);self.assertIn('운영',gr.HEADER)
     def test_no_plaintext_key_in_generated_config(self):

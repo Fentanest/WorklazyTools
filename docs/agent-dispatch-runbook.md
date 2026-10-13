@@ -58,7 +58,10 @@ python3 scripts/codex_direct.py --repo "$WORKTREE" cancel "$JOB"
 
 Gemini 모델은 고정하지 않는다(2026-10-13). 사용 가능한 모델은 `agy models`로 확인하고, `--model`은 필요할 때만 지정한다(생략 시 agy 기본값). 실제 사용 모델을 기록한다. `--mode plan`은 기본값으로 쓰지 않는다. 모델에 따라 `--effort`를 거부하므로 붙이지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
 
+**메모리 상한 필수(2026-10-13 사고):** agy는 작업 폴더의 git 미추적 파일마다 diff를 만든다. 대용량 미추적 운영 데이터가 있는 폴더를 `--add-dir`로 주면 수십 GB까지 커져 시스템 전체 OOM이 나고 편집기·Claude 세션까지 죽는다. 항상 `systemd-run --user --scope --collect -p MemoryMax=8G -p MemorySwapMax=0`으로 감싸고, 저장소 전체 대신 필요한 범위의 작은 폴더를 준다. 운영 데이터 폴더(`artifacts/`)는 로컬 `.git/info/exclude`로 미추적 목록에서 뺀다.
+
 ```bash
+systemd-run --user --scope --collect -p MemoryMax=8G -p MemorySwapMax=0 \
 agy --add-dir "$WORKTREE" \
   --print-timeout 15m --log-file "$JOB_DIR/gemini.log" \
   -p "$(cat "$PROMPT_FILE")" < /dev/null \
