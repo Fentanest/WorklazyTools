@@ -68,8 +68,68 @@ class MappingAndBracketTests(unittest.TestCase):
     def test_subfive_unresolved_is_no_obligation_and_falling_report_consistent(self):
         self.assertEqual(p.compare_ratio('2', self.names.resolve('UNKNOWN'), [])['category'], 'NO_DISCLOSURE_OBLIGATION')
         self.assertEqual(self.compare('3', observation(ratio_pct='4.5'))['category'], 'CONSISTENT')
-        self.assertEqual(self.compare('3', observation(ratio_pct='5.5'))['category'], 'NO_DISCLOSURE_OBLIGATION')
+        self.assertEqual(self.compare('3', observation(ratio_pct='5.5'))['category'], 'FALL_BELOW_REPORT_MISSING')
         self.assertEqual(p.compare_ratio('5', self.names.resolve('UNKNOWN'), [])['category'], 'NAME_UNRESOLVED')
+
+    def test_subfive_missing_report_threshold_ignores_ratio_tolerance(self):
+        for prior, excel in [('5.15', '4.35'), ('6.62', '3.58'), ('5.02', '4.91'), ('5', '4.9999')]:
+            with self.subTest(prior=prior, excel=excel):
+                obs = observation(ratio_pct=prior)
+                result = self.compare(excel, obs)
+                self.assertEqual(result['category'], 'FALL_BELOW_REPORT_MISSING')
+                self.assertEqual(result['reason'], 'last_report_at_or_above_five_percent')
+                self.assertEqual(result['pre_yearend']['ratio_pct'], prior)
+                self.assertEqual(result['pre_yearend']['evidence'], [obs])
+
+    def test_subfive_latest_same_class_pre_yearend_controls_obligation(self):
+        high = observation(ratio_pct='6', base_date='2025-10-01')
+        low = observation(ratio_pct='4', base_date='2025-12-31')
+        future = observation(ratio_pct='7', base_date='2026-01-01')
+        self.assertEqual(self.compare('3', high, low, future)['category'], 'CONSISTENT')
+        self.assertEqual(self.compare('3', future)['category'], 'NO_DISCLOSURE_OBLIGATION')
+        self.assertEqual(self.compare('3', low, observation(ratio_pct='5', base_date='2025-12-31'))['category'],
+                         'DISCREPANCY')
+        result = self.compare('4.91', observation(ratio_pct='5', base_date='2025-12-31'),
+                              observation(ratio_pct='4', base_date='2026-01-01'))
+        self.assertEqual(result['category'], 'FALL_BELOW_REPORT_MISSING')
+        self.assertEqual(result['pre_yearend']['base_date'], '2025-12-31')
+
+    def test_subfive_preferred_requires_own_class_and_series_in_both_directions(self):
+        mapping = self.names.resolve('SYNCO2우B')
+        common = observation(ratio_pct='6')
+        other = observation(ratio_pct='7', security_class='preferred', security_series='우')
+        same = observation(ratio_pct='5.02', security_class='preferred', security_series='2우B')
+        for unrelated in (common, other, observation(issuer_stock_code='654321'),
+                          observation(security_class='preferred', security_series=None)):
+            with self.subTest(unrelated=unrelated):
+                self.assertEqual(p.compare_ratio('4.91', mapping, [unrelated])['category'], 'NO_DISCLOSURE_OBLIGATION')
+        result = p.compare_ratio('4.91', mapping, [common, other, same])
+        self.assertEqual(result['category'], 'FALL_BELOW_REPORT_MISSING')
+        self.assertEqual(result['pre_yearend']['evidence'], [same])
+        self.assertEqual(self.compare('4.91', same, other)['category'], 'NO_DISCLOSURE_OBLIGATION')
+        low = {**same, 'ratio_pct': '4', 'base_date': '2025-11-01'}
+        self.assertEqual(p.compare_ratio('3', mapping, [low, common, other])['category'], 'CONSISTENT')
+
+    def test_subfive_conflicts_do_not_hide_obligation_or_choose_a_receipt(self):
+        for ratios, expected in [(('5.02', '5.1'), 'FALL_BELOW_REPORT_MISSING'),
+                                 (('4', '4.5'), 'CONSISTENT'),
+                                 (('4.9', '5.02'), 'SOURCE_CONFLICT_WITHIN_TOLERANCE'),
+                                 (('3', '6'), 'DISCREPANCY')]:
+            with self.subTest(ratios=ratios):
+                obs = [observation(ratio_pct=r, receipt_no=str(i)) for i, r in enumerate(ratios)]
+                result = self.compare('4.91', *obs)
+                self.assertEqual(result['category'], expected)
+                self.assertIsNone(result['pre_yearend']['ratio_pct'])
+                self.assertEqual(result['pre_yearend']['evidence'], obs)
+
+    def test_subfive_uses_existing_total_position_and_guarantee_selection(self):
+        for extra in ({'position_scope': 'ACCOUNT'}, {'account_identifier': 'A'}, {'position_series_id': 'A'}):
+            self.assertEqual(self.compare('4', observation(**extra))['category'], 'NO_DISCLOSURE_OBLIGATION')
+        low = observation(ratio_pct='4.5')
+        high = observation(ratio_pct='6', guarantee_level='LLM_JUDGMENT')
+        self.assertEqual(self.compare('4', low, high)['category'], 'CONSISTENT')
+        result = self.compare('4', low, {**high, 'base_date': '2025-12-31'})
+        self.assertEqual(result['category'], 'FALL_BELOW_REPORT_MISSING')
 
     def test_tolerance_both_edges_and_outside(self):
         for ratio in ('6', '8', '7'):
@@ -269,6 +329,32 @@ class AdapterAndRunnerTests(unittest.TestCase):
         self.assertTrue(gap['later_than_20261008_build'])
         self.assertIn('DENOMINATOR_UNVERIFIED', report['rows'][0]['pre_yearend']['evidence'][0]['computation_blockers'])
         self.assertEqual(before, {str(x): hashlib.sha256(x.read_bytes()).hexdigest() for x in self.root.rglob('*') if x.is_file()})
+
+    def test_missing_fall_below_report_is_counted_and_lists_observation_receipts(self):
+        self.excel.write_bytes(synthetic_workbook([(1, 'SYNCO', '10', '.1', '.0491'),
+            (2, 'SYNCO우', '1', '.1', '.03'), (3, 'SYNCO2우B', '1', '.1', '.02')]))
+        web = self.artifacts / 'dart-attachments'
+        web.mkdir()
+        records = [formal(ratio_pct='5.02'), formal(ratio_pct='5.020', rcept_no='20251203000001'),
+                   formal(ratio_pct='6', security_class='preferred', security_series='2우B',
+                          rcept_no='20251204000001')]
+        (web / 'structured-holdings.jsonl').write_text(''.join(json.dumps(r) + '\n' for r in records))
+        with patch.object(p, 'reverify', side_effect=AssertionError('not a ratio discrepancy')):
+            report = p.reconcile(self.excel, self.artifacts, self.root)
+        self.assertEqual(report['counts']['FALL_BELOW_REPORT_MISSING'], 2)
+        self.assertEqual(report['counts']['NO_DISCLOSURE_OBLIGATION'], 1)
+        self.assertEqual(sum(report['counts'][c] for c in p.CATEGORIES), 3)
+        self.assertEqual(report['counts']['below_five_percent'], 3)
+        self.assertEqual(report['counts']['disclosure_checkable'], 0)
+        row = report['rows'][0]
+        self.assertEqual(row['pre_yearend']['ratio_pct'], '5.02')
+        self.assertEqual({o['receipt_no'] for o in row['pre_yearend']['evidence']},
+                         {'20251202000001', '20251203000001'})
+        rendered = p.markdown(report)
+        section = rendered.split('## Missing fall-below reports', 1)[1].split('\n## ', 1)[0]
+        for value in ('SYNCO / common', 'SYNCO2우B / preferred / 2우B', '5.02', '2025-12-01',
+                      '20251202000001', '20251203000001', '20251204000001'):
+            self.assertIn(value, section)
 
     def test_discrepancy_without_local_original_does_not_call_worker(self):
         self.write('codex-verdicts.jsonl', [self.record(facts=[fact(stake_pct=5)])])

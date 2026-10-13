@@ -22,7 +22,7 @@ from pipeline.foliotrace import yearend, yearend_worker
 from pipeline.foliotrace.nps_pipeline_adapter import GUARANTEES, NPS, NameMap, PipelineAdapter, day, number
 from pipeline.foliotrace.yearend_reconcile import _safe_source
 
-CATEGORIES = ('NO_DISCLOSURE_OBLIGATION', 'CONSISTENT', 'DISCREPANCY',
+CATEGORIES = ('NO_DISCLOSURE_OBLIGATION', 'FALL_BELOW_REPORT_MISSING', 'CONSISTENT', 'DISCREPANCY',
               'NO_PIPELINE_EVIDENCE', 'NAME_UNRESOLVED', 'SOURCE_CONFLICT_WITHIN_TOLERANCE')
 
 
@@ -67,10 +67,20 @@ def compare_ratio(ratio, mapping, observations, target='2025-12-31'):
     pre, post = endpoint(subject, True, target), endpoint(subject, False, target)
     result.update(pre_yearend=pre, post_yearend=post)
     if below:
-        fallen = pre and pre['ratio_pct'] is not None and Decimal(pre['ratio_pct']) < 5
-        result.update(category='CONSISTENT' if fallen else 'NO_DISCLOSURE_OBLIGATION',
-                      reason='last_report_below_five_percent' if fallen else 'below_five_percent')
-        return result
+        if pre is None:
+            result.update(category='NO_DISCLOSURE_OBLIGATION', reason='below_five_percent')
+            return result
+        ratios = [pre['ratio_pct']] if pre['ratio_pct'] is not None else pre['conflicting_ratios']
+        if all(Decimal(value) < 5 for value in ratios):
+            result.update(category='CONSISTENT', reason='last_report_below_five_percent')
+            return result
+        if all(Decimal(value) >= 5 for value in ratios):
+            # Crossing the disclosure threshold is independent of the 1%p
+            # numerical tolerance. Keep all selected observations/receipts.
+            result.update(category='FALL_BELOW_REPORT_MISSING', reason='last_report_at_or_above_five_percent')
+            return result
+        # Same-day sources straddling 5% cannot establish a fall or absence of
+        # obligation. Preserve the existing source-conflict classification.
     if pre is None:
         result.update(category='NO_PIPELINE_EVIDENCE', reason='no_usable_pre_yearend_observation')
         return result
@@ -302,6 +312,8 @@ def reconcile(workbook, artifacts_root, source_root, *, target='2025-12-31', pro
                              {'path': str(corpfile), 'sha256': corp_digest}, *adapter.inventory],
             'rows': details, 'network': 'not_used', 'models': 'not_called',
             'limitations': ['CONSISTENT means the Excel ratio satisfies the requested 1%p disclosure tolerance, not an exact certified year-end balance.',
+                            'For Excel ratios below 5%, a last same-class observation below 5% is CONSISTENT; one at or above 5% is FALL_BELOW_REPORT_MISSING regardless of tolerance. Conflicts straddling 5% remain source conflicts/discrepancies.',
+                            'FALL_BELOW_REPORT_MISSING identifies a missing fall-below observation in the selected pipeline evidence, not proof that no filing exists. disclosure_checkable counts Excel ratios at or above 5%, not historical filing obligations.',
                             'Post-year-end observations bound time and describe endpoints; they never backdate holdings or assume monotonic trading.',
                             'Preferred classes require their own series; issuer totals and unspecified preferred series are not borrowed.',
                             'LLM reported ratios retain gate blockers and limitations; they are judgments, not Python or calculation guarantees.',
@@ -323,6 +335,17 @@ def markdown(report):
                   f"Previous: `{comparison['previous_report']}` (SHA-256 {comparison['previous_sha256']}).", '',
                   '| Category | Previous | Current | Change |', '| --- | ---: | ---: | ---: |']
         lines += [f"| {key} | {value['previous']} | {value['current']} | {value['delta']:+d} |" for key, value in comparison['counts'].items()]
+    missing = [row for row in report['rows'] if row['category'] == 'FALL_BELOW_REPORT_MISSING']
+    if missing:
+        lines += ['', '## Missing fall-below reports', '',
+                  'Excel is below 5%, but the last same-class pipeline observation is at or above 5%; the 1%p tolerance does not waive this threshold crossing.', '',
+                  '| Name / class / series | Excel % | Last pre-year-end (date / %) | Observation receipts |', '| --- | ---: | --- | --- |']
+        for row in missing:
+            pre = row['pre_yearend']
+            security = ' / '.join(filter(None, (row['mapping']['security_class'], row['mapping'].get('security_series'))))
+            ratios = pre['ratio_pct'] or ', '.join(pre['conflicting_ratios'])
+            receipts = ', '.join(sorted({o['receipt_no'] for o in pre['evidence']}))
+            lines.append(f"| {row['name']} / {security} | {row['excel_ratio_pct']} | {pre['base_date']} / {ratios} | {receipts} |")
     conflicts = [row for row in report['rows'] if row['category'] == 'SOURCE_CONFLICT_WITHIN_TOLERANCE']
     if conflicts:
         lines += ['', '## Source conflicts within tolerance', '', '| Name | Excel % | Observation date | Source ratios % | Receipts |', '| --- | ---: | --- | --- | --- |']
