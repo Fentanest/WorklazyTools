@@ -75,7 +75,7 @@ export function WorkCalculatorPage() {
     observer?.observe(element);
     if (!observer) window.addEventListener("resize", remember);
     return () => { observer?.disconnect(); window.removeEventListener("resize", remember); };
-  }, [state.error, mode]);
+  }, [state, mode]);
   const business = state.business;
   const leave = state.leave;
   const excluded = useMemo(() => business && excludedOpen ? business.excludedPage(excludedPage, 40) : undefined, [business, excludedOpen, excludedPage]);

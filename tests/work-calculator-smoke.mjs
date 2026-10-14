@@ -27,6 +27,9 @@ await test('English range errors interpolate dates and invalid height follows ac
   const invalid=await result().evaluate(e=>e.getBoundingClientRect().height);assert.ok(Math.abs(height-invalid)<=1,`${width}: ${height} -> ${invalid}`);
   await page.locator('#work-hire').fill('2025-12-31');await page.waitForFunction(()=>document.querySelector('#work-hire').getAttribute('aria-invalid')==='false');
  }
+ await page.evaluate(()=>{window.__workNativeResizeObserver=ResizeObserver;window.ResizeObserver=undefined;});
+ try{await page.locator('#work-hire').fill('');await page.waitForFunction(()=>document.querySelector('#work-hire').getAttribute('aria-invalid')==='true');await page.locator('#work-hire').fill('2025-12-31');await page.waitForFunction(()=>document.querySelector('#work-hire').getAttribute('aria-invalid')==='false');await page.locator('#work-asOf').fill('2025-12-31');await page.waitForFunction(()=>document.querySelector('.work-primary-value')?.textContent==='0일');const h=await result().evaluate(e=>e.getBoundingClientRect().height);await page.locator('#work-hire').fill('');await page.waitForFunction(()=>document.querySelector('#work-hire').getAttribute('aria-invalid')==='true');assert.ok(Math.abs((await result().evaluate(e=>e.getBoundingClientRect().height))-h)<=1);}finally{await page.evaluate(()=>{window.ResizeObserver=window.__workNativeResizeObserver;});}
+
 });
 await test('custom holiday draft atomic paste duplicate/outside/remove and reason preservation',async()=>{
  await open();await fillPeriod('2025-05-03','2025-05-09');const original=await page.locator('.work-primary-value').innerText();await page.locator('.work-extra summary').click();
