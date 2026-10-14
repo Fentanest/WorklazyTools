@@ -33,6 +33,10 @@ function legacyOracleWorkerSource(source: Buffer | string) {
     .replace(/^import JSZip from "jszip";\n/m, "")
     .replace(/^import \{ createZipArchiveBlob \} from "\.\.\/\.\.\/utils\/zipArchive\.ts";\n/m, "")
     .replace(/\nasync function exportGroups[\s\S]*?(?=\nasync function decoratePdf)/u, "")
+    // Image conversion has its own final-PDF byte, orientation and layout oracle.
+    // Keep every legacy merge/decorate/save statement pinned independently.
+    .replace(/\nasync function buildImagePdf[\s\S]*?(?=\nasync function combineOcrPdfs)/u, "")
+    .replace('return { ...error, message: error.message, code: error.code };', 'return { message: error.message, code: error.code };')
     .replace(/\n{2,}/gu, "\n");
 }
 
@@ -81,7 +85,7 @@ test("legacy PDF oracles remain tied to the exact main blobs and all three oracl
   assert.equal(
     legacyOracleWorkerSource(currentWorker),
     legacyOracleWorkerSource(baseWorker),
-    "The legacy merge worker remains unchanged outside the independently tested result-ZIP packaging path.",
+    "The legacy merge worker remains unchanged outside the independently tested result-ZIP packaging and image conversion paths.",
   );
   for (const mode of manifest.modes) {
     assert.equal(crypto.createHash("sha256").update(await fs.readFile(path.join(legacyDirectory, mode.output.file))).digest("hex"), mode.output.sha256, mode.mode);
@@ -161,4 +165,13 @@ test("PDF finish fixture generator imports Node built-ins only", async () => {
   const imports = [...source.matchAll(/from\s+["']([^"']+)["']/g)].map((match) => match[1]);
   assert.ok(imports.length > 0);
   assert.ok(imports.every((specifier) => specifier.startsWith("node:")), imports.join(", "));
+});
+
+// Ensure narrowing the image oracle cannot accidentally unpin legacy merge behavior.
+test("legacy worker guard still rejects merge and decoration mutations", async () => {
+  const source = await fs.readFile(path.join(repositoryRoot, "src/features/pdf-editor/pdf.worker.ts"), "utf8");
+  for (const [before, after] of [["output.save({ useObjectStreams: true })", "output.save({ useObjectStreams: false })"], ["watermark.width * 0.55", "watermark.width * 0.5"]]) {
+    assert.ok(source.includes(before));
+    assert.notEqual(legacyOracleWorkerSource(source.replace(before, after)), legacyOracleWorkerSource(source));
+  }
 });

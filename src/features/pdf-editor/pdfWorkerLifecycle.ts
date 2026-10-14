@@ -6,6 +6,9 @@ import type { WorkerProgress } from "./types";
 interface PdfWorkerErrorPayload {
   message?: string;
   code?: string;
+  imageId?: string;
+  stage?: string;
+  errorName?: string;
 }
 
 interface PdfWorkerEnvelope<TResult> {
@@ -39,7 +42,7 @@ export function runPdfWorker<TRequest, TResult>(
 
   return runModuleWorker<TRequest, TResult>(
     () => createPdfEnvelopeAdapter(createWorker, (error) => {
-      envelopeError = error ? { message: error.message, code: error.code } : undefined;
+      envelopeError = error ? { ...error } : undefined;
     }),
     request,
     {
@@ -63,6 +66,8 @@ export function runPdfWorker<TRequest, TResult>(
         ruleId?: string;
       };
       const lifecycleError = error as Error & { code?: string; details?: string[]; ruleId?: string };
+      Object.assign(localized, envelopeError);
+      localized.message = resolveFeatureMessage(language, envelopeError.message);
       localized.code = envelopeError.code ?? lifecycleError.code;
       localized.details = lifecycleError.details;
       localized.ruleId = lifecycleError.ruleId;

@@ -167,32 +167,42 @@ interface FileDropZoneProps {
   multiple?: boolean;
   files: File[];
   onFiles: (files: File[]) => void | Promise<void>;
+  /** Opt-in delta contract; existing consumers still receive the merged list. */
+  onNewFiles?: (files: File[]) => void | Promise<void>;
   accent?: ToolAccent;
   disabled?: boolean;
 }
 
-export function FileDropZone({ label, hint, accept, multiple = false, files, onFiles, accent = "blue", disabled = false }: FileDropZoneProps) {
+export function FileDropZone({ label, hint, accept, multiple = false, files, onFiles, onNewFiles, accent = "blue", disabled = false }: FileDropZoneProps) {
   const { t } = useTranslation("common");
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
+  const processing = useRef(false);
+  const [pending, setPending] = useState(false);
+  const selectionGeneration = useRef(0);
+  const blocked = disabled || pending;
   const accessibleName = t("files.selectOrDrop", { label: label || t("files.generic"), action: multiple && files.length ? t("files.add") : t("files.select") });
 
   const appendFiles = async (incoming: FileList | null) => {
-    if (!incoming || disabled) return;
+    if (!incoming || disabled || processing.current) return;
+    processing.current = true; setPending(true);
     const next = Array.from(incoming);
-    await onFiles(multiple ? [...files, ...next] : next.slice(0, 1));
+    try {
+      if (onNewFiles) await onNewFiles(multiple ? next : next.slice(0, 1));
+      else await onFiles(multiple ? [...files, ...next] : next.slice(0, 1));
+    } finally { processing.current = false; setPending(false); }
   };
 
   const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
     const selectedFiles = input.files;
+    const generation = ++selectionGeneration.current;
     try {
       await appendFiles(selectedFiles);
     } finally {
-      // Some browsers revoke access to a selected File as soon as the input is
-      // reset. Keep the selection alive until async consumers finish copying it.
-      input.value = "";
+      // Await the consumer before resetting; an older event must not clear a newer selection.
+      if (generation === selectionGeneration.current) input.value = "";
     }
   };
 
@@ -209,28 +219,28 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
   };
 
   return (
-    <div data-ui-component="file-drop-zone" className="ui-drop-zone-wrap">
+    <div data-ui-component="file-drop-zone" className="ui-drop-zone-wrap" aria-busy={pending}>
       {label && <label className="mb-2 ml-0.5 block text-sm font-bold" htmlFor={id}>{label}</label>}
-      <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple={multiple} disabled={disabled} aria-label={accessibleName} onChange={handleChange} />
+      <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple={multiple} disabled={blocked} aria-label={accessibleName} onChange={handleChange} />
       <Card
         data-ui-part="drop-target"
         className={cn(
           "relative min-h-28 flex-row items-center gap-3 overflow-visible rounded-4xl border border-dashed border-border bg-muted/40 p-4 shadow-none ring-0 transition-[border-color,background-color,transform] max-[620px]:flex-wrap max-[620px]:items-start",
           dragging && ["scale-[.995]", accentDraggingClasses[accent]],
-          disabled && "cursor-not-allowed opacity-50",
+          blocked && "cursor-not-allowed opacity-50",
         )}
-        onDragEnter={(event) => { event.preventDefault(); if (!disabled) setDragging(true); }}
+        onDragEnter={(event) => { event.preventDefault(); if (!blocked) setDragging(true); }}
         onDragOver={(event) => {
           event.preventDefault();
-          event.dataTransfer.dropEffect = disabled ? "none" : "copy";
-          if (!disabled) setDragging(true);
+          event.dataTransfer.dropEffect = blocked ? "none" : "copy";
+          if (!blocked) setDragging(true);
         }}
         onDragLeave={handleDragLeave}
         onDrop={(event) => { void handleDrop(event); }}
       >
         <span className={cn("grid size-[43px] shrink-0 place-items-center rounded-2xl", accentSoftClasses[accent])}>{files.length ? <FilePlus2 size={25} /> : <UploadCloud size={25} />}</span>
         <div className="min-w-0 flex-1 max-[620px]:min-w-[calc(100%-60px)]" aria-live="polite"><strong className="mb-1 block text-[15px]">{files.length ? `${t("files.selected", { count: files.length })}${multiple ? ` · ${t("files.keepAdding")}` : ""}` : t("files.dropHere")}</strong><DropZoneHint>{hint}</DropZoneHint></div>
-        <Button className="h-10 rounded-2xl font-semibold max-[620px]:h-11 max-[620px]:w-full" variant="secondary" size="lg" disabled={disabled} onClick={() => inputRef.current?.click()}>{multiple && files.length ? t("actions.addFiles") : t("actions.selectFile")}</Button>
+        <Button className="h-10 rounded-2xl font-semibold max-[620px]:h-11 max-[620px]:w-full" variant="secondary" size="lg" disabled={blocked} onClick={() => inputRef.current?.click()}>{multiple && files.length ? t("actions.addFiles") : t("actions.selectFile")}</Button>
         {files.length > 0 && <em className="absolute right-3 bottom-2 flex items-center gap-1 text-[13px] font-bold not-italic text-green-700 max-[620px]:static max-[620px]:-mt-1 max-[620px]:w-full max-[620px]:justify-center dark:text-green-300" key={files.length}><Check size={12} /> {t("files.added")}</em>}
       </Card>
     </div>
