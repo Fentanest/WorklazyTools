@@ -5,7 +5,7 @@ import { calculateAnnualLeave, calculateBusinessDays, getKoreanHolidays } from "
 import { calculateNetPay, calculateSeverance, calculateWeeklyAllowance, estimateMonthlyIncomeTax } from "../../src/features/payroll-calculator/payroll.ts";
 import { generatePassword } from "../../src/features/security-tools/securityPassword.ts";
 
-test("Korean holidays use the Dangi calendar and emit one substitute for one overlap", () => {
+test("Korean holidays use the reviewed local lunar table and emit one substitute for one overlap", () => {
   const holidays2025 = getKoreanHolidays(2025);
   assert.ok(holidays2025.some((holiday) => holiday.date === "2025-01-29" && holiday.name === "설날"));
   assert.equal(holidays2025.filter((holiday) => holiday.substitute && holiday.date.startsWith("2025-05-")).length, 1);
@@ -21,9 +21,9 @@ test("Korean holidays use the Dangi calendar and emit one substitute for one ove
 });
 
 test("first-year leave requires completed months rather than calendar month boundaries", () => {
-  assert.equal(calculateAnnualLeave("2026-01-31", "2026-02-01", "hire").days, 0);
-  assert.equal(calculateAnnualLeave("2026-01-31", "2026-02-28", "hire").days, 1);
-  assert.equal(calculateAnnualLeave("2026-01-01", "2026-11-15", "hire").days, 10);
+  assert.equal(calculateAnnualLeave("2026-01-31", "2026-02-01", "hire").monthly.total, 0);
+  assert.equal(calculateAnnualLeave("2026-01-31", "2026-02-28", "hire").monthly.total, 0);
+  assert.equal(calculateAnnualLeave("2026-01-01", "2026-11-15", "hire").monthly.total, 10);
 });
 
 test("custom holidays reject malformed or impossible calendar dates", () => {
