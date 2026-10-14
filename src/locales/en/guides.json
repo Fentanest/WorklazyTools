@@ -499,31 +499,35 @@
   },
   "work": {
     "title": "Working Day Calculation Criteria",
-    "description": "Public holiday information and annual leave results are reference values for schedule planning.",
+    "description": "Calculate Korean holidays and leave accrual by period. Usage, carryover, expiry and resignation settlements are not tracked.",
     "blocks": [
       {
-        "title": "Public Holidays",
+        "title": "Business days and data coverage",
         "paragraphs": [
-          "Calculates solar public holidays, Seollal, Chuseok, Buddha's Birthday, and substitute holidays. Fixed election days and temporary holidays are also reflected in the yearly list. Please manually add company holidays."
+          "Both start and end dates are included. Saturdays, Sundays, holidays applicable on each date and registered additional holidays are excluded. A date is excluded only once even when reasons overlap; the details retain every exclusion reason.",
+          "Years 2000–2050 are supported. Holiday information was checked on 2026-10-14 and includes recorded designated dates through 2026 plus rules effective at the time. Later years are projected under current rules and exclude election or temporary holidays that have not been announced. New announcements can also change a recorded year."
         ]
       },
       {
-        "title": "Annual Leave",
+        "title": "Registering additional holidays",
         "paragraphs": [
-          "Applies the basic accrual structure under the Labor Standards Act, but the actual granted days may vary depending on the company's fiscal year operation and time-and-attendance settlement methods."
+          "Select a company holiday date or paste several dates, then use the nearby Add button to register them. Draft text does not affect the result. Commas, whitespace and line breaks are accepted; duplicates are registered once. If any date is invalid, the entire input batch remains unregistered.",
+          "Dates outside the selected range remain in the list but do not reduce business days in that range. Remove a registered holiday using the button beside its date."
         ]
       },
       {
-        "title": "How do I include company-specific holidays in the business day calculation?",
+        "title": "Leave amounts and their periods",
         "paragraphs": [
-          "Distinguish between the total days between two dates on a calendar and the number of business days excluding weekends and public holidays. Days off specific to the company, like a founding anniversary or departmental holiday, must be added manually as custom holidays.",
-          "Leave calculations are reference results based on the entered reference date and calculation method. Generated leave is different from the remaining leave after usage, so always verify the actual remaining days against the company's usage records. It's also best to check if newly designated holidays are reflected before calculating."
+          "Perfect attendance and at least 80% annual attendance are assumed. The monthly accrual total is historical first-year accrual of up to 11 days. It is not added to the current hire-cycle or fiscal-year grant as a remaining balance. Usage, expiry and carryover are not tracked; check company records for the actual available balance.",
+          "The hire-date method shows the grant for the current hire-date cycle. The fiscal-year method estimates the grant for the current year starting January 1. The first fiscal-year prorated amount uses 15 days × service days in the previous calendar year ÷ the total days in that year (365 or 366). Displaying two decimals does not impose a grant rounding rule; check company grant and settlement policies separately."
         ]
       },
       {
-        "title": "Examples and Selection Help",
+        "title": "Supported dates and practical application",
         "paragraphs": [
-          "Adding a company holiday as a custom holiday changes the business-day count even for the same date range. Add company-specific days off manually and distinguish them from official public holidays when checking the result."
+          "Hire dates from 1900 and calculation dates from 2018-05-29 through 2050-12-31 are supported. Monthly accrual history is unsupported for hires before 2017-05-30; unsupported history is never displayed as zero days.",
+          "Monthly and annual accrual dates model successive civil-calendar periods: accrual is estimated on the day after each completed attendance period. If a matching day is absent, the period expires at month-end and accrual follows the next day, without postponement for weekends. For example, a January 31 hire first accrues monthly leave on March 1. This is the calculator’s period interpretation assumption, not a definitive court ruling for individual cases.",
+          "General statutory eligibility assumes a workplace with at least five regular workers, an average of at least 15 working hours per week and the relevant attendance requirements. Falling outside these assumptions does not mean contractual leave is zero. Check company rules and actual attendance. Actual-workday methods, company rounding, resignation settlements and unused-leave payments are not calculated."
         ]
       }
     ],

@@ -1,0 +1,86 @@
+.work-calculator-page { max-width: 860px; }
+.work-calculator-page .ui-page-header { margin-bottom: 18px; }
+.work-calculator-page .ui-page-header > div > p:first-child { margin-bottom: 5px; font-size: 12px; }
+.work-calculator-page .ui-page-header h1 { font-size: clamp(1.65rem, 3vw, 2.3rem); }
+.work-calculator-page .ui-page-description { margin-top: 8px; font-size: 14px; }
+.work-core { padding: 16px; border: 1px solid var(--border); border-radius: 20px; background: var(--card); color: var(--card-foreground); }
+.work-mode, .work-method { width: 340px; max-width: 100%; }
+.work-mode { margin-bottom: 16px; }
+.work-core-grid { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 16px; align-items: start; }
+.work-inputs { min-width: 0; }
+.work-date-row { display: grid; grid-template-columns: repeat(2, minmax(0, 210px)); gap: 12px; }
+.work-date-field { min-width: 0; }
+.work-date-field label, .work-paste-label, .work-control-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: var(--muted-foreground); }
+.work-calculator-page input[aria-invalid="true"], .work-calculator-page textarea[aria-invalid="true"] { border-color: var(--destructive); }
+.work-calculator-page button:focus-visible, .work-calculator-page summary:focus-visible, .work-calculator-page textarea:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.work-field-error { margin-top: 5px; font-size: 12px; line-height: 1.5; color: var(--destructive); overflow-wrap: anywhere; }
+.work-shortcuts { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin: 8px 0 12px; }
+.work-shortcuts button, .work-add-button, .work-pagination button { min-height: 36px; padding: 6px 10px; border-radius: 8px; font-size: 13px; font-weight: 600; }
+.work-shortcuts button { background: var(--muted); }
+.work-shortcuts span, .work-help, .work-action-status { font-size: 12px; line-height: 1.6; color: var(--muted-foreground); }
+.work-extra { border-top: 1px solid var(--border); }
+.work-extra summary, .work-details > summary { cursor: pointer; min-height: 44px; padding: 11px 0; font-size: 13px; font-weight: 600; }
+.work-extra-content { padding-top: 4px; }
+.work-add-row { display: flex; align-items: end; gap: 8px; max-width: 300px; margin-bottom: 12px; }
+.work-add-row .work-date-field { flex: 1; }
+.work-add-button { flex-shrink: 0; min-height: 40px; background: var(--primary); color: var(--primary-foreground); }
+.work-paste-row { display: flex; align-items: start; gap: 8px; }
+.work-paste-row textarea { width: 100%; min-width: 0; resize: vertical; padding: 8px 10px; border: 1px solid var(--input); border-radius: 10px; background: var(--background); color: var(--foreground); font-size: 13px; }
+.work-extra-content > .work-help { margin-top: 6px; }
+.work-action-status:empty { display: none; }
+.work-action-status { margin-top: 5px; }
+.work-holiday-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.work-holiday-chips li { display: flex; align-items: center; gap: 3px; border-radius: 9px; background: var(--muted); font-size: 12px; }
+.work-holiday-chips li > span { padding-left: 9px; }
+.work-holiday-chips small { display: block; color: var(--muted-foreground); font-size: 10px; }
+.work-holiday-chips button { min-width: 36px; min-height: 36px; font-size: 20px; border-radius: 8px; }
+.work-result { min-height: 212px; padding: 14px; border: 1px solid var(--brand-border, var(--border)); border-radius: 14px; background: var(--brand-soft, var(--muted)); overflow-wrap: anywhere; }
+.work-result h2 { margin: 0 0 7px; font-size: 14px; font-weight: 600; }
+.work-primary-value { display: block; font-size: 32px; line-height: 1.3; letter-spacing: -.035em; }
+.work-secondary-value { margin-top: 6px; font-size: 13px; }
+.work-period { margin-top: 5px; font-size: 12px; color: var(--muted-foreground); }
+.work-monthly-summary { margin-top: 12px; border-top: 1px solid var(--brand-border, var(--border)); padding-top: 10px; font-size: 13px; }
+.work-monthly-summary strong { font-size: 12px; }
+.work-monthly-summary p { margin-top: 3px; }
+.work-next-event { margin-top: 10px; font-size: 12px; }
+.work-assumptions { margin-top: 12px; font-size: 12px; line-height: 1.6; color: var(--muted-foreground); }
+.work-data-status { margin-top: 8px; font-size: 11px; line-height: 1.6; color: var(--muted-foreground); }
+.work-result-message { min-height: 75px; }
+.work-result-message p { font-size: 13px; line-height: 1.6; }
+.work-details { margin-top: 10px; border-bottom: 1px solid var(--border); }
+.work-details > summary { padding-left: 4px; }
+.work-detail-content { padding: 4px 4px 14px; font-size: 13px; }
+.work-table-scroll { overflow-x: auto; }
+.work-detail-content table { width: 100%; max-width: 760px; border-collapse: collapse; text-align: left; font-size: 12px; }
+.work-detail-content th, .work-detail-content td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.work-detail-content th { font-weight: 600; color: var(--muted-foreground); }
+.work-detail-content td:first-child { white-space: nowrap; }
+.work-detail-content td small { display: block; margin-top: 4px; color: var(--muted-foreground); }
+.work-pagination { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
+.work-pagination button { background: var(--muted); }
+.work-pagination button:disabled { opacity: .4; cursor: not-allowed; }
+.work-detail-content > .work-help { margin-top: 10px; }
+.work-guide .ui-tool-guide { margin-top: 4px; }
+@media (max-width: 1100px) and (min-width: 821px), (max-width: 670px) {
+  .work-core-grid { grid-template-columns: minmax(0, 1fr); }
+  .work-result { min-height: 180px; }
+}
+@media (max-width: 620px) {
+  .work-core { padding: 12px; border-radius: 16px; }
+  .work-core-grid { gap: 12px; }
+  .work-calculator-page input { height: 44px; font-size: 16px; }
+  .work-shortcuts button, .work-add-button, .work-pagination button, .work-holiday-chips button { min-height: 44px; }
+  .work-holiday-chips button { min-width: 44px; }
+  .work-mode { margin-bottom: 12px; }
+  .work-paste-row textarea { font-size: 16px; }
+}
+@media (max-width: 450px) {
+  .work-date-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .work-calculator-page .ui-page-header { margin-bottom: 14px; }
+  .work-shortcuts span { flex-basis: 100%; }
+}
+
+.work-sources { margin: 14px 0; font-size: 13px; }
+.work-sources h3 { font-weight: 600; margin-bottom: 8px; }
+.work-sources ul { display: grid; gap: 8px; list-style: none; padding: 0; }
+.work-sources a { color: var(--brand-on-bg, var(--primary)); text-decoration: underline; text-underline-offset: 3px; }

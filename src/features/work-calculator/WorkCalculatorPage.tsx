@@ -1,55 +1,195 @@
-import { CalendarCheck, CalendarDays, Calculator, Palmtree } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { PageHeader, SegmentedControl } from "../../components/ui";
 import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
-import {
- UtilityField,
- UtilityInput,
- UtilityNotice,
- UtilityPage,
- UtilitySectionCard,
-} from "../../components/UtilitySurface";
-import { localIsoDate } from "../../utils/date";
-import { calculateAnnualLeave, calculateBusinessDays } from "./workCalculator";
+import { UtilityInput, UtilityPage } from "../../components/UtilitySurface";
+import { calculateAnnualLeave, calculateBusinessDays, parseCustomHolidays, seoulToday, validateWorkDate } from "./workCalculator";
+import type { AnnualLeaveResult, BusinessResult, LeaveEvent, WorkDateField } from "./workCalculatorTypes";
+import "./WorkCalculatorPage.css";
+
+type CalculationState = {
+  business?: BusinessResult;
+  leave?: AnnualLeaveResult;
+  errors: Partial<Record<WorkDateField, string>>;
+  error: string;
+};
 
 export function WorkCalculatorPage() {
- const { t, i18n } = useTranslation("features");
- const language = i18n.language === "en" ? "en" : "ko";
- const [mode, setMode] = useState<"business" | "leave">("business");
- const [start, setStart] = useState(() => localIsoDate()); const [end, setEnd] = useState(() => localIsoDate());
- const [custom, setCustom] = useState("");
- const [hire, setHire] = useState(() => `${new Date().getFullYear() - 1}-01-01`); const [asOf, setAsOf] = useState(() => localIsoDate());
- const [method, setMethod] = useState<"hire" | "fiscal">("hire");
- const businessState = useMemo(() => { try { return { result: calculateBusinessDays(start, end, custom.split(/[\s,]+/), language), error: "" }; } catch (reason) { return { result: undefined, error: reason instanceof Error ? reason.message : t("work.periodError") }; } }, [start, end, custom, language, t]);
- const business = businessState.result;
- const leaveState = useMemo(() => {
-  try { return { result: calculateAnnualLeave(hire, asOf, method, language), error: "" }; }
-  catch (reason) { return { result: undefined, error: reason instanceof Error ? reason.message : t("work.periodError") }; }
- }, [hire, asOf, method, language, t]);
- const leave = leaveState.result;
+  const { t, i18n } = useTranslation("features");
+  const language = i18n.resolvedLanguage?.startsWith("en") ? "en" : "ko";
+  const [mode, setMode] = useState<"business" | "leave">("business");
+  const [start, setStart] = useState(seoulToday);
+  const [end, setEnd] = useState(seoulToday);
+  const [hire, setHire] = useState(() => `${Number(seoulToday().slice(0, 4)) - 1}-01-01`);
+  const [asOf, setAsOf] = useState(seoulToday);
+  const [method, setMethod] = useState<"hire" | "fiscal">("hire");
+  const [custom, setCustom] = useState<string[]>([]);
+  const [customDate, setCustomDate] = useState("");
+  const [customText, setCustomText] = useState("");
+  const [customError, setCustomError] = useState<{ source: "date" | "text"; message: string }>();
+  const [addedCount, setAddedCount] = useState<number>();
+  const [excludedOpen, setExcludedOpen] = useState(false);
+  const [excludedPage, setExcludedPage] = useState(0);
+  const [eventsOpen, setEventsOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
- const fieldGridClassName = "grid grid-cols-3 gap-[11px] max-[620px]:grid-cols-1";
+  // Only the visible calculator runs. Draft holidays never enter the calculation.
+  const state = useMemo<CalculationState>(() => {
+    const errors: CalculationState["errors"] = {};
+    const fields: [WorkDateField, string][] = mode === "business" ? [["start", start], ["end", end]] : [["hire", hire], ["asOf", asOf]];
+    for (const [field, value] of fields) {
+      try { validateWorkDate(value, field, language, mode); }
+      catch (error) { errors[field] = error instanceof Error ? error.message : t("work.periodError"); }
+    }
+    if (Object.keys(errors).length) return { errors, error: Object.values(errors)[0] || t("work.periodError") };
+    try {
+      return mode === "business"
+        ? { business: calculateBusinessDays(start, end, custom, language), errors, error: "" }
+        : { leave: calculateAnnualLeave(hire, asOf, method, language), errors, error: "" };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : t("work.periodError");
+      const field = error && typeof error === "object" && "field" in error ? error.field : undefined;
+      if (field === "start" || field === "end" || field === "hire" || field === "asOf") errors[field] = message;
+      return { errors, error: message };
+    }
+  }, [mode, start, end, hire, asOf, method, custom, language, t]);
+  const business = state.business;
+  const leave = state.leave;
+  const excluded = useMemo(() => business && excludedOpen ? business.excludedPage(excludedPage, 40) : undefined, [business, excludedOpen, excludedPage]);
+  const events = useMemo(() => leave && eventsOpen ? [...leave.monthly.events, ...(leave.annual ? [leave.annual] : [])].sort((a, b) => a.date.localeCompare(b.date)) : [], [leave, eventsOpen]);
+  const number = (value: number) => value > 0 && value < 0.01 ? "<0.01" : value.toLocaleString(language, { maximumFractionDigits: 2 });
+  const days = (value: number) => t("work.dayValue", { count: value, value: number(value) });
 
- return <UtilityPage toolId="work-calculator">
-  <PageHeader eyebrow="WORK CALCULATOR" title={t("work.title")} description={t("work.description")}><PrivacyBanner compact /></PageHeader>
-  <UtilityNotice className="mt-1 mb-[18px]" kind="success"><CalendarCheck className="mt-0.5 shrink-0" size={20} /><strong>{t("work.koreanNotice")}</strong></UtilityNotice>
-  <div className="mb-4 mt-1 rounded-2xl bg-muted p-1" data-testid="work-mode"><SegmentedControl value={mode} onChange={setMode} label={t("work.modeLabel")} options={[{ value: "business", label: t("work.businessMode") }, { value: "leave", label: t("work.leaveMode") }]} /></div>
-  {mode === "business" ? <>
-   <UtilitySectionCard title={t("work.period")} description={t("work.periodHelp")}><div className={fieldGridClassName}><UtilityField><span>{t("work.start")}</span><UtilityInput type="date" value={start} onChange={(event) => setStart(event.target.value)} /></UtilityField><UtilityField><span>{t("work.end")}</span><UtilityInput type="date" value={end} onChange={(event) => setEnd(event.target.value)} /></UtilityField><UtilityField className="col-span-2 max-[620px]:col-auto"><span>{t("work.extra")}</span><UtilityInput value={custom} onChange={(event) => setCustom(event.target.value)} placeholder="2026-08-17, 2026-12-31" /><small className="text-xs font-medium text-muted-foreground">{t("work.extraHelp")}</small></UtilityField></div></UtilitySectionCard>
-   {business && <UtilitySectionCard title={t("work.result")}><div className="grid grid-cols-3 gap-2.5 max-[620px]:grid-cols-1" data-testid="business-day-results"><Metric icon={<CalendarDays />} label={t("work.total")} value={t("work.days", { count: business.total })} /><Metric icon={<CalendarCheck />} label={t("work.business")} value={t("work.days", { count: business.business })} /><Metric icon={<Palmtree />} label={t("work.excluded")} value={t("work.days", { count: business.excluded.length })} /></div><details className="mt-3 overflow-hidden rounded-xl border border-border"><summary className="cursor-pointer px-3.5 py-3 text-sm font-bold">{t("work.excludedDates")}</summary><ul className="m-0 max-h-[260px] list-none overflow-auto px-3.5 pb-2.5">{business.excluded.map((item) => <li className="flex justify-between gap-3 border-t border-border py-2 text-[13px] text-muted-foreground" key={item.date}><time>{item.date}</time><span>{item.reason}</span></li>)}</ul></details></UtilitySectionCard>}
-  </> : <>
-   <UtilitySectionCard title={t("work.employment")}><div className={fieldGridClassName}><UtilityField><span>{t("work.hire")}</span><UtilityInput type="date" value={hire} onChange={(event) => setHire(event.target.value)} /></UtilityField><UtilityField><span>{t("work.asOf")}</span><UtilityInput type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} /></UtilityField></div><div className="mt-[15px] max-w-[520px]" data-testid="leave-method"><SegmentedControl value={method} onChange={setMethod} label={t("work.basisLabel")} options={[{ value: "hire", label: t("work.hireBasis") }, { value: "fiscal", label: t("work.fiscalBasis") }]} /></div></UtilitySectionCard>
-   {leave && <UtilitySectionCard title={t("work.leaveResult")}><div className="flex items-center gap-4 rounded-2xl border border-green-200 bg-green-50/70 p-5 text-green-700 dark:border-green-900 dark:bg-green-950/40 dark:text-green-300" data-testid="leave-result"><Calculator size={28} /><div><strong className="block text-3xl tracking-[-.045em] text-foreground">{t("work.days", { count: leave.days })}</strong><p className="mt-1 text-sm text-muted-foreground">{leave.detail} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></div></div><p className="mt-3 rounded-xl bg-amber-500/10 px-3.5 py-3 text-[13px] leading-relaxed text-amber-800 dark:text-amber-300">{t("work.leaveNote")}</p></UtilitySectionCard>}
-  </>}
-  {businessState.error && mode === "business" && <UtilityNotice kind="error" role="alert">{businessState.error}</UtilityNotice>}
-  {leaveState.error && mode === "leave" && <UtilityNotice kind="error" role="alert">{leaveState.error}</UtilityNotice>}
-  <ToolGuideWrapper slug="work" />
- </UtilityPage>;
-}
+  const addHolidays = (source: "date" | "text") => {
+    try {
+      const text = source === "date" ? customDate : customText;
+      if (!text.trim()) validateWorkDate("", "custom", language, "business");
+      const incoming = parseCustomHolidays(text, language);
+      const next = [...new Set([...custom, ...incoming])].sort();
+      setAddedCount(next.length - custom.length);
+      setCustom(next);
+      setCustomError(undefined);
+      if (source === "date") setCustomDate(""); else setCustomText("");
+      setExcludedPage(0);
+    } catch (error) {
+      setCustomError({ source, message: error instanceof Error ? error.message : t("work.periodError") });
+      setAddedCount(undefined);
+    }
+  };
+  const updateRange = (kind: "month" | "year") => {
+    const today = seoulToday();
+    const year = Number(today.slice(0, 4));
+    const month = Number(today.slice(5, 7));
+    setStart(kind === "year" ? `${year}-01-01` : `${today.slice(0, 7)}-01`);
+    setEnd(kind === "year" ? `${year}-12-31` : `${today.slice(0, 7)}-${new Date(Date.UTC(year, month, 0)).getUTCDate()}`);
+    setExcludedPage(0);
+  };
+  const dateField = (field: "start" | "end" | "hire" | "asOf", value: string, onChange: (value: string) => void) => <div className="work-date-field">
+    <label htmlFor={`work-${field}`}>{t(`work.${field}`)}</label>
+    <UtilityInput id={`work-${field}`} type="date" value={value}
+      min={mode === "business" ? "2000-01-01" : field === "hire" ? "1900-01-01" : "2018-05-29"} max="2050-12-31"
+      aria-invalid={Boolean(state.errors[field])} aria-describedby={state.errors[field] ? `work-${field}-error` : "work-date-help"}
+      onChange={event => { onChange(event.target.value); setExcludedPage(0); }} />
+    {state.errors[field] && <p className="work-field-error" id={`work-${field}-error`}>{state.errors[field]}</p>}
+  </div>;
+  const annualLabel = leave?.annual?.kind === "prorated" ? t("work.fiscalProrated") : method === "fiscal" ? t("work.fiscalGrant") : t("work.cycleGrant");
+  const eventKind = (event: LeaveEvent) => t(`work.eventKinds.${event.kind}`);
 
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
- return <article className="min-w-0 rounded-2xl bg-primary/10 p-[15px] text-primary ">{icon}<span className="mt-3 block text-[13px] font-bold text-muted-foreground">{label}</span><strong className="mt-1 block [overflow-wrap:anywhere] text-xl tracking-[-.04em] text-foreground">{value}</strong></article>;
+  return <UtilityPage toolId="work-calculator" className="work-calculator-page">
+    <PageHeader eyebrow="WORK CALCULATOR" title={t("work.title")} description={t("work.description")} />
+    <section className="work-core" aria-label={t("work.title")} data-testid="work-core">
+      <div className="work-mode" data-testid="work-mode"><SegmentedControl value={mode} onChange={setMode} label={t("work.modeLabel")} options={[{ value: "business", label: t("work.businessMode") }, { value: "leave", label: t("work.leaveMode") }]} /></div>
+      <div className="work-core-grid">
+        <div className="work-inputs">
+          <div className="work-date-row">
+            {mode === "business" ? <>{dateField("start", start, setStart)}{dateField("end", end, setEnd)}</> : <>{dateField("hire", hire, setHire)}{dateField("asOf", asOf, setAsOf)}</>}
+          </div>
+          <div className="work-shortcuts">
+            {mode === "business" ? <>
+              <button type="button" onClick={() => updateRange("month")}>{t("work.thisMonth")}</button>
+              <button type="button" onClick={() => updateRange("year")}>{t("work.thisYear")}</button>
+              <button type="button" onClick={() => { const today = seoulToday(); setStart(today); setEnd(today); setExcludedPage(0); }}>{t("work.today")}</button>
+            </> : <button type="button" onClick={() => setAsOf(seoulToday())}>{t("work.asOfToday")}</button>}
+            <span id="work-date-help">{t("work.seoulDates")}</span>
+          </div>
+          {mode === "business" ? <details className="work-extra">
+            <summary>{t("work.extraCount", { count: custom.length })}</summary>
+            <div className="work-extra-content">
+              <div className="work-add-row">
+                <div className="work-date-field">
+                  <label htmlFor="work-custom-date">{t("work.extraDate")}</label>
+                  <UtilityInput id="work-custom-date" type="date" min="2000-01-01" max="2050-12-31" value={customDate}
+                    aria-invalid={customError?.source === "date"} aria-describedby={customError?.source === "date" ? "work-custom-error" : "work-custom-help"}
+                    onChange={event => { setCustomDate(event.target.value); setCustomError(undefined); setAddedCount(undefined); }}
+                    onKeyDown={event => { if (event.key === "Enter") { event.preventDefault(); addHolidays("date"); } }} />
+                </div>
+                <button type="button" className="work-add-button" onClick={() => addHolidays("date")}>{t("work.add")}</button>
+              </div>
+              <label className="work-paste-label" htmlFor="work-custom-text">{t("work.pasteDates")}</label>
+              <div className="work-paste-row">
+                <textarea id="work-custom-text" rows={2} value={customText} placeholder="2026-08-17, 2026-12-31"
+                  aria-invalid={customError?.source === "text"} aria-describedby={customError?.source === "text" ? "work-custom-help work-custom-error" : "work-custom-help"}
+                  onChange={event => { setCustomText(event.target.value); setCustomError(undefined); setAddedCount(undefined); }} />
+                <button type="button" className="work-add-button" onClick={() => addHolidays("text")}>{t("work.add")}</button>
+              </div>
+              <p className="work-help" id="work-custom-help">{t("work.extraHelp")}</p>
+              {customError && <p className="work-field-error" id="work-custom-error" role="alert">{customError.message}</p>}
+              <p className="work-action-status" role="status">{addedCount !== undefined ? t("work.addedCount", { count: addedCount }) : ""}</p>
+              {custom.length > 0 && <ul className="work-holiday-chips">{custom.map(date => <li key={date}>
+                <span><time>{date}</time>{business && (date < start || date > end) && <small>{t("work.outsidePeriod")}</small>}</span>
+                <button type="button" aria-label={t("work.removeDate", { date })} onClick={() => { setCustom(custom.filter(item => item !== date)); setAddedCount(undefined); setExcludedPage(0); }}>×</button>
+              </li>)}</ul>}
+            </div>
+          </details> : <div className="work-method" data-testid="leave-method">
+            <p className="work-control-label">{t("work.basisLabel")}</p>
+            <SegmentedControl value={method} onChange={setMethod} label={t("work.basisLabel")} options={[{ value: "hire", label: t("work.hireBasis") }, { value: "fiscal", label: t("work.fiscalBasis") }]} />
+          </div>}
+        </div>
+        <section className="work-result" aria-label={t("work.result")} data-testid="work-result-region">
+          {state.error ? <div className="work-result-message"><h2>{t("work.inputNeeded")}</h2><p>{state.error}</p></div> : business ? <div data-testid="business-day-results">
+            <h2>{t("work.business")}</h2>
+            <strong className="work-primary-value">{days(business.business)}</strong>
+            <p className="work-secondary-value">{t("work.businessSummary", { total: number(business.total), excluded: number(business.excludedCount) })}</p>
+          </div> : leave && <div data-testid="leave-result">
+            <h2>{leave.annual ? annualLabel : t("work.monthlyHistory")}</h2>
+            {leave.annual ? <><strong className="work-primary-value">{days(leave.annual.days)}</strong><p className="work-period">{t("work.grantDate", { date: leave.annual.date })}</p><p className="work-period">{t("work.earningPeriod", { start: leave.annual.periodStart, end: leave.annual.periodEnd })}</p>
+              {leave.annual.kind === "prorated" && leave.annual.numerator !== undefined && leave.annual.denominator !== undefined && <p className="work-help">{t("work.proratedFormula", { numerator: leave.annual.numerator, denominator: leave.annual.denominator })}</p>}</> : leave.monthly.total !== null ? <strong className="work-primary-value">{days(leave.monthly.total)}</strong> : <p>{t("work.historyUnsupported")}</p>}
+            {leave.annual && <div className="work-monthly-summary"><strong>{t("work.monthlyHistory")}</strong><p>{leave.monthly.total === null ? t("work.historyUnsupported") : days(leave.monthly.total)}</p></div>}
+            {leave.monthly.total !== null && <p className="work-period">{t("work.monthlyPeriod", { start: leave.monthly.periodStart, end: leave.monthly.periodEnd, date: asOf })}</p>}
+            {leave.nextEvent && <p className="work-next-event">{t("work.nextEvent", { date: leave.nextEvent.date, kind: eventKind(leave.nextEvent), days: days(leave.nextEvent.days) })}</p>}
+          </div>}
+          <p className="work-assumptions">{t(mode === "business" ? "work.businessAssumptions" : "work.leaveAssumptions")}</p>
+          {business && <div className="work-data-status">
+            <p>{t(`work.dataStatuses.${business.holidayInfo.status}`)}</p>
+            <p>{t("work.checkedAt", { date: business.holidayInfo.checkedAt })}</p>
+            <p>{t("work.supportedYears", { start: business.holidayInfo.minYear, end: business.holidayInfo.maxYear })}</p>
+          </div>}
+        </section>
+      </div>
+    </section>
+    {mode === "business" && <details className="work-details" open={excludedOpen} onToggle={event => setExcludedOpen(event.currentTarget.open)}>
+      <summary>{t("work.excludedDates")}{business ? ` (${number(business.excludedCount)})` : ""}</summary>
+      {excludedOpen && <div className="work-detail-content">{excluded ? <>
+        {excluded.items.length ? <div className="work-table-scroll"><table><thead><tr><th>{t("work.date")}</th><th>{t("work.weekday")}</th><th>{t("work.reason")}</th></tr></thead><tbody>
+          {excluded.items.map(item => <tr key={item.date}><td><time>{item.date}</time></td><td>{new Intl.DateTimeFormat(language, { weekday: "short", timeZone: "UTC" }).format(new Date(`${item.date}T00:00:00Z`))}</td><td>{item.reasons.join(" · ")}</td></tr>)}
+        </tbody></table></div> : <p>{t("work.noExcluded")}</p>}
+        {excluded.pageCount > 1 && <nav className="work-pagination" aria-label={t("work.excludedDates")}><button type="button" disabled={excluded.page <= 0} onClick={() => setExcludedPage(excluded.page - 1)}>{t("work.previous")}</button><span>{t("work.pageCount", { page: excluded.page + 1, count: excluded.pageCount })}</span><button type="button" disabled={excluded.page >= excluded.pageCount - 1} onClick={() => setExcludedPage(excluded.page + 1)}>{t("work.next")}</button></nav>}
+      </> : <p>{state.error}</p>}</div>}
+    </details>}
+    {mode === "leave" && <details className="work-details" open={eventsOpen} onToggle={event => setEventsOpen(event.currentTarget.open)}>
+      <summary>{t("work.leaveEvents")}</summary>
+      {eventsOpen && <div className="work-detail-content">{leave ? <>
+        {!leave.monthly.historySupported && <p>{t("work.historyUnsupported")}</p>}
+        {events.length ? <div className="work-table-scroll"><table><thead><tr><th>{t("work.date")}</th><th>{t("work.kind")}</th><th>{t("work.dayCount")}</th><th>{t("work.eventPeriod")}</th></tr></thead><tbody>{events.map(event => <tr key={`${event.date}-${event.kind}`}><td><time>{event.date}</time></td><td>{eventKind(event)}</td><td>{days(event.days)}</td><td>{event.periodStart} – {event.periodEnd}{event.kind === "prorated" && event.numerator !== undefined && event.denominator !== undefined && <small>{t("work.proratedFormula", { numerator: event.numerator, denominator: event.denominator })}</small>}</td></tr>)}</tbody></table></div> : <p>{t("work.noEvents")}</p>}
+        <p className="work-help">{t("work.historyNote")}</p>
+      </> : <p>{state.error}</p>}</div>}
+    </details>}
+    <details className="work-details work-guide" open={guideOpen} onToggle={event => setGuideOpen(event.currentTarget.open)}><summary>{t("work.guide")}</summary>{guideOpen && <ToolGuideWrapper slug="work"><div className="work-sources"><h3>{t("work.sources")}</h3><ul>
+      <li><a href="https://www.law.go.kr/법령/근로기준법" target="_blank" rel="noreferrer">{t("work.sourceLaw")}</a></li>
+      <li><a href="https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20180600335" target="_blank" rel="noreferrer">{t("work.sourceLeaveGuide")}</a></li>
+      <li><a href="https://www.moel.go.kr/news/enews/report/enewsView.do?bbs_id=12&news_seq=13052&pageIndex=1&searchField=3" target="_blank" rel="noreferrer">{t("work.sourceAccrual")}</a></li>
+      <li><a href="https://www.mpm.go.kr/mpm/info/infoService/BizService02/" target="_blank" rel="noreferrer">{t("work.sourceHolidays")}</a></li>
+    </ul></div></ToolGuideWrapper>}</details>
+  </UtilityPage>;
 }
