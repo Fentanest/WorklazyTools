@@ -1,4 +1,4 @@
-.work-calculator-page { max-width: 860px; }
+.work-calculator-page { max-width: 760px; }
 .work-calculator-page .ui-page-header { margin-bottom: 18px; }
 .work-calculator-page .ui-page-header > div > p:first-child { margin-bottom: 5px; font-size: 12px; }
 .work-calculator-page .ui-page-header h1 { font-size: clamp(1.65rem, 3vw, 2.3rem); }

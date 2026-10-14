@@ -230,7 +230,7 @@
     "fiscalGrant": "올해 회계연도 부여 추정치",
     "fiscalProrated": "첫 회계연도 비례 부여 추정치",
     "monthlyHistory": "입사 첫해 월별 발생 누계 (과거)",
-    "leaveAssumptions": "개근·출근율 80% 충족 가정 · 사용·소멸 미반영 · 잔여 연차가 아닙니다.",
+    "leaveAssumptions": "통상근로자·5인 이상·평균 주15시간 이상, 개근·80% 출근 가정. 사용·소멸 미반영, 잔여 연차가 아닙니다.",
     "monthlyPeriod": "첫해 대상 {{start}} – {{end}} · {{date}}까지 발생한 누계",
     "proratedFormula": "15 × 재직 {{numerator}}일 / 연간 {{denominator}}일 · 표시만 소수 둘째 자리",
     "historyUnsupported": "2017-05-30 이전 입사자의 과거 월별 발생 이력은 지원하지 않습니다.",
@@ -260,7 +260,14 @@
     "sourceAccrual": "고용노동부 연차휴가 발생시점 안내",
     "sourceHolidays": "인사혁신처 공휴일 안내",
     "grantDate": "부여일 {{date}}",
-    "earningPeriod": "산정 대상 {{start}} – {{end}}"
+    "earningPeriod": "산정 대상 {{start}} – {{end}}",
+    "inputErrors": {
+      "empty": "{{field}}: 날짜를 입력해 주세요.",
+      "format": "{{field}}: YYYY-MM-DD 형식으로 입력해 주세요 ({{value}}).",
+      "invalidDate": "{{field}}: 존재하지 않는 날짜입니다 ({{value}}).",
+      "outOfRange": "{{field}}: {{min}}~{{max}} 범위의 날짜를 입력해 주세요.",
+      "order": "{{field}}은 시작일 또는 입사일보다 빠를 수 없습니다."
+    }
   },
   "payroll": {
     "title": "급여·주휴수당·퇴직금 계산기",

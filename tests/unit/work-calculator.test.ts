@@ -61,3 +61,7 @@ test('date-only results and Seoul today agree across UTC, LA DST and Kiritimati'
  const code=`import {calculateBusinessDays as b,calculateAnnualLeave as a,seoulToday} from './src/features/work-calculator/workCalculator.ts';console.log(JSON.stringify([b('2024-03-01','2024-11-10'),a('2024-02-29','2025-03-01','hire'),seoulToday(new Date('2026-10-13T16:00:00Z'))]));`;
  const runs=['UTC','America/Los_Angeles','Pacific/Kiritimati'].map(TZ=>execFileSync(process.execPath,['--experimental-strip-types','--input-type=module','-e',code],{env:{...process.env,TZ},encoding:'utf8'}));assert.equal(new Set(runs).size,1);assert.equal(seoulToday(new Date('2026-10-13T16:00:00Z')),'2026-10-14');
 });
+
+test('fiscal-aligned full first year is an ordinary annual grant, not a prorated estimate',()=>{const r=leave('2025-01-01','2026-01-01','fiscal');assert.equal(r.annual?.kind,'annual');assert.equal(r.annual?.days,15);assert.equal(r.annual?.numerator,undefined);});
+
+test('2025 annual official schedule plus weekends excludes121 of365 days',()=>{const r=business('2025-01-01','2025-12-31');assert.equal(r.excludedCount,121);assert.equal(r.business,244);});

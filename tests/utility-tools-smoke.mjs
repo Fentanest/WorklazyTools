@@ -356,8 +356,8 @@ try {
   await page.waitForFunction(() => document.querySelector("[data-testid='formatter-output']")?.value.includes('\n  "name"'));
 
   await page.goto(`${koBaseUrl}/tools/work-calculator`, { waitUntil: "networkidle0" });
-  await page.waitForSelector("[data-testid='business-day-results'] article:nth-child(2)");
-  const businessDays = await page.$eval("[data-testid='business-day-results'] article:nth-child(2) strong", (element) => element.textContent);
+  await page.waitForSelector("[data-testid='business-day-results'] .work-primary-value");
+  const businessDays = await page.$eval("[data-testid='business-day-results'] .work-primary-value", (element) => element.textContent);
   if (!businessDays?.includes("일")) throw new Error("Business-day result is missing.");
   await page.$eval("[data-testid='work-mode'] [data-ui-component='segmented-control']", (root) => root.querySelectorAll("button")[1]?.click());
   await page.waitForSelector("[data-testid='leave-result']");

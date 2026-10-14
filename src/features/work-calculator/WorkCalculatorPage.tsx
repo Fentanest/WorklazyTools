@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { PageHeader, SegmentedControl } from "../../components/ui";
 import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { UtilityInput, UtilityPage } from "../../components/UtilitySurface";
 import { calculateAnnualLeave, calculateBusinessDays, parseCustomHolidays, seoulToday, validateWorkDate } from "./workCalculator";
-import type { AnnualLeaveResult, BusinessResult, LeaveEvent, WorkDateField } from "./workCalculatorTypes";
+import type { AnnualLeaveResult, BusinessResult, LeaveEvent, WorkDateErrorCode, WorkDateField } from "./workCalculatorTypes";
 import "./WorkCalculatorPage.css";
 
 type CalculationState = {
@@ -27,12 +27,20 @@ export function WorkCalculatorPage() {
   const [custom, setCustom] = useState<string[]>([]);
   const [customDate, setCustomDate] = useState("");
   const [customText, setCustomText] = useState("");
-  const [customError, setCustomError] = useState<{ source: "date" | "text"; message: string }>();
+  const [customError, setCustomError] = useState<{ source: "date" | "text"; reason: unknown }>();
   const [addedCount, setAddedCount] = useState<number>();
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [excludedPage, setExcludedPage] = useState(0);
   const [eventsOpen, setEventsOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+
+  const messageForError = useCallback((reason: unknown) => {
+    const error = reason as { code?: WorkDateErrorCode; field?: WorkDateField; value?: string };
+    if (!error?.code || !error.field) return t("work.periodError");
+    const field = t(`work.${error.field === "custom" ? "extraDate" : error.field}`);
+    const min = error.field === "custom" || mode === "business" ? "2000-01-01" : error.field === "hire" ? "1900-01-01" : "2018-05-29";
+    return t(`work.inputErrors.${error.code}`, { field, value: error.value ?? "", min, max: "2050-12-31" });
+  }, [mode, t]);
 
   // Only the visible calculator runs. Draft holidays never enter the calculation.
   const state = useMemo<CalculationState>(() => {
@@ -40,7 +48,7 @@ export function WorkCalculatorPage() {
     const fields: [WorkDateField, string][] = mode === "business" ? [["start", start], ["end", end]] : [["hire", hire], ["asOf", asOf]];
     for (const [field, value] of fields) {
       try { validateWorkDate(value, field, language, mode); }
-      catch (error) { errors[field] = error instanceof Error ? error.message : t("work.periodError"); }
+      catch (error) { errors[field] = messageForError(error); }
     }
     if (Object.keys(errors).length) return { errors, error: Object.values(errors)[0] || t("work.periodError") };
     try {
@@ -48,12 +56,17 @@ export function WorkCalculatorPage() {
         ? { business: calculateBusinessDays(start, end, custom, language), errors, error: "" }
         : { leave: calculateAnnualLeave(hire, asOf, method, language), errors, error: "" };
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("work.periodError");
+      const message = messageForError(error);
       const field = error && typeof error === "object" && "field" in error ? error.field : undefined;
       if (field === "start" || field === "end" || field === "hire" || field === "asOf") errors[field] = message;
       return { errors, error: message };
     }
-  }, [mode, start, end, hire, asOf, method, custom, language, t]);
+  }, [mode, start, end, hire, asOf, method, custom, language, t, messageForError]);
+  const resultRef = useRef<HTMLElement>(null);
+  const readyHeight = useRef({ business: 0, leave: 0 });
+  useLayoutEffect(() => {
+    if (!state.error && resultRef.current) readyHeight.current[mode] = resultRef.current.getBoundingClientRect().height;
+  }, [state, mode]);
   const business = state.business;
   const leave = state.leave;
   const excluded = useMemo(() => business && excludedOpen ? business.excludedPage(excludedPage, 40) : undefined, [business, excludedOpen, excludedPage]);
@@ -73,7 +86,7 @@ export function WorkCalculatorPage() {
       if (source === "date") setCustomDate(""); else setCustomText("");
       setExcludedPage(0);
     } catch (error) {
-      setCustomError({ source, message: error instanceof Error ? error.message : t("work.periodError") });
+      setCustomError({ source, reason: error });
       setAddedCount(undefined);
     }
   };
@@ -134,7 +147,7 @@ export function WorkCalculatorPage() {
                 <button type="button" className="work-add-button" onClick={() => addHolidays("text")}>{t("work.add")}</button>
               </div>
               <p className="work-help" id="work-custom-help">{t("work.extraHelp")}</p>
-              {customError && <p className="work-field-error" id="work-custom-error" role="alert">{customError.message}</p>}
+              {customError && <p className="work-field-error" id="work-custom-error" role="alert">{messageForError(customError.reason)}</p>}
               <p className="work-action-status" role="status">{addedCount !== undefined ? t("work.addedCount", { count: addedCount }) : ""}</p>
               {custom.length > 0 && <ul className="work-holiday-chips">{custom.map(date => <li key={date}>
                 <span><time>{date}</time>{business && (date < start || date > end) && <small>{t("work.outsidePeriod")}</small>}</span>
@@ -146,7 +159,7 @@ export function WorkCalculatorPage() {
             <SegmentedControl value={method} onChange={setMethod} label={t("work.basisLabel")} options={[{ value: "hire", label: t("work.hireBasis") }, { value: "fiscal", label: t("work.fiscalBasis") }]} />
           </div>}
         </div>
-        <section className="work-result" aria-label={t("work.result")} data-testid="work-result-region">
+        <section ref={resultRef} style={state.error && readyHeight.current[mode] ? { minHeight: readyHeight.current[mode] } : undefined} className="work-result" aria-label={t("work.result")} data-testid="work-result-region">
           {state.error ? <div className="work-result-message"><h2>{t("work.inputNeeded")}</h2><p>{state.error}</p></div> : business ? <div data-testid="business-day-results">
             <h2>{t("work.business")}</h2>
             <strong className="work-primary-value">{days(business.business)}</strong>

@@ -67,6 +67,7 @@ function yearlyEvent(hire: string, date: string, method: 'hire' | 'fiscal'): Lea
   if (year === hireYear + 1) {
     const numerator = dateOrdinal(fiscalStart) - dateOrdinal(hire);
     const denominator = dateOrdinal(fiscalStart) - dateOrdinal(`${hireYear}-01-01`);
+    if (numerator === denominator) return {date:fiscalStart,kind:'annual',days:15,periodStart:hire,periodEnd:`${hireYear}-12-31`};
     return {date:fiscalStart,kind:'prorated',days:15 * numerator / denominator,periodStart:hire,periodEnd:`${hireYear}-12-31`,numerator,denominator};
   }
   return {date:fiscalStart,kind:'annual',days:annualDays(serviceAt(hire,fiscalStart).years),periodStart:`${year-1}-01-01`,periodEnd:`${year-1}-12-31`};
