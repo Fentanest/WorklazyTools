@@ -2283,6 +2283,33 @@
       "initializing": "Initializing the OCR engine…",
       "loadingLanguage": "Loading Korean and English language models…",
       "initializingApi": "Preparing Korean and English recognition…"
+    },
+    "imageInput": {
+      "reading": "Reading file",
+      "preview": "Preparing preview",
+      "ready": "Ready",
+      "failed": "Processing failed",
+      "retry": "Retry preview",
+      "reselect": "Select the file again or remove it.",
+      "previewOnly": "The preview failed. You can try converting the retained original.",
+      "locked": "The image list and settings are locked during conversion.",
+      "preparing": "Preparing images: {{done}} / {{total}}",
+      "cancelPreparation": "Cancel image preparation",
+      "canceling": "Canceling…",
+      "preprocessing": "Preparing PDF image {{index}} / {{total}} · {{name}}",
+      "failure": "Image {{index}} “{{name}}”: {{stage}} failed.",
+      "embedFailure": "Image {{index}} “{{name}}”: PDF image insertion failed. Retry or select this file again.",
+      "saving": "Saving PDF",
+      "saveFailure": "Saving the PDF failed. Please retry.",
+      "stages": {
+        "read": "File reading",
+        "metadata": "Format/metadata validation",
+        "decode": "Image decoding",
+        "thumbnail": "Thumbnail creation/display",
+        "orientation": "Orientation correction",
+        "embed": "PDF image insertion",
+        "save": "PDF saving"
+      }
     }
   },
   "excelCompare": {

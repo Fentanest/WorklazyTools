@@ -1,3 +1,6 @@
+import { inspectImage, ImageInputError } from "./imageInput.ts";
+import { rasterImage } from "./imageRaster.ts";
+import { imageConversionError } from "./imageMessages";
 import type {
   PdfPagePlan,
   PdfOutputOptions,
@@ -117,63 +120,38 @@ export async function imagesToPdf(
   language: AppLanguage = "ko",
   options: PdfOutputOptions = {},
   signal?: AbortSignal,
+  imageIds: string[] = [],
 ) {
   const inputs: PdfWorkerInput[] = [];
   for (let index = 0; index < files.length; index += 1) {
     throwIfPdfWorkerAborted(signal, language);
-    const normalized = options.imagesAlreadyNormalized ? files[index] : await normalizeImageOrientation(files[index], language);
-    throwIfPdfWorkerAborted(signal, language);
-    const buffer = await normalized.arrayBuffer();
-    throwIfPdfWorkerAborted(signal, language);
-    inputs.push({ id: `image-${index}`, name: normalized.name, mimeType: normalized.type, buffer });
+    const file = files[index], id = imageIds[index] ?? `image-${index}`;
+    onProgress?.(index / files.length * 30, featureMessage(language, "pdf.imageInput.preprocessing", { index: index+1, total: files.length, name: file.name }));
+    try {
+      let buffer: ArrayBuffer;
+      try { buffer = await file.arrayBuffer(); } catch (cause) { throw new ImageInputError('read', cause); }
+      throwIfPdfWorkerAborted(signal, language);
+      const metadata = inspectImage(buffer);
+      const direct = metadata.directJpeg || options.imagesAlreadyNormalized;
+      if (!direct) {
+        const normalized = await rasterImage(new File([buffer], file.name, { type: metadata.mime }), metadata, false, signal);
+        buffer = await normalized.arrayBuffer();
+      }
+      throwIfPdfWorkerAborted(signal, language);
+      console.debug('image-pdf', { id, name: file.name, size: file.size, width: metadata.width, height: metadata.height,
+        route: metadata.directJpeg ? 'jpeg-direct' : direct ? 'already-normalized' : 'normalize', index: index+1, total: files.length });
+      inputs.push({ id, name: file.name, mimeType: metadata.mime, buffer });
+    } catch (reason) {
+      throwIfPdfWorkerAborted(signal, language);
+      throw imageConversionError(reason, language, file, index, id);
+    }
   }
   const workerOptions = await serializeOutputOptions(options, language, signal);
   const transfer = [...inputs.map((input) => input.buffer), ...(workerOptions.watermarkImage ? [workerOptions.watermarkImage] : [])];
   return runWorker<PdfWorkerResult>(
-    { type: "images-to-pdf", inputs, pageMode, fileName, options: workerOptions },
-    transfer,
-    onProgress,
-    language,
-    signal,
+    { type: "images-to-pdf", inputs, pageMode, fileName, options: workerOptions }, transfer,
+    (value, message) => onProgress?.(30 + value * 0.7, message), language, signal,
   );
-}
-
-async function normalizeImageOrientation(file: File, language: AppLanguage) {
-    let bitmap: ImageBitmap | undefined;
-  let image: HTMLImageElement | undefined;
-  let objectUrl = "";
-  try {
-    try {
-      bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
-    } catch {
-      objectUrl = URL.createObjectURL(file);
-      image = new Image();
-      image.src = objectUrl;
-      await image.decode();
-    }
-    const source = bitmap ?? image;
-    if (!source) throw new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.theSourceImageCouldNotBeDecoded"));
-    const width = bitmap?.width ?? image?.naturalWidth ?? 0;
-    const height = bitmap?.height ?? image?.naturalHeight ?? 0;
-    if (!width || !height) throw new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.theImageDimensionsCouldNotBeDetermined"));
-    const canvas = document.createElement("canvas");
-    canvas.width = width;
-    canvas.height = height;
-    const context = canvas.getContext("2d", { alpha: file.type === "image/png" });
-    if (!context) throw new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.unableToCorrectTheImageOrientation"));
-    context.drawImage(source, 0, 0);
-    const mimeType = file.type === "image/png" ? "image/png" : "image/jpeg";
-    const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.unableToPrepareTheImageForPdfConversion"))), mimeType, 0.96));
-    canvas.width = 1;
-    canvas.height = 1;
-    const extension = mimeType === "image/png" ? "png" : "jpg";
-    return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.${extension}`, { type: mimeType, lastModified: file.lastModified });
-  } catch (error) {
-    throw error instanceof Error ? error : new Error(featureMessage(language, "pdf.messages.pdfWorkerClient.unableToReadTheImageFile"));
-  } finally {
-    bitmap?.close();
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-  }
 }
 
 export function textDocumentToOffice(

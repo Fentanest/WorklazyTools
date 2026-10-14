@@ -45,7 +45,7 @@ test.after(() => fs.rmSync(bundleDirectory, { recursive: true, force: true }));
 type WorkerEvent =
   | { type: "progress"; progress?: number; message?: string }
   | { type: "result"; result: unknown }
-  | { type: "error"; error?: { message?: string; code?: string } };
+  | { type: "error"; error?: { message?: string; code?: string; imageId?: string; stage?: string; errorName?: string } };
 
 for (const language of ["ko", "en"] as const) {
   test(`PDF worker facade preserves ${language} result, warnings, progress, transfer identity, and one termination`, async () => {
@@ -430,3 +430,14 @@ function cancelingRenderTask(log: string[]) {
     },
   };
 }
+
+test("image error context survives localization without exposing the native exception in UI text", async () => {
+  const message = workerMessage('en', 'pdf.imageInput.embedFailure', { index: 2, name: 'example.jpg' });
+  const worker = fakeWorker([{ type: 'error', error: { message, code: 'INVALID_IMAGE', imageId: 'attachment-2', stage: 'embed', errorName: 'EncodingError' } }]);
+  await assert.rejects(runPdfWorker(() => worker as unknown as Worker, {}, [], undefined, 'en'), (error: any) => {
+    assert.match(error.message, /Image 2.*example.jpg.*PDF image insertion failed/);
+    assert.doesNotMatch(error.message, /EncodingError/);
+    assert.equal(error.imageId, 'attachment-2'); assert.equal(error.stage, 'embed'); assert.equal(error.errorName, 'EncodingError'); return true;
+  });
+  assert.equal(worker.terminated, 1);
+});

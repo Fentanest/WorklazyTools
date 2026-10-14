@@ -168,7 +168,10 @@ async function buildImagePdf(data: {
     if (!imageType) throw new PdfWorkerError(featureMessage(currentLanguage, "pdf.messages.pdf.thisIsNotAJpgOrPngImage", { p0: input.name }), "UNSUPPORTED_IMAGE");
     let image;
     try { image = imageType === "png" ? await output.embedPng(input.buffer) : await output.embedJpg(input.buffer); }
-    catch { throw new PdfWorkerError(featureMessage(currentLanguage, "pdf.messages.pdf.theImageIsDamagedOrUnreadable", { p0: input.name }), "INVALID_IMAGE"); }
+    catch (cause) {
+      throw Object.assign(new PdfWorkerError(featureMessage(currentLanguage, "pdf.imageInput.embedFailure", { index: index+1, name: input.name }), "INVALID_IMAGE"),
+        { imageId: input.id, stage: "embed", errorName: cause instanceof Error ? cause.name : "Error" });
+    }
     const originalWidth = image.width * 0.75;
     const originalHeight = image.height * 0.75;
     let pageWidth = originalWidth;
@@ -193,7 +196,12 @@ async function buildImagePdf(data: {
     progress(8 + ((index + 1) / data.inputs.length) * 82, featureMessage(currentLanguage, "pdf.messages.pdf.placed", { p0: index + 1, p1: data.inputs.length, p2: input.name }));
   }
   await decoratePdf(output, data.options);
-  return pdfResult(await output.save({ useObjectStreams: true }), ensureExtension(data.fileName, "pdf"), [
+  let bytes: Uint8Array;
+  progress(94, featureMessage(currentLanguage, "pdf.imageInput.saving"));
+  try { bytes = await output.save({ useObjectStreams: true }); }
+  catch (cause) { throw Object.assign(new PdfWorkerError(featureMessage(currentLanguage, "pdf.imageInput.saveFailure"), "PDF_SAVE_FAILED"),
+    { stage: "save", errorName: cause instanceof Error ? cause.name : "Error" }); }
+  return pdfResult(bytes, ensureExtension(data.fileName, "pdf"), [
     featureMessage(currentLanguage, "pdf.messages.pdf.imageBasedCompressionRedrawsPagesSoSearchableText"),
   ]);
 }
@@ -259,7 +267,7 @@ class PdfWorkerError extends Error {
 }
 
 function normalizeError(error: unknown) {
-  if (error instanceof PdfWorkerError) return { message: error.message, code: error.code };
+  if (error instanceof PdfWorkerError) return { ...error, message: error.message, code: error.code };
   const message = error instanceof Error ? error.message : featureMessage(currentLanguage, "pdf.messages.pdf.anUnknownErrorOccurredWhileProcessingThePdf");
   return { message, code: "PDF_PROCESSING_ERROR" };
 }
