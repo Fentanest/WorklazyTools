@@ -16,6 +16,8 @@
 
 국소 브라우저 검사는 공식 날짜, 추가 휴일 원자적 등록, 빈 값·기간 전환·월 누계, 키보드, 두 모드/한영/명암/7뷰포트56조합, 오프라인·Dangi 실패, 접근성을 검증했다. 초기 검사 실패는 삭제 버튼 이름·native date의 내부Tab단계·React 반영 대기 및 Playwright boundingBox의 height키 오사용이었다. 기대 법령값이나 결과를 낮추지 않고 검사기만 수정했다. 원시 실행·화면·거리·성능은 gitignored `docs/jobs/todo/work-calculator/`와 상위 work 로그에 보존한다. 현재 호출부는 계산기 페이지와 단위 검사뿐임을 검색한 뒤 단일 days 계약을 명시적 이벤트 모델로 바꿨다. — Codx
 
+최종 통합 검토에서 영어 범위 오류 문구의 `{{max}}` 닫힘 누락과, 화면 크기 변경 뒤 이전 결과 높이를 유지하는 경로를 추가 수리했다. 번역 자리표시자 균형/한영 변수 일치 검사와 실제 영어 범위 안내 회귀를 추가했다. 결과 높이는 유효 상태의 ResizeObserver로 최신 실제 크기를 기억하며 오류 중에는 바뀐 내용을 이전 값처럼 남기지 않고 높이만 유지한다. 공통 reduced-motion 규칙이 모든 요소에 .01ms duration을 부여하여 기본 transition-property:all과 합쳐진 미세한 높이 전환은 이 페이지의 결과 영역에서만 transition-property:none으로 막았다. 실제1440→390→1440 전환 후 빈 입력 검증으로 확인했다. — Codx
+
 ## 2026-10-08 — Bento·Stirling 문서 변환 엔진 후보 검증
 
 BentoPDF `3a5f146d`의 lockfile에 있던 `@matbee/libreoffice-converter` 2.6.0은 공개 Bento 정적 자산과 npm 엔진 바이트가 달랐고, 일치하는 npm 2.6.0 자산으로도 새 세션의 Calc `documentLoad`가 멈추는 재현이 있었다. 공식 upstream tag `v2.3.1`/커밋 `b94b8a6`에 대응하는 npm 2.3.1의 JS·Worker·WASM·data 5개 원본 해시를 함께 고정했다. 이 버전의 원본 Worker에 `noInitialRun`과 NanumGothic 시작 전 등록을 제한적으로 적용한 결과, 독립 3세션×12파일=36개 PDF의 한글·표·그림·페이지·슬라이드 비율을 다시 열어 확인했다. 같은 배치에서 Worker 시작/종료는 세션마다 1회였고 외부 변환 요청은 없었다. 이전 엔진으로 자동 우회하지 않는다. Office 고정 소스의 정식 묶음 검수는 별도 진행 중이다. — Codx

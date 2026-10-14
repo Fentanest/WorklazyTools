@@ -65,8 +65,17 @@ export function WorkCalculatorPage() {
   const resultRef = useRef<HTMLElement>(null);
   const readyHeight = useRef({ business: 0, leave: 0 });
   useLayoutEffect(() => {
-    if (!state.error && resultRef.current) readyHeight.current[mode] = resultRef.current.getBoundingClientRect().height;
-  }, [state, mode]);
+    const element = resultRef.current;
+    if (state.error || !element) return;
+    const remember = () => { readyHeight.current[mode] = element.getBoundingClientRect().height; };
+    remember();
+    // Viewport, font and translated-content changes can resize a valid result
+    // without changing calculator inputs. Keep the last actually displayed size.
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(remember);
+    observer?.observe(element);
+    if (!observer) window.addEventListener("resize", remember);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", remember); };
+  }, [state.error, mode]);
   const business = state.business;
   const leave = state.leave;
   const excluded = useMemo(() => business && excludedOpen ? business.excludedPage(excludedPage, 40) : undefined, [business, excludedOpen, excludedPage]);

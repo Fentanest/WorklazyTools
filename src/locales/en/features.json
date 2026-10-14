@@ -272,7 +272,7 @@
       "empty": "{{field}}: enter a date.",
       "format": "{{field}}: use YYYY-MM-DD ({{value}}).",
       "invalidDate": "{{field}}: this date does not exist ({{value}}).",
-      "outOfRange": "{{field}}: enter a date between {{min}} and {{max}.",
+      "outOfRange": "{{field}}: enter a date between {{min}} and {{max}}.",
       "order": "{{field}} cannot be earlier than the start or hire date."
     }
   },

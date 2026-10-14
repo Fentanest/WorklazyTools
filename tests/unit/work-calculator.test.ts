@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import {calculateBusinessDays as business,calculateAnnualLeave as leave,getKoreanHolidays,validateWorkDate,parseCustomHolidays,seoulToday,WorkDateError} from '../../src/features/work-calculator/workCalculator.ts';
 import { dateOrdinal,addIsoDays,nextPeriodBoundary } from '../../src/features/work-calculator/workDate.ts';
@@ -65,3 +66,14 @@ test('date-only results and Seoul today agree across UTC, LA DST and Kiritimati'
 test('fiscal-aligned full first year is an ordinary annual grant, not a prorated estimate',()=>{const r=leave('2025-01-01','2026-01-01','fiscal');assert.equal(r.annual?.kind,'annual');assert.equal(r.annual?.days,15);assert.equal(r.annual?.numerator,undefined);});
 
 test('2025 annual official schedule plus weekends excludes121 of365 days',()=>{const r=business('2025-01-01','2025-12-31');assert.equal(r.excludedCount,121);assert.equal(r.business,244);});
+
+test('work date error translations have balanced placeholders and matching KO/EN parameters',()=>{
+ const resources=['ko','en'].map(lang=>JSON.parse(fs.readFileSync(new URL(`../../src/locales/${lang}/features.json`,import.meta.url),'utf8')).work.inputErrors);
+ for(const key of Object.keys(resources[0])){
+  const tokens=resources.map(messages=>{
+   const text=messages[key] as string;assert.equal(typeof text,'string');
+   const parameters=[...text.matchAll(/\{\{([a-zA-Z]+)\}\}/g)].map(m=>m[1]).sort();
+   assert.doesNotMatch(text.replace(/\{\{[a-zA-Z]+\}\}/g,''),/[{}]/);return parameters;
+  });assert.deepEqual(tokens[0],tokens[1],key);
+ }
+});
