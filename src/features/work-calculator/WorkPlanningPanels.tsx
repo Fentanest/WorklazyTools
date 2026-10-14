@@ -57,6 +57,7 @@ export function WorkPlanningPanels({ custom, language }: { custom: string[]; lan
       {vacation.restPeriods.map(period => <p className="work-help" key={period.start}>{period.start} – {period.end} · {t('work.restDays',{days:period.days})}</p>)}
       {vacation.rangeLimited && <p className="work-help">{t('work.restRangeLimited')}</p>}<p className="work-help">{t('work.halfDayNote')}</p>
     </section>
+    <p className="work-help work-local-note" data-testid="work-planning-coverage">{t('work.planningCoverage')}</p>
     <p className="work-help work-local-note">{t('work.localPlanning')}</p>
   </div>;
 }
