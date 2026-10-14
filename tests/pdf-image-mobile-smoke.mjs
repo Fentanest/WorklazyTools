@@ -33,7 +33,7 @@ async function ready(n){await page.waitForFunction(n=>document.querySelectorAll(
 async function convert(){await page.evaluate(()=>{window.__imageMetrics.phase='pdf';window.__imageMetrics.pdfStart=performance.now();});await page.getByRole('button',{name:'PDF 만들기',exact:true}).click();await page.getByTestId('pdf-download').waitFor();const b=await page.getByTestId('pdf-download').evaluate(async e=>{const blob=await(await fetch(e.href)).blob();return new Promise(resolve=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.readAsDataURL(blob);});});return Buffer.from(b,'base64');}
 function imageHashes(doc){return doc.getPages().map(p=>{const x=p.node.Resources().lookup(PDFName.of('XObject'));const stream=x.lookup(x.keys()[0]);assert.equal(stream.dict.get(PDFName.of('Filter')).toString(),'/DCTDecode');return hash(stream.contents);});}
 const hash=b=>createHash('sha256').update(b).digest('hex');
-async function test(name,fn){const start=performance.now();try{await fn();report.cases.push({name,status:'PASS',ms:performance.now()-start});console.log('PASS',name);}catch(e){report.cases.push({name,status:'FAIL',error:String(e),stack:e.stack});console.error('FAIL',name,e);await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});}await fs.writeFile(path.join(out,'report.json'),JSON.stringify(report,null,2));}
+async function test(name,fn){if(process.env.IMAGE_TEST_FILTER&&!new RegExp(process.env.IMAGE_TEST_FILTER).test(name))return;const start=performance.now();try{await fn();report.cases.push({name,status:'PASS',ms:performance.now()-start});console.log('PASS',name);}catch(e){report.cases.push({name,status:'FAIL',error:String(e),stack:e.stack});console.error('FAIL',name,e);await page.screenshot({path:path.join(out,'failure.png')}).catch(()=>{});}await fs.writeFile(path.join(out,'report.json'),JSON.stringify(report,null,2));}
 let synthetic;
 await open();
 synthetic=await page.evaluate(async()=>{const c=document.createElement('canvas');c.width=160;c.height=100;const x=c.getContext('2d');x.fillStyle='red';x.fillRect(0,0,80,50);x.fillStyle='lime';x.fillRect(80,0,80,50);x.fillStyle='blue';x.fillRect(0,50,80,50);x.fillStyle='yellow';x.fillRect(80,50,80,50);return Array.from(new Uint8Array(await (await new Promise(r=>c.toBlob(r,'image/jpeg',.98))).arrayBuffer()));});
@@ -130,6 +130,17 @@ await test('cancel during non-abortable preprocessing holds retry until disposal
  const x=doc.getPages()[0].node.Resources().lookup(PDFName.of('XObject'));const stream=x.lookup(x.keys()[0]);assert.ok(stream.dict.get(PDFName.of('SMask')),'PNG transparency soft mask retained');
  await fs.writeFile(path.join(out,'transparent.pdf'),b);
 });
+await test('canceling a thumbnail retry removes the previous PDF and discards the late thumbnail',async()=>{
+ await open();await page.locator('input[type=file]').setInputFiles(sample);await ready(1);await convert();
+ await page.locator('.pdf-image-preview img').dispatchEvent('error');
+ await page.evaluate(()=>{const native=window.createImageBitmap;window.createImageBitmap=(...args)=>new Promise((resolve,reject)=>{window.__releaseRetry=()=>native(...args).then(resolve,reject);});});
+ await page.getByRole('button',{name:'미리보기 재시도',exact:true}).click();await page.waitForFunction(()=>!!window.__releaseRetry);
+ await page.getByRole('button',{name:'이미지 준비 취소',exact:true}).click();
+ assert.equal(await page.locator('.pdf-image-card').count(),0);assert.equal(await page.getByTestId('pdf-download').count(),0);
+ await page.evaluate(()=>window.__releaseRetry());await page.waitForFunction(()=>window.__imageMetrics.decodes===0);
+ assert.equal(await page.getByTestId('pdf-download').count(),0);assert.equal(await page.locator('.pdf-image-card').count(),0);
+ assert.equal(await page.evaluate(()=>window.__imageMetrics.urls.length),0);assert.equal(await page.evaluate(()=>window.__imageMetrics.bitmaps),0);
+});
 await test('shared drop zone retains legacy sync/async, single/multiple/drop and reset contracts',async()=>{
  await open();await page.evaluate(async()=>{
   const {mountDropHarness}=await import('/tests/helpers/pdf-image-drop-harness.tsx');window.__drop=mountDropHarness();
@@ -164,6 +175,22 @@ await test('EXIF 1–8 and absent: asymmetric pixel oracle in final PDF, bitmap 
  }
 });
 
+await test('PNG eXIf orientation uses decoded aspect ratio for thumbnail and final PDF',async()=>{
+ await open();const {PNG}=await import('pngjs');const png=new PNG({width:160,height:100});
+ for(let y=0;y<100;y++)for(let x=0;x<160;x++)png.data.set([[255,0,0,255],[0,255,0,255],[0,0,255,255],[255,255,0,255]][(y>=50?2:0)+(x>=80?1:0)],(y*160+x)*4);
+ const raw=PNG.sync.write(png),tiff=Buffer.from([73,73,42,0,8,0,0,0,1,0,18,1,3,0,1,0,0,0,6,0,0,0,0,0,0,0]);
+ const body=Buffer.concat([Buffer.from('eXIf'),tiff]);let crc=0xffffffff;
+ for(const byte of body){crc^=byte;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
+ const chunk=Buffer.alloc(body.length+8);chunk.writeUInt32BE(tiff.length);body.copy(chunk,4);chunk.writeUInt32BE((crc^0xffffffff)>>>0,chunk.length-4);
+ const bytes=Buffer.concat([raw.subarray(0,33),chunk,raw.subarray(33)]);
+ await page.locator('input[type=file]').setInputFiles({name:'oriented.png',mimeType:'',buffer:bytes});await ready(1);
+ assert.deepEqual(await page.locator('.pdf-image-preview img').evaluate(async e=>{await e.decode();return [e.naturalWidth,e.naturalHeight];}),[100,160]);
+ await page.getByRole('button',{name:'이미지 크기',exact:true}).click();const output=await convert();assert.deepEqual((await PDFDocument.load(output)).getPages()[0].getSize(),{width:75,height:120});
+ const pdfPath=path.join(out,'png-exif.pdf');await fs.writeFile(pdfPath,output);
+ const {execFileSync}=await import('node:child_process');execFileSync('pdftoppm',['-png','-scale-to','160',pdfPath,path.join(out,'png-exif')]);
+ const rendered=PNG.sync.read(await fs.readFile(path.join(out,'png-exif-1.png')));const at=(40*rendered.width+25)*4;
+ assert.ok(rendered.data[at+2]>240&&rendered.data[at]<15&&rendered.data[at+1]<15,'orientation 6 top-left is blue');
+});
 await test('Korean/English tablet and phone visual states with synthetic inputs',async()=>{
  for(const [lang,width,dark] of [['ko',800,false],['en',800,true],['ko',390,false],['en',1280,true]]){
   await page.setViewportSize({width,height:1000});await page.goto(base+`/${lang}/tools/pdf-converter/image-to-pdf/`);await page.locator('input[type=file]').waitFor();
@@ -174,4 +201,4 @@ await test('Korean/English tablet and phone visual states with synthetic inputs'
   await page.screenshot({path:path.join(out,`visual-${lang}-${width}-${dark?'dark':'light'}.png`),fullPage:true});
  }
 });
-await context.close();await browser.close();console.log(`# tests ${report.cases.length}`);console.log(`# pass ${report.cases.filter(x=>x.status==='PASS').length}`);console.log(`# fail ${report.cases.filter(x=>x.status==='FAIL').length}`);if(report.cases.some(x=>x.status==='FAIL'))process.exitCode=1;
+await context.close();await browser.close();console.log(`# tests ${report.cases.length}`);console.log(`# pass ${report.cases.filter(x=>x.status==='PASS').length}`);console.log(`# fail ${report.cases.filter(x=>x.status==='FAIL').length}`);if(!report.cases.length||report.cases.some(x=>x.status==='FAIL'))process.exitCode=1;

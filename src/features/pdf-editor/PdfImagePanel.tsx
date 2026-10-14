@@ -103,7 +103,7 @@ function ImagesToPdf() {
           </SectionCard>
           {(preparing || inputs.acquiring) && <div role="status" className="my-3 text-sm">
             {!preparing ? featureMessage(language, "pdf.imageInput.canceling") : featureMessage(language, "pdf.imageInput.preparing", { done: inputs.entries.filter(e => e.status === 'ready' || e.status === 'failed').length, total: inputs.entries.length })}
-            <Button variant="outline" onClick={inputs.cancelPreparation}>{featureMessage(language, "pdf.imageInput.cancelPreparation")}</Button>
+            <Button variant="outline" onClick={() => { inputs.cancelPreparation(); download.clearResult(); setError(""); }}>{featureMessage(language, "pdf.imageInput.cancelPreparation")}</Button>
           </div>}
           {!!inputs.entries.length && (
             <SectionCard step={2} title={featureMessage(language, "pdf.messages.PdfImagePanel.pageOrder")} description={featureMessage(language, "pdf.messages.PdfImagePanel.dragImagesToChangeThePdfPageOrder")} className="">

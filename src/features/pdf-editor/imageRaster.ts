@@ -12,8 +12,10 @@ export function rasterImage(file: File, metadata: ImageMetadata, thumbnail: bool
       const swapped = (metadata.orientation ?? 1) >= 5;
       const w = swapped ? metadata.height : metadata.width, h = swapped ? metadata.width : metadata.height;
       const scale = thumbnail ? Math.min(1, 400 / Math.max(w,h)) : 1;
+      // PNG eXIf and malformed JPEG metadata may still orient in the browser.
+      // Only use header-derived resize dimensions when orientation is known.
       try {
-        bitmap = await createImageBitmap(file, { imageOrientation: 'from-image', ...(thumbnail ? {
+        bitmap = await createImageBitmap(file, { imageOrientation: 'from-image', ...(thumbnail && metadata.mime === 'image/jpeg' && !metadata.malformedExif ? {
           resizeWidth: Math.max(1,Math.round(w*scale)), resizeHeight: Math.max(1,Math.round(h*scale)), resizeQuality: 'high' as const,
         } : {}) });
       } catch {
