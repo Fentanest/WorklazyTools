@@ -529,6 +529,14 @@
           "Monthly and annual accrual dates model successive civil-calendar periods: accrual is estimated on the day after each completed attendance period. If a matching day is absent, the period expires at month-end and accrual follows the next day, without postponement for weekends. For example, a January 31 hire first accrues monthly leave on March 1. This is the calculator’s period interpretation assumption, not a definitive court ruling for individual cases.",
           "General statutory eligibility assumes a workplace with at least five regular workers, an average of at least 15 working hours per week and the relevant attendance requirements. Falling outside these assumptions does not mean contractual leave is zero. Check company rules and actual attendance. Actual-workday methods, company rounding, resignation settlements and unused-leave payments are not calculated."
         ]
+      },
+      {
+        "title": "Date offsets and vacation planning",
+        "paragraphs": [
+          "Business-day offsets use the same weekend, public holiday and custom holiday rules. Start inclusion counts a working anchor as the first day; zero returns the anchor. Results outside the supported range are rejected.",
+          "Add full or half days per vacation date. Re-adding a date replaces its unit. Weekends and holidays cost no leave and remain natural days off. Working half days split full-rest periods. Each period and the longest period include adjacent weekends and holidays, stopping at supported date boundaries.",
+          "Plans calculate locally with no storage or upload. Vacation plans are not combined with annual awards or past monthly history into a remaining leave balance."
+        ]
       }
     ],
     "faq": {

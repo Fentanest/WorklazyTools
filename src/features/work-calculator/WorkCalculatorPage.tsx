@@ -7,6 +7,7 @@ import { UtilityInput, UtilityPage } from "../../components/UtilitySurface";
 import { calculateAnnualLeave, calculateBusinessDays, parseCustomHolidays, seoulToday, validateWorkDate } from "./workCalculator";
 import type { AnnualLeaveResult, BusinessResult, LeaveEvent, WorkDateErrorCode, WorkDateField } from "./workCalculatorTypes";
 import "./WorkCalculatorPage.css";
+import { WorkMonthCalendar, WorkPlanningPanels } from "./WorkPlanningPanels";
 
 type CalculationState = {
   business?: BusinessResult;
@@ -31,7 +32,7 @@ export function WorkCalculatorPage() {
   const [addedCount, setAddedCount] = useState<number>();
   const [excludedOpen, setExcludedOpen] = useState(false);
   const [excludedPage, setExcludedPage] = useState(0);
-  const [eventsOpen, setEventsOpen] = useState(false);
+  const [eventsOpen, setEventsOpen] = useState(true);
   const [guideOpen, setGuideOpen] = useState(false);
 
   const messageForError = useCallback((reason: unknown) => {
@@ -113,7 +114,7 @@ export function WorkCalculatorPage() {
       min={mode === "business" ? "2000-01-01" : field === "hire" ? "1900-01-01" : "2018-05-29"} max="2050-12-31"
       aria-invalid={Boolean(state.errors[field])} aria-describedby={state.errors[field] ? `work-${field}-error` : "work-date-help"}
       onChange={event => { onChange(event.target.value); setExcludedPage(0); }} />
-    {state.errors[field] && <p className="work-field-error" id={`work-${field}-error`}>{state.errors[field]}</p>}
+    <p className="work-field-error work-date-error" id={`work-${field}-error`}>{state.errors[field] || ""}</p>
   </div>;
   const annualLabel = leave?.annual?.kind === "prorated" ? t("work.fiscalProrated") : method === "fiscal" ? t("work.fiscalGrant") : t("work.cycleGrant");
   const eventKind = (event: LeaveEvent) => t(`work.eventKinds.${event.kind}`);
@@ -169,27 +170,25 @@ export function WorkCalculatorPage() {
           </div>}
         </div>
         <section ref={resultRef} style={state.error && readyHeight.current[mode] ? { minHeight: readyHeight.current[mode] } : undefined} className="work-result" aria-label={t("work.result")} data-testid="work-result-region">
-          {state.error ? <div className="work-result-message"><h2>{t("work.inputNeeded")}</h2><p>{state.error}</p></div> : business ? <div data-testid="business-day-results">
+          {state.error ? <div className="work-result-message"><h2>{t("work.inputNeeded")}</h2><p>{state.error}</p></div> : business ? <div className="work-business-summary" data-testid="business-day-results"><div>
             <h2>{t("work.business")}</h2>
             <strong className="work-primary-value">{days(business.business)}</strong>
             <p className="work-secondary-value">{t("work.businessSummary", { total: number(business.total), excluded: number(business.excludedCount) })}</p>
-          </div> : leave && <div data-testid="leave-result">
-            <h2>{leave.annual ? annualLabel : t("work.monthlyHistory")}</h2>
-            {leave.annual ? <><strong className="work-primary-value">{days(leave.annual.days)}</strong><p className="work-period">{t("work.grantDate", { date: leave.annual.date })}</p><p className="work-period">{t("work.earningPeriod", { start: leave.annual.periodStart, end: leave.annual.periodEnd })}</p>
-              {leave.annual.kind === "prorated" && leave.annual.numerator !== undefined && leave.annual.denominator !== undefined && <p className="work-help">{t("work.proratedFormula", { numerator: leave.annual.numerator, denominator: leave.annual.denominator })}</p>}</> : leave.monthly.total !== null ? <strong className="work-primary-value">{days(leave.monthly.total)}</strong> : <p>{t("work.historyUnsupported")}</p>}
-            {leave.annual && <div className="work-monthly-summary"><strong>{t("work.monthlyHistory")}</strong><p>{leave.monthly.total === null ? t("work.historyUnsupported") : days(leave.monthly.total)}</p></div>}
-            {leave.monthly.total !== null && <p className="work-period">{t("work.monthlyPeriod", { start: leave.monthly.periodStart, end: leave.monthly.periodEnd, date: asOf })}</p>}
-            {leave.nextEvent && <p className="work-next-event">{t("work.nextEvent", { date: leave.nextEvent.date, kind: eventKind(leave.nextEvent), days: days(leave.nextEvent.days) })}</p>}
+            </div><dl className="work-summary-counts">{([['total',business.total],['weekendBucket',business.breakdown.weekend],['publicBucket',business.breakdown.publicHoliday],['customBucket',business.breakdown.customHoliday]] as const).map(([label,value]) => <div key={label}><dt>{t(`work.${label}`)}</dt><dd>{days(Number(value))}</dd></div>)}</dl>
+          </div> : leave && <div className="work-leave-summary" data-testid="leave-result">
+            <div><h2>{leave.annual ? annualLabel : t("work.monthlyHistory")}</h2>
+            {leave.annual ? <><strong className="work-primary-value">{days(leave.annual.days)}</strong><p className="work-period">{t("work.grantDate", { date: leave.annual.date })}</p></> : leave.monthly.total !== null ? <strong className="work-primary-value">{days(leave.monthly.total)}</strong> : <p>{t("work.historyUnsupported")}</p>}</div>
+            {leave.annual && <div className="work-monthly-summary"><strong>{t("work.monthlyHistory")}</strong><p>{leave.monthly.total === null ? t("work.historyUnsupported") : days(leave.monthly.total)}</p><small>{t("work.historyNote")}</small></div>}
+            {leave.nextEvent && <div className="work-next-summary"><h2>{t("work.nextAward")}</h2><strong>{leave.nextEvent.date}</strong><p>{eventKind(leave.nextEvent)} · {days(leave.nextEvent.days)}</p></div>}
           </div>}
           <p className="work-assumptions">{t(mode === "business" ? "work.businessAssumptions" : "work.leaveAssumptions")}</p>
-          {business && <div className="work-data-status">
-            <p>{t(`work.dataStatuses.${business.holidayInfo.status}`)}</p>
-            <p>{t("work.checkedAt", { date: business.holidayInfo.checkedAt })}</p>
-            <p>{t("work.supportedYears", { start: business.holidayInfo.minYear, end: business.holidayInfo.maxYear })}</p>
-          </div>}
+          {business && <p className="work-data-caption">{t(`work.dataStatuses.${business.holidayInfo.status}`)}</p>}
         </section>
       </div>
     </section>
+    <div className="work-evidence-grid" data-testid="work-evidence-grid">
+    <div className="work-evidence-history">
+    {business && <WorkMonthCalendar key={start.slice(0,7)} start={start} end={end} custom={custom} language={language} />}
     {mode === "business" && <details className="work-details" open={excludedOpen} onToggle={event => setExcludedOpen(event.currentTarget.open)}>
       <summary>{t("work.excludedDates")}{business ? ` (${number(business.excludedCount)})` : ""}</summary>
       {excludedOpen && <div className="work-detail-content">{excluded ? <>
@@ -207,6 +206,22 @@ export function WorkCalculatorPage() {
         <p className="work-help">{t("work.historyNote")}</p>
       </> : <p>{state.error}</p>}</div>}
     </details>}
+    </div>
+    <section className="work-panel work-evidence" data-testid="work-evidence"><h2>{t("work.evidence")}</h2>
+      {business ? <><p className="work-evidence-formula">{number(business.total)} − {number(business.breakdown.weekend)} − {number(business.breakdown.publicHoliday)} − {number(business.breakdown.customHoliday)} = <strong>{days(business.business)}</strong></p>
+        <p className="work-help">{t("work.bucketHelp")}</p><dl className="work-evidence-values"><div><dt>{t("work.eventPeriod")}</dt><dd>{start} – {end}</dd></div><div><dt>{t("work.total")}</dt><dd>{days(business.total)}</dd></div><div><dt>{t("work.excludedDates")}</dt><dd>{days(business.excludedCount)}</dd></div></dl>
+        <div className="work-data-status"><p>{t("work.checkedAt", { date: business.holidayInfo.checkedAt })}</p><p>{t("work.supportedYears", { start: business.holidayInfo.minYear, end: business.holidayInfo.maxYear })}</p></div>
+      </> : leave ? <><dl className="work-evidence-values"><div><dt>{t("work.basisLabel")}</dt><dd>{t(method === "hire" ? "work.hireBasis" : "work.fiscalBasis")}</dd></div>
+        {leave.annual ? <><div><dt>{t("work.awardDate")}</dt><dd>{leave.annual.date}</dd></div><div><dt>{t("work.assessmentPeriod")}</dt><dd>{leave.annual.periodStart} – {leave.annual.periodEnd}</dd></div>
+          <div><dt>{t("work.baseGrant")}</dt><dd>{days(15)}</dd></div><div><dt>{t("work.tenureExtra")}</dt><dd>{days(leave.annual.kind === "prorated" ? 0 : Math.max(0,leave.annual.days - 15))}</dd></div>
+          {leave.annual.kind === "prorated" && <><div><dt>{t("work.fiscalFraction")}</dt><dd>15 × {leave.annual.numerator} / {leave.annual.denominator}</dd></div><div><dt>{t("work.unrounded")}</dt><dd>{leave.annual.days.toPrecision(15)}</dd></div></>}
+          <div><dt>{t("work.displayedGrant")}</dt><dd>{days(leave.annual.days)}</dd></div></> : <div><dt>{t("work.cycleGrant")}</dt><dd>{t("work.noAnnualGrant")}</dd></div>}
+        {leave.nextEvent && <div><dt>{t("work.nextAward")}</dt><dd>{leave.nextEvent.date} · {eventKind(leave.nextEvent)} · {days(leave.nextEvent.days)}</dd></div>}
+        <div><dt>{t("work.monthlyHistory")}</dt><dd>{leave.monthly.total === null ? t("work.historyUnsupported") : days(leave.monthly.total)}</dd></div></dl>
+        {leave.monthly.total !== null && <p className="work-help">{t("work.monthlyPeriod", { start: leave.monthly.periodStart, end: leave.monthly.periodEnd, date: asOf })}</p>}<p className="work-help">{t("work.roundingHelp")}</p><p className="work-help">{t("work.historyNote")}</p>
+      </> : <p className="work-help">{state.error}</p>}
+    </section></div>
+    <WorkPlanningPanels custom={custom} language={language} />
     <details className="work-details work-guide" open={guideOpen} onToggle={event => setGuideOpen(event.currentTarget.open)}><summary>{t("work.guide")}</summary>{guideOpen && <ToolGuideWrapper slug="work"><div className="work-sources"><h3>{t("work.sources")}</h3><ul>
       <li><a href="https://www.law.go.kr/법령/근로기준법" target="_blank" rel="noreferrer">{t("work.sourceLaw")}</a></li>
       <li><a href="https://www.moel.go.kr/policy/policydata/view.do?bbs_seq=20180600335" target="_blank" rel="noreferrer">{t("work.sourceLeaveGuide")}</a></li>

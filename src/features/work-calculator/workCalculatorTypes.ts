@@ -8,6 +8,7 @@ export interface HolidayInfo {
 }
 export interface BusinessResult {
   total: number; business: number; excludedCount: number; holidayInfo: HolidayInfo;
+  breakdown: { weekend: number; publicHoliday: number; customHoliday: number };
   /** Compatibility accessor, materialized only when requested. Prefer excludedPage for UI. */
   readonly excluded: ExcludedDay[];
   excludedPage: (page?: number, pageSize?: number) => { items: ExcludedDay[]; page: number; pageCount: number };
@@ -22,3 +23,7 @@ export interface AnnualLeaveResult {
   annual: LeaveEvent | null;
   nextEvent: LeaveEvent | null;
 }
+
+export interface WorkDay { date: string; business: boolean; weekend: boolean; publicHoliday: boolean; customHoliday: boolean; reasons: string[] }
+export interface VacationEntry { date: string; units: 1 | 0.5 }
+export interface VacationPlan { needed: number; entries: (VacationEntry & { needed: number; reasons: string[] })[]; restPeriods: { start: string; end: string; days: number }[]; longestRest: number; rangeLimited: boolean }

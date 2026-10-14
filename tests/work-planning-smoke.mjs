@@ -1,0 +1,35 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {chromium} from 'playwright';
+const base=process.env.TEST_BASE_URL || 'http://127.0.0.1:5193';
+const output=path.resolve(process.env.WORK_TEST_OUTPUT || 'docs/jobs/todo/work-calculator-evidence-layout/browser');await fs.mkdir(output,{recursive:true});
+const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+const context=await browser.newContext({serviceWorkers:'block',reducedMotion:'reduce'});await context.route('**/*',r=>{const u=new URL(r.request().url());return /^https?:$/.test(u.protocol)&&u.origin!==base?r.abort():r.continue();});await context.addInitScript(()=>{window.__WORKLAZY_MOCK_PROVIDERS__=true;});
+const page=await context.newPage();const errors=[],cases=[];page.on('pageerror',e=>errors.push(String(e)));page.setDefaultTimeout(15000);
+async function open(lang='ko'){await page.goto(`${base}/${lang}/tools/work-calculator`);await page.getByTestId('work-calendar').waitFor();}
+async function test(name,fn){try{await fn();cases.push({name,status:'PASS'});console.log('PASS',name);}catch(e){cases.push({name,status:'FAIL',error:String(e)});console.error('FAIL',name,e);}await fs.writeFile(path.join(output,'report.json'),JSON.stringify({cases,errors},null,2));}
+await test('real month selection, overlapping reasons and supported month bounds',async()=>{
+ await open();await page.locator('#work-start').fill('2025-05-03');await page.locator('#work-end').fill('2025-05-09');await page.locator('.work-extra summary').click();await page.locator('#work-custom-date').fill('2025-05-05');await page.locator('.work-add-row button').click();await page.locator('.work-calendar-grid button').filter({has:page.locator('time[datetime="2025-05-05"]')}).click();assert.match(await page.locator('.work-calendar-selection').innerText(),/어린이날.*부처님.*직접/);
+ await page.locator('#work-month').fill('2000-01');assert.equal(await page.getByRole('button',{name:'이전 달',exact:true}).isDisabled(),true);await page.locator('#work-month').fill('2050-12');assert.equal(await page.getByRole('button',{name:'다음 달',exact:true}).isDisabled(),true);assert.equal(await page.locator('.work-calendar-grid button').count(),31);
+});
+await test('offset include, before, zero, holiday policy and errors update locally',async()=>{
+ await open();await page.locator('#work-anchor').fill('2026-01-09');await page.locator('#work-offset-count').fill('1');const result=page.getByTestId('work-offset').locator('[role="status"]');assert.match(await result.innerText(),/2026-01-12/);await page.getByLabel('기준일 포함',{exact:true}).check();assert.match(await result.innerText(),/2026-01-09/);await page.getByLabel('기준일 포함',{exact:true}).uncheck();await page.locator('#work-direction').selectOption('before');assert.match(await result.innerText(),/2026-01-08/);await page.locator('#work-anchor').fill('2026-01-10');await page.locator('#work-offset-count').fill('0');assert.match(await result.innerText(),/2026-01-10/);await page.locator('#work-offset-count').fill('0.5');assert.match(await result.innerText(),/정수/);await page.locator('#work-anchor').fill('2000-01-01');await page.locator('#work-offset-count').fill('1');assert.match(await result.innerText(),/2050-12-31/);
+});
+await test('vacation replacement halfday nonworking precedence and persistent mode switching',async()=>{
+ await open();const panel=page.getByTestId('work-vacation');const add=async(date,unit)=>{await page.locator('#work-vacation-date').fill(date);await page.locator('#work-vacation-unit').selectOption(unit);await panel.getByRole('button',{name:'추가',exact:true}).click();};
+ await add('2026-01-09','1');await add('2026-01-12','1');assert.match(await panel.locator('[role="status"]').innerText(),/연차 2일.*휴식 4일/);await add('2026-01-11','0.5');assert.match(await panel.locator('[role="status"]').innerText(),/연차 2일.*휴식 4일/);await add('2026-01-09','0.5');assert.match(await panel.locator('[role="status"]').innerText(),/연차 1.5일.*휴식 3일/);assert.equal(await panel.locator('li').count(),3);
+ await page.getByTestId('work-mode').getByRole('button').nth(1).click();assert.equal(await panel.isVisible(),true);assert.equal(await panel.locator('li').count(),3);await add('2026-01-13','0.5');assert.match(await panel.locator('[role="status"]').innerText(),/연차 2일/);await page.getByTestId('work-mode').getByRole('button').nth(0).click();assert.equal(await panel.locator('li').count(),4);
+});
+await test('fiscal base and extra derive from award not current tenure; exact raw fraction',async()=>{
+ await open();await page.getByTestId('work-mode').getByRole('button').nth(1).click();await page.locator('#work-hire').fill('2023-07-01');await page.locator('#work-asOf').fill('2026-10-14');await page.getByTestId('leave-method').getByRole('button').nth(1).click();const evidence=page.getByTestId('work-evidence');assert.match(await evidence.innerText(),/근속 가산\s*0일/);assert.match(await evidence.innerText(),/2025-01-01 – 2025-12-31/);await page.locator('#work-hire').fill('2025-07-01');assert.match(await evidence.innerText(),/15 × 184 \/ 365/);assert.match(await evidence.innerText(),/7\.56164383561644/);assert.equal(await page.locator('.work-details tbody tr').count(),12);
+});
+await test('320/390/1280/1440 light/dark KO/EN geometry and real screenshots',async()=>{
+ for(const lang of ['ko','en'])for(const theme of ['light-coral','dark-coral'])for(const width of [320,390,1280,1440])for(const mode of ['business','leave']){
+  await page.setViewportSize({width,height:900});await open(lang);await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);if(mode==='leave')await page.getByTestId('work-mode').getByRole('button').nth(1).click();
+  const geometry=await page.evaluate(()=>{const box=s=>document.querySelector(s).getBoundingClientRect();return{scroll:document.documentElement.scrollWidth,viewport:innerWidth,core:box('.work-core').width,page:box('[data-tool-page="work-calculator"]').width,columns:getComputedStyle(document.querySelector('.work-evidence-grid')).gridTemplateColumns,targets:[...document.querySelectorAll('.work-calendar-grid button')].map(e=>{const r=e.getBoundingClientRect();return[r.width,r.height];})};});
+  assert.ok(geometry.scroll<=width,JSON.stringify(geometry));assert.ok(Math.abs(geometry.core-geometry.page)<1);if(width>=1280){assert.ok(geometry.core>760);assert.equal(geometry.columns.split(' ').length,2);}else{assert.equal(geometry.columns.split(' ').length,1);for(const [w,h]of geometry.targets)assert.ok(w>=43.9&&h>=44);}
+  await page.screenshot({path:path.join(output,`${lang}-${theme}-${width}-${mode}.png`),fullPage:true});
+ }
+});
+await browser.close();console.log(`# tests ${cases.length}\n# pass ${cases.filter(c=>c.status==='PASS').length}\n# fail ${cases.filter(c=>c.status==='FAIL').length}`);if(errors.length||cases.some(c=>c.status==='FAIL'))process.exitCode=1;
