@@ -105,7 +105,7 @@ try {
   assert.equal(await page.getByTestId('pdf-finish-range').inputValue(), '2');
   results.push('PDF finishing append retains page range and existing file');
 
-  await page.goto(`${base}/en/tools/document-redactor`);
+  await page.goto(`${base}/en/tools/document-redactor/`);
   await page.locator('input[type=file]').first().waitFor({ state: 'attached', timeout: 120000 });
   await page.locator('input[type=file]').first().setInputFiles(path.join(output, 'A.pdf'));
   await page.locator('.redactor-preview-canvas').waitFor({ timeout: 60000 });
@@ -118,4 +118,5 @@ try {
   assert.deepEqual(errors, []);
   await fs.writeFile(path.join(output, 'result.json'), JSON.stringify({ base, results, errors }, null, 2));
   console.log(`PASS ${results.length} file-drop browser flows`);
-} finally { await browser.close(); }
+  console.log(`1..${results.length}\n# tests ${results.length}\n# pass ${results.length}\n# fail 0`);
+} catch (error) { await page.screenshot({ path: path.join(output, "failure.png"), fullPage: true }); throw error; } finally { await browser.close(); }
