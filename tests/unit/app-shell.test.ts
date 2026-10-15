@@ -54,6 +54,9 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     .filter((relativePath) => executableExtensions.has(path.extname(relativePath)) && !relativePath.startsWith(vendorPrefix) && fs.existsSync(path.join(repositoryRoot, relativePath)))
     .filter((relativePath) => needles.some((needle) => read(relativePath).includes(needle)))
     .sort();
+  const resultDropTest = read("tests/file-drop-result-smoke.mjs");
+  assert.match(resultDropTest, /script\.type='application\/json'/);
+  assert.doesNotMatch(resultDropTest, /script\.src\s*=/);
   const allowlist = [
     "scripts/validate-static-output.mjs", // Owner: static isolation-page absence assertions.
     "src/components/AdSenseLoader.tsx", // Owner: the sole script creator.
@@ -63,6 +66,7 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     "tests/direct-entry-core-smoke.mjs", // Owner: unpublished video direct-entry and ad absence assertions.
     "tests/excel-cleaner-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/excel-compare-smoke.mjs", // Owner: standard-route presence assertion.
+    "tests/file-drop-result-smoke.mjs", // Owner: inert JSON ad marker for result-navigation/session regression; no provider request.
     "tests/helpers/ad-stub.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.
     "tests/new-tools-smoke.mjs", // Owner: video-isolation absence and request assertions.
     "tests/office-editor-smoke.mjs", // Owner: office-isolation absence assertion.
