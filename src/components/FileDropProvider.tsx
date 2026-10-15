@@ -13,7 +13,7 @@ export function acceptsFile(file: File, accept: string) {
 export function isFileDrag(event: { dataTransfer: DataTransfer | null }) {
   return Array.from(event.dataTransfer?.types ?? []).includes("Files");
 }
-type Target = { element: () => HTMLElement | null; label: () => string; accept: string; disabled: boolean; receive: (files: File[]) => void | Promise<void> };
+type Target = { element: () => HTMLElement | null; label: () => string; accept: string; disabled: boolean; scopeSelector?: string; receive: (files: File[]) => void | Promise<void> };
 function available(target: Target) {
   const element = target.element();
   return !!element?.isConnected && !element.closest('[hidden], [aria-hidden="true"], [inert]');
@@ -60,7 +60,12 @@ export function FileDropProvider({ children, routeKey }: { children: ReactNode; 
       const hit = event.target instanceof Element ? event.target : null;
       // Explicit areas (for example comparison columns) take priority over format routing.
       const local = entries.filter(([, get]) => {
-        const element = get().element();
+        const target = get();
+        const element = target.element();
+        if (target.scopeSelector) {
+          const scope = hit?.closest(target.scopeSelector);
+          return !!scope && !!element?.contains(scope);
+        }
         const scope = element?.closest("[data-file-drop-scope]") ?? element;
         return hit && scope?.contains(hit);
       });

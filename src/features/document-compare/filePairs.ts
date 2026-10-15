@@ -23,3 +23,7 @@ export function deduplicateDocumentFiles(files: File[]) {
 export function stripDocumentExtension(fileName: string) {
   return fileName.replace(/\.[^.]+$/, "");
 }
+
+export function isSupportedDocumentName(file: File) {
+  return /\.(docx?|hwp|hwpx)$/i.test(file.name);
+}

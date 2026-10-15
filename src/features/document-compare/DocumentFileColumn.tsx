@@ -23,6 +23,7 @@ export function DocumentFileColumn({
   onMove,
   onMoveAcross,
   renderAccessory,
+  disabled = false,
 }: {
   files: File[];
   side: DocumentPairSide;
@@ -36,6 +37,7 @@ export function DocumentFileColumn({
   onMove: (from: number, to: number) => void;
   onMoveAcross: (index: number) => void;
   renderAccessory?: (file: File) => ReactNode;
+  disabled?: boolean;
 }) {
   const { t } = useTranslation("features");
   const [receivingFiles, setReceivingFiles] = useState(false);
@@ -72,7 +74,7 @@ export function DocumentFileColumn({
       onDragOver={(event) => { if (isExternalFileDrag(event)) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } }}
       onDragLeave={(event) => { const next = event.relatedTarget; if (!(next instanceof Node && event.currentTarget.contains(next))) setReceivingFiles(false); }}
       onDrop={(event) => {
-        if (!isExternalFileDrag(event)) return;
+        if (!isExternalFileDrag(event) || disabled) return;
         event.preventDefault();
         setReceivingFiles(false);
         if ((event.target as Element).closest('[data-ui-part="drop-target"]')) return;
@@ -80,7 +82,7 @@ export function DocumentFileColumn({
         if (dropped.length) onFiles([...files, ...dropped]);
       }}
     >
-      <FileDropZone label={t("documentCompare.fileCount", { side: sideLabel, count: files.length })} accept={accept} hint={hint} multiple files={files} onFiles={onFiles} accent={accent} />
+      <FileDropZone disabled={disabled} label={t("documentCompare.fileCount", { side: sideLabel, count: files.length })} accept={accept} hint={hint} multiple files={files} onFiles={onFiles} accent={accent} />
       {!!files.length && (
         <ol className={cn("mt-2.5 flex list-none flex-col gap-2 p-0", listClassName)} data-testid={`document-file-list-${side}`} aria-label={t("documentCompare.documentOrder", { side: sideLabel })}>
           {files.map((file, index) => {

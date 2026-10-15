@@ -20,7 +20,7 @@ import { compareDocumentFilePairs } from "./documentCompareClient";
 import { fileKey, useDocumentCompareSession } from "./documentCompareSession";
 import { DocumentFileColumn } from "./DocumentFileColumn";
 import { DocumentPairingPreview } from "./DocumentPairingPreview";
-import { stripDocumentExtension } from "./filePairs";
+import { isSupportedDocumentName, stripDocumentExtension } from "./filePairs";
 import { useDocumentPairFiles } from "./useDocumentPairFiles";
 
 export function DocumentComparePage() {
@@ -154,7 +154,7 @@ export function DocumentComparePage() {
 
       <UtilitySectionCard step={1} title={L("비교할 문서", "Documents to compare")} description={L("같은 번호의 파일끼리 비교합니다. Word와 HWP는 서로 짝지을 수 없습니다.", "Files at the same position are paired. Word and HWP documents cannot be paired together.")}>
         <div className="grid grid-cols-2 gap-3.5 max-[720px]:grid-cols-1" data-testid="document-file-grid">
-          <DocumentFileColumn
+          <DocumentFileColumn disabled={loading}
             files={session.beforeFiles}
             side="before"
             sideLabel={L("수정 전", "Before")}
@@ -167,7 +167,7 @@ export function DocumentComparePage() {
             onMoveAcross={(index) => pairFiles.moveAcross("before", index)}
             renderAccessory={passwordAccessory}
           />
-          <DocumentFileColumn
+          <DocumentFileColumn disabled={loading}
             files={session.afterFiles}
             side="after"
             sideLabel={L("수정 후", "After")}
@@ -242,10 +242,6 @@ export function DocumentComparePage() {
       <RhwpVersionNotice mode="compare" />
     </UtilityPage>
   );
-}
-
-function isSupportedDocumentName(file: File) {
-  return /\.(docx?|hwp|hwpx)$/i.test(file.name);
 }
 
 function isHwpName(name: string) {
