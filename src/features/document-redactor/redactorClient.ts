@@ -74,11 +74,19 @@ export class RedactorClient {
             throw new RedactorError('cancelled');
         return this.run(async (context) => {
             const next = new Map<string, StoredInput>();
+            const existing = new Map(Array.from(this.inputs.values(), value => [value.file, value]));
             let totalPages = 0;
             const failures: InputSelection["failures"] = [];
             for (let index = 0; index < files.length; index++) {
                 await checkpoint(context);
                 const file = files[index];
+                const retained = existing.get(file);
+                if (retained) {
+                    totalPages += retained.info.pages.length;
+                    if (totalPages > LIMITS.batchPages) throw new RedactorError('limit');
+                    next.set(retained.info.id, { file, info: { ...retained.info, index } });
+                    continue;
+                }
                 const input = await this.ledger.allocate(context.owner, 'inspection-input', 'binary', file.size, async () => new Uint8Array(await file.arrayBuffer()));
                 try {
                     const pdf = isPdf(input.value);

@@ -1,3 +1,4 @@
+import { FileInput } from "../../components/FileDropProvider";
 import { Download, FileCheck2, FileText, FolderOpen, RefreshCw, X } from "lucide-react";
 import { createEditor, type HmlSaveState, type RhwpEditor } from "@rhwp/editor";
 import { useEffect, useRef, useState } from "react";
@@ -193,7 +194,7 @@ export function HwpEditorPage() {
           <div className="flex max-w-full flex-wrap items-center gap-1.5" data-testid="hwp-focus-actions">
             <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" onClick={() => setDocumentOpen(false)}><X size={16} /> 도구 화면</Button>
             <label className="relative inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-secondary px-[11px] text-[13px] font-bold whitespace-nowrap text-secondary-foreground transition-colors hover:bg-muted"><FolderOpen size={16} /> 다른 문서
-              <input className="sr-only" data-testid="hwp-focus-open" type="file" accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" onChange={(event) => { const next = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; selectFiles(next); }} />
+              <FileInput className="sr-only" data-testid="hwp-focus-open" type="file" accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" onChange={(event) => { const next = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; selectFiles(next); }} />
             </label>
             <Button className="h-9 rounded-xl bg-orange-700 px-[11px] text-[13px] font-bold text-white shadow-md shadow-orange-700/20 hover:bg-orange-800" data-testid="hwp-save" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwp")}><Download size={16} /> {exporting === "hwp" ? "저장 중…" : "HWP 저장"}</Button>
             <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwpx")}><Download size={16} /> HWPX</Button>
@@ -204,7 +205,7 @@ export function HwpEditorPage() {
           <FileCheck2 className="mt-px shrink-0" size={18} />
           <span className="flex flex-col gap-[3px]"><strong className="text-[13px] text-foreground">이 사이트에 포함된 공식 rhwp Studio</strong><small className="text-[13px] leading-5 text-muted-foreground">버전이 고정된 편집기·WASM·글꼴을 Worklazy Tools의 정적 자산에서 불러오며, 선택한 파일은 브라우저 내부 MessageChannel로 전달됩니다.</small></span>
         </div>}
-        <div ref={containerRef} className={cn("h-[clamp(680px,78vh,980px)] w-full overflow-hidden rounded-2xl border border-border bg-[#f4f5f7] shadow-[0_16px_42px_rgba(30,35,50,.12)] empty:relative empty:bg-[linear-gradient(145deg,var(--muted),var(--card))] empty:after:absolute empty:after:inset-0 empty:after:grid empty:after:place-items-center empty:after:text-sm empty:after:font-bold empty:after:text-muted-foreground empty:after:content-['rhwp_편집기를_불러오는_중…'] [&>iframe]:block [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0 [&>iframe]:bg-white max-[620px]:h-[max(620px,78vh)] max-[620px]:rounded-lg dark:border-white/15 dark:shadow-[0_20px_50px_rgba(0,0,0,.38)]", documentOpen && "h-auto min-h-0 flex-1 rounded-none border-0 border-t border-border shadow-none max-[620px]:h-auto max-[620px]:rounded-none")} data-testid="hwp-editor-shell" aria-label="HWP 문서 편집기" />
+        <div data-file-drop-frame-scope ref={containerRef} className={cn("h-[clamp(680px,78vh,980px)] w-full overflow-hidden rounded-2xl border border-border bg-[#f4f5f7] shadow-[0_16px_42px_rgba(30,35,50,.12)] empty:relative empty:bg-[linear-gradient(145deg,var(--muted),var(--card))] empty:after:absolute empty:after:inset-0 empty:after:grid empty:after:place-items-center empty:after:text-sm empty:after:font-bold empty:after:text-muted-foreground empty:after:content-['rhwp_편집기를_불러오는_중…'] [&>iframe]:block [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0 [&>iframe]:bg-white max-[620px]:h-[max(620px,78vh)] max-[620px]:rounded-lg dark:border-white/15 dark:shadow-[0_20px_50px_rgba(0,0,0,.38)]", documentOpen && "h-auto min-h-0 flex-1 rounded-none border-0 border-t border-border shadow-none max-[620px]:h-auto max-[620px]:rounded-none")} data-testid="hwp-editor-shell" aria-label="HWP 문서 편집기" />
         {documentOpen && <RhwpVersionNotice mode="editor" compact />}
       </SectionCard>
 

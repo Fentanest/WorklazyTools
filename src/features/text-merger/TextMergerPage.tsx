@@ -1,3 +1,4 @@
+import { FileInput } from "../../components/FileDropProvider";
 import {
   Check,
   ChevronDown,
@@ -194,7 +195,7 @@ export function TextMergerPage() {
       <PageHeader eyebrow="TEXT MERGER" title={t("features:textMerger.title")} description={t("features:textMerger.description")}><PrivacyBanner compact /></PageHeader>
 
       <UtilitySectionCard title={t("features:textMerger.sourcesTitle")} description={t("features:textMerger.sourcesDescription")}>
-        <input ref={fileInputRef} className="sr-only" type="file" accept=".txt,text/plain" multiple onChange={(event) => void loadFiles(event)} />
+        <FileInput disabled={readingFiles} aria-label={t("features:textMerger.loadTxt")} ref={fileInputRef} className="sr-only" type="file" accept=".txt,text/plain" multiple onChange={(event) => void loadFiles(event)} />
         <div className="flex flex-wrap items-center gap-2" data-testid="text-merger-add-actions">
           <Button variant="secondary" size="lg" className="rounded-xl font-bold" type="button" onClick={addDirect}><Plus size={17} /> {t("features:textMerger.addDirect")}</Button>
           <Button variant="secondary" size="lg" className="rounded-xl font-bold" type="button" disabled={readingFiles} onClick={() => fileInputRef.current?.click()}><Upload size={17} /> {readingFiles ? t("features:textMerger.readingFiles") : t("features:textMerger.loadTxt")}</Button>

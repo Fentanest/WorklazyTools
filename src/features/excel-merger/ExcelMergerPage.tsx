@@ -486,6 +486,7 @@ export function ExcelMergerPage() {
               multiple
               files={visibleFiles}
               onFiles={handleFiles}
+              disabled={precisionPreparing || operation.status === "running"}
               accent="green"
             />
             <UtilityNotice className="mt-3" kind="warning">{t(preserveLegacyXls ? "excel.steps.files.preserveNotice" : "excel.steps.files.notice")}</UtilityNotice>

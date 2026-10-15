@@ -545,12 +545,8 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     const controller = new AbortController();
     fileLifecycleControllerRef.current = controller;
     const previous = fileRef.current;
-    fileRef.current = incoming[0];
-    setFile(incoming[0]);
-    setSources([]);
-    setFileKey("");
-    setPageCount(0);
-    setRangeText("");
+    const retainPrimary = previous === incoming[0];
+    const retainedSources = new Map(sources.map(source => [source.file, source]));
     previewOwnerRef.current = undefined;
     setPreviewing(false);
     setInspecting(true);
@@ -559,28 +555,28 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     setRiskAccepted(false);
     operation.reset();
     download.clearResults();
-    if (previous) void releasePdf(previous);
     try {
       const inspectedSources: FinishSource[] = [];
       for (const [index, next] of incoming.entries()) {
+        const retained = retainedSources.get(next);
+        if (retained) { inspectedSources.push(retained); continue; }
         const inspected = await inspectPdf(next, language, { requirePdfLibCompatibility: true, signal: controller.signal });
         if (index > 0) await releasePdf(next);
         if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
         inspectedSources.push({ key: createLocalId("finish-source"), file: next, pageCount: inspected.pageCount });
       }
       const first = inspectedSources[0];
+      if (previous && !retainPrimary) void releasePdf(previous);
+      fileRef.current = first.file;
+      setFile(first.file);
       setSources(inspectedSources);
       setFileKey(first.key);
       setPageCount(first.pageCount);
-      setRangeText(`1-${first.pageCount}`);
-      setParity("all");
+      if (!retainPrimary) { setRangeText(`1-${first.pageCount}`); setParity("all"); }
     } catch (reason) {
       if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
       setError(inspectionErrorMessage(reason, language, copy));
-      fileRef.current = null;
-      setFile(null);
-      setSources([]);
-      await releasePdf(incoming[0]);
+      for (const next of incoming) if (!retainedSources.has(next)) await releasePdf(next);
     } finally {
       if (fileRequestRef.current === requestId) setInspecting(false);
     }

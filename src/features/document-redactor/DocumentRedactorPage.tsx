@@ -59,8 +59,8 @@ export function DocumentRedactorPage() {
   const releaseAllResults=useCallback(()=>{const value=client.current; Object.values(resultsRef.current).forEach(result=>{revoke(result.url);try{value?.releaseResult(result.info.id)}catch{}}); resultsRef.current={};setResults({});revokeZip();},[revoke,revokeZip]);
   const replaceInputs=useCallback(async(next:File[])=>{const value=client.current;if(!value||running||selecting)return;setSelecting(true);setNotice('');setJobFailures([]);try{
     const selection=await value.setInputs(next); if(!mounted.current)return; releaseAllResults(); const accepted=selection.inputs.map(info=>next[info.index]); setFiles(accepted);setInputs(selection.inputs);setFailures(selection.failures);
-    setHistories(Object.fromEntries(selection.inputs.map(info=>[info.id,emptyMaskHistory()])));setFileId(selection.inputs[0]?.id??'');setPageIndex(0);setSelectedMask(-1);setConfirmed(false);setResultMode(false);
-  }catch(error){if(mounted.current)setNotice(c.errors[safeError(error).code]);}finally{if(mounted.current)setSelecting(false)}},[c,releaseAllResults,running,selecting]);
+    setHistories(old=>Object.fromEntries(selection.inputs.map(info=>[info.id,old[info.id]??emptyMaskHistory()])));setFileId(old=>selection.inputs.some(info=>info.id===old)?old:selection.inputs[0]?.id??'');if(!selection.inputs.some(info=>info.id===fileId)){setPageIndex(0);setSelectedMask(-1);}setConfirmed(false);setResultMode(false);
+  }catch(error){if(mounted.current)setNotice(c.errors[safeError(error).code]);}finally{if(mounted.current)setSelecting(false)}},[c,releaseAllResults,running,selecting,fileId]);
 
   const commit=useCallback((next:MasksByPage)=>{if(!input)return;setHistories(old=>({...old,[input.id]:commitMasks(old[input.id]??emptyMaskHistory(),next)}));setConfirmed(false);},[input]);
   const setPageMasks=(next:MaskRect[])=>commit({...history.present,[pageIndex]:next});

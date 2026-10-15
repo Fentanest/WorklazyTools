@@ -1,3 +1,4 @@
+import { isFileDrag, useFileDropTarget } from "./FileDropProvider";
 import { Check, FilePlus2, LoaderCircle, UploadCloud, X } from "lucide-react";
 import {
   type ChangeEvent,
@@ -177,6 +178,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
   const { t } = useTranslation("common");
   const id = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const dropRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const processing = useRef(false);
   const [pending, setPending] = useState(false);
@@ -184,7 +186,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
   const blocked = disabled || pending;
   const accessibleName = t("files.selectOrDrop", { label: label || t("files.generic"), action: multiple && files.length ? t("files.add") : t("files.select") });
 
-  const appendFiles = async (incoming: FileList | null) => {
+  const appendFiles = async (incoming: FileList | File[] | null) => {
     if (!incoming || disabled || processing.current) return;
     processing.current = true; setPending(true);
     const next = Array.from(incoming);
@@ -193,6 +195,9 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
       else await onFiles(multiple ? [...files, ...next] : next.slice(0, 1));
     } finally { processing.current = false; setPending(false); }
   };
+
+  useFileDropTarget({ element: () => dropRef.current, label: () => label || accessibleName, accept, disabled: blocked,
+    receive: incoming => appendFiles(incoming) });
 
   const handleChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const input = event.currentTarget;
@@ -207,6 +212,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
   };
 
   const handleDrop = async (event: DragEvent<HTMLElement>) => {
+    if (!isFileDrag(event)) return;
     event.preventDefault();
     setDragging(false);
     await appendFiles(event.dataTransfer.files);
@@ -219,7 +225,7 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
   };
 
   return (
-    <div data-ui-component="file-drop-zone" className="ui-drop-zone-wrap" aria-busy={pending}>
+    <div ref={dropRef} data-ui-component="file-drop-zone" className="ui-drop-zone-wrap" aria-busy={pending}>
       {label && <label className="mb-2 ml-0.5 block text-sm font-bold" htmlFor={id}>{label}</label>}
       <input ref={inputRef} id={id} className="sr-only" type="file" accept={accept} multiple={multiple} disabled={blocked} aria-label={accessibleName} onChange={handleChange} />
       <Card
@@ -229,8 +235,9 @@ export function FileDropZone({ label, hint, accept, multiple = false, files, onF
           dragging && ["scale-[.995]", accentDraggingClasses[accent]],
           blocked && "cursor-not-allowed opacity-50",
         )}
-        onDragEnter={(event) => { event.preventDefault(); if (!blocked) setDragging(true); }}
+        onDragEnter={(event) => { if (!isFileDrag(event)) return; event.preventDefault(); if (!blocked) setDragging(true); }}
         onDragOver={(event) => {
+          if (!isFileDrag(event)) return;
           event.preventDefault();
           event.dataTransfer.dropEffect = blocked ? "none" : "copy";
           if (!blocked) setDragging(true);

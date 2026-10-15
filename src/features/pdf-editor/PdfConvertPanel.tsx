@@ -141,7 +141,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
         <div>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfConvertPanel.chooseAPdf")} description={featureMessage(language, "pdf.messages.PdfConvertPanel.convertTextOrScannedPdfsToDocxXlsx")} className="">
-            <FileDropZone accept=".pdf,application/pdf" multiple files={[]} onFiles={setInput} accent="violet" hint={language === "ko" ? "여러 PDF를 한 번에 선택할 수 있습니다." : "Choose one or more PDFs."} />
+            <FileDropZone accept=".pdf,application/pdf" multiple files={file ? [file] : []} disabled={loading || operation.status === "running"} onFiles={setInput} accent="violet" hint={language === "ko" ? "여러 PDF를 한 번에 선택할 수 있습니다." : "Choose one or more PDFs."} />
             {file && <FileList files={[file]} accent="violet" onRemove={() => { activeController.current?.abort(); void releasePdf(file); setLoading(false); operation.reset(); setFile(null); setPageCount(0); download.clearResult(); }} />}
           </SectionCard>
           {file && (

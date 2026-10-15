@@ -121,7 +121,12 @@
     "keepAdding": "you can keep adding files",
     "dropHere": "Drop files here",
     "added": "Added to the list",
-    "remove": "Remove {{name}}"
+    "remove": "Remove {{name}}",
+    "dropAnywhere": "Drop anywhere to add files.",
+    "dropBusy": "This input is busy or getting ready. Add files again when it is ready.",
+    "dropUnsupported": "Check the file formats supported by this input.",
+    "dropFailed": "Could not add the files. Please try again.",
+    "chooseDropTarget": "Choose where to add the files."
   },
   "actions": {
     "selectFile": "Choose files",

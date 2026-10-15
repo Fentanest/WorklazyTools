@@ -65,6 +65,7 @@ export function DocumentFileColumn({
         receivingFiles && accent === "blue" && "border-blue-500/50 bg-blue-500/[.06] shadow-[0_0_0_3px_rgba(59,130,246,.08)]",
         receivingFiles && accent === "orange" && "border-orange-500/50 bg-orange-500/[.07] shadow-[0_0_0_3px_rgba(249,115,22,.09)]",
       )}
+      data-file-drop-scope
       data-document-file-column={side}
       data-receiving-files={receivingFiles || undefined}
       onDragEnter={(event) => { if (isExternalFileDrag(event)) { event.preventDefault(); setReceivingFiles(true); } }}

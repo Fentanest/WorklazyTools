@@ -1,3 +1,4 @@
+import { FileInput } from "../../components/FileDropProvider";
 import { useFocusMode } from "../../components/AppShell";
 import { AlertCircle, Download, FileText, FileUp, Save } from "lucide-react";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -352,6 +353,7 @@ export function OfficeEditorAppPage() {
           ? "fixed inset-y-0 right-0 left-[280px] z-20 m-0 flex h-dvh w-auto max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[1020px]:left-[250px] max-[820px]:inset-0 max-[820px]:z-[60] max-[820px]:p-0"
           : "pt-[61px] pb-[52px] motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2 motion-safe:duration-500 max-[820px]:pt-[calc(104px+env(safe-area-inset-top))] max-[820px]:pb-[calc(92px+env(safe-area-inset-bottom))]",
       )}
+      data-file-drop-frame-scope
       onDragEnterCapture={(event) => {
         if (!event.dataTransfer.types.includes("Files")) return;
         dragDepth.current++;
@@ -427,7 +429,7 @@ export function OfficeEditorAppPage() {
           {file
             ? L("다른 파일 열기", "Open another file")
             : L("파일 선택", "Choose file")}
-          <input
+          <FileInput dropEnabled={state === "editing" || state === "saving"}
             className="sr-only"
             data-testid="office-file-picker"
             type="file"

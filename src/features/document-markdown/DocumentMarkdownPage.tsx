@@ -95,7 +95,7 @@ export function DocumentMarkdownPage() {
     </PageHeader>
     {batchFiles ? <BatchConversionPanel mode="markdown" files={batchFiles} onClose={() => setBatchFiles(undefined)} /> : <>
     <SectionCard step={1} title={L("문서 선택", "Choose a document")} description="DOCX · XLSX · XLS · PPTX · PDF">
-      <FileDropZone accept={MARKDOWN_ACCEPT} multiple files={[]} onFiles={choose} accent="blue"
+      <FileDropZone disabled={loading} accept={MARKDOWN_ACCEPT} multiple files={file ? [file] : []} onFiles={choose} accent="blue"
         hint={L("여러 파일을 놓거나 선택하세요. 파일당 최대 50 MiB.", "Drop or choose files, up to 50 MiB each.")} />
       {file && <FileList files={[file]} accent="blue" onRemove={() => choose([])} />}
     </SectionCard>

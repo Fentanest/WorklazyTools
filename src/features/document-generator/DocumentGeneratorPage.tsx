@@ -87,13 +87,14 @@ export function DocumentGeneratorPage() {
     if (busy) return; setPending(true); setMessage(''); clearPrepared(); releaseDownload(zip); setZip(undefined); setZipAttemptId(undefined);
     try {
       await client.reset();
+      const retained = new Map(dataFiles.map((file, index) => [file, sources[index]]));
       const accepted: File[] = []; const loaded: GeneratorSource[] = []; const failures: Array<{index:number;code:string}> = [];
       for (let index = 0; index < files.length; index++) {
-        try { const [source] = await client.loadSources([files[index]]); accepted.push(files[index]); loaded.push(source); }
+        try { const source = retained.get(files[index]) ?? (await client.loadSources([files[index]]))[0]; accepted.push(files[index]); loaded.push(source); }
         catch (error) { failures.push({index, code: error instanceof GeneratorError ? error.code : 'DAMAGED_DATA'}); }
       }
       setDataFiles(accepted); setSources(loaded); setSourceFailures(failures);
-      setDrafts(Object.fromEntries(loaded.map(source => [source.id, makeDraft(source)])));
+      setDrafts(old => Object.fromEntries(loaded.map(source => [source.id, old[source.id] ?? makeDraft(source)])));
     } catch (error) { setMessage(errorText(error)); }
     finally { setPending(false); }
   };

@@ -121,7 +121,12 @@
     "keepAdding": "계속 추가 가능",
     "dropHere": "파일을 여기에 놓으세요",
     "added": "목록에 추가됨",
-    "remove": "{{name}} 제거"
+    "remove": "{{name}} 제거",
+    "dropAnywhere": "화면 어디에 놓아도 파일을 추가합니다.",
+    "dropBusy": "현재 처리 중이거나 입력을 준비 중입니다. 작업이 끝난 뒤 다시 추가해 주세요.",
+    "dropUnsupported": "이 입력에서 지원하는 파일 형식을 확인해 주세요.",
+    "dropFailed": "파일을 추가하지 못했습니다. 다시 시도해 주세요.",
+    "chooseDropTarget": "파일을 추가할 대상을 선택하세요."
   },
   "actions": {
     "selectFile": "파일 선택",

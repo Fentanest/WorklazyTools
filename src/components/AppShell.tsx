@@ -1,3 +1,4 @@
+import { FileDropProvider } from "./FileDropProvider";
 import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
 import { VIDEO_STUDIO_PUBLIC, documentReadiness, safeAnalyticsPage } from "../app/publicService";
@@ -303,6 +304,7 @@ export function AppShell() {
 
   return (
     <FocusModeContext.Provider value={setFocusMode}>
+    <FileDropProvider routeKey={location.pathname}>
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} triggerId="mobile-navigation-trigger">
       <div className={cn("app-shell", sidebarCollapsed && "wl-collapsed", focusMode === "editor" && "editor-mode")}>
       <RouteSeo />
@@ -474,6 +476,7 @@ export function AppShell() {
       </SheetContent>
       </div>
     </Sheet>
+    </FileDropProvider>
     </FocusModeContext.Provider>
   );
 }

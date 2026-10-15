@@ -1,3 +1,4 @@
+import { FileInput } from "../../components/FileDropProvider";
 import { AlertTriangle, Camera, CameraOff, Copy, Download, ExternalLink, FileArchive, FileSpreadsheet, FileText, ImagePlus, QrCode, ScanLine, Share2, ShieldCheck } from "lucide-react";
 import QRCode from "qrcode";
 import { lazy, useCallback, useEffect, useRef, useState } from "react";
@@ -278,7 +279,7 @@ export function QrStudioPage({ initialMode = "create" }: { initialMode?: QrMode 
                   : <PrimaryButton accent="blue" loading={cameraStarting} onClick={() => void startCamera()}><Camera size={18} /> {t("qr.cameraScan")}</PrimaryButton>}
                 <label className={`inline-flex min-h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-secondary px-4 text-sm font-bold text-secondary-foreground outline-none transition-colors hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/30 ${busy ? "pointer-events-none opacity-50" : ""}`} data-testid="qr-photo-picker" aria-disabled={busy}>
                   {busy ? <><ScanLine size={18} /> {t("qr.analyzing")}</> : <><ImagePlus size={18} /> {t("qr.choosePhoto")}</>}
-                  <input
+                  <FileInput
                     className="sr-only"
                     type="file"
                     accept="image/*"

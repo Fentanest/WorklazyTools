@@ -1,3 +1,4 @@
+import { FileInput } from "./FileDropProvider";
 import type {
   ComponentProps,
   InputHTMLAttributes,
@@ -45,8 +46,9 @@ export function UtilityTextarea({ className, ...props }: TextareaHTMLAttributes<
 }
 
 export function UtilityInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  const Input = props.type === "file" ? FileInput : "input";
   return (
-    <input
+    <Input
       data-slot="input"
       className={cn(
         "h-10 w-full min-w-0 rounded-xl border border-input bg-background px-3 text-sm text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 disabled:cursor-not-allowed disabled:opacity-50 max-[620px]:text-base",

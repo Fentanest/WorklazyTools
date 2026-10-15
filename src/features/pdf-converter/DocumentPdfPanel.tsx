@@ -86,7 +86,7 @@ export function DocumentPdfPanel() {
   if (batchFiles) return <BatchConversionPanel mode="document-pdf" files={batchFiles} onClose={() => setBatchFiles(undefined)} />;
   return <div data-document-pdf-ready={crossOriginIsolated}>
     <SectionCard step={1} title={L("문서 선택", "Choose a document")} description="HWP · HWPX · DOC · DOCX · XLS · XLSX · PPT · PPTX">
-      <FileDropZone disabled={!crossOriginIsolated || loading} multiple files={[]} accept=".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onFiles={choose} accent="coral" hint={L("여러 파일 선택 가능 · 파일당 최대 50 MiB", "Choose one or more files · up to 50 MiB each")} />
+      <FileDropZone disabled={!crossOriginIsolated || loading} multiple files={file ? [file] : []} accept=".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onFiles={choose} accent="coral" hint={L("여러 파일 선택 가능 · 파일당 최대 50 MiB", "Choose one or more files · up to 50 MiB each")} />
       {file && <FileList files={[file]} accent="coral" onRemove={() => choose([])} />}
     </SectionCard>
     {!isHwp && <UtilityNotice kind="info" className="my-4"><FileText className="shrink-0" size={18} /><span>{L(

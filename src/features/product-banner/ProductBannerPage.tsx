@@ -1,3 +1,4 @@
+import { FileInput } from "../../components/FileDropProvider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useUnsavedWorkGuard } from "../../app/toolState";
@@ -107,7 +108,7 @@ export function ProductBannerPage() {
             <Button variant="secondary" disabled={showSample || !output.value || !state.project.products.length} onClick={() => output.value && save(output.value.standalone, "product-banner.html", "text/html")}>{text.saveHtml}</Button>
             <Button variant="secondary" disabled={showSample} onClick={() => { save(saveProjectJson(state.project), "product-banner.json", "application/json"); dispatch({ type: "mark-saved" }); setMessage(text.saved); }}>{text.saveJson}</Button>
             <Button variant="secondary" onClick={() => jsonInput.current?.click()}>{text.loadJson}</Button>
-            <input ref={jsonInput} type="file" accept=".json" className="hidden" aria-label={text.loadJson} onChange={(e) => { void importJson(e.target.files?.[0]); e.target.value = ""; }} />
+            <FileInput ref={jsonInput} type="file" accept=".json" className="hidden" aria-label={text.loadJson} onChange={(e) => { void importJson(e.target.files?.[0]); e.target.value = ""; }} />
           </div>
           {!showSample && output.value && <div className="mt-4 space-y-3 text-sm text-muted-foreground"><p>{format === "html" ? help.direct : help.frame}</p>{state.project.settings.autoHeight && <p>{help.auto}</p>}<p>{help.images}</p><p>{output.value.bytes[format].toLocaleString(language)} bytes</p>{output.value.largeOutput && <p>{help.large}</p>}<UtilityTextarea aria-label={text.export} readOnly value={output.value[format]} className="h-40" onFocus={(e) => e.target.select()} /></div>}
         </SectionCard>
