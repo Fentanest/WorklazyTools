@@ -1963,7 +1963,14 @@
         "pdfEditExtractLog": "PDF edit & extract log",
         "enterAnOutputFileName": "Enter an output file name.",
         "thisFileNameDuplicatesAnotherRange": "This file name duplicates another range.",
-        "checkThePageRange": "Check the page range."
+        "checkThePageRange": "Check the page range.",
+        "groupByFile": "Group by source file",
+        "moveFileGroup": "Move file group {{p0}}",
+        "filePageCount": "{{p0}} pages",
+        "ungroupToMovePages": "Ungroup to move individual pages.",
+        "moveSelectionCount": "Move {{p0}} pages together",
+        "clearMoveSelection": "Clear move selection",
+        "draggingPages": "Moving {{p0}} pages · Drop at the dashed position"
       },
       "PdfThumbnail": {
         "previewFailed": "Preview failed",
@@ -1986,7 +1993,8 @@
         "select": "Select",
         "deselect": "Deselect",
         "splitAfterPage": "Split after page {{p0}}",
-        "removeSplitAfterPage": "Remove split after page {{p0}}"
+        "removeSplitAfterPage": "Remove split after page {{p0}}",
+        "moveSelected": "Selected to move together"
       },
       "pdfUi": {
         "yourFileIsReady": "Your file is ready.",
