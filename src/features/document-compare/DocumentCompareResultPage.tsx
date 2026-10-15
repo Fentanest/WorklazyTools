@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useFileDropTarget } from "../../components/FileDropProvider";
 import { useDocumentPairFiles } from "./useDocumentPairFiles";
 import { isSupportedDocumentName } from "./filePairs";
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 
 import { useUnsavedWorkGuard } from "../../app/toolState";
 import { RhwpVersionNotice } from "../../components/RhwpVersionNotice";
@@ -21,8 +21,12 @@ export function DocumentCompareResultPage() {
     setBeforeFiles: session.setBeforeFiles, setAfterFiles: session.setAfterFiles,
     accepts: isSupportedDocumentName, onReset: session.clearResults });
   const receive = (files: File[], side: "before" | "after") => {
-    pairFiles.updateFiles([...(side === "before" ? beforeFiles : afterFiles), ...files], side);
-    navigate(inputPath);
+    // Commit result invalidation and the route change together. Otherwise the
+    // old route briefly renders an expired result and its ad guard reloads the document.
+    startTransition(() => {
+      pairFiles.updateFiles([...(side === "before" ? beforeFiles : afterFiles), ...files], side);
+      navigate(inputPath);
+    });
   };
   useFileDropTarget({ element: () => dropRef.current, label: () => language === "en" ? "Before" : "수정 전",
     accept: ".docx,.doc,.hwp,.hwpx", disabled: false, scopeSelector: '[data-document-side="before"]', receive: files => receive(files, "before") });

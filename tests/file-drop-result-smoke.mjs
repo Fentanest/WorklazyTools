@@ -22,6 +22,9 @@ try {
  await page.getByRole('button',{name:'Compare 1 document pairs',exact:true}).click();
  await page.getByTestId('document-view-result').click();
  await page.getByTestId('document-page-view').waitFor();
+ // Exercise the production ad-bearing document boundary without loading a provider.
+ await page.evaluate(() => { if (!document.querySelector('script[data-worklazy-adsense]')) { const script=document.createElement('script');script.type='application/json';script.dataset.worklazyAdsense='true';script.textContent='{}';document.head.append(script); } });
+ const documentStarted = await page.evaluate(() => performance.timeOrigin);
  await drop(1100,35);
  await page.getByTestId('file-drop-target-choice').waitFor();
  await page.getByTestId('file-drop-target-choice').getByRole('button',{name:'Cancel',exact:true}).click();
@@ -29,6 +32,7 @@ try {
  await drop(box.x+box.width/2,box.y+box.height/2);
  await page.waitForURL('**/en/tools/document-compare');
  await page.getByTestId('document-file-grid').waitFor();
+ assert.equal(await page.evaluate(() => performance.timeOrigin),documentStarted,'result append must not reload and lose the in-memory session');
  assert.equal(await page.getByTestId('document-file-list-before').getByTestId('document-file-item').count(),2);
  assert.equal(await page.getByTestId('document-file-list-after').getByTestId('document-file-item').count(),1);
  assert.equal(await page.getByTestId('file-drop-target-choice').count(),0);
