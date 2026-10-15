@@ -22,6 +22,7 @@ export function PdfThumbnail({
   groupNumbers = [],
   draggable = true,
   selected = false,
+  moveSelected = false,
   selectionDisabled = false,
   splitAfter = false,
 }: {
@@ -37,6 +38,7 @@ export function PdfThumbnail({
   groupNumbers?: number[];
   draggable?: boolean;
   selected?: boolean;
+  moveSelected?: boolean;
   selectionDisabled?: boolean;
   splitAfter?: boolean;
 }) {
@@ -92,15 +94,18 @@ export function PdfThumbnail({
       ref={hostRef}
       className={cn(
         "pdf-page-card min-w-0 gap-0 overflow-hidden rounded-2xl border border-border bg-white/40 py-0 shadow-sm ring-0 transition-[border-color,box-shadow,transform] dark:bg-white/[.025] [&.sortable-ghost]:opacity-35 [&.sortable-chosen]:border-primary [&.sortable-chosen]:shadow-lg [&.sortable-chosen]:shadow-primary/15",
+        "[&.pdf-insertion-marker]:border-dashed [&.pdf-insertion-marker]:border-2 [&.pdf-insertion-marker]:border-primary [&.pdf-insertion-marker]:opacity-50 [&.pdf-moving-member]:opacity-60",
+        moveSelected && "outline-2 outline-offset-2 outline-sky-500",
         selected && "relative border-primary bg-primary/10 shadow-md shadow-primary/15 ring-2 ring-primary/20 before:pointer-events-none before:absolute before:inset-y-2 before:left-1 before:z-10 before:w-1 before:rounded-full before:bg-primary dark:border-primary dark:bg-primary/15 dark:before:bg-primary-foreground",
       )}
+      data-move-selected={moveSelected || undefined}
       data-selected={selected || undefined}
       data-page-id={item.id}
       data-rotation={item.rotation}
     >
-      <div className="pdf-page-card-top grid h-[33px] grid-cols-[27px_1fr_auto_auto] items-center gap-1 border-b border-border px-2 text-muted-foreground">
+      <div className={cn("pdf-page-card-top grid min-h-[33px] items-center gap-1 border-b border-border px-2 text-muted-foreground", draggable ? "grid-cols-[27px_1fr_auto_auto] max-[620px]:min-h-11 max-[620px]:grid-cols-[44px_1fr_auto_auto]" : "grid-cols-[1fr_auto_auto]")}>
         {draggable && <Button type="button" className="pdf-drag-handle size-[27px] touch-none cursor-grab rounded-lg p-0 text-muted-foreground active:cursor-grabbing max-[620px]:size-11" variant="ghost" size="icon-xs" aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.reorderPage", { p0: outputIndex + 1 })}><GripVertical size={16} /></Button>}
-        <strong className="text-sm text-foreground">{outputIndex + 1}</strong>
+        <strong className="text-sm text-foreground">{outputIndex + 1}{moveSelected && <span className="ml-1 text-[10px] text-sky-700 dark:text-sky-300" title={featureMessage(language, "pdf.messages.PdfThumbnail.moveSelected")}>↔</span>}</strong>
         <span className="text-xs font-bold">{item.rotation ? `${item.rotation}°` : featureMessage(language, "pdf.messages.PdfThumbnail.original")}</span>
         {onSelect && <label className={cn("pdf-page-select relative grid size-[22px] cursor-pointer place-items-center rounded-lg border border-border bg-muted text-transparent focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2", selected && "border-primary bg-primary text-primary-foreground dark:border-primary", selectionDisabled && "cursor-not-allowed opacity-45")} data-selected={selected || undefined} data-disabled={selectionDisabled || undefined}><input className="absolute inset-0 z-10 m-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed" type="checkbox" checked={selected} disabled={selectionDisabled} onChange={(event) => onSelect(event.target.checked, Boolean((event.nativeEvent as MouseEvent).shiftKey))} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.page", { p0: outputIndex + 1, p1: featureMessage(language, selected ? "pdf.messages.PdfThumbnail.deselect" : "pdf.messages.PdfThumbnail.select") })} /><Check size={13} aria-hidden="true" /></label>}
       </div>
@@ -116,7 +121,7 @@ export function PdfThumbnail({
         <small className="mt-1 text-xs text-muted-foreground">{featureMessage(language, "pdf.messages.PdfThumbnail.sourcePage", { p0: item.sourcePageIndex + 1 })}</small>
       </div>
       {(onRotate || onRemove || onMove) && (
-        <div className="pdf-page-actions grid grid-cols-[29px_1fr_29px_31px] gap-1 border-t border-border p-2">
+        <div className={cn("pdf-page-actions grid gap-1 border-t border-border p-2", onMove ? "grid-cols-[29px_1fr_29px_31px]" : "grid-cols-[1fr_31px]")}>
           {onMove && <Button className="min-h-[29px] rounded-lg bg-primary/10 p-0 text-primary hover:bg-primary/20 " variant="ghost" size="icon-xs" type="button" onClick={() => onMove(-1)} disabled={outputIndex === 0} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.moveLeft")}><ChevronLeft size={15} /></Button>}
           {onRotate && <Button className="min-h-[29px] rounded-lg bg-primary/10 p-0 text-xs font-bold text-primary hover:bg-primary/20 " variant="ghost" size="sm" type="button" data-page-action="rotate" onClick={onRotate} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.rotate90DegreesClockwise")}><RotateCw size={15} /><span>{featureMessage(language, "pdf.messages.PdfThumbnail.rotate")}</span></Button>}
           {onMove && <Button className="min-h-[29px] rounded-lg bg-primary/10 p-0 text-primary hover:bg-primary/20 " variant="ghost" size="icon-xs" type="button" onClick={() => onMove(1)} disabled={totalItems !== undefined && outputIndex === totalItems - 1} aria-label={featureMessage(language, "pdf.messages.PdfThumbnail.moveRight")}><ChevronRight size={15} /></Button>}

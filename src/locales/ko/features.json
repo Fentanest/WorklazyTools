@@ -1956,7 +1956,14 @@
         "pdfEditExtractLog": "PDF 편집·추출 로그",
         "enterAnOutputFileName": "결과 파일명을 입력해 주세요.",
         "thisFileNameDuplicatesAnotherRange": "다른 범위와 파일명이 중복됩니다.",
-        "checkThePageRange": "페이지 범위를 확인해 주세요."
+        "checkThePageRange": "페이지 범위를 확인해 주세요.",
+        "groupByFile": "파일 단위로 묶기",
+        "moveFileGroup": "{{p0}} 파일 묶음 이동",
+        "filePageCount": "{{p0}}페이지",
+        "ungroupToMovePages": "개별 페이지를 이동하려면 묶기를 해제하세요.",
+        "moveSelectionCount": "함께 이동 {{p0}}페이지",
+        "clearMoveSelection": "이동 선택만 해제",
+        "draggingPages": "{{p0}}페이지 함께 이동 · 점선 위치에 놓으세요"
       },
       "PdfThumbnail": {
         "previewFailed": "미리보기 실패",
@@ -1979,7 +1986,8 @@
         "select": "선택",
         "deselect": "선택 해제",
         "splitAfterPage": "{{p0}}페이지 뒤에서 나누기",
-        "removeSplitAfterPage": "{{p0}}페이지 뒤 나누기 취소"
+        "removeSplitAfterPage": "{{p0}}페이지 뒤 나누기 취소",
+        "moveSelected": "함께 이동할 페이지"
       },
       "pdfUi": {
         "yourFileIsReady": "결과 파일이 준비됐어요.",

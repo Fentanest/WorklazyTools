@@ -7,6 +7,32 @@ export function movePdfItem<T>(items: T[], from: number, to: number) {
   return next;
 }
 
+/** Move an ID-selected block in its current visual order, before a remaining item (or to the end). */
+export function movePdfItemsById<T extends { id: string }>(items: readonly T[], movingIds: ReadonlySet<string>, beforeId?: string): T[] {
+  if (beforeId && movingIds.has(beforeId)) return [...items];
+  const moving = items.filter(item => movingIds.has(item.id));
+  const remaining = items.filter(item => !movingIds.has(item.id));
+  const beforeIndex = beforeId ? remaining.findIndex(item => item.id === beforeId) : remaining.length;
+  if (!moving.length || beforeIndex < 0) return [...items];
+  return [...remaining.slice(0, beforeIndex), ...moving, ...remaining.slice(beforeIndex)];
+}
+
+/** Map order preserves first source appearance, and page objects retain edits and thumbnail identity. */
+export function groupPdfPagesBySource<T extends { id: string; sourceId: string }>(pages: readonly T[]) {
+  const groups = new Map<string, { id: string; pages: T[] }>();
+  for (const page of pages) {
+    let group = groups.get(page.sourceId);
+    if (!group) { group = { id: page.sourceId, pages: [] }; groups.set(page.sourceId, group); }
+    group.pages.push(page);
+  }
+  return [...groups.values()];
+}
+
+export function pdfPageIndexesById(pages: readonly { id: string }[], pageIds: readonly string[]) {
+  const selected = new Set(pageIds);
+  return pages.flatMap((page, index) => selected.has(page.id) ? [index] : []);
+}
+
 export function normalizePdfRotation(value: number): 0 | 90 | 180 | 270 {
   return (((value % 360) + 360) % 360) as 0 | 90 | 180 | 270;
 }

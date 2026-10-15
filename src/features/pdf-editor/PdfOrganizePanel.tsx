@@ -1,4 +1,4 @@
-import { Download, FileArchive, FileCheck2, Info, Layers3, Plus, Scissors, Settings2, Trash2, X } from "lucide-react";
+import { Download, FileArchive, FileCheck2, GripVertical, Info, Layers3, Plus, Scissors, Settings2, Trash2, X } from "lucide-react";
 import Sortable from "sortablejs";
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
@@ -15,7 +15,7 @@ import { inspectPdf, parsePageRange, releasePdf, renderPdfPageAsJpeg } from "./p
 import { PdfDownloadCard, PdfError, normalizeOutputName, useDownloadResult } from "./pdfUi";
 import { exportPdfGroups, imagesToPdf, mergePdfPages } from "./pdfWorkerClient";
 import { createLocalId, type PdfPageItem, type PdfSourceFile } from "./types";
-import { compactPdfPageRange, mapWithConcurrency, movePdfItem as moveItem, normalizePdfRotation as normalizeRotation, splitPdfPageRanges } from "./pdfShared";
+import { compactPdfPageRange, groupPdfPagesBySource, mapWithConcurrency, movePdfItemsById, pdfPageIndexesById, normalizePdfRotation as normalizeRotation, splitPdfPageRanges } from "./pdfShared";
 import { featureMessage } from "../../i18n/featureMessages";
 import { cn } from "../../lib/utils";
 
@@ -25,6 +25,8 @@ interface RangeRow {
   id: string;
   name: string;
   range: string;
+  pageIds?: string[];
+  orderIds?: string[];
 }
 
 interface EvaluatedRangeRow extends RangeRow {
@@ -40,11 +42,22 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   const [sources, setSources] = useState<PdfSourceFile[]>([]);
   const [pages, setPages] = useState<PdfPageItem[]>([]);
   const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(new Set());
+  const [movePageIds, setMovePageIds] = useState<Set<string>>(new Set());
+  const [groupByFile, setGroupByFile] = useState(false);
+  const [dragPageCount, setDragPageCount] = useState(0);
+  const dragIdsRef = useRef<Set<string>>(new Set());
   const [selectionRange, setSelectionRange] = useState("");
   const [selectionError, setSelectionError] = useState("");
   const [outputMode, setOutputMode] = useState<OutputMode>("merged");
-  const [rangeRows, setRangeRows] = useState<RangeRow[]>(() => [createRangeRow(1, language)]);
-  const [activeRangeId, setActiveRangeId] = useState(() => rangeRows[0].id);
+  const [rangeRowState, setRangeRows] = useState<RangeRow[]>(() => [createRangeRow(1, language)]);
+  // Keep text editable (including an unfinished comma/range); only remap positions after the page order changes.
+  const rangeRows = useMemo(() => rangeRowState.map(row => row.pageIds === undefined || row.orderIds?.length === pages.length && row.orderIds.every((id, index) => id === pages[index].id) ? row : {
+    ...row, range: compactPdfPageRange(pdfPageIndexesById(pages, row.pageIds)),
+  }), [rangeRowState, pages]);
+  const [activeRangeId, setActiveRangeId] = useState(() => rangeRowState[0].id);
+  const sourceGroups = useMemo(() => groupPdfPagesBySource(pages), [pages]);
+  const dragStateRef = useRef({ movePageIds, sourceGroups });
+  dragStateRef.current = { movePageIds, sourceGroups };
   const [quickSplitOpen, setQuickSplitOpen] = useState(false);
   const [splitAfterPageIds, setSplitAfterPageIds] = useState<Set<string>>(new Set());
   const [outputName, setOutputName] = useState(featureMessage(language, "pdf.messages.PdfOrganizePanel.worklazyPdfEdited"));
@@ -84,7 +97,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setError("");
     setOutputMode(next?.outputMode ?? "merged");
     setQuickSplitOpen(next?.quickSplit ?? false);
-    if (next?.purpose === "split" && pages.length) setRangeRows(current => current.some(row => row.range.trim()) ? current : [{ ...current[0], range: compactPdfPageRange(pages.map((_, index) => index)) }]);
+    if (next?.purpose === "split" && pages.length) setRangeRows(current => current.some(row => row.range.trim()) ? current : [{ ...current[0], range: compactPdfPageRange(pages.map((_, index) => index)), pageIds: pages.map(page => page.id), orderIds: undefined }]);
     focusAfterLoad.current = next?.postLoadFocus;
   });
   useEffect(() => () => { resumeGeneration.current += 1; activeController.current?.abort(); }, []);
@@ -169,20 +182,43 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     if (!grid || locked || quickSplitOpen) return;
     const sortable = Sortable.create(grid, {
       animation: 170,
-      handle: ".pdf-drag-handle",
-      draggable: ".pdf-page-card",
+      handle: groupByFile ? ".pdf-file-drag-handle" : ".pdf-drag-handle",
+      draggable: groupByFile ? ".pdf-file-group" : ".pdf-page-card",
+      ghostClass: "pdf-insertion-marker",
       delay: 120,
       delayOnTouchOnly: true,
       fallbackTolerance: 4,
-      onEnd: ({ oldIndex, newIndex }) => {
+      onStart: ({ item }) => {
+        const state = dragStateRef.current;
+        const id = item.dataset.pageId ?? item.dataset.sourceId;
+        if (!id) return;
+        const moving = groupByFile || !state.movePageIds.has(id) ? new Set([id]) : new Set(state.movePageIds);
+        dragIdsRef.current = moving;
+        const count = groupByFile ? state.sourceGroups.find(group => group.id === id)?.pages.length ?? 0 : moving.size;
+        setDragPageCount(count);
+        // The browser drag image may be a single card; mark all members and the insertion placeholder.
+        for (const child of grid.children) {
+          const element = child as HTMLElement;
+          if (moving.has(element.dataset.pageId ?? element.dataset.sourceId ?? "")) element.classList.add("pdf-moving-member");
+        }
+      },
+      onEnd: ({ item, oldIndex, newIndex }) => {
+        setDragPageCount(0);
+        for (const child of grid.children) child.classList.remove("pdf-moving-member");
         if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex) return;
+        const moving = dragIdsRef.current;
+        let next = item.nextElementSibling as HTMLElement | null;
+        while (next && moving.has(next.dataset.pageId ?? next.dataset.sourceId ?? "")) next = next.nextElementSibling as HTMLElement | null;
+        const beforeId = next?.dataset.pageId ?? next?.dataset.sourceId;
         restoreSortableDom(grid, oldIndex, newIndex);
-        setPages((current) => moveItem(current, oldIndex, newIndex));
+        setPages(current => groupByFile
+          ? movePdfItemsById(groupPdfPagesBySource(current), moving, beforeId).flatMap(group => group.pages)
+          : movePdfItemsById(current, moving, beforeId));
         download.clearResult();
       },
     });
     return () => sortable.destroy();
-  }, [download.clearResult, locked, pages.length, quickSplitOpen]);
+  }, [download.clearResult, locked, pages.length, quickSplitOpen, groupByFile]);
 
   const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length, language), [rangeRows, pages.length, language]);
   const groupMembership = useMemo(() => {
@@ -234,7 +270,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
       focusAfterLoad.current = direct.acceptedPreset?.postLoadFocus;
       setSources((current) => [...current, ...addedSources]);
       setPages((current) => [...current, ...addedPages]);
-      if (direct.acceptedPreset?.purpose === "split") setRangeRows(current => current.some(row => row.range.trim()) ? current : [{ ...current[0], range: compactPdfPageRange([...pages, ...addedPages].map((_, index) => index)) }]);
+      if (direct.acceptedPreset?.purpose === "split") setRangeRows(current => current.some(row => row.range.trim()) ? current : [{ ...current[0], range: compactPdfPageRange([...pages, ...addedPages].map((_, index) => index)), pageIds: [...pages, ...addedPages].map(page => page.id), orderIds: undefined }]);
       setSelectedPageIds((current) => new Set([...current, ...addedPages.map((page) => page.id)]));
       operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.addedAndSelectedAllPages", { p0: addedPages.length }));
     } catch (reason) {
@@ -263,6 +299,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setSources((current) => current.filter((_, currentIndex) => currentIndex !== index));
     setPages((current) => current.filter((page) => page.sourceId !== source.id));
     setSelectedPageIds((current) => new Set([...current].filter((id) => !removedIds.has(id))));
+    setMovePageIds((current) => new Set([...current].filter((id) => !removedIds.has(id))));
     setSplitAfterPageIds((current) => new Set([...current].filter((id) => !removedIds.has(id))));
     void releasePdf(source.file);
     download.clearResult();
@@ -325,6 +362,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     try {
       const indexes = parsePageRange(selectionRange, pages.length, language);
       setSelectedPageIds(new Set(indexes.map((index) => pages[index].id)));
+      setMovePageIds(new Set(indexes.map((index) => pages[index].id)));
       setSelectionError("");
       setError("");
       download.clearResult();
@@ -334,7 +372,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   };
 
   const updateRangeRow = (id: string, field: "name" | "range", value: string) => {
-    setRangeRows((current) => current.map((row) => row.id === id ? { ...row, [field]: value } : row));
+    setRangeRows((current) => current.map((row) => row.id === id ? field === "range" ? rangeRowWithPages(row, value, pages, language) : { ...row, name: value } : row));
     setActiveRangeId(id);
     download.clearResult();
   };
@@ -343,6 +381,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     if (locked) return;
     setPages((current) => current.filter((page) => page.id !== id));
     setSelectedPageIds((current) => { const next = new Set(current); next.delete(id); return next; });
+    setMovePageIds((current) => { const next = new Set(current); next.delete(id); return next; });
     setSplitAfterPageIds((current) => { const next = new Set(current); next.delete(id); return next; });
     download.clearResult();
   };
@@ -354,10 +393,10 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   };
 
   const movePage = (index: number, direction: -1 | 1) => {
-    if (locked) return;
+    if (locked || groupByFile) return;
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= pages.length) return;
-    setPages((current) => moveItem(current, index, nextIndex));
+    setPages((current) => movePdfItemsById(current, new Set([current[index].id]), current[direction < 0 ? nextIndex : nextIndex + 1]?.id));
     download.clearResult();
   };
 
@@ -367,7 +406,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
       const selectedRange = compactPdfPageRange(selectedIndexes, true);
       setRangeRows((current) => current.some((row) => row.range.trim())
         ? current
-        : [{ ...(current[0] ?? createRangeRow(1, language)), range: selectedRange }]);
+        : [{ ...(current[0] ?? createRangeRow(1, language)), range: selectedRange, pageIds: pages.filter(page => selectedPageIds.has(page.id)).map(page => page.id), orderIds: undefined }]);
     }
     setQuickSplitOpen(false);
     setSplitAfterPageIds(new Set());
@@ -379,12 +418,14 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
 
   const selectAllPages = () => {
     setSelectedPageIds(new Set(pages.map((page) => page.id)));
+    setMovePageIds(new Set(pages.map((page) => page.id)));
     setSelectionError("");
     download.clearResult();
   };
 
   const clearPageSelection = () => {
     setSelectedPageIds(new Set());
+    setMovePageIds(new Set());
     setSelectionError("");
     download.clearResult();
   };
@@ -392,6 +433,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   const togglePageSelection = (id: string, selected: boolean, extend: boolean) => {
     const affectedIds = extend ? pageIdsBetweenAnchor(pages, selectionAnchorsRef.current.get("single"), id) : [id];
     setSelectedPageIds((current) => setItemsSelected(current, affectedIds, selected));
+    setMovePageIds((current) => setItemsSelected(current, affectedIds, selected));
     selectionAnchorsRef.current.set("single", id);
     setSelectionError("");
     download.clearResult();
@@ -429,7 +471,8 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
       if (selected && position < 0) nextIndexes.push(index);
       if (!selected && position >= 0) nextIndexes.splice(position, 1);
     }
-    setRangeRows((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, range: compactPdfPageRange(nextIndexes) } : candidate));
+    setRangeRows((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, range: compactPdfPageRange(nextIndexes), pageIds: nextIndexes.map(index => pages[index].id), orderIds: undefined } : candidate));
+    setMovePageIds((current) => setItemsSelected(current, affectedIds, selected));
     selectionAnchorsRef.current.set(row.id, id);
     setActiveRangeId(row.id);
     setError("");
@@ -439,7 +482,8 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   const setActiveRangePages = (selected: boolean) => {
     const row = rangeRows.find((candidate) => candidate.id === activeRangeId) ?? rangeRows[0];
     if (!row) return;
-    setRangeRows((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, range: selected ? compactPdfPageRange(pages.map((_, index) => index)) : "" } : candidate));
+    setRangeRows((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, range: selected ? compactPdfPageRange(pages.map((_, index) => index)) : "", pageIds: selected ? pages.map(page => page.id) : [], orderIds: undefined } : candidate));
+    setMovePageIds(selected ? new Set(pages.map(page => page.id)) : new Set());
     selectionAnchorsRef.current.delete(row.id);
     download.clearResult();
   };
@@ -465,6 +509,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
       id: rangeRows[index]?.id ?? createLocalId("pdf-range"),
       name: `${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index + 1).padStart(2, "0")}`,
       range: compactPdfPageRange(indexes),
+      pageIds: indexes.map(index => pages[index].id),
     }));
     setRangeRows(nextRows);
     setActiveRangeId(nextRows[0]?.id ?? "");
@@ -490,6 +535,13 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   const creatingLabel = featureMessage(language, outputMode === "merged"
     ? "pdf.messages.PdfOrganizePanel.creatingPdf"
     : "pdf.messages.PdfOrganizePanel.creatingPdfZip", { p0: operation.progress });
+
+  const renderPage = (page: PdfPageItem, index: number) => {
+    const source = sources.find((candidate) => candidate.id === page.sourceId);
+    if (!source) return null;
+    const pageEditingLocked = locked || quickSplitOpen;
+    return <PdfThumbnail key={page.id} item={page} file={source.file} outputIndex={index} totalItems={pages.length} selected={outputMode === "ranges" ? !quickSplitOpen && activeRangeIndexes.has(index) : selectedPageIds.has(page.id)} groupNumbers={outputMode === "ranges" ? groupMembership.get(page.id) : []} draggable={!pageEditingLocked && !groupByFile} moveSelected={!groupByFile && movePageIds.has(page.id)} onSelect={locked || quickSplitOpen ? undefined : outputMode === "ranges" ? (selected, extend) => toggleRangePage(page.id, selected, extend) : (selected, extend) => togglePageSelection(page.id, selected, extend)} onSplitAfter={outputMode === "ranges" && quickSplitOpen && index < pages.length - 1 ? () => toggleSplitAfter(page.id) : undefined} splitAfter={splitAfterPageIds.has(page.id)} onRotate={pageEditingLocked ? undefined : () => rotatePage(page.id)} onRemove={pageEditingLocked ? undefined : () => removePage(page.id)} onMove={pageEditingLocked || groupByFile ? undefined : (direction) => movePage(index, direction)} />;
+  };
 
   return (
     <>
@@ -520,13 +572,32 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
                   </form>
                 </div>
               )}
-              <div ref={gridRef} className="pdf-page-grid grid grid-cols-[repeat(auto-fill,minmax(166px,1fr))] gap-3 max-[620px]:grid-cols-2">
-                {pages.map((page, index) => {
-                  const source = sources.find((candidate) => candidate.id === page.sourceId);
-                  if (!source) return null;
-                  const pageEditingLocked = locked || quickSplitOpen;
-                  return <PdfThumbnail key={page.id} item={page} file={source.file} outputIndex={index} totalItems={pages.length} selected={outputMode === "ranges" ? !quickSplitOpen && activeRangeIndexes.has(index) : selectedPageIds.has(page.id)} groupNumbers={outputMode === "ranges" ? groupMembership.get(page.id) : []} draggable={!pageEditingLocked} onSelect={locked || quickSplitOpen ? undefined : outputMode === "ranges" ? (selected, extend) => toggleRangePage(page.id, selected, extend) : (selected, extend) => togglePageSelection(page.id, selected, extend)} onSplitAfter={outputMode === "ranges" && quickSplitOpen && index < pages.length - 1 ? () => toggleSplitAfter(page.id) : undefined} splitAfter={splitAfterPageIds.has(page.id)} onRotate={pageEditingLocked ? undefined : () => rotatePage(page.id)} onRemove={pageEditingLocked ? undefined : () => removePage(page.id)} onMove={pageEditingLocked ? undefined : (direction) => movePage(index, direction)} />;
-                })}
+              <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+                <label className="flex cursor-pointer items-center gap-2 font-semibold">
+                  <input type="checkbox" checked={groupByFile} disabled={locked || quickSplitOpen} onChange={event => {
+                    const enabled = event.target.checked;
+                    setGroupByFile(enabled);
+                    if (enabled) { setPages(current => groupPdfPagesBySource(current).flatMap(group => group.pages)); download.clearResult(); }
+                  }} />{featureMessage(language, "pdf.messages.PdfOrganizePanel.groupByFile")}
+                </label>
+                {groupByFile ? <span className="text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.ungroupToMovePages")}</span> : movePageIds.size > 0 && <>
+                  <span className="font-semibold text-primary">{featureMessage(language, "pdf.messages.PdfOrganizePanel.moveSelectionCount", { p0: movePageIds.size })}</span>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setMovePageIds(new Set())}>{featureMessage(language, "pdf.messages.PdfOrganizePanel.clearMoveSelection")}</Button>
+                </>}
+              </div>
+              {dragPageCount > 0 && <div className="pointer-events-none fixed bottom-24 left-1/2 z-90 -translate-x-1/2 rounded-full bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-lg" role="status">{featureMessage(language, "pdf.messages.PdfOrganizePanel.draggingPages", { p0: dragPageCount })}</div>}
+              <div ref={gridRef} className={cn("pdf-page-grid grid gap-3", !groupByFile && "grid-cols-[repeat(auto-fill,minmax(166px,1fr))] max-[620px]:grid-cols-2")}>
+                {groupByFile ? sourceGroups.map(group => (
+                  <section key={group.id} data-source-id={group.id} className="pdf-file-group min-w-0 rounded-xl border border-border bg-muted/30 p-3 [&.pdf-insertion-marker]:border-dashed [&.pdf-insertion-marker]:border-primary [&.pdf-insertion-marker]:bg-primary/10 [&.pdf-moving-member]:ring-2 [&.pdf-moving-member]:ring-primary/50">
+                    <div className="mb-3 flex min-w-0 items-center gap-2">
+                      <Button type="button" variant="ghost" size="sm" disabled={locked || quickSplitOpen} className="pdf-file-drag-handle min-w-0 flex-1 cursor-grab justify-start touch-none active:cursor-grabbing" aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.moveFileGroup", { p0: group.pages[0].sourceName })}>
+                        <GripVertical size={18} className="shrink-0" /><span className="truncate">{group.pages[0].sourceName}</span>
+                      </Button>
+                      <span className="shrink-0 text-xs text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.filePageCount", { p0: group.pages.length })}</span>
+                    </div>
+                    <div className="grid grid-cols-[repeat(auto-fill,minmax(166px,1fr))] gap-3 max-[620px]:grid-cols-2">{group.pages.map(page => renderPage(page, pages.indexOf(page)))}</div>
+                  </section>
+                )) : pages.map(renderPage)}
               </div>
             </SectionCard>
           )}
@@ -635,7 +706,12 @@ function SummaryRow({ label, value }: { label: string; value: string | number })
 }
 
 function createRangeRow(index: number, language: AppLanguage): RangeRow {
-  return { id: createLocalId("pdf-range"), name: `${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index).padStart(2, "0")}`, range: "" };
+  return { id: createLocalId("pdf-range"), name: `${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index).padStart(2, "0")}`, range: "", pageIds: [] };
+}
+
+function rangeRowWithPages(row: RangeRow, range: string, pages: PdfPageItem[], language: AppLanguage): RangeRow {
+  try { return { ...row, range, pageIds: parsePageRange(range, pages.length, language).map(index => pages[index].id), orderIds: pages.map(page => page.id) }; }
+  catch { return { ...row, range, pageIds: undefined }; }
 }
 
 function evaluateRangeRows(rows: RangeRow[], pageCount: number, language: AppLanguage): EvaluatedRangeRow[] {
