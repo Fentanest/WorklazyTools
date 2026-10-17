@@ -13,8 +13,8 @@ const layoutDefaults = {
   "photo-strip": { visibleCount: 4, imageHeight: 160, autoPlay: true, iframeHeight: 300 },
   "product-card": { visibleCount: 3, imageHeight: 180, autoPlay: true, iframeHeight: 420 },
   slim: { visibleCount: 1, imageHeight: 64, autoPlay: true, iframeHeight: 200 },
-  vertical: { visibleCount: 4, imageHeight: 80, autoPlay: false, iframeHeight: 600 },
-  grid: { visibleCount: 4, imageHeight: 160, autoPlay: false, iframeHeight: 600 },
+  vertical: { visibleCount: 4, imageHeight: 80, autoPlay: true, iframeHeight: 600 },
+  grid: { visibleCount: 4, imageHeight: 160, autoPlay: true, iframeHeight: 600 },
 } as const;
 export function createDefaultSettings(language: BannerLanguage, design: DesignId = "photo-strip"): BannerSettings {
   return validateSettings({ design, ...layoutDefaults[design], width: 1030, gridPreset: "2x2", gridColumns: 2, gridRows: 2,
@@ -37,7 +37,7 @@ export function validateSettings(value: unknown): BannerSettings {
       gridRows: gridPreset === "custom" ? gridRows : 2,
       showName: boolean(v.showName), showPrice: boolean(v.showPrice), showDiscount: boolean(v.showDiscount), showButton: boolean(v.showButton),
       colors: { background: color("background"), text: color("text"), accent: color("accent"), border: color("border") },
-      theme: oneOf(v.theme, ["light", "dark", "auto"]), autoPlay: design === "vertical" || design === "grid" ? false : autoPlay,
+      theme: oneOf(v.theme, ["light", "dark", "auto"]), autoPlay: boolean(v.autoPlay),
       intervalSeconds: size("intervalSeconds"), moveBy: oneOf(v.moveBy, ["one", "page"]), language: oneOf(v.language, ["ko", "en"]),
       advertisingLabel: true, affiliateNotice: string(v.affiliateNotice), iframeHeight: size("iframeHeight"), autoHeight: boolean(v.autoHeight) };
   } catch (error) {

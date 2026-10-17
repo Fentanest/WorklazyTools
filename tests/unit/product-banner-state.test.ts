@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createEditorState, reduceEditorState as reduce, detectDuplicates, hasBannerWork, hasUnsavedChanges, imageStatus, productReviewFields } from "../../src/features/product-banner/state.ts";
 import { BannerStateError, DESIGN_IDS, UNDO_LIMITS } from "../../src/features/product-banner/stateTypes.ts";
-import { createDefaultSettings, DEFAULT_AFFILIATE_NOTICES, SETTING_RANGES, updateSettings } from "../../src/features/product-banner/settings.ts";
+import { createDefaultSettings, DEFAULT_AFFILIATE_NOTICES, SETTING_RANGES, updateSettings, validateSettings } from "../../src/features/product-banner/settings.ts";
 import { createDisplayModel } from "../../src/features/product-banner/displayModel.ts";
 import { inputProduct, importedAt, stateWith } from "../fixtures/product-banner/state.ts";
 import { extractInputProducts, parsePrice } from "../../src/features/product-banner/inputMapping.ts";
@@ -123,12 +123,19 @@ test("undo is bounded, no-op changes do not fill it and large appends reject wit
 for (const design of DESIGN_IDS) test(`settings: ${design} defaults, language, constrained layout and immutable patches`, () => {
   const defaults = createDefaultSettings("en", design); assert.equal(defaults.design, design); assert.equal(defaults.language, "en");
   assert.equal(defaults.intervalSeconds, 5); assert.equal(defaults.showPrice, true); assert.equal(defaults.showDiscount, true); assert.equal(defaults.showName, true); assert.equal(defaults.showButton, true); assert.equal(defaults.autoHeight, true); assert.equal(defaults.advertisingLabel, true);
-  assert.equal(defaults.autoPlay, design !== "grid" && design !== "vertical");
+  assert.equal(defaults.autoPlay, true);
   assert.equal(defaults.affiliateNotice, DEFAULT_AFFILIATE_NOTICES.en);
   if (design === "photo-strip") { assert.equal(defaults.visibleCount, 4); assert.equal(defaults.showName, true); assert.equal(defaults.showButton, true); }
   const updated = updateSettings(defaults, { visibleCount: 6, gridPreset: "3x2", gridColumns: 6, gridRows: 9, autoPlay: true });
   assert.equal(updated.visibleCount, design === "slim" ? 1 : 6); assert.equal(updated.gridColumns, 3); assert.equal(updated.gridRows, 2);
   assert.equal(defaults.visibleCount, createDefaultSettings("en", design).visibleCount);
+});
+test("validateSettings preserves explicit vertical/grid autoPlay instead of forcing false", () => {
+  for (const design of ["vertical", "grid"] as const) for (const autoPlay of [true, false] as const) {
+    const kept = validateSettings({ ...createDefaultSettings("ko", design), autoPlay });
+    assert.equal(kept.autoPlay, autoPlay);
+    assert.equal(updateSettings(createDefaultSettings("ko", design), { autoPlay }).autoPlay, autoPlay);
+  }
 });
 test("design and language switches apply defaults but preserve edited publisher notice, colors, theme and price opt-in", () => {
   let settings = updateSettings(createDefaultSettings("ko"), { language: "en" }); assert.equal(settings.affiliateNotice, DEFAULT_AFFILIATE_NOTICES.en);

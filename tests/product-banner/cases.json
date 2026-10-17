@@ -102,11 +102,14 @@
         "settings: slim defaults, language, constrained layout and immutable patches",
         "settings: vertical defaults, language, constrained layout and immutable patches",
         "settings: grid defaults, language, constrained layout and immutable patches",
+        "validateSettings preserves explicit vertical/grid autoPlay instead of forcing false",
         "export photo-strip: four outputs, exact links, sandbox and byte counts",
         "export product-card: four outputs, exact links, sandbox and byte counts",
         "export slim: four outputs, exact links, sandbox and byte counts",
         "export vertical: four outputs, exact links, sandbox and byte counts",
         "export grid: four outputs, exact links, sandbox and byte counts",
+        "export vertical default enables autoplay and transparent iframe document",
+        "export grid default enables autoplay and transparent iframe document",
         "price digits: ko USD 206.50 (string)",
         "price digits: ko USD 1,150.16 (string)",
         "price digits: ko USD 387 (string)",
@@ -165,7 +168,8 @@
     {
       "id": "render",
       "files": [
-        "tests/product-banner/render.browser.test.ts"
+        "tests/product-banner/render.browser.test.ts",
+        "tests/product-banner/banner-auto.browser.test.ts"
       ],
       "cases": [
         "five designs at wide/narrow widths, dark samples, container layout, footer geometry and local images",
@@ -217,7 +221,9 @@
         "R2a autoplay capture: product-card width=320",
         "R2a autoplay capture: slim width=960",
         "R2a autoplay capture: slim width=320",
-        "explicit per-banner language preserves renamed pause/status labels and legacy English fallback"
+        "explicit per-banner language preserves renamed pause/status labels and legacy English fallback",
+        "vertical/grid autoplay advances one screen and pause stops it",
+        "exported iframe corners stay transparent on light and dark parents"
       ]
     },
     {

@@ -65,7 +65,7 @@ export function ProductBannerPage() {
   }, [state.project, includedCount]);
   const sample = useMemo(() => showSample ? samplePreview(sampleSettings, runtime) : null, [showSample, sampleSettings]);
   // Insert the chosen real export into a sandboxed host document, including the nested iframe/helper for iframe mode.
-  const preview = output.value ? `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}</style></head><body>${output.value[format]}</body></html>` : "";
+  const preview = output.value ? `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><style>html,body{background:transparent}body{margin:0}</style></head><body>${output.value[format]}</body></html>` : "";
   const errorText = (code: InputErrorCode) => inputErrorMessages[language][code];
   async function importJson(file?: File) {
     if (!file || busy) return;

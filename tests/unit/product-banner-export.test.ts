@@ -87,6 +87,19 @@ test("helper builder is deterministic and available through the Vite virtual-mod
   assert.equal(source, `export default ${JSON.stringify(runtime.heightParent)};`);
 });
 
+for (const design of ["vertical", "grid"] as const) test(`export ${design} default enables autoplay and transparent iframe document`, () => {
+  const p = { ...stateWith(7).project, settings: createDefaultSettings("ko", design) };
+  assert.equal(p.settings.autoPlay, true);
+  const output = exportBanner(p, runtime);
+  for (const html of [output.html, output.standalone]) assert.ok(html.includes('data-wlpb-auto="true"'), `${design} markup must enable autoplay`);
+  const outer = new JSDOM(output.iframe), srcdoc = outer.window.document.querySelector("iframe")!.getAttribute("srcdoc")!;
+  assert.ok(srcdoc.includes('data-wlpb-auto="true"'), `${design} srcdoc must enable autoplay`);
+  for (const document of [srcdoc, output.standalone]) {
+    assert.ok(document.includes('<meta name="color-scheme" content="light dark">'), `${design} document must declare dual color-scheme`);
+    assert.ok(document.includes("html,body{background:transparent}"), `${design} document background must stay transparent`);
+  }
+  outer.window.close();
+});
 for (const language of ["ko", "en"] as const) for (const autoHeight of [true, false]) test(`iframe ${language}/${autoHeight}: only frame and optional height helper, no visitor instructions`, () => {
   const project = stateWith(2).project;
   const output = exportBanner({ ...project, settings: { ...project.settings, language, autoHeight } }, runtime);

@@ -23,5 +23,5 @@ export function samplePreview(settings: BannerSettings, runtime: string) {
     const local = new URL(`${import.meta.env.BASE_URL}product-banner-samples/${name}.svg`, window.location.href).href;
     markup = markup.replace(`src="https://example.com/worklazy-sample/${name}.svg"`, `src="${escapeHtml(local)}"`);
   }
-  return { document: `<!doctype html><html lang="${settings.language}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}${rendered.css}</style></head><body>${markup}<script>${runtime}</script></body></html>`, height: defaultFrameHeight(model) };
+  return { document: `<!doctype html><html lang="${settings.language}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><style>html,body{background:transparent}body{margin:0}${rendered.css}</style></head><body>${markup}<script>${runtime}</script></body></html>`, height: defaultFrameHeight(model) };
 }

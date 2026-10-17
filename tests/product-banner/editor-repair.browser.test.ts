@@ -131,7 +131,7 @@ test("new defaults, saved false and mixed display choices survive design switche
     await page.getByLabel(text.design, { exact: true }).selectOption(design);
     for (const key of ["showName", "showPrice", "showDiscount", "showButton"] as const) assert.equal(await page.getByLabel(text.controls[key], { exact: true }).isChecked(), false);
     assert.equal(await page.getByLabel(text.autoHeight, { exact: true }).isChecked(), false);
-    assert.equal(await page.getByLabel(text.play, { exact: true }).isDisabled(), design === "vertical" || design === "grid");
+    assert.equal(await page.getByLabel(text.play, { exact: true }).isDisabled(), false);
   }
   await page.getByLabel(text.controls.showName, { exact: true }).check(); await page.getByLabel(text.controls.showButton, { exact: true }).check();
   for (const design of [...DESIGN_IDS].reverse()) {
