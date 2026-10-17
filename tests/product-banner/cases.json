@@ -138,7 +138,23 @@
         "vertical/light: positive discount badge, CTA semantics and clear file disclosure",
         "vertical/dark: positive discount badge, CTA semantics and clear file disclosure",
         "grid/light: positive discount badge, CTA semantics and clear file disclosure",
-        "grid/dark: positive discount badge, CTA semantics and clear file disclosure"
+        "grid/dark: positive discount badge, CTA semantics and clear file disclosure",
+        "exact price equality in HTML, iframe and standalone: long decimal Number collision",
+        "exact price equality in HTML, iframe and standalone: large amount Number collision",
+        "exact price equality in HTML, iframe and standalone: trailing fractional zeros",
+        "exact price equality in HTML, iframe and standalone: commas and leading zeros",
+        "exact price equality in HTML, iframe and standalone: integer and decimal",
+        "exact price equality in HTML, iframe and standalone: zero",
+        "exact price equality in HTML, iframe and standalone: different currencies",
+        "exact price equality in HTML, iframe and standalone: same long decimal with trailing zeros",
+        "exact price equality in model and markup: long decimal Number collision",
+        "exact price equality in model and markup: large amount Number collision",
+        "exact price equality in model and markup: trailing fractional zeros",
+        "exact price equality in model and markup: commas and leading zeros",
+        "exact price equality in model and markup: integer and decimal",
+        "exact price equality in model and markup: zero",
+        "exact price equality in model and markup: different currencies",
+        "exact price equality in model and markup: same long decimal with trailing zeros"
       ]
     },
     {
