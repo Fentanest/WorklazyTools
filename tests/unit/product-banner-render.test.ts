@@ -9,6 +9,32 @@ import { stateWith } from "../fixtures/product-banner/state.ts";
 import { advanceIndex, canPlay, windowIndices, type Playback } from "../../src/features/product-banner/rotation.ts";
 import { buildBannerRuntime, productBannerRuntimePlugin } from "../../scripts/product-banner-runtime.mjs";
 import { createServer, build } from "vite";
+import { parsePrice } from "../../src/features/product-banner/inputMapping.ts";
+import { pricePairs } from "../fixtures/product-banner/price-pairs.ts";
+
+for (const pair of pricePairs) test(`exact price equality in model and markup: ${pair.name}`, () => {
+  const project = stateWith(1).project;
+  const product = { ...project.products[0],
+    originPrice: parsePrice({ text: pair.original, kind: "string" }),
+    discountPrice: parsePrice({ text: pair.sale, kind: "string" }),
+    discount: { raw: "0%", percent: 0 },
+  };
+  // Every pair intentionally has equal Number amounts, including the distinct prices.
+  assert.equal(product.originPrice.amount, product.discountPrice.amount);
+  const before = JSON.stringify(product);
+  const model = createDisplayModel({ ...project, products: [product], settings: { ...project.settings, showPrice: true, showDiscount: true } });
+  assert.deepEqual(model.products[0].prices, {
+    ...(!pair.same ? { original: { text: pair.original.slice(4), currency: product.originPrice.currency } } : {}),
+    sale: { text: pair.sale.slice(4), currency: product.discountPrice.currency },
+  });
+  assert.equal(model.products[0].discount, undefined);
+  const dom = new JSDOM(renderBanner(model).markup), d = dom.window.document;
+  assert.equal(d.querySelector(".wlpb-v1-original")?.textContent, pair.same ? undefined : pair.original);
+  assert.equal(d.querySelector(".wlpb-v1-prices strong")?.textContent, pair.sale);
+  assert.equal(d.querySelectorAll(".wlpb-v1-discount").length, 0);
+  assert.equal(JSON.stringify(product), before);
+  dom.window.close();
+});
 
 for (const design of DESIGN_IDS) test(`${design}: all ordered products, distinct layout, safe links, footer and validated settings`, () => {
   const project = stateWith(7).project, settings = { ...createDefaultSettings("ko", design), showPrice: false, showDiscount: false, showName: design !== "photo-strip", showButton: false };

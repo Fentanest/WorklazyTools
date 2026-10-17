@@ -26,6 +26,12 @@ function displayPrice(value: PriceValue): DisplayPrice | undefined {
   const text = price.raw!.trim().replace(/^[A-Za-z]{3}\s+/u, "");
   return { text, currency: price.currency };
 }
+/** Compare validated numeric tokens exactly; keep the displayed source digits untouched. */
+function normalizedAmount(text: string): string {
+  const [integer, fraction = ""] = text.replace(/,/gu, "").split(".");
+  const whole = integer.replace(/^0+/u, "") || "0", decimal = fraction.replace(/0+$/u, "");
+  return decimal ? `${whole}.${decimal}` : whole;
+}
 export function createDisplayModel(project: BannerProject): BannerDisplayModel {
   const settings = validateSettings(project.settings);
   const products = project.products.filter((p) => p.included).map((p, index): DisplayProduct => {
@@ -37,7 +43,7 @@ export function createDisplayModel(project: BannerProject): BannerDisplayModel {
     };
     if (settings.showPrice) {
       const original = displayPrice(p.originPrice), sale = displayPrice(p.discountPrice);
-      const samePrice = original && sale && original.currency === sale.currency && p.originPrice.amount === p.discountPrice.amount;
+      const samePrice = original && sale && original.currency === sale.currency && normalizedAmount(original.text) === normalizedAmount(sale.text);
       if (original || sale) result.prices = { ...(original && !samePrice ? { original } : {}), ...(sale ? { sale } : {}) };
     }
     if (settings.showDiscount) {

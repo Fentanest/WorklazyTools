@@ -7,7 +7,29 @@ import { createDefaultSettings } from "../../src/features/product-banner/setting
 import { DESIGN_IDS } from "../../src/features/product-banner/stateTypes.ts";
 import { stateWith } from "../fixtures/product-banner/state.ts";
 import { buildBannerRuntime, buildHeightParentRuntime, productBannerRuntimePlugin } from "../../scripts/product-banner-runtime.mjs";
+import { parsePrice } from "../../src/features/product-banner/inputMapping.ts";
+import { loadProjectJson } from "../../src/features/product-banner/projectJson.ts";
+import { pricePairs } from "../fixtures/product-banner/price-pairs.ts";
 const runtime = { banner: await buildBannerRuntime(), heightParent: await buildHeightParentRuntime() };
+for (const pair of pricePairs) test(`exact price equality in HTML, iframe and standalone: ${pair.name}`, () => {
+  const project = stateWith(1).project;
+  const product = { ...project.products[0],
+    originPrice: parsePrice({ text: pair.original, kind: "string" }),
+    discountPrice: parsePrice({ text: pair.sale, kind: "string" }),
+    discount: { raw: "0%", percent: 0 },
+  };
+  const p = { ...project, products: [product], settings: { ...project.settings, showPrice: true, showDiscount: true } };
+  const output = exportBanner(p, runtime), outer = new JSDOM(output.iframe);
+  assert.deepEqual(loadProjectJson(output.json), p);
+  for (const html of [output.html, outer.window.document.querySelector("iframe")!.getAttribute("srcdoc")!, output.standalone]) {
+    const dom = new JSDOM(html), d = dom.window.document;
+    assert.equal(d.querySelector(".wlpb-v1-original")?.textContent, pair.same ? undefined : pair.original);
+    assert.equal(d.querySelector(".wlpb-v1-prices strong")?.textContent, pair.sale);
+    assert.equal(d.querySelectorAll(".wlpb-v1-discount").length, 0);
+    dom.window.close();
+  }
+  outer.window.close();
+});
 for (const design of DESIGN_IDS) test(`export ${design}: four outputs, exact links, sandbox and byte counts`, () => {
   const p = { ...stateWith(7).project, settings: createDefaultSettings("ko", design) }, output = exportBanner(p, runtime);
   const outer = new JSDOM(output.iframe), frame = outer.window.document.querySelector("iframe")!;
