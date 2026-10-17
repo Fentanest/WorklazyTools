@@ -3,7 +3,7 @@
   "project": "WorklazyTools",
   "policy_version": "2026-09-22",
   "models": {
-    "gemini": null,
+    "gemini": "gemini-3.8-flash-high",
     "implementation": "gpt-6.1-sol",
     "review": "gpt-6-astra",
     "research": "gpt-6-luna",

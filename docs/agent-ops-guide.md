@@ -21,7 +21,7 @@ python3 scripts/codex_direct.py doctor
 | `scripts/jev_client.py` | 공식 REST 요청·응답 검증, 환경변수 인증, 비밀값 추가 검사, 오류 시 fail-unverified |
 | `scripts/agent_ops.py` | 원문 추출·계획 해시·테스트 영수증·Jev 대조·누적 상태·조건 판정·묶음 검수 발주/회수 |
 | `scripts/codex_direct.py` | 설치된 companion 직접 실행·실제 모델/cwd/sandbox 확인·발주 예약·중복 방지 |
-| `scripts/gemini_research.py` | Gemini(설정 모델 또는 agy 기본값)·셸 허용·전경 실행·결과/오류 영속 보관 |
+| `scripts/gemini_research.py` | Gemini(설정 모델 `gemini-3.8-flash-high`)·셸 허용·전경 실행·결과/오류 영속 보관 |
 | `docs/agent-ops-config.json` | 모델 매핑, 5개/800줄 초기 상한, 고위험 경로·줄 수 제외 목록 |
 
 프로그램은 Jev에 수정 명령 생성·배포 승인·모델 선택을 맡기지 않는다. shell 문자열을 eval하지 않는다. 자동 Stop hook·daemon은 설치하지 않는다. 모델이 작업 종료/영역 전환 때 아래 명령을 호출하는 방식으로 기존 협업에 연결한다.
