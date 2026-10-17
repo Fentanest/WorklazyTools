@@ -1,5 +1,5 @@
 {
-  "scope": "T6a core + T6b full Chromium matrix + AliExpress editor repair + banner-fix-20261017; suite/name is a fixed required case ID",
+  "scope": "T6a core + T6b full Chromium matrix + AliExpress editor repair + banner-fix-20261017; suite/name is a fixed required case ID + banner-url-20261017",
   "suites": [
     {
       "id": "unit",
@@ -12,7 +12,8 @@
         "tests/unit/product-banner-runner.test.ts",
         "tests/unit/product-banner-state-json.test.ts",
         "tests/unit/product-banner-state.test.ts",
-        "tests/unit/product-banner-ui-contract.test.ts"
+        "tests/unit/product-banner-ui-contract.test.ts",
+        "tests/unit/product-banner-url.test.ts"
       ],
       "cases": [
         "every serialization context keeps hostile strings as data",
@@ -154,7 +155,11 @@
         "exact price equality in model and markup: integer and decimal",
         "exact price equality in model and markup: zero",
         "exact price equality in model and markup: different currencies",
-        "exact price equality in model and markup: same long decimal with trailing zeros"
+        "exact price equality in model and markup: same long decimal with trailing zeros",
+        "banner URL accepts normalized origins and exact affiliate query bytes",
+        "banner URL rejects unsafe origins, repaired paths, separators, controls and invalid tokens",
+        "banner URL sizes require one bounded bz or explicit integer viewport dimensions",
+        "banner URL output DOM contains only the escaped frame and optional localized ad disclosure"
       ]
     },
     {
@@ -481,6 +486,23 @@
         "banner fixes: five designs, ko/en, HTML/iframe at 390px light",
         "banner fixes: five designs, ko/en, HTML/iframe at 390px dark"
       ]
+    },
+    {
+      "id": "banner-url",
+      "files": [
+        "tests/product-banner/banner-url.browser.test.ts"
+      ],
+      "cases": [
+        "banner URL modes create and copy localized code without automatic external requests",
+        "banner URL manual size is required for missing duplicate or invalid bz and preserves src",
+        "banner URL preview requires a fresh click after URL changes invalidation or leaving mode",
+        "banner URL file round trip preserves products settings pending mapping and v1 JSON",
+        "banner URL mode stays locked during Excel inspection and extraction then imports normally",
+        "banner URL static host paste and UI capture 1000px light",
+        "banner URL static host paste and UI capture 1000px dark",
+        "banner URL static host paste and UI capture 390px light",
+        "banner URL static host paste and UI capture 390px dark"
+      ]
     }
   ],
   "deferred": {},
@@ -490,7 +512,8 @@
     "rotation-lifecycle-instances-image-failure": "render,late-image",
     "ko-en-import-edits-work-guard-no-egress": "ui,t5b,r3a,r3b",
     "full-matrix": "matrix/T6b matrix {design} {format} {width} {theme}: 8 counts per case; matrix/T6b zoom200 {design} {format}",
-    "editor-repair": "editor-repair: actual sequential keyboard drafts, saved/exported height, defaults/saved false/design switches, localized links in 10 designs/languages × HTML/iframe/standalone from English UI, desktop/375px both themes, static SEO/FAQ"
+    "editor-repair": "editor-repair: actual sequential keyboard drafts, saved/exported height, defaults/saved false/design switches, localized links in 10 designs/languages × HTML/iframe/standalone from English UI, desktop/375px both themes, static SEO/FAQ",
+    "banner-url": "banner-url: URL validation/copy, request authorization, manual sizes, file state/mapping/JSON, real synthetic Excel, static host and UI captures"
   },
   "supplemental": "T6b performance/base/final-visual have independent test files and raw receipts; see evidence/T6b.md for measured scope and unverified gates"
 }

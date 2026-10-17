@@ -1,7 +1,7 @@
 {
   "productBanner": {
     "title": "AliExpress Ad Banner Builder guide",
-    "description": "Build five AliExpress affiliate ad banner designs from Excel or CSV product lists and save HTML or iframe code. Files are processed in your browser.",
+    "description": "Build five AliExpress ad banner designs from Excel or CSV lists and save HTML or iframe code, or convert a banner URL to iframe code. Files and URLs are processed in your browser.",
     "blocks": [
       {
         "title": "Files and editing",
@@ -14,6 +14,12 @@
         "paragraphs": [
           "Direct HTML can conflict with host styles. Iframes provide stronger isolation. Automatic rotation requires JavaScript. CSP, iframe and srcdoc filtering can restrict embedding. Banner text and the language of its builder link follow the Banner language setting. Changing the editor language or loading an editing file preserves the saved banner language. Support for untested platforms is not confirmed."
         ]
+      },
+      {
+        "title": "Convert a banner URL",
+        "paragraphs": [
+          "Choose Banner URL in step 1 and paste an s.click.aliexpress.com/e/ URL. Enter width and height manually if bz is missing or invalid. Size changes affect only the iframe viewport and preserve the original URL. Review the disclosure and copy the code. The tool connects to the external site only when you select Load actual banner. URL mode is not saved in editing files."
+        ]
       }
     ],
     "faq": {
@@ -23,7 +29,7 @@
       },
       "offline": {
         "q": "Are images guaranteed offline?",
-        "a": "Photos reference remote URLs, so offline display is not guaranteed. Host image policies can affect display."
+        "a": "Photos reference remote URLs, so offline display is not guaranteed. Host image policies can affect display. Banner URL previews may also be restricted by the external site’s policies or connection status."
       }
     }
   },

@@ -51,7 +51,7 @@
     "product-banner": {
       "title": "AliExpress Ad Banner Builder",
       "shortTitle": "AliExpress Ad Banner Builder",
-      "description": "Build five AliExpress affiliate ad banner designs from Excel or CSV product lists and save HTML or iframe code. Files are processed in your browser.",
+      "description": "Build five AliExpress ad banner designs from Excel or CSV lists and save HTML or iframe code, or convert a banner URL to iframe code. Files and URLs are processed in your browser.",
       "eyebrow": "AliExpress ad banners",
       "highlights": [
         "Five designs",

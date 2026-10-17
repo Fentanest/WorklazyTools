@@ -1,3 +1,5 @@
+import { BannerUrlPanel } from "./BannerUrlPanel";
+import { bannerUrlMessages } from "./bannerUrl";
 import { FileInput } from "../../components/FileDropProvider";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,6 +30,7 @@ export function ProductBannerPage() {
   const [state, setState] = useState(() => createEditorState(language));
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false), [pending, setPending] = useState(false);
+  const [inputMode, setInputMode] = useState<"file" | "url">("file");
   const [mode, setMode] = useState<"append" | "replace">("append");
   const [format, setFormat] = useState<"html" | "iframe">("html");
   const [showSample, setShowSample] = useState(false);
@@ -92,15 +95,24 @@ export function ProductBannerPage() {
     <PageHeader eyebrow={text.title} title={text.title} description={text.description} />
     <p className="mb-5 max-w-3xl text-sm text-muted-foreground">{text.privacy}</p>
     <div role="status" aria-live="polite" className="mb-4">{message === text.copyFailed ? "" : message}</div>
-    <div className="grid items-start gap-5 xl:grid-cols-2">
+    <div className={inputMode === "file" ? "grid items-start gap-5 xl:grid-cols-2" : "space-y-5"}>
       <div className="min-w-0 space-y-5" data-testid="settings-column">
         <SectionCard step={1} title={text.import}>
+          <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label={bannerUrlMessages[language].method}>
+            <Button variant={inputMode === "file" ? "default" : "secondary"} aria-pressed={inputMode === "file"} disabled={busy || jsonReading} onClick={() => setInputMode("file")}>{bannerUrlMessages[language].file}</Button>
+            <Button variant={inputMode === "url" ? "default" : "secondary"} aria-pressed={inputMode === "url"} disabled={busy || jsonReading} onClick={() => setInputMode("url")}>{bannerUrlMessages[language].url}</Button>
+          </div>
+          {/* Keep the importer mounted so pending sheet selections and mappings survive mode changes. */}
+          <div hidden={inputMode !== "file"}>
           <UtilitySelect aria-label={text.import} value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="append">{text.add}</option><option value="replace">{text.replace}</option></UtilitySelect>
           <ImportSelection text={text} errorText={errorText} onBusy={setBusy} onPending={setPending} onImport={(products) => {
             if (mode === "replace" && hasBannerWork(state) && !window.confirm(text.confirm)) return false;
             return dispatch({ type: mode, products, importedAt: new Date().toISOString(), confirmDiscard: true });
           }} />
+          </div>
         </SectionCard>
+        {inputMode === "url" && <BannerUrlPanel language={language} />}
+        <div hidden={inputMode !== "file"} className="space-y-5">
         <SectionCard step={2} title={text.products}>{!state.project.products.length && <p className="mb-4 text-muted-foreground">{text.empty}</p>}<ProductReview state={state} dispatch={dispatch} text={text} /></SectionCard>
         <SectionCard step={3} title={text.settings}><BannerAppearance settings={showSample ? sampleSettings : state.project.settings} update={(patch) => showSample ? setSampleSettings((previous) => updateSettings(previous, patch)) : dispatch({ type: "settings", patch })} text={text} /></SectionCard>
         <SectionCard step={4} title={text.export}>
@@ -117,8 +129,9 @@ export function ProductBannerPage() {
           </div>
           {!showSample && output.value && <div className="mt-4 space-y-3 text-sm text-muted-foreground"><p>{format === "html" ? help.direct : help.frame}</p>{state.project.settings.autoHeight && <p>{help.auto}</p>}<p>{help.images}</p><p>{output.value.bytes[format].toLocaleString(language)} bytes</p>{output.value.largeOutput && <p>{help.large}</p>}<UtilityTextarea aria-label={text.export} readOnly value={output.value[format]} className="h-40" onFocus={(e) => e.target.select()} /></div>}
         </SectionCard>
+        </div>
       </div>
-      <div className="min-w-0 xl:sticky xl:top-24" data-testid="preview-column">
+      <div hidden={inputMode !== "file"} className="min-w-0 xl:sticky xl:top-24" data-testid="preview-column">
         <SectionCard title={text.preview}>
           <div className="mb-3 flex flex-wrap gap-2"><Button variant="secondary" aria-pressed={showSample} onClick={() => { if (!showSample) setSampleSettings(state.project.settings); setShowSample(true); }}>{text.sample}</Button><Button variant="secondary" aria-pressed={!showSample} onClick={() => setShowSample(false)}>{text.realData}</Button></div>
           <p className="mb-3 rounded-xl border border-border p-3 text-sm" data-testid="preview-data-label">{showSample ? text.sampleNotice : text.realNotice}</p>
