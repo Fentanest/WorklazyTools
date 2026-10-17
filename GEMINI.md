@@ -4,7 +4,7 @@
 
 ## 모델·담당
 
-**Gemini 모델은 고정하지 않는다**(2026-10-13 사용자 지시). 설치된 agy에서 사용 가능한 Gemini 모델을 쓰고 실제 사용 모델 ID를 결과에 기록한다. `docs/agent-ops-config.json`의 `models.gemini`가 `null`이면 agy 기본값, 값이 있으면 그 모델을 쓴다.
+**Gemini 모델은 `gemini-3.8-flash-high`(Gemini 3.8 Flash)로 고정한다**(2026-10-17 사용자 지시). 실제 사용 모델 ID를 결과에 기록한다. 정본 값은 `docs/agent-ops-config.json`의 `models.gemini`다.
 
 Claude는 총괄·감사, Astra는 정식 기술 검수다. Gemini는 실제 원문 탐색·관계 분석·반례 수집·지정 화면 열람을 맡는다. 제품 코드·테스트·설정 수정·커밋·push·배포를 하지 않는다. 명시적 문서/스킬/운영 도구 유지보수 예외는 그 범위에만 적용한다. 
 
