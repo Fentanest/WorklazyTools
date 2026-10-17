@@ -98,3 +98,39 @@ test("actual Vite dev transform and production bundle supply the same runtime by
   const module = await import(`data:text/javascript,${encodeURIComponent(result.output[0].code)}`);
   assert.equal(module.default, source);
 });
+
+for (const language of ["ko", "en"] as const) test(`zero/missing discounts and equal amounts are suppressed without changing saved prices: ${language}`, () => {
+  const project = stateWith(3).project;
+  const products = project.products.map((p, i) => ({ ...p,
+    originPrice: { raw: i === 2 ? "EUR 16.99" : "USD 16.990", amount: 16.99, currency: i === 2 ? "EUR" : "USD" },
+    discountPrice: { raw: "USD 16.99", amount: 16.99, currency: "USD" },
+    discount: i === 1 ? { raw: null, percent: null } : { raw: "0%", percent: 0 },
+  }));
+  const model = createDisplayModel({ ...project, products, settings: { ...project.settings, language, showPrice: true, showDiscount: true } });
+  assert.ok(model.products.every((p) => p.discount === undefined));
+  assert.equal(model.products[0].prices?.original, undefined);
+  assert.equal(model.products[1].prices?.original, undefined);
+  assert.equal(model.products[2].prices?.original?.currency, "EUR");
+  const dom = new JSDOM(renderBanner(model).markup);
+  assert.equal(dom.window.document.querySelectorAll(".wlpb-v1-original").length, 1);
+  assert.equal(dom.window.document.querySelectorAll(".wlpb-v1-discount").length, 0);
+  assert.equal(dom.window.document.querySelectorAll(".wlpb-v1-prices")[0].textContent, "USD 16.99");
+  assert.equal(products[0].originPrice.raw, "USD 16.990");
+  dom.window.close();
+});
+for (const design of DESIGN_IDS) for (const theme of ["light", "dark"] as const) test(`${design}/${theme}: positive discount badge, CTA semantics and clear file disclosure`, () => {
+  const project = stateWith(1).project;
+  const settings = { ...project.settings, design, theme, showDiscount: true, showPrice: true, showButton: true };
+  const dom = new JSDOM(renderBanner(createDisplayModel({ ...project, settings })).markup), d = dom.window.document;
+  assert.equal(d.querySelector(".wlpb-v1-photo > .wlpb-v1-discount")?.textContent, "27%");
+  assert.equal(d.querySelectorAll(".wlpb-v1-details .wlpb-v1-discount").length, 0);
+  const cta = d.querySelector("[data-wlpb-cta]")!;
+  assert.equal(cta.getAttribute("rel"), "sponsored noopener");
+  assert.equal(cta.getAttribute("target"), "_blank");
+  assert.equal(cta.getAttribute("aria-label"), "상품 보기: 합성 상품 1");
+  assert.equal(d.querySelectorAll(".wlpb-v1-disclosures .wlpb-v1-notice").length, 2);
+  assert.ok(d.querySelector(".wlpb-v1-disclosures")!.textContent!.includes(bannerLabels.ko.file));
+  const hidden = new JSDOM(renderBanner(createDisplayModel({ ...project, settings: { ...settings, showDiscount: false } })).markup);
+  assert.equal(hidden.window.document.querySelectorAll(".wlpb-v1-discount").length, 0);
+  hidden.window.close(); dom.window.close();
+});

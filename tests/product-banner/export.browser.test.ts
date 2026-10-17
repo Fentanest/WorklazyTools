@@ -185,12 +185,12 @@ run("PB-EXPORT-height-cleanup", async (t) => {
 });
 run("PB-EXPORT-script-blocked", async (t) => {
   const output = exportBanner(project("grid", true), runtime), { page, stats } = await open(t, output.iframe, { scriptBlocked: true }), frame = await child(page);
-  assert.equal(await page.locator("iframe").getAttribute("height"), String(output.height)); assert.ok(await page.locator("small").textContent());
+  assert.equal(await page.locator("iframe").getAttribute("height"), String(output.height)); assert.equal(await page.locator("small").count(), 0); assert.ok(output.help.auto);
   assert.equal(await frame.locator("li").count(), 10); assert.equal(await frame.locator("[data-wlpb-ready]").count(), 0); return stats();
 });
 run("PB-EXPORT-srcdoc-blocked", async (t) => {
   const output = exportBanner(project(), runtime), { page, stats } = await open(t, output.iframe.replace(/ srcdoc="[^"]*"/u, ""));
-  assert.ok((await page.locator("small").textContent())!.includes("srcdoc")); assert.equal(await page.locator("iframe").getAttribute("height"), String(output.height)); return stats();
+  assert.equal(await page.locator("small").count(), 0); assert.ok(output.help.frame.includes("srcdoc")); assert.equal(await page.locator("iframe").getAttribute("height"), String(output.height)); return stats();
 });
 run("PB-EXPORT-security-strings", async (t) => {
   const bad = `"' & < > 한글 😀\n</script><!--\u2028\u2029<img onerror="window.escaped=1"> javascript:alert(1)`, p = project("product-card");

@@ -48,6 +48,7 @@ export function ImportSelection({ text, onImport, errorText, onBusy, onPending }
   }
   return <div className="space-y-4">
     <FileDropZone label={text.import} hint={text.hint} accept=".xls,.xlsx,.csv" multiple files={[]} onFiles={inspect} disabled={busy} />
+    {!busy && files.length > 0 && <p role="status" className="rounded-xl border border-border bg-muted p-3 text-sm">{text.pendingImport}</p>}
     {files.map((entry, index) => <div key={index} className="space-y-3 rounded-2xl border border-border p-3">
       <p className="break-all">{index + 1}. {entry.file.name}</p>
       <div className="flex gap-2"><Button variant="secondary" disabled={busy || index === 0} onClick={() => setFiles((previous) => { const next = [...previous]; [next[index - 1], next[index]] = [next[index], next[index - 1]]; return next; })}>{text.up}</Button><Button variant="secondary" disabled={busy} onClick={() => setFiles((previous) => previous.filter((_, i) => i !== index))}>{text.delete}</Button></div>

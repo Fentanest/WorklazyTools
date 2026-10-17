@@ -181,9 +181,9 @@ for (const language of ["ko", "en"] as const) for (const [raw, text, kind] of [
   let s = reduce(createEditorState(language), { type: "append", products: [input], importedAt });
   s = reduce(s, { type: "settings", patch: { showPrice: true } });
   const display = createDisplayModel(s.project).products[0];
-  assert.deepEqual(display.prices, { original: { text, currency: "USD" }, sale: { text, currency: "USD" } });
+  assert.deepEqual(display.prices, { sale: { text, currency: "USD" } });
   assert.equal(s.project.products[0].originPrice.raw, raw);
-  assert.equal(Object.hasOwn(display.prices!.original!, "raw"), false);
+  assert.equal(Object.hasOwn(display.prices!.sale!, "raw"), false);
 });
 test("price display omits invalid or inconsistent raw digits without substituting amounts", () => {
   for (const raw of ["USD 206.50<script>", "USD 206.51", "KRW 206.50", "USD 20,6.50", ""]) {

@@ -47,8 +47,8 @@ export function exportBanner(project: BannerProject, runtime: ExportRuntime, opt
   if (options.parentOrigin && (!/^https:\/\//u.test(options.parentOrigin) || new URL(options.parentOrigin).origin !== options.parentOrigin)) throw new Error("INVALID_PARENT_ORIGIN");
   const height = options.height ?? defaultFrameHeight(model);
   if (!Number.isInteger(height) || height < 120 || height > 2400) throw new Error("INVALID_IFRAME_HEIGHT");
-  const frame = `<iframe data-wlpb-frame title="${s.language === "ko" ? "알리익스프레스 광고 배너 만들기" : "AliExpress Ad Banner Builder"}" width="100%" height="${height}" loading="lazy" style="border:0" sandbox="${BANNER_SANDBOX}" srcdoc="${escapeHtml(documentFor(s.autoHeight))}">${escapeHtml(help.frame)}</iframe>`;
-  const iframe = `<span data-wlpb-embed>${frame}<small>${escapeHtml(s.autoHeight ? help.auto : help.frame)}</small></span>${s.autoHeight ? `<script>${runtime.heightParent}</script>` : ""}`;
+  const frame = `<iframe data-wlpb-frame title="${s.language === "ko" ? "알리익스프레스 광고 배너 만들기" : "AliExpress Ad Banner Builder"}" width="100%" height="${height}" loading="lazy" style="border:0" sandbox="${BANNER_SANDBOX}" srcdoc="${escapeHtml(documentFor(s.autoHeight))}"></iframe>`;
+  const iframe = `<span data-wlpb-embed>${frame}</span>${s.autoHeight ? `<script>${runtime.heightParent}</script>` : ""}`;
   const standalone = documentFor(false), json = saveProjectJson(project);
   const contents = { html, iframe, standalone, json };
   const bytes = Object.fromEntries(Object.entries(contents).map(([key, value]) => [key, utf8Bytes(value)])) as Record<keyof typeof contents, number>;

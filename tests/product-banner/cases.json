@@ -1,5 +1,5 @@
 {
-  "scope": "T6a core + T6b full Chromium matrix + AliExpress editor repair; suite/name is a fixed required case ID",
+  "scope": "T6a core + T6b full Chromium matrix + AliExpress editor repair + banner-fix-20261017; suite/name is a fixed required case ID",
   "suites": [
     {
       "id": "unit",
@@ -122,7 +122,23 @@
         "saved false choices survive JSON load and every design switch: slim",
         "saved false choices survive JSON load and every design switch: vertical",
         "saved false choices survive JSON load and every design switch: grid",
-        "AliExpress names, descriptions, search aliases and OG source agree in both languages"
+        "AliExpress names, descriptions, search aliases and OG source agree in both languages",
+        "iframe ko/true: only frame and optional height helper, no visitor instructions",
+        "iframe ko/false: only frame and optional height helper, no visitor instructions",
+        "iframe en/true: only frame and optional height helper, no visitor instructions",
+        "iframe en/false: only frame and optional height helper, no visitor instructions",
+        "zero/missing discounts and equal amounts are suppressed without changing saved prices: ko",
+        "zero/missing discounts and equal amounts are suppressed without changing saved prices: en",
+        "photo-strip/light: positive discount badge, CTA semantics and clear file disclosure",
+        "photo-strip/dark: positive discount badge, CTA semantics and clear file disclosure",
+        "product-card/light: positive discount badge, CTA semantics and clear file disclosure",
+        "product-card/dark: positive discount badge, CTA semantics and clear file disclosure",
+        "slim/light: positive discount badge, CTA semantics and clear file disclosure",
+        "slim/dark: positive discount badge, CTA semantics and clear file disclosure",
+        "vertical/light: positive discount badge, CTA semantics and clear file disclosure",
+        "vertical/dark: positive discount badge, CTA semantics and clear file disclosure",
+        "grid/light: positive discount badge, CTA semantics and clear file disclosure",
+        "grid/dark: positive discount badge, CTA semantics and clear file disclosure"
       ]
     },
     {
@@ -436,6 +452,18 @@
         "local layout and visible keyboard focus: en 375 dark-coral",
         "built static SEO and FAQ use exact AliExpress name: ko",
         "built static SEO and FAQ use exact AliExpress name: en"
+      ]
+    },
+    {
+      "id": "banner-fix",
+      "files": [
+        "tests/product-banner/banner-fix.browser.test.ts"
+      ],
+      "cases": [
+        "banner fixes: five designs, ko/en, HTML/iframe at 1000px light",
+        "banner fixes: five designs, ko/en, HTML/iframe at 1000px dark",
+        "banner fixes: five designs, ko/en, HTML/iframe at 390px light",
+        "banner fixes: five designs, ko/en, HTML/iframe at 390px dark"
       ]
     }
   ],

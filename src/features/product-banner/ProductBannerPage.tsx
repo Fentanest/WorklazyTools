@@ -52,10 +52,14 @@ export function ProductBannerPage() {
     }
     catch { setMessage(text.limitError); return false; }
   };
+  const includedCount = state.project.products.filter((p) => p.included).length;
+  const awaitingImport = pending && !busy && includedCount === 0;
+  const emptyHint = awaitingImport ? text.pendingImport : state.project.products.length ? text.noIncluded : text.empty;
   const output = useMemo(() => {
+    if (!includedCount) return { value: null, error: false };
     try { return { value: exportBanner(state.project, { banner: runtime, heightParent }), error: false }; }
     catch { return { value: null, error: true }; }
-  }, [state.project]);
+  }, [state.project, includedCount]);
   const sample = useMemo(() => showSample ? samplePreview(sampleSettings, runtime) : null, [showSample, sampleSettings]);
   // Insert the chosen real export into a sandboxed host document, including the nested iframe/helper for iframe mode.
   const preview = output.value ? `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0}</style></head><body>${output.value[format]}</body></html>` : "";
@@ -101,11 +105,12 @@ export function ProductBannerPage() {
         <SectionCard step={3} title={text.settings}><BannerAppearance settings={showSample ? sampleSettings : state.project.settings} update={(patch) => showSample ? setSampleSettings((previous) => updateSettings(previous, patch)) : dispatch({ type: "settings", patch })} text={text} /></SectionCard>
         <SectionCard step={4} title={text.export}>
           {message === text.copyFailed && <p role="status" className="mb-3 text-sm">{text.copyFailed}</p>}
+          {!includedCount && (!showSample || awaitingImport) && <p className="mb-3 text-sm text-muted-foreground">{emptyHint}</p>}
           {showSample && <p className="mb-3 text-sm text-muted-foreground">{text.sampleBlocked}</p>}
           <div className="flex flex-wrap gap-2">
-            <Button disabled={showSample || !output.value || !state.project.products.length} onClick={() => void copy("html")}>{text.copyHtml}</Button>
-            <Button disabled={showSample || !output.value || !state.project.products.length} onClick={() => void copy("iframe")}>{text.copyIframe}</Button>
-            <Button variant="secondary" disabled={showSample || !output.value || !state.project.products.length} onClick={() => output.value && save(output.value.standalone, "product-banner.html", "text/html")}>{text.saveHtml}</Button>
+            <Button disabled={showSample || !output.value || !includedCount} onClick={() => void copy("html")}>{text.copyHtml}</Button>
+            <Button disabled={showSample || !output.value || !includedCount} onClick={() => void copy("iframe")}>{text.copyIframe}</Button>
+            <Button variant="secondary" disabled={showSample || !output.value || !includedCount} onClick={() => output.value && save(output.value.standalone, "product-banner.html", "text/html")}>{text.saveHtml}</Button>
             <Button variant="secondary" disabled={showSample} onClick={() => { save(saveProjectJson(state.project), "product-banner.json", "application/json"); dispatch({ type: "mark-saved" }); setMessage(text.saved); }}>{text.saveJson}</Button>
             <Button variant="secondary" onClick={() => jsonInput.current?.click()}>{text.loadJson}</Button>
             <FileInput disabled={busy} ref={jsonInput} type="file" accept=".json" className="hidden" aria-label={text.loadJson} onChange={(e) => { void importJson(e.target.files?.[0]); e.target.value = ""; }} />
@@ -117,10 +122,11 @@ export function ProductBannerPage() {
         <SectionCard title={text.preview}>
           <div className="mb-3 flex flex-wrap gap-2"><Button variant="secondary" aria-pressed={showSample} onClick={() => { if (!showSample) setSampleSettings(state.project.settings); setShowSample(true); }}>{text.sample}</Button><Button variant="secondary" aria-pressed={!showSample} onClick={() => setShowSample(false)}>{text.realData}</Button></div>
           <p className="mb-3 rounded-xl border border-border p-3 text-sm" data-testid="preview-data-label">{showSample ? text.sampleNotice : text.realNotice}</p>
-          <p className="mb-3">{text.count}: {showSample ? 3 : state.project.products.filter((p) => p.included).length}</p>
+          {showSample && awaitingImport && <p className="mb-3 text-sm text-muted-foreground">{text.pendingImport}</p>}
+          <p className="mb-3">{text.count}: {showSample ? 3 : includedCount}</p>
           <UtilitySelect disabled={showSample} aria-label={text.preview} value={format} onChange={(e) => setFormat(e.target.value as typeof format)}><option value="html">{text.html}</option><option value="iframe">{text.iframe}</option></UtilitySelect>
           {/* Replace changed sandbox documents: srcdoc navigation would add joint history entries and obstruct the app's leave guard. */}
-          {sample ? <div className="mt-4 max-h-[70vh] overflow-auto xl:max-h-[calc(100dvh-24rem)]"><iframe key={sample.document} title={text.sample} data-testid="sample-preview" sandbox={BANNER_SANDBOX} srcDoc={sample.document} style={{ width: "100%", maxWidth: sampleSettings.width, height: sample.height + 60, border: 0 }} /></div> : output.error ? <p role="alert" className="mt-4 text-destructive">{text.exportError}</p> : !state.project.products.length ? <p className="mt-4 text-muted-foreground">{text.empty}</p> : <div className="mt-4 max-h-[70vh] overflow-auto xl:max-h-[calc(100dvh-24rem)]"><iframe key={preview} title={text.preview} data-testid="banner-preview" sandbox={BANNER_SANDBOX} srcDoc={preview} style={{ width: "100%", maxWidth: state.project.settings.width, height: (output.value?.height ?? 420) + 60, border: 0 }} /></div>}
+          {sample ? <div className="mt-4 max-h-[70vh] overflow-auto xl:max-h-[calc(100dvh-24rem)]"><iframe key={sample.document} title={text.sample} data-testid="sample-preview" sandbox={BANNER_SANDBOX} srcDoc={sample.document} style={{ width: "100%", maxWidth: sampleSettings.width, height: sample.height + 60, border: 0 }} /></div> : output.error ? <p role="alert" className="mt-4 text-destructive">{text.exportError}</p> : !includedCount ? <p className="mt-4 text-muted-foreground">{emptyHint}</p> : <div className="mt-4 max-h-[70vh] overflow-auto xl:max-h-[calc(100dvh-24rem)]"><iframe key={preview} title={text.preview} data-testid="banner-preview" sandbox={BANNER_SANDBOX} srcDoc={preview} style={{ width: "100%", maxWidth: state.project.settings.width, height: (output.value?.height ?? 420) + 60, border: 0 }} /></div>}
         </SectionCard>
       </div>
     </div>

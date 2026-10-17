@@ -37,11 +37,12 @@ export function createDisplayModel(project: BannerProject): BannerDisplayModel {
     };
     if (settings.showPrice) {
       const original = displayPrice(p.originPrice), sale = displayPrice(p.discountPrice);
-      if (original || sale) result.prices = { ...(original ? { original } : {}), ...(sale ? { sale } : {}) };
+      const samePrice = original && sale && original.currency === sale.currency && p.originPrice.amount === p.discountPrice.amount;
+      if (original || sale) result.prices = { ...(original && !samePrice ? { original } : {}), ...(sale ? { sale } : {}) };
     }
     if (settings.showDiscount) {
       const discount = validateDiscount(p.discount);
-      if (discount.percent !== null) result.discount = `${discount.percent}%`;
+      if (discount.percent !== null && discount.percent > 0) result.discount = `${discount.percent}%`;
     }
     return result;
   });

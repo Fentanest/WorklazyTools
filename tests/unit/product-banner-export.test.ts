@@ -64,3 +64,17 @@ test("helper builder is deterministic and available through the Vite virtual-mod
   const source = await plugin.load.call({ addWatchFile() {} }, id);
   assert.equal(source, `export default ${JSON.stringify(runtime.heightParent)};`);
 });
+
+for (const language of ["ko", "en"] as const) for (const autoHeight of [true, false]) test(`iframe ${language}/${autoHeight}: only frame and optional height helper, no visitor instructions`, () => {
+  const project = stateWith(2).project;
+  const output = exportBanner({ ...project, settings: { ...project.settings, language, autoHeight } }, runtime);
+  const dom = new JSDOM(output.iframe), d = dom.window.document;
+  assert.equal(d.querySelectorAll("[data-wlpb-embed] > iframe").length, 1);
+  assert.equal(d.querySelector("[data-wlpb-embed]")!.children.length, 1);
+  assert.equal(d.querySelector("iframe")!.textContent, "");
+  assert.equal(d.querySelectorAll("small").length, 0);
+  assert.equal(d.querySelectorAll("body > script").length, autoHeight ? 1 : 0);
+  assert.equal(d.querySelectorAll("body > script")[0]?.textContent, autoHeight ? runtime.heightParent : undefined);
+  assert.ok(output.help.auto.length > 0);
+  dom.window.close();
+});

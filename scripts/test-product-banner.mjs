@@ -16,7 +16,7 @@ export function assess(expected, observed, exitCode) {
   return { cases, ...counts, ok: !invalid && exitCode === 0 && counts.passed === expected.length };
 }
 export function validSuites(suites) {
-  const required = ["unit", "render", "export", "ui", "t5b", "r3a", "r3b", "late-image", "matrix", "editor-repair"];
+  const required = ["unit", "render", "export", "ui", "t5b", "r3a", "r3b", "late-image", "matrix", "editor-repair", "banner-fix"];
   return Array.isArray(suites) && required.every((id) => suites.filter((s) => s.id === id).length === 1)
     && new Set(suites.map((s) => s.id)).size === suites.length;
 }
@@ -61,7 +61,7 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
       PB_T4_WORK_DIR: dir, PB_T4_SHOT_DIR: `${dir}/shots`, PB_T5_SHOT_DIR: `${dir}/shots`,
       PB_REPAIR_RESULT_DIR: dir, PB_T5B_SHOT_DIR: `${dir}/shots-${path.basename(run)}`, PB_R3A_SHOT_DIR: `${dir}/shots`,
       PB_LATE_RESULT_DIR: `${dir}/late`, PB_R3BFIX_ROOT: root,
-      PB_R3BFIX_RUN: path.basename(run).toLowerCase(), PB_MATRIX_RESULT_DIR: dir, PB_IMAGE_ENGINE: "chromium" };
+      PB_R3BFIX_RUN: path.basename(run).toLowerCase(), PB_MATRIX_RESULT_DIR: dir, PB_IMAGE_ENGINE: "chromium", PB_FIX_SHOTS: `${dir}/shots` };
     const result = spawnSync(process.execPath, ["--experimental-strip-types", "--test",
       "--test-reporter=tap", `--test-reporter-destination=${dir}/tap.log`,
       "--test-reporter=./tests/product-banner/case-reporter.mjs", "--test-reporter-destination=stdout", ...suite.files],
