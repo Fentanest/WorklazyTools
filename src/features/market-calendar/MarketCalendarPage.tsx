@@ -1,21 +1,23 @@
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { setAdIneligible } from '../../app/adEligibility'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { PageHeader, SectionCard } from '../../components/ui'
 import { ToolGuideWrapper } from '../../components/ToolGuideWrapper'
 import type { TranslationResources } from '../../i18n/resources'
 import { loadCalendar, isOld, sourceHref, venues, type Venue, type CalendarView } from './loadCalendar'
 import { groupSources, publicationTextKey, sessionNameKey, sortSessions } from './calendarDisplay'
+import { calendarSelectionSearch, readCalendarSelection, type CalendarSelection } from './calendarSelection'
 import './market-calendar.css'
 
 export function MarketCalendarPage() {
   const { t, i18n } = useTranslation('features')
   const text = (key: keyof TranslationResources['features']['marketCalendar']) => t(`marketCalendar.${key}`)
   const [view, setView] = useState<CalendarView>({ status: 'loading' })
-  const [venue, setVenue] = useState<Venue>('krx')
-  const [yearChoice, setYear] = useState(new Date().getFullYear())
-  const [month, setMonth] = useState(new Date().getMonth() + 1)
-  const [day, setDay] = useState(1)
+  const [defaultDate] = useState(() => new Date())
+  const [parameters, setParameters] = useSearchParams()
+  const selection = readCalendarSelection(parameters, defaultDate)
+  const { venue, year: yearChoice, month, day } = selection
   const [reload, setReload] = useState(0)
   // Refresh the elapsed-time warning even when this page stays open.
   const [now, setNow] = useState(Date.now)
@@ -35,6 +37,9 @@ export function MarketCalendarPage() {
   const manifest = view.status === 'ready' ? view.manifest : null
   const years = manifest?.files.map(file => file.year) ?? []
   const year = years.includes(yearChoice) ? yearChoice : years[0] ?? yearChoice
+  // Commit the public selection to the URL in the same navigation that renders
+  // its unavailable marker. The common ad document replacement retains this URL.
+  const select = (next: Partial<CalendarSelection>) => setParameters(calendarSelectionSearch({ ...selection, year, ...next }), { replace: true })
   const scope = manifest?.scopes.find(s => s.venue === venue && s.year === year)
   const rows = view.status === 'ready' ? view.rows.filter(r => r.venue === venue && r.date.startsWith(`${year}${String(month).padStart(2, '0')}`)) : []
   const adIneligible = view.status !== 'ready' || !scope?.included || rows.length === 0
@@ -62,13 +67,13 @@ export function MarketCalendarPage() {
     </SectionCard> : <>
       <SectionCard title={text('calendar')}>
         <div className="mcal-controls">
-          <label>{text('venue')}<select className="mcal-control" value={venue} onChange={e => setVenue(e.target.value as Venue)}>
+          <label>{text('venue')}<select className="mcal-control" value={venue} onChange={e => select({ venue: e.target.value as Venue })}>
             {venues.map(v => <option key={v} value={v}>{v.toUpperCase()}</option>)}
           </select></label>
-          <label>{text('year')}<select className="mcal-control" value={year} onChange={e => { setYear(Number(e.target.value)); setDay(1) }}>
+          <label>{text('year')}<select className="mcal-control" value={year} onChange={e => select({ year: Number(e.target.value), day: 1 })}>
             {years.map(y => <option key={y}>{y}</option>)}
           </select></label>
-          <label>{text('month')}<select className="mcal-control" value={month} onChange={e => { setMonth(Number(e.target.value)); setDay(1) }}>
+          <label>{text('month')}<select className="mcal-control" value={month} onChange={e => select({ month: Number(e.target.value), day: 1 })}>
             {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
           </select></label>
         </div>
@@ -86,7 +91,7 @@ export function MarketCalendarPage() {
               return <td key={column}>{d > 0 && d <= count && <button
                 className={`mcal-day mcal-${row?.status ?? 'missing'}`} aria-pressed={d === day}
                 aria-label={`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')} ${text(row?.status ?? 'missing')}`}
-                onClick={() => setDay(d)}><strong>{d}</strong><span>{text(row?.status ?? 'missing')}</span>{row?.special && <span className="mcal-special">•</span>}</button>}</td>
+                onClick={() => select({ day: d })}><strong>{d}</strong><span>{text(row?.status ?? 'missing')}</span>{row?.special && <span className="mcal-special">•</span>}</button>}</td>
             })}
           </tr>)}</tbody>
         </table>

@@ -1,3 +1,4 @@
+import { selectCalendarValue, selectCalendarDay } from './helpers/market-calendar-selection.mjs';
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import fs from 'node:fs/promises';
@@ -12,11 +13,11 @@ try {
     await context.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : (external.push(route.request().url()), route.abort()));
     const page = await context.newPage(); page.on('pageerror', e => errors.push(String(e)));
     await page.goto(`${origin}/${lang}/tools/market-calendar/`); await page.locator('.mcal-grid').waitFor();
-    await page.locator('.mcal-controls select').nth(1).selectOption('2026');
+    await selectCalendarValue(page, 1, '2026');
     for (const scenario of ['new-year', 'early-close']) {
-      await page.locator('.mcal-controls select').nth(0).selectOption(scenario === 'new-year' ? 'krx' : 'nyse');
-      await page.locator('.mcal-controls select').nth(2).selectOption(scenario === 'new-year' ? '1' : '11');
-      await page.locator('.mcal-day').filter({ has: page.locator('strong', { hasText: scenario === 'new-year' ? /^1$/ : /^27$/ }) }).click();
+      await selectCalendarValue(page, 0, scenario === 'new-year' ? 'krx' : 'nyse');
+      await selectCalendarValue(page, 2, scenario === 'new-year' ? '1' : '11');
+      await selectCalendarDay(page, scenario === 'new-year' ? 1 : 27);
       const detail = await page.locator('.mcal-detail').innerText();
       const expected = scenario === 'new-year' ? (lang === 'ko' ? /신정/ : /New Year/) : (lang === 'ko' ? /조기.*(?:종료|폐장)/ : /early clos/i);
       assert.match(detail, expected);

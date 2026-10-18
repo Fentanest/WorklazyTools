@@ -1,0 +1,66 @@
+import { selectCalendarValue } from './helpers/market-calendar-selection.mjs';
+import assert from 'node:assert/strict';
+import { chromium } from 'playwright';
+import fs from 'node:fs/promises';
+import { installAdFirewall, createCounters, assertNoRealNetwork, ADSENSE_SCRIPT_URL, stubScriptBody } from './helpers/ad-stub.mjs';
+const origin = process.env.MCAL_ORIGIN || 'http://127.0.0.1:4427';
+const output = process.env.MCAL_OUTPUT_DIR || '.review-tmp/mcal-r3';
+await fs.mkdir(output, { recursive: true });
+const browser = await chromium.launch({ executablePath: process.env.WORKLAZY_CHROME_PATH || '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox'] });
+const results = [];
+try {
+  for (const language of ['ko', 'en']) {
+    const context = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1440, height: 1000 } });
+    const counters = createCounters(), errors = [];
+    await installAdFirewall(context, origin, counters);
+    await context.route(ADSENSE_SCRIPT_URL, async route => {
+      counters.attempt++; counters.stub++;
+      await route.fulfill({ contentType: 'application/javascript', body: stubScriptBody() + `const ad=document.createElement('iframe');ad.id='held-rendered-auto-ad';ad.className='google-auto-placed';ad.title='Synthetic rendered ad';ad.srcdoc='<body>Ad stub</body>';document.documentElement.append(ad);` });
+    });
+    await context.addInitScript(() => { if (window === window.top) { window.__WORKLAZY_MOCK_PROVIDERS__ = true; window.__heldDocumentToken = crypto.randomUUID(); } });
+    const page = await context.newPage(); page.on('pageerror', e => errors.push(String(e)));
+    const observe = () => page.evaluate(() => ({
+      url: location.href, documentToken: window.__heldDocumentToken,
+      selection: [...document.querySelectorAll('.mcal-controls select')].map(e => e.value),
+      caption: document.querySelector('.mcal-grid caption')?.textContent,
+      warnings: [...document.querySelectorAll('.mcal-warning')].map(e => e.textContent),
+      ads: document.querySelectorAll('script[data-worklazy-adsense]').length,
+      residue: document.querySelectorAll('#held-rendered-auto-ad, .google-auto-placed, .wl-ad-stub-marker, iframe.coupang-banner-frame').length,
+    }));
+    try {
+      await page.goto(`${origin}/${language}/tools/market-calendar/`);
+      await page.locator('.mcal-grid').waitFor(); await page.locator('#held-rendered-auto-ad').waitFor();
+      await selectCalendarValue(page, 0, 'nasdaq');
+      await selectCalendarValue(page, 1, '2026');
+      await selectCalendarValue(page, 2, '11');
+      const before = await observe();
+      assert.deepEqual(before.selection, ['nasdaq', '2026', '11']); assert.equal(before.ads, 1); assert.ok(before.residue > 0);
+      await selectCalendarValue(page, 1, '2027');
+      await page.waitForFunction(token => window.__heldDocumentToken !== token, before.documentToken);
+      await page.locator('.mcal-grid').waitFor();
+      await page.waitForFunction(() => document.querySelectorAll('.mcal-warning').length >= 2);
+      const after = await observe();
+      const assertHeld = state => {
+        assert.deepEqual(state.selection, ['nasdaq', '2027', '11']); assert.equal(state.caption, 'NASDAQ · 2027-11');
+        assert.match(state.warnings.join(' '), language === 'ko' ? /발행 보류/ : /on hold/);
+        assert.match(state.warnings.join(' '), language === 'ko' ? /연간 일정의 공식 근거/ : /Official evidence for the annual schedule/);
+        assert.match(state.warnings.join(' '), language === 'ko' ? /공개된 자료가 없습니다/ : /No published data/);
+        assert.equal(state.ads, 0); assert.equal(state.residue, 0);
+      };
+      assertHeld(after); assert.equal(counters.attempt, 1, 'held document must not reload the SDK');
+      await page.screenshot({ path: `${output}/held-selection-${language}.png`, fullPage: true });
+      await page.reload(); await page.locator('.mcal-grid').waitFor();
+      const refreshed = await observe(); assertHeld(refreshed); assert.equal(counters.attempt, 1);
+      const direct = await context.newPage(); await direct.goto(after.url); await direct.locator('.mcal-grid').waitFor();
+      assert.deepEqual(await direct.locator('.mcal-controls select').evaluateAll(es => es.map(e => e.value)), ['nasdaq', '2027', '11']);
+      assert.equal(await direct.locator('script[data-worklazy-adsense], #held-rendered-auto-ad, .wl-ad-stub-marker').count(), 0);
+      assert.equal(counters.attempt, 1, 'direct shared held URL must stay ad-free'); await direct.close();
+      await selectCalendarValue(page, 1, '2026'); await page.locator('#held-rendered-auto-ad').waitFor();
+      assert.equal(counters.attempt, 2, 'returning to the available scope restores normal ad eligibility');
+      assertNoRealNetwork(counters, language); assert.equal(errors.length, 0, JSON.stringify(errors));
+      results.push({ language, before, after, refreshed, counters, errors, pass: true });
+      console.log(`ok ${results.length} - ${language} SDK-active held selection persists without ads`);
+    } finally { await context.close(); }
+  }
+} finally { await browser.close(); await fs.writeFile(`${output}/held-selection.json`, JSON.stringify(results, null, 2)); }
+console.log(`1..${results.length}\n# tests ${results.length}\n# pass ${results.length}\n# fail 0`);

@@ -2,6 +2,7 @@ import { seoByPath, toolSlugByPath } from "./seo.ts";
 import { stripLanguagePrefix } from "../i18n/languages.ts";
 import { VIDEO_STUDIO_PUBLIC } from "./publicServiceConfig.mjs";
 import { withSiteBasePath } from "./siteBasePath.ts";
+import { parseCalendarSelection } from "../features/market-calendar/calendarSelection.ts";
 
 // One publication decision is consumed by the catalog, router, static generator and tracking.
 // The implementation remains in src/features/video-studio for a later reactivation.
@@ -69,6 +70,7 @@ export function safeAnalyticsPage(pathname: string, search = "", hash = "") {
   if (!isKnownPublicPath(path)) return null;
   const parameters = new URLSearchParams(search);
   const allowed = path === "/tools" && parameters.size === 1 && publicToolCategories.has(parameters.get("category") ?? "")
+    || path === "/tools/market-calendar" && parseCalendarSelection(parameters) !== null
     || path === "/tools/office-editor" && parameters.size === 1 && parameters.get("guide") === "1"
     || path === "/tools/excel-merger/xls-preserve" && [...parameters].every(([key, value]) => (key === "formula" || key === "format") && (value === "0" || value === "1")) && parameters.size <= 2;
   if (search && !allowed) return null;
