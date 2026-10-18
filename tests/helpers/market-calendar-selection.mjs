@@ -1,13 +1,30 @@
-// URL navigation may commit after the native select event. Wait for both the
-// requested control and React's matching calendar caption before the next action.
+// Wait for URL navigation and the rendered calendar before the next arrow click.
 export async function selectCalendarValue(page, index, value) {
-  await page.locator('.mcal-controls select').nth(index).selectOption(String(value));
-  await page.waitForFunction(({ index, value }) => {
-    const controls = [...document.querySelectorAll('.mcal-controls select')];
-    if (controls.length !== 3 || controls[index].value !== value) return false;
-    return document.querySelector('.mcal-grid caption')?.textContent ===
-      `${controls[0].value.toUpperCase()} · ${controls[1].value}-${controls[2].value.padStart(2, '0')}`;
-  }, { index, value: String(value) });
+  const caption = () => page.locator('.mcal-grid caption').innerText();
+  if (index === 0) {
+    await page.locator('.mcal-controls select').selectOption(String(value));
+    await page.waitForFunction(value => {
+      const params = new URLSearchParams(location.search);
+      return params.get('venue') === value && document.querySelector('.mcal-grid caption')?.textContent ===
+        `${value.toUpperCase()} · ${params.get('year')}-${params.get('month').padStart(2, '0')}`;
+    }, String(value));
+    return;
+  }
+  const match = (await caption()).match(/(\d{4})-(\d{2})$/);
+  let current = Number(match[index]);
+  const target = Number(value);
+  while (current !== target) {
+    const direction = target > current ? 1 : -1;
+    const before = await caption();
+    await page.locator('.mcal-nav button').nth(index === 1 ? (direction > 0 ? 3 : 0) : (direction > 0 ? 2 : 1)).click();
+    current += direction;
+    await page.waitForFunction(({ index, current, before }) => {
+      const params = new URLSearchParams(location.search);
+      const caption = document.querySelector('.mcal-grid caption')?.textContent;
+      return Number(params.get(index === 1 ? 'year' : 'month')) === current && caption !== before && caption ===
+        `${params.get('venue').toUpperCase()} · ${params.get('year')}-${params.get('month').padStart(2, '0')}`;
+    }, { index, current, before });
+  }
 }
 
 export async function selectCalendarDay(page, day) {

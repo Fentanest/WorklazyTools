@@ -2,6 +2,12 @@ import { venues, type Venue } from './loadCalendar.ts'
 
 export interface CalendarSelection { venue: Venue; year: number; month: number; day: number }
 
+export function moveCalendarSelection(selection: CalendarSelection, months: number, years: readonly number[]): CalendarSelection | null {
+  const date = new Date(Date.UTC(selection.year, selection.month - 1 + months, 1))
+  const year = date.getUTCFullYear()
+  return years.includes(year) ? { ...selection, year, month: date.getUTCMonth() + 1, day: 1 } : null
+}
+
 // Public schedule selectors only. Reject unknown/duplicate keys rather than
 // allowing arbitrary URL content through the shared readiness/analytics gate.
 export function parseCalendarSelection(parameters: URLSearchParams): CalendarSelection | null {

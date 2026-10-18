@@ -19,14 +19,18 @@ try {
     });
     await context.addInitScript(() => { if (window === window.top) { window.__WORKLAZY_MOCK_PROVIDERS__ = true; window.__heldDocumentToken = crypto.randomUUID(); } });
     const page = await context.newPage(); page.on('pageerror', e => errors.push(String(e)));
-    const observe = () => page.evaluate(() => ({
-      url: location.href, documentToken: window.__heldDocumentToken,
-      selection: [...document.querySelectorAll('.mcal-controls select')].map(e => e.value),
-      caption: document.querySelector('.mcal-grid caption')?.textContent,
-      warnings: [...document.querySelectorAll('.mcal-warning')].map(e => e.textContent),
-      ads: document.querySelectorAll('script[data-worklazy-adsense]').length,
-      residue: document.querySelectorAll('#held-rendered-auto-ad, .google-auto-placed, .wl-ad-stub-marker, iframe.coupang-banner-frame').length,
-    }));
+    const observe = () => page.evaluate(() => {
+      const caption = document.querySelector('.mcal-grid caption')?.textContent;
+      const yearMonth = caption?.match(/(\d{4})-(\d{2})$/);
+      return {
+        url: location.href, documentToken: window.__heldDocumentToken,
+        selection: [document.querySelector('.mcal-controls select')?.value, yearMonth?.[1], String(Number(yearMonth?.[2]))],
+        caption,
+        warnings: [...document.querySelectorAll('.mcal-warning')].map(e => e.textContent),
+        ads: document.querySelectorAll('script[data-worklazy-adsense]').length,
+        residue: document.querySelectorAll('#held-rendered-auto-ad, .google-auto-placed, .wl-ad-stub-marker, iframe.coupang-banner-frame').length,
+      };
+    });
     try {
       await page.goto(`${origin}/${language}/tools/market-calendar/`);
       await page.locator('.mcal-grid').waitFor(); await page.locator('#held-rendered-auto-ad').waitFor();
@@ -53,7 +57,9 @@ try {
       await page.reload(); await page.locator('.mcal-grid').waitFor();
       const refreshed = await observe(); assertHeld(refreshed); assert.equal(counters.attempt, 1);
       const direct = await context.newPage(); await direct.goto(after.url); await direct.locator('.mcal-grid').waitFor();
-      assert.deepEqual(await direct.locator('.mcal-controls select').evaluateAll(es => es.map(e => e.value)), ['nasdaq', '2027', '11']);
+      assert.equal(await direct.locator('.mcal-controls select').inputValue(), 'nasdaq');
+      assert.equal(await direct.locator('.mcal-grid caption').innerText(), 'NASDAQ · 2027-11');
+      assert.equal(await direct.locator('.mcal-month-title').innerText(), language === 'ko' ? '2027년 11월' : 'November 2027');
       assert.equal(await direct.locator('script[data-worklazy-adsense], #held-rendered-auto-ad, .wl-ad-stub-marker').count(), 0);
       assert.equal(counters.attempt, 1, 'direct shared held URL must stay ad-free'); await direct.close();
       await selectCalendarValue(page, 1, '2026'); await page.locator('#held-rendered-auto-ad').waitFor();

@@ -1,6 +1,10 @@
 .market-calendar .mcal-controls { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
 .market-calendar label { display: flex; align-items: center; gap: .5rem; }
 .market-calendar .mcal-control { border: 1px solid var(--border); border-radius: .65rem; padding: .6rem .8rem; background: var(--card); color: var(--foreground); min-height: 44px; }
+.market-calendar .mcal-nav { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; align-items: center; gap: .25rem; width: 100%; max-width: 26rem; margin: 0 auto 1rem; }
+.market-calendar .mcal-nav-button { width: clamp(1.75rem, 8vw, 2.75rem); padding: .2rem; font-size: 1.5rem; line-height: 1; }
+.market-calendar .mcal-nav-button:disabled { opacity: .4; cursor: default; }
+.market-calendar .mcal-month-title { text-align: center; white-space: nowrap; font-size: clamp(.75rem, 3.3vw, 1rem); }
 .market-calendar button, .market-calendar select, .market-calendar summary { cursor: pointer; }
 .market-calendar :is(button, select, a, summary):focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
 .market-calendar .mcal-warning { border-left: 4px solid var(--primary); padding: .75rem; margin-bottom: .75rem; background: var(--muted); overflow-wrap: anywhere; }

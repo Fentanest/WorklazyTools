@@ -8,7 +8,7 @@ import { ToolGuideWrapper } from '../../components/ToolGuideWrapper'
 import type { TranslationResources } from '../../i18n/resources'
 import { loadCalendar, isOld, venues, type Venue, type CalendarView } from './loadCalendar'
 import { dateCopyKeys, dateDescriptions, displayClock, formatLastUpdated, koreaSessionRange, officialSources, sessionNameKey, sortSessions } from './calendarDisplay'
-import { calendarSelectionSearch, readCalendarSelection, type CalendarSelection } from './calendarSelection'
+import { calendarSelectionSearch, moveCalendarSelection, readCalendarSelection, type CalendarSelection } from './calendarSelection'
 import './market-calendar.css'
 
 export function MarketCalendarPage() {
@@ -61,6 +61,7 @@ export function MarketCalendarPage() {
   const count = new Date(Date.UTC(year, month, 0)).getUTCDate()
   const offset = new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
   const weekdays = Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(i18n.language, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 0, 4 + i))))
+  const monthTitle = new Intl.DateTimeFormat(i18n.language, { year: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(Date.UTC(year, month - 1, 1)))
 
   return <UtilityPage toolId="market-calendar"><div data-ad-unavailable={adIneligible ? true : undefined} className="market-calendar space-y-6">
     <PageHeader eyebrow={text('eyebrow')} title={text('title')} description={text('description')}>
@@ -78,15 +79,19 @@ export function MarketCalendarPage() {
           <label>{text('venue')}<select className="mcal-control" value={venue} onChange={e => select({ venue: e.target.value as Venue })}>
             {venues.map(v => <option key={v} value={v}>{v.toUpperCase()}</option>)}
           </select></label>
-          <label>{text('year')}<select className="mcal-control" value={year} onChange={e => select({ year: Number(e.target.value), day: 1 })}>
-            {years.map(y => <option key={y}>{y}</option>)}
-          </select></label>
-          <label>{text('month')}<select className="mcal-control" value={month} onChange={e => select({ month: Number(e.target.value), day: 1 })}>
-            {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
-          </select></label>
         </div>
         {warnings.map(warning => <p key={warning} role="status" className="mcal-warning">{warning}</p>)}
         <p className="mb-3 text-sm text-muted-foreground">{text('localDates')}</p>
+        <div className="mcal-nav" role="group" aria-label={text('calendar')}>
+          {([-12, -1, 0, 1, 12] as const).map(months => {
+            if (months === 0) return <strong key={months} className="mcal-month-title" aria-live="polite" aria-atomic="true">{monthTitle}</strong>
+            const next = moveCalendarSelection({ ...selection, year }, months, years)
+            const label = text(months === -12 ? 'previousYear' : months === -1 ? 'previousMonth' : months === 1 ? 'nextMonth' : 'nextYear')
+            return <button key={months} type="button" className="mcal-control mcal-nav-button" aria-label={label} title={label} disabled={!next} onClick={() => { if (next) select(next) }}>
+              <span aria-hidden="true">{months === -12 ? '«' : months === -1 ? '‹' : months === 1 ? '›' : '»'}</span>
+            </button>
+          })}
+        </div>
         <table className="mcal-grid">
           <caption>{venue.toUpperCase()} · {year}-{String(month).padStart(2, '0')}</caption>
           <thead><tr>{weekdays.map((label, i) => <th scope="col" key={i}>{label}</th>)}</tr></thead>
