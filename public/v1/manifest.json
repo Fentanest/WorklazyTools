@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
-  "generation_id": "MCAL-C-host-20261018T112229Z",
-  "created_at": "2026-10-18T12:05:40.866184+00:00",
-  "source_manifest_sha256": "2509bf41981fcea4faf78bd2208a3e654f112824152a44c30a2e116832118b71",
+  "generation_id": "MCAL-C-host-20261018T154312Z",
+  "created_at": "2026-10-18T16:17:41.335497+00:00",
+  "source_manifest_sha256": "dac6499d63e44e1d25e78f6b9505f052f1246ed7fed8c46f6a25477eadcf89af",
   "files": [
     {
       "path": "calendar-2026.json",
       "year": 2026,
-      "sha256": "0e4d71b64671148be8869d338993b2f08d8244ac862b880c31f948fd55af72d2",
-      "source_sha256": "e3ae120217c6179a30dba0ff66d1d893214b2778fd172acc7d1b2528f446f3bf"
+      "sha256": "a39d292965bba436602e7a0dc951dd556ee1541d1b32c7a9fbf9734666cfa8cc",
+      "source_sha256": "2a903cea4db7b7cd1e724faa7075f5b6635555dce8fc9137550aebb864dd5194"
     },
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "f3b2892663813f6f70e9eecfb024e6199870190ac6ced352e6f9a84b7732a92a",
-      "source_sha256": "04558b800f3ef500e20738971540bfad9291e43e6f4d95814ce24cea575e2bfb"
+      "sha256": "2c92b12501f9a4efc7c309ec4ff4e3cf9605014cb03b7ab281c2bbd293f5d1d8",
+      "source_sha256": "f1863573ddfb8d519b73fe973348bd1481cff35cee08de1b1d1c0423e30800ed"
     }
   ],
   "scopes": [
@@ -22,8 +22,8 @@
       "venue": "krx",
       "year": 2026,
       "included": true,
-      "evidence_generation": "d29330a51cf4d2bb6c5c127d2ea09aaba8a36a08c9d9bab900e3d5f1886d8681",
-      "last_checked_at": "2026-10-18T11:33:37.019668+00:00",
+      "evidence_generation": "f586c446a36d692ed62d6ef24c56f1179393a52a353abf29b5c4fa2971e1ffed",
+      "last_checked_at": "2026-10-18T15:52:44.373982+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -31,8 +31,8 @@
       "venue": "nasdaq",
       "year": 2026,
       "included": true,
-      "evidence_generation": "65957633a0bda12413b8af6fb7998b96b5a0b0821d1cd787f1f7672a9947a949",
-      "last_checked_at": "2026-10-18T11:33:37.019668+00:00",
+      "evidence_generation": "849af27c799de47b7fa218a5492d3692ea13a7b734bcda4167973db2b21e6b7d",
+      "last_checked_at": "2026-10-18T15:52:44.373982+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -40,8 +40,8 @@
       "venue": "nxt",
       "year": 2026,
       "included": true,
-      "evidence_generation": "b898a253a7b5f8fe3193600d48b77aa8737aa3febc0510cc51724b63d3c1c5b8",
-      "last_checked_at": "2026-10-18T11:33:37.019668+00:00",
+      "evidence_generation": "895641c3f97220257712060c41fc04e072c3f53eee138a0f818c51e0f714f998",
+      "last_checked_at": "2026-10-18T15:52:44.373982+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -50,7 +50,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-18T11:33:37.019668+00:00",
+      "last_checked_at": "2026-10-18T15:52:44.373982+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -58,8 +58,8 @@
       "venue": "krx",
       "year": 2027,
       "included": true,
-      "evidence_generation": "fe23a2c257ef0b105dcf7b5f3f8b37806dc05be703988f1ca2d57719ec0ee566",
-      "last_checked_at": "2026-10-18T11:33:37.019668+00:00",
+      "evidence_generation": "7901a67ba8ec5e9c7148551eb5cc1735bedeb9cf70ad1d74fbfe369e7c9c76b8",
+      "last_checked_at": "2026-10-18T15:52:44.373982+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -68,7 +68,7 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-18T11:33:37.019668+00:00",
+      "last_checked_at": "2026-10-18T15:52:44.373982+00:00",
       "validity": "held",
       "reason": "nasdaq-2027-annual"
     },
@@ -77,7 +77,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-10-18T11:33:37.019668+00:00",
+      "last_checked_at": "2026-10-18T15:52:44.373982+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -86,7 +86,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-18T11:33:37.019668+00:00",
+      "last_checked_at": "2026-10-18T15:52:44.373982+00:00",
       "validity": "valid",
       "reason": null
     }
