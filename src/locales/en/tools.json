@@ -372,6 +372,17 @@
         "One DOCX per row",
         "Sample and result reports"
       ]
+    },
+    "market-calendar": {
+      "title": "Official market calendar",
+      "shortTitle": "Official market calendar",
+      "description": "Browse published schedules for KRX, NXT, NYSE and Nasdaq. Select a date for local session times and official sources.",
+      "eyebrow": "Market schedules · Official sources",
+      "highlights": [
+        "Monthly calendar",
+        "Local session times",
+        "Official sources"
+      ]
     }
   }
 }

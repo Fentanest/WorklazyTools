@@ -2405,5 +2405,29 @@
         "5"
       ]
     }
+  },
+  "market-calendar": {
+    "title": "Market calendar guide",
+    "description": "View the published schedule. Choose an exchange, year and month, then select a date.",
+    "blocks": [
+      {
+        "title": "Unknown and missing data",
+        "paragraphs": [
+          "Unknown dates retain the published reason, such as an unpublished announcement, conflicting decisions or insufficient evidence. Missing dates are not inferred to be open or closed."
+        ]
+      },
+      {
+        "title": "Freshness and timezones",
+        "paragraphs": [
+          "Dates and sessions use the exchange’s local timezone, shown beside each session. Warnings flag checks older than 48 hours, stale data and held publication. Reload fetches the currently published edition."
+        ]
+      }
+    ],
+    "faq": {
+      "source": {
+        "q": "Does this page calculate market holidays?",
+        "a": "No. The calendar displays the published structured data: open, closed or unknown status, sessions, reasons and official sources."
+      }
+    }
   }
 }

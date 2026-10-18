@@ -2866,5 +2866,38 @@
       "failed": "Failed",
       "canceled": "Canceled"
     }
+  },
+  "marketCalendar": {
+    "eyebrow": "Market schedules · Official sources",
+    "title": "Official market calendar",
+    "description": "Browse published schedules for KRX, NXT, NYSE and Nasdaq. Select a date for local session times and official sources.",
+    "reload": "Reload published data",
+    "calendar": "Monthly market schedule",
+    "venue": "Exchange",
+    "year": "Year",
+    "month": "Month",
+    "open": "Open",
+    "closed": "Closed",
+    "unknown": "Unknown",
+    "missing": "No data",
+    "loading": "Loading data",
+    "empty": "No published market calendar is available.",
+    "error": "The data could not be loaded or verified. Try reloading later.",
+    "stale": "This exchange and year need rechecking (stale).",
+    "held": "Publication for this exchange and year is on hold (held).",
+    "old": "Old data: more than 48 hours since the last check.",
+    "missingScope": "No published data for this exchange and year.",
+    "localDates": "Dates use the exchange’s local calendar",
+    "special": "Special day",
+    "reason": "Reason",
+    "sessions": "Session times (local timezone)",
+    "noSessions": "No session times in the publication.",
+    "notes": "Publication notes",
+    "sources": "Official sources",
+    "noSources": "No source links in the publication.",
+    "quote": "View source excerpt",
+    "published": "Published at",
+    "generation": "Generation",
+    "checked": "Last checked at"
   }
 }

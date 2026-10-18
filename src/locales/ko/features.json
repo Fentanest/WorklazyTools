@@ -2859,5 +2859,38 @@
       "failed": "실패",
       "canceled": "취소"
     }
+  },
+  "marketCalendar": {
+    "eyebrow": "거래 일정 · 공식 근거",
+    "title": "공식 거래 달력",
+    "description": "KRX·NXT·NYSE·Nasdaq의 발행된 일정을 월 달력으로 확인하세요. 날짜를 선택하면 현지 세션 시각과 공식 근거가 표시됩니다.",
+    "reload": "게시된 자료 다시 불러오기",
+    "calendar": "월별 거래 일정",
+    "venue": "거래소",
+    "year": "연도",
+    "month": "월",
+    "open": "개장",
+    "closed": "휴장",
+    "unknown": "미확인",
+    "missing": "자료 없음",
+    "loading": "자료 불러오는 중",
+    "empty": "게시된 거래 달력 자료가 없습니다.",
+    "error": "자료를 불러오거나 확인하지 못했습니다. 잠시 후 다시 불러오세요.",
+    "stale": "이 거래소·연도 자료는 재확인이 필요합니다 (stale).",
+    "held": "이 거래소·연도 자료는 발행 보류 상태입니다 (held).",
+    "old": "오래된 자료: 마지막 확인 이후 48시간이 지났습니다.",
+    "missingScope": "이 거래소·연도에 공개된 자료가 없습니다.",
+    "localDates": "날짜는 거래소 현지 기준입니다",
+    "special": "특수일",
+    "reason": "사유",
+    "sessions": "세션 시각 (현지 시간대)",
+    "noSessions": "발행본에 세션 시각이 없습니다.",
+    "notes": "발행본 참고 사항",
+    "sources": "공식 근거",
+    "noSources": "발행본에 근거 링크가 없습니다.",
+    "quote": "근거 원문 보기",
+    "published": "발행 시각",
+    "generation": "발행 세대",
+    "checked": "마지막 확인 시각"
   }
 }

@@ -1,0 +1,26 @@
+.market-calendar .mcal-controls { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+.market-calendar label { display: flex; align-items: center; gap: .5rem; }
+.market-calendar .mcal-control { border: 1px solid var(--border); border-radius: .65rem; padding: .6rem .8rem; background: var(--card); color: var(--foreground); min-height: 44px; }
+.market-calendar button, .market-calendar select, .market-calendar summary { cursor: pointer; }
+.market-calendar :is(button, select, a, summary):focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+.market-calendar .mcal-warning { border-left: 4px solid var(--primary); padding: .75rem; margin-bottom: .75rem; background: var(--muted); overflow-wrap: anywhere; }
+.market-calendar .mcal-grid { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.market-calendar caption { text-align: left; font-weight: 700; padding-bottom: .8rem; }
+.market-calendar th { font-size: .85rem; padding: .5rem 0; color: var(--muted-foreground); }
+.market-calendar td { border: 1px solid var(--border); padding: 2px; vertical-align: top; }
+.market-calendar .mcal-day { width: 100%; min-height: 80px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; border-radius: .5rem; }
+.market-calendar .mcal-day span { font-size: .8rem; }
+.market-calendar .mcal-open { background: var(--brand-soft); color: var(--brand-on-bg); }
+.market-calendar .mcal-closed { background: var(--muted); }
+.market-calendar .mcal-unknown { border: 1px dashed var(--foreground); }
+.market-calendar .mcal-day[aria-pressed="true"] { outline: 2px solid var(--primary); outline-offset: -2px; }
+.market-calendar .mcal-special { line-height: .5; }
+.market-calendar :is(.mcal-detail, .mcal-metadata) { overflow-wrap: anywhere; }
+.market-calendar .mcal-detail h3 { font-weight: 700; }
+.market-calendar .mcal-detail a { color: var(--brand-on-bg); text-decoration: underline; }
+.market-calendar blockquote { white-space: pre-wrap; margin-top: .5rem; max-height: 18rem; overflow: auto; }
+@media (max-width: 480px) {
+  .market-calendar .mcal-day { min-height: 65px; }
+  .market-calendar .mcal-day span { font-size: .65rem; }
+  .market-calendar .ui-section-card { padding: .75rem; }
+}

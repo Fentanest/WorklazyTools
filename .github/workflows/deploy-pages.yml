@@ -168,6 +168,20 @@ jobs:
       - name: Validate deployed FolioTrace contract and HTML
         run: node --experimental-strip-types scripts/validate-foliotrace-snapshot.mjs dist
 
+      - name: Checkout published market calendar
+        id: market-calendar
+        continue-on-error: true # Calendar availability must not block the site.
+        uses: actions/checkout@v4
+        with:
+          ref: market-calendar-data
+          path: market-calendar-state
+          persist-credentials: false
+
+      - name: Copy verified market calendar
+        if: steps.market-calendar.outcome == 'success'
+        continue-on-error: true # Missing or mismatched data leaves the calendar unavailable.
+        run: python3 scripts/copy-market-calendar.py market-calendar-state/public/v1 dist/data/market-calendar/v1
+
       - name: Run unit tests
         run: npm run test:unit
 
