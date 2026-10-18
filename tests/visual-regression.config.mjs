@@ -17,6 +17,7 @@ export const visualRegressionConfig = Object.freeze({
     clock: Object.freeze({
       isoTime: "2026-09-05T03:00:00.000Z",
       toolReasons: Object.freeze({
+        "market-calendar": "The initial year/month and the 48-hour freshness warning use the current date and Date.now().",
         "timezone-calculator": "Initial date/time, world clocks and current-time action use DateTime.now().",
         "work-calculator": "Business dates, annual-leave reference date and hire year default to today.",
         "payroll-calculator": "The retirement reference date defaults to today, including before its mode is selected.",

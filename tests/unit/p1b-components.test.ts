@@ -27,6 +27,7 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
     "hwp-editor/HwpEditorPage.tsx",
     "image-privacy/ImagePrivacyPage.tsx",
     "image-studio/ImageStudioPage.tsx",
+    "market-calendar/MarketCalendarPage.tsx",
     "office-editor/OfficeEditorAppPage.tsx",
     "office-editor/OfficeEditorPage.tsx",
     "payroll-calculator/PayrollCalculatorPage.tsx",

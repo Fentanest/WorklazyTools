@@ -53,6 +53,7 @@ const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, ko
 const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
   "product-banner",
+  "market-calendar",
   "document-redactor",
   "document-generator",
   "text-formatter",
@@ -889,6 +890,7 @@ export const interactionCoveredToolIds = Object.freeze(Object.keys(interactionDe
 
 export const interactionNotApplicableReasons = Object.freeze({
   "foliotrace": "Its published-data search, sorting, and detail states require a synthetic static dataset; they are reviewed in the isolated FolioTrace preview rather than the generic empty-route visual harness.",
+  "market-calendar": "Venue, year, month, and day interactions require a published manifest and SHA-256-matched calendar files. The generic empty-route fixture DSL cannot supply this dataset; loaded-calendar interactions remain in the dedicated MCAL-7 fixture review.",
   "document-generator": "Its multi-file DOCX/XLSX generation states use the dedicated synthetic U7 UI harness because the generic visual fixture DSL cannot express the paired template and data inputs.",
   "pdf-compare": "Its paired PDF run, mapping, preview, cancellation, rerun, replacement, and report states use the dedicated synthetic U8 UI harness because the generic visual fixture DSL cannot express two related file inputs and output reopening.",
 });

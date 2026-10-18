@@ -43,11 +43,12 @@ test("visual Date ignores host day/year changes and preserves explicit dates and
   }
 });
 
-test("all states and QA profiles of the three calendar tools and PDF finish receive the same pre-navigation clock", async () => {
-  const clockedTools = ["payroll-calculator", "pdf-editor", "timezone-calculator", "work-calculator"];
+test("all states and QA profiles of the four calendar tools and PDF finish receive the same pre-navigation clock", async () => {
+  const clockedTools = ["market-calendar", "payroll-calculator", "pdf-editor", "timezone-calculator", "work-calculator"];
   assert.deepEqual(Object.keys(clock.toolReasons).sort(), clockedTools);
   // Three conversion states moved to pdf-converter and do not use a date token.
-  for (const [scenarios, expectedScenarios, expectedCaptures] of [[visualRegressionConfig.scenarios, 21, 92], [qaCaptureScenarios, 12, 96]] as const) {
+  // Market Calendar adds initial/bottom states: 6 visual and 16 QA captures.
+  for (const [scenarios, expectedScenarios, expectedCaptures] of [[visualRegressionConfig.scenarios, 23, 98], [qaCaptureScenarios, 14, 112]] as const) {
     let fixedScenarios = 0;
     let fixedCaptures = 0;
     for (const scenario of scenarios) {
