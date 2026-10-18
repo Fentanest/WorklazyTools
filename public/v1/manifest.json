@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
-  "generation_id": "MCAL-C-host-20261018T082718Z",
-  "created_at": "2026-10-18T09:11:19.702682+00:00",
-  "source_manifest_sha256": "db6cb51e42e436d0a9029824b87b86d2236107a65fae9c95c67e5b3bf6beb351",
+  "generation_id": "MCAL-C-host-20261018T092441Z",
+  "created_at": "2026-10-18T10:15:33.324613+00:00",
+  "source_manifest_sha256": "f0c71ce3f94359f9bf966b200975c82eb7e7d05a6a341f3050436a3c6ab194f0",
   "files": [
     {
       "path": "calendar-2026.json",
       "year": 2026,
-      "sha256": "5dde2534cee570ea46faa5fd084aa1a869228748909065b3b2c1a1d7a6c3fc17",
-      "source_sha256": "a470a7f116f03933f2081b3a3a95ca2a788699511665355c0408bf481da45e18"
+      "sha256": "3c6cdc74069d1de2bdd7efeca2a909e145aa0f3088630ed8b26fad985d8d610d",
+      "source_sha256": "a349e17c82cd8086cc414355d28a2b0bc0524c8437150be4d0e1a3000c8ad1fc"
     },
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "460f367c12c75fb282b6ac1212e1141f027ca763cda43763de063214da1e1fcd",
-      "source_sha256": "bca4f37d8ee1e2ecf3ba3c37fafb59082bbca56d42d0c567878f8ec03333f992"
+      "sha256": "b387fa6e904c28170b29100e10feca5262a942dfe05ae8ef766280a27e3fce5f",
+      "source_sha256": "3b8fbd5f5dd705ffcda76bd6dbf28bde56f562b11401797b6fce9de6e7119935"
     }
   ],
   "scopes": [
@@ -23,7 +23,7 @@
       "year": 2026,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
       "validity": "stale",
       "reason": "collection:krx-kospi-2026-year_open; collection:krx-kospi-2026-exam; collection:krx-kospi-2026-year_end; collection:krx-kospi-2026-temporary_change; collection:krx-kosdaq-2026-exam; collection:krx-kosdaq-2026-year_end; collection:krx-kosdaq-2026-temporary_change"
     },
@@ -31,8 +31,8 @@
       "venue": "nasdaq",
       "year": 2026,
       "included": true,
-      "evidence_generation": "74a344c5e25b80edbb66557b93f04f39a289a2e3bc1cbe1eede77842eb643198",
-      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "evidence_generation": "3c91c27bfa1db85d87cdb6e2eeb132097fd3c1f5b7fbbcf03650e079580e67f7",
+      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -40,8 +40,8 @@
       "venue": "nxt",
       "year": 2026,
       "included": true,
-      "evidence_generation": "b68a7a3cb7068642a93566b5bce15a7b796b1ce6ab68dc955a6ac19dd012f85a",
-      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "evidence_generation": "9f5d68c9abc07d61709c131d583bf040013149a87e34c7f9be509b4c489d7b46",
+      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -50,7 +50,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -59,7 +59,7 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
       "validity": "stale",
       "reason": "collection:krx-kospi-2027-year_open; collection:krx-kospi-2027-exam; collection:krx-kospi-2027-year_end; collection:krx-kospi-2027-temporary_change; collection:krx-kospi-2027-special_closure; collection:krx-kosdaq-2027-year_open; collection:krx-kosdaq-2027-exam; collection:krx-kosdaq-2027-year_end; collection:krx-kosdaq-2027-temporary_change; collection:krx-kosdaq-2027-special_closure"
     },
@@ -68,7 +68,7 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
       "validity": "held",
       "reason": "nasdaq-2027-annual"
     },
@@ -77,7 +77,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -86,7 +86,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
       "validity": "valid",
       "reason": null
     }
