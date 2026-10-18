@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "generation_id": "MCAL-C-host-20261018T071912Z",
+  "created_at": "2026-10-18T07:47:47.584831+00:00",
+  "source_manifest_sha256": "8b2431af6ea59fb142727ba92d48089ade898fb2baca6b7ca372ff69f5667e14",
+  "files": [
+    {
+      "path": "calendar-2026.json",
+      "year": 2026,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "calendar-2027.json",
+      "year": 2027,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "scopes": [
+    {
+      "venue": "krx",
+      "year": 2026,
+      "included": false,
+      "evidence_generation": null,
+      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "validity": "stale",
+      "reason": "collection:krx-kospi-2026-year_open; collection:krx-kospi-2026-exam; collection:krx-kospi-2026-year_end; collection:krx-kospi-2026-temporary_change; collection:krx-kosdaq-2026-exam; collection:krx-kosdaq-2026-year_end; collection:krx-kosdaq-2026-temporary_change; collection:collection_not_refreshed"
+    },
+    {
+      "venue": "nasdaq",
+      "year": 2026,
+      "included": false,
+      "evidence_generation": null,
+      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "validity": "stale",
+      "reason": "collection:collection_not_refreshed"
+    },
+    {
+      "venue": "nxt",
+      "year": 2026,
+      "included": false,
+      "evidence_generation": null,
+      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "validity": "stale",
+      "reason": "collection:collection_not_refreshed"
+    },
+    {
+      "venue": "nyse",
+      "year": 2026,
+      "included": false,
+      "evidence_generation": null,
+      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "validity": "stale",
+      "reason": "collection:collection_not_refreshed"
+    },
+    {
+      "venue": "krx",
+      "year": 2027,
+      "included": false,
+      "evidence_generation": null,
+      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "validity": "stale",
+      "reason": "collection:krx-kospi-2027-year_open; collection:krx-kospi-2027-exam; collection:krx-kospi-2027-year_end; collection:krx-kospi-2027-temporary_change; collection:krx-kospi-2027-special_closure; collection:krx-kosdaq-2027-year_open; collection:krx-kosdaq-2027-exam; collection:krx-kosdaq-2027-year_end; collection:krx-kosdaq-2027-temporary_change; collection:krx-kosdaq-2027-special_closure; collection:collection_not_refreshed"
+    },
+    {
+      "venue": "nasdaq",
+      "year": 2027,
+      "included": false,
+      "evidence_generation": null,
+      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "validity": "held",
+      "reason": "nasdaq-2027-annual; collection:collection_not_refreshed"
+    },
+    {
+      "venue": "nxt",
+      "year": 2027,
+      "included": false,
+      "evidence_generation": null,
+      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "validity": "stale",
+      "reason": "collection:collection_not_refreshed"
+    },
+    {
+      "venue": "nyse",
+      "year": 2027,
+      "included": false,
+      "evidence_generation": null,
+      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "validity": "stale",
+      "reason": "collection:collection_not_refreshed"
+    }
+  ]
+}
