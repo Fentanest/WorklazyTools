@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
-  "generation_id": "MCAL-C-host-20261018T071912Z",
-  "created_at": "2026-10-18T07:47:47.584831+00:00",
-  "source_manifest_sha256": "8b2431af6ea59fb142727ba92d48089ade898fb2baca6b7ca372ff69f5667e14",
+  "generation_id": "MCAL-C-host-20261018T082718Z",
+  "created_at": "2026-10-18T09:11:19.702682+00:00",
+  "source_manifest_sha256": "db6cb51e42e436d0a9029824b87b86d2236107a65fae9c95c67e5b3bf6beb351",
   "files": [
     {
       "path": "calendar-2026.json",
       "year": 2026,
-      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
-      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      "sha256": "5dde2534cee570ea46faa5fd084aa1a869228748909065b3b2c1a1d7a6c3fc17",
+      "source_sha256": "a470a7f116f03933f2081b3a3a95ca2a788699511665355c0408bf481da45e18"
     },
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
-      "source_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      "sha256": "460f367c12c75fb282b6ac1212e1141f027ca763cda43763de063214da1e1fcd",
+      "source_sha256": "bca4f37d8ee1e2ecf3ba3c37fafb59082bbca56d42d0c567878f8ec03333f992"
     }
   ],
   "scopes": [
@@ -23,72 +23,72 @@
       "year": 2026,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
       "validity": "stale",
-      "reason": "collection:krx-kospi-2026-year_open; collection:krx-kospi-2026-exam; collection:krx-kospi-2026-year_end; collection:krx-kospi-2026-temporary_change; collection:krx-kosdaq-2026-exam; collection:krx-kosdaq-2026-year_end; collection:krx-kosdaq-2026-temporary_change; collection:collection_not_refreshed"
+      "reason": "collection:krx-kospi-2026-year_open; collection:krx-kospi-2026-exam; collection:krx-kospi-2026-year_end; collection:krx-kospi-2026-temporary_change; collection:krx-kosdaq-2026-exam; collection:krx-kosdaq-2026-year_end; collection:krx-kosdaq-2026-temporary_change"
     },
     {
       "venue": "nasdaq",
       "year": 2026,
-      "included": false,
-      "evidence_generation": null,
-      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
-      "validity": "stale",
-      "reason": "collection:collection_not_refreshed"
+      "included": true,
+      "evidence_generation": "74a344c5e25b80edbb66557b93f04f39a289a2e3bc1cbe1eede77842eb643198",
+      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "validity": "valid",
+      "reason": null
     },
     {
       "venue": "nxt",
       "year": 2026,
-      "included": false,
-      "evidence_generation": null,
-      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
-      "validity": "stale",
-      "reason": "collection:collection_not_refreshed"
+      "included": true,
+      "evidence_generation": "b68a7a3cb7068642a93566b5bce15a7b796b1ce6ab68dc955a6ac19dd012f85a",
+      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "validity": "valid",
+      "reason": null
     },
     {
       "venue": "nyse",
       "year": 2026,
-      "included": false,
-      "evidence_generation": null,
-      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
-      "validity": "stale",
-      "reason": "collection:collection_not_refreshed"
+      "included": true,
+      "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
+      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "validity": "valid",
+      "reason": null
     },
     {
       "venue": "krx",
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
       "validity": "stale",
-      "reason": "collection:krx-kospi-2027-year_open; collection:krx-kospi-2027-exam; collection:krx-kospi-2027-year_end; collection:krx-kospi-2027-temporary_change; collection:krx-kospi-2027-special_closure; collection:krx-kosdaq-2027-year_open; collection:krx-kosdaq-2027-exam; collection:krx-kosdaq-2027-year_end; collection:krx-kosdaq-2027-temporary_change; collection:krx-kosdaq-2027-special_closure; collection:collection_not_refreshed"
+      "reason": "collection:krx-kospi-2027-year_open; collection:krx-kospi-2027-exam; collection:krx-kospi-2027-year_end; collection:krx-kospi-2027-temporary_change; collection:krx-kospi-2027-special_closure; collection:krx-kosdaq-2027-year_open; collection:krx-kosdaq-2027-exam; collection:krx-kosdaq-2027-year_end; collection:krx-kosdaq-2027-temporary_change; collection:krx-kosdaq-2027-special_closure"
     },
     {
       "venue": "nasdaq",
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
+      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
       "validity": "held",
-      "reason": "nasdaq-2027-annual; collection:collection_not_refreshed"
+      "reason": "nasdaq-2027-annual"
     },
     {
       "venue": "nxt",
       "year": 2027,
-      "included": false,
-      "evidence_generation": null,
-      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
-      "validity": "stale",
-      "reason": "collection:collection_not_refreshed"
+      "included": true,
+      "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
+      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "validity": "valid",
+      "reason": null
     },
     {
       "venue": "nyse",
       "year": 2027,
-      "included": false,
-      "evidence_generation": null,
-      "last_checked_at": "2026-10-18T07:19:12.473664+00:00",
-      "validity": "stale",
-      "reason": "collection:collection_not_refreshed"
+      "included": true,
+      "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
+      "last_checked_at": "2026-10-18T08:49:27.773504+00:00",
+      "validity": "valid",
+      "reason": null
     }
   ]
 }
