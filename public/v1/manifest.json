@@ -1,38 +1,38 @@
 {
   "schema_version": 1,
-  "generation_id": "MCAL-C-host-20261018T092441Z",
-  "created_at": "2026-10-18T10:15:33.324613+00:00",
-  "source_manifest_sha256": "f0c71ce3f94359f9bf966b200975c82eb7e7d05a6a341f3050436a3c6ab194f0",
+  "generation_id": "MCAL-C-host-20261018T102635Z",
+  "created_at": "2026-10-18T11:11:13.224129+00:00",
+  "source_manifest_sha256": "4529766cdc457fee9c67f187e5baff7ec95b8689e781aa935ad747907081db73",
   "files": [
     {
       "path": "calendar-2026.json",
       "year": 2026,
-      "sha256": "3c6cdc74069d1de2bdd7efeca2a909e145aa0f3088630ed8b26fad985d8d610d",
-      "source_sha256": "a349e17c82cd8086cc414355d28a2b0bc0524c8437150be4d0e1a3000c8ad1fc"
+      "sha256": "eedd66d0002775e98aaf77e85e449fbbd525ca27c37cfe4d63e05926b1ed9c2a",
+      "source_sha256": "772a0ab2c5e1caf6ae23b8a5fcc5ad5ae32643f7abc9059f7a99b2a06a1a6ae9"
     },
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "b387fa6e904c28170b29100e10feca5262a942dfe05ae8ef766280a27e3fce5f",
-      "source_sha256": "3b8fbd5f5dd705ffcda76bd6dbf28bde56f562b11401797b6fce9de6e7119935"
+      "sha256": "6995491220494bb78b86fd91993f3f198f0be8edbce537a194bb11d474032414",
+      "source_sha256": "c3a2c597fc79c289ef1f84132738ee7ff96be26591d8f536deee3f9af1152f6a"
     }
   ],
   "scopes": [
     {
       "venue": "krx",
       "year": 2026,
-      "included": false,
-      "evidence_generation": null,
-      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
-      "validity": "stale",
-      "reason": "collection:krx-kospi-2026-year_open; collection:krx-kospi-2026-exam; collection:krx-kospi-2026-year_end; collection:krx-kospi-2026-temporary_change; collection:krx-kosdaq-2026-exam; collection:krx-kosdaq-2026-year_end; collection:krx-kosdaq-2026-temporary_change"
+      "included": true,
+      "evidence_generation": "f586c446a36d692ed62d6ef24c56f1179393a52a353abf29b5c4fa2971e1ffed",
+      "last_checked_at": "2026-10-18T10:45:10.705605+00:00",
+      "validity": "valid",
+      "reason": null
     },
     {
       "venue": "nasdaq",
       "year": 2026,
       "included": true,
-      "evidence_generation": "3c91c27bfa1db85d87cdb6e2eeb132097fd3c1f5b7fbbcf03650e079580e67f7",
-      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
+      "evidence_generation": "65957633a0bda12413b8af6fb7998b96b5a0b0821d1cd787f1f7672a9947a949",
+      "last_checked_at": "2026-10-18T10:45:10.705605+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -40,8 +40,8 @@
       "venue": "nxt",
       "year": 2026,
       "included": true,
-      "evidence_generation": "9f5d68c9abc07d61709c131d583bf040013149a87e34c7f9be509b4c489d7b46",
-      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
+      "evidence_generation": "f59c8f8d57c52388dc0cde15c4a9c3314c22ea32dec3bc6c13f417da1e5bd810",
+      "last_checked_at": "2026-10-18T10:45:10.705605+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -50,25 +50,25 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
+      "last_checked_at": "2026-10-18T10:45:10.705605+00:00",
       "validity": "valid",
       "reason": null
     },
     {
       "venue": "krx",
       "year": 2027,
-      "included": false,
-      "evidence_generation": null,
-      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
-      "validity": "stale",
-      "reason": "collection:krx-kospi-2027-year_open; collection:krx-kospi-2027-exam; collection:krx-kospi-2027-year_end; collection:krx-kospi-2027-temporary_change; collection:krx-kospi-2027-special_closure; collection:krx-kosdaq-2027-year_open; collection:krx-kosdaq-2027-exam; collection:krx-kosdaq-2027-year_end; collection:krx-kosdaq-2027-temporary_change; collection:krx-kosdaq-2027-special_closure"
+      "included": true,
+      "evidence_generation": "fe23a2c257ef0b105dcf7b5f3f8b37806dc05be703988f1ca2d57719ec0ee566",
+      "last_checked_at": "2026-10-18T10:45:10.705605+00:00",
+      "validity": "valid",
+      "reason": null
     },
     {
       "venue": "nasdaq",
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
+      "last_checked_at": "2026-10-18T10:45:10.705605+00:00",
       "validity": "held",
       "reason": "nasdaq-2027-annual"
     },
@@ -77,7 +77,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
+      "last_checked_at": "2026-10-18T10:45:10.705605+00:00",
       "validity": "valid",
       "reason": null
     },
@@ -86,7 +86,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-18T09:39:51.614774+00:00",
+      "last_checked_at": "2026-10-18T10:45:10.705605+00:00",
       "validity": "valid",
       "reason": null
     }
