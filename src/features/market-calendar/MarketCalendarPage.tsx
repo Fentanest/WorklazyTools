@@ -4,6 +4,7 @@ import { PageHeader, SectionCard } from '../../components/ui'
 import { ToolGuideWrapper } from '../../components/ToolGuideWrapper'
 import type { TranslationResources } from '../../i18n/resources'
 import { loadCalendar, isOld, sourceHref, venues, type Venue, type CalendarView } from './loadCalendar'
+import { groupSources, sessionNameKey, sortSessions } from './calendarDisplay'
 import './market-calendar.css'
 
 export function MarketCalendarPage() {
@@ -87,14 +88,17 @@ export function MarketCalendarPage() {
             {selected.special && <p>{text('special')}: {selected.special}</p>}
             {selected.reason && <p>{text('reason')}: {selected.reason}</p>}
             <h3>{text('sessions')}</h3>
-            {selected.sessions.length ? <ul>{selected.sessions.map((s, i) => <li key={i}>
-              <strong>{s.code}</strong> · {s.start}–{s.end} ({s.tz})
-            </li>)}</ul> : <p>{text('noSessions')}</p>}
+            {selected.sessions.length ? <ul>{sortSessions(selected.sessions).map((s, i) => {
+              const nameKey = sessionNameKey(venue, s.code)
+              return <li key={i}>
+                <strong>{nameKey ? text(nameKey) : s.code}</strong> · {s.start}–{s.end} ({s.tz})
+              </li>
+            })}</ul> : <p>{text('noSessions')}</p>}
             {selected.notes.length > 0 && <div><h3>{text('notes')}</h3><ul>{selected.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></div>}
             <h3>{text('sources')}</h3>
-            {selected.sources.length ? <ul className="space-y-2">{selected.sources.map((source, i) => <li key={i}>
+            {selected.sources.length ? <ul className="space-y-2">{groupSources(selected.sources).map(source => <li key={source.id}>
               {sourceHref(source.url) ? <a href={sourceHref(source.url)} target="_blank" rel="noopener noreferrer">{source.id} ↗</a> : <span>{source.id} · {source.url}</span>}
-              <details><summary>{text('quote')}</summary><blockquote>{source.quote}</blockquote></details>
+              <details><summary>{text('quote')}</summary>{source.quotes.map(quote => <blockquote key={quote}>{quote}</blockquote>)}</details>
             </li>)}</ul> : <p>{text('noSources')}</p>}
           </>}
         </div>

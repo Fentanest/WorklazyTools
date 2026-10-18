@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { loadCalendar, isOld, sourceHref } from '../../src/features/market-calendar/loadCalendar.ts'
+import { groupSources, sessionNameKey, sortSessions } from '../../src/features/market-calendar/calendarDisplay.ts'
 
 const row = { date: '20261119', venue: 'krx', status: 'unknown', sessions: [], special: null,
   sources: [{ id: 'weekend', url: 'urn:market-calendar:rule:weekend', quote: '주말' }], reason: '필수 expected 근거 미확보: krx-kospi-2026-exam', notes: [] }
@@ -9,6 +10,38 @@ const makeManifest = (payload: string) => ({ schema_version: 1, generation_id: '
   created_at: '2026-10-18T12:00:00Z', files: [{ path: 'calendar-2026.json', year: 2026,
     sha256: createHash('sha256').update(payload).digest('hex') }],
   scopes: [{ venue: 'krx', year: 2026, included: true, validity: 'valid', last_checked_at: '2026-10-18T11:00:00Z', reason: null }] })
+
+test('session display follows start times without changing publication order', () => {
+  const sessions = [
+    { code: 'closing_auction', start: '15:20:00', end: '15:30:00', tz: 'Asia/Seoul' },
+    { code: 'regular', start: '09:00:30', end: '15:20:00', tz: 'Asia/Seoul' },
+    { code: 'opening_auction', start: '08:30:00', end: '09:00:00', tz: 'Asia/Seoul' },
+  ]
+  const before = structuredClone(sessions)
+  assert.deepEqual(sortSessions(sessions).map(s => s.code), ['opening_auction', 'regular', 'closing_auction'])
+  assert.deepEqual(sessions, before)
+  assert.equal(sessionNameKey('krx', 'opening_auction'), 'openingAuction')
+  assert.equal(sessionNameKey('nxt', 'after'), 'afterMarket')
+  assert.equal(sessionNameKey('nyse', 'regular'), 'regularSession')
+  assert.equal(sessionNameKey('nasdaq', 'regular'), 'regularSession')
+  assert.equal(sessionNameKey('krx', 'unlisted'), undefined)
+  assert.equal(sessionNameKey('nxt', 'regular'), undefined)
+})
+
+test('source display groups each id once and retains its distinct original quotes', () => {
+  const sources = [
+    { id: 'krx-hours', url: 'https://example.com/krx', quote: 'Opening hours' },
+    { id: 'weekend', url: 'urn:market-calendar:rule:weekend', quote: '주말' },
+    { id: 'krx-hours', url: 'https://example.com/krx', quote: 'Closing hours' },
+    { id: 'krx-hours', url: 'https://example.com/krx', quote: 'Opening hours' },
+  ]
+  const before = structuredClone(sources)
+  assert.deepEqual(groupSources(sources), [
+    { id: 'krx-hours', url: 'https://example.com/krx', quotes: ['Opening hours', 'Closing hours'] },
+    { id: 'weekend', url: 'urn:market-calendar:rule:weekend', quotes: ['주말'] },
+  ])
+  assert.deepEqual(sources, before)
+})
 
 test('verified publication preserves unknown status and original reasons without inferring sessions', async t => {
   const reasons = ['공표 전', '판정 불일치', row.reason]

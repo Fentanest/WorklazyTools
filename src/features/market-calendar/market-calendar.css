@@ -12,7 +12,7 @@
 .market-calendar .mcal-day span { font-size: .8rem; }
 .market-calendar .mcal-open { background: var(--brand-soft); color: var(--brand-on-bg); }
 .market-calendar .mcal-closed { background: var(--muted); }
-.market-calendar .mcal-unknown { border: 1px dashed var(--foreground); }
+.market-calendar .mcal-unknown { background: var(--wl-warningBg); color: var(--wl-warningText); border: 1px dashed var(--wl-warningText); }
 .market-calendar .mcal-day[aria-pressed="true"] { outline: 2px solid var(--primary); outline-offset: -2px; }
 .market-calendar .mcal-special { line-height: .5; }
 .market-calendar :is(.mcal-detail, .mcal-metadata) { overflow-wrap: anywhere; }
