@@ -3,6 +3,7 @@ import { setAdIneligible } from '../../app/adEligibility'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader, SectionCard } from '../../components/ui'
+import { UtilityPage } from '../../components/UtilitySurface'
 import { ToolGuideWrapper } from '../../components/ToolGuideWrapper'
 import type { TranslationResources } from '../../i18n/resources'
 import { loadCalendar, isOld, sourceHref, venues, type Venue, type CalendarView } from './loadCalendar'
@@ -54,7 +55,7 @@ export function MarketCalendarPage() {
   const offset = new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
   const weekdays = Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(i18n.language, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 0, 4 + i))))
 
-  return <div data-tool-page="market-calendar" data-ad-unavailable={adIneligible ? true : undefined} className="market-calendar space-y-6">
+  return <UtilityPage toolId="market-calendar"><div data-ad-unavailable={adIneligible ? true : undefined} className="market-calendar space-y-6">
     <PageHeader eyebrow={text('eyebrow')} title={text('title')} description={text('description')}>
       <button className="mcal-control" onClick={() => {
         setAdIneligible('marketCalendarUnpublished', true)
@@ -125,5 +126,5 @@ export function MarketCalendarPage() {
       </div>
     </>}
     <ToolGuideWrapper slug="market-calendar" />
-  </div>
+  </div></UtilityPage>
 }
