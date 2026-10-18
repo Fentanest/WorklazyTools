@@ -1,20 +1,30 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
-import { installAdFirewall, createCounters, assertNoRealNetwork } from './helpers/ad-stub.mjs';
+import { installAdFirewall, createCounters, assertNoRealNetwork, ADSENSE_SCRIPT_URL, stubScriptBody } from './helpers/ad-stub.mjs';
 
-// Astra's seven-state regression. Every provider request is stubbed or blocked.
-// Run against a production preview: MCAL_ORIGIN=http://127.0.0.1:4427 node tests/market-calendar-ads-smoke.mjs
+// Seven publication states plus Astra's other-tool -> missing-calendar residue.
+// Every provider request is stubbed or blocked; the synthetic SDK renders an iframe.
 const origin = process.env.MCAL_ORIGIN || 'http://127.0.0.1:4427';
+const output = process.env.MCAL_OUTPUT_DIR || '.review-tmp/mcal-r2';
+await fs.mkdir(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.WORKLAZY_CHROME_PATH || '/usr/bin/google-chrome', headless: true, args: ['--no-sandbox'] });
 let passed = 0;
-const errors = [];
+const errors = [], observations = [];
 try {
-  for (const mode of ['ready', 'loading', 'missing', 'error', 'corrupt', 'empty', 'ready-to-missing']) {
+  for (const mode of ['ready', 'loading', 'missing', 'error', 'corrupt', 'empty', 'ready-to-missing', 'other-tool-to-missing']) {
     const context = await browser.newContext({ serviceWorkers: 'block' });
     const counters = createCounters();
     await installAdFirewall(context, origin, counters);
-    await context.addInitScript(() => { if (window === window.top) window.__WORKLAZY_MOCK_PROVIDERS__ = true; });
+    await context.route(ADSENSE_SCRIPT_URL, async route => {
+      counters.attempt++; counters.stub++;
+      await route.fulfill({ contentType: 'application/javascript', body: stubScriptBody() + `
+        const ad=document.createElement('iframe');ad.id='mcal-rendered-auto-ad';ad.className='google-auto-placed';
+        ad.title='Synthetic already rendered Auto Ad';ad.srcdoc='<body style="background:#ffe28a">Synthetic rendered ad</body>';
+        ad.style='position:fixed;right:20px;bottom:20px;width:300px;height:80px;z-index:9999';document.documentElement.append(ad);` });
+    });
+    await context.addInitScript(() => { if (window === window.top) { window.__WORKLAZY_MOCK_PROVIDERS__ = true; window.__mcalDocumentToken = crypto.randomUUID(); } });
     let release;
     const waiting = new Promise(resolve => { release = resolve; });
     let missing = false;
@@ -23,41 +33,59 @@ try {
     await context.route('**/data/market-calendar/v1/**', async route => {
       if (mode === 'loading') { await waiting; return route.abort().catch(() => {}); }
       if (mode === 'missing' || missing || mode === 'error') return route.fulfill({ status: mode === 'error' ? 500 : 404, body: '' });
-      const isManifest = route.request().url().endsWith('/manifest.json');
-      return route.fulfill({ status: 200, contentType: 'application/json', body: isManifest ? JSON.stringify(manifest) : payload + (mode === 'corrupt' ? ' ' : '') });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: route.request().url().endsWith('/manifest.json') ? JSON.stringify(manifest) : payload + (mode === 'corrupt' ? ' ' : '') });
     });
     const page = await context.newPage();
     page.on('pageerror', error => errors.push({ mode, message: String(error) }));
-    // Fixed date ensures the synthetic November data is the displayed month.
     await page.clock.install({ time: new Date('2026-11-19T12:00:00Z') });
+    const observe = async state => {
+      const value = await page.evaluate(() => ({ documentToken: window.__mcalDocumentToken, ads: document.querySelectorAll('script[data-worklazy-adsense]').length, renderedAds: document.querySelectorAll('#mcal-rendered-auto-ad, .wl-ad-stub-marker, .google-auto-placed').length, coupang: document.querySelectorAll('iframe.coupang-banner-frame').length, calendar: !!document.querySelector('.mcal-grid') }));
+      observations.push({ mode, state, ...value, attempts: counters.attempt });
+      return value;
+    };
     try {
-      await page.goto(`${origin}/en/tools/market-calendar/`);
-      await page.locator('[data-tool-page="market-calendar"]').waitFor();
-      if (mode === 'ready' || mode === 'ready-to-missing') {
-        await page.locator('.mcal-grid').waitFor();
-        await page.waitForFunction(() => Boolean(document.querySelector('script[data-worklazy-adsense]')));
+      const transition = mode === 'ready-to-missing' || mode === 'other-tool-to-missing';
+      await page.goto(`${origin}/en/tools/${mode === 'other-tool-to-missing' ? 'text-merger' : 'market-calendar'}/`);
+      if (mode !== 'other-tool-to-missing') await page.locator('[data-tool-page="market-calendar"]').waitFor();
+      let initial;
+      if (mode === 'ready' || transition) {
+        await page.locator('#mcal-rendered-auto-ad').waitFor();
+        initial = await observe('ad-bearing-document');
+        assert.ok(initial.renderedAds > 0);
+        if (mode !== 'other-tool-to-missing') await page.locator('.mcal-grid').waitFor();
       }
-      if (mode === 'ready-to-missing') {
+      if (transition) {
         missing = true;
-        await page.getByRole('button', { name: 'Reload published data' }).click();
+        if (mode === 'ready-to-missing') await page.getByRole('button', { name: 'Reload published data' }).click();
+        else await page.locator('aside a[href="/en/tools/market-calendar"]').click();
         await page.getByText('No published market calendar is available.', { exact: true }).waitFor();
+        await page.waitForFunction(token => window.__mcalDocumentToken !== token, initial.documentToken);
       }
       await page.waitForTimeout(650);
-      const ads = await page.locator('script[data-worklazy-adsense]').count();
-      const pause = await page.evaluate(() => window.adsbygoogle?.pauseAdRequests ?? null);
-      if (mode === 'ready') { assert.equal(ads, 1); assert.equal(counters.attempt, 1); }
-      else if (mode === 'ready-to-missing') {
-        assert.ok(ads === 0 || pause === 1, 'loaded Auto Ads must be paused after publication disappears');
-        assert.equal(await page.locator('iframe.coupang-banner-frame').count(), 0);
-        assert.equal(counters.attempt, 1, 'no new ad script request after failure');
-      } else { assert.equal(counters.attempt, 0, `${mode} must not request ads`); assert.equal(ads, 0); }
+      const current = await observe('settled');
+      if (mode === 'ready') { assert.equal(current.ads, 1); assert.ok(current.renderedAds > 0); assert.equal(counters.attempt, 1); }
+      else {
+        assert.equal(current.ads, 0, `${mode}: script must be removed, pause is insufficient`);
+        assert.equal(current.renderedAds, 0, `${mode}: rendered iframe and SDK residue must be removed`);
+        assert.equal(current.coupang, 0);
+        assert.equal(counters.attempt, transition ? 1 : 0, 'no new ad script request in unavailable state');
+        if (transition) {
+          assert.notEqual(current.documentToken, initial.documentToken, 'common document transition must remove SDK callbacks and ads');
+          await page.screenshot({ path: `${output}/ad-residue-${mode}.png`, fullPage: true });
+          missing = false;
+          await page.getByRole('button', { name: 'Reload published data' }).click();
+          await page.locator('.mcal-grid').waitFor(); await page.locator('#mcal-rendered-auto-ad').waitFor();
+          assert.equal(counters.attempt, 2, 'recovered valid calendar permits ads again');
+          await observe('recovered');
+        }
+      }
       assertNoRealNetwork(counters, mode);
       assert.equal(errors.length, 0, JSON.stringify(errors));
       console.log(`ok ${++passed} - ${mode}`);
-    } finally {
-      release();
-      await context.close();
-    }
+    } finally { release(); await context.close(); }
   }
-} finally { await browser.close(); }
+} finally {
+  await browser.close();
+  await fs.writeFile(`${output}/ad-residue.json`, JSON.stringify({ observations, errors, passed }, null, 2));
+}
 console.log(`1..${passed}\n# tests ${passed}\n# pass ${passed}\n# fail 0`);

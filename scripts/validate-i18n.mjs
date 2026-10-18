@@ -1,10 +1,11 @@
 import fs from "fs";
 import path from "path";
+import { hasPublicationTextMapping } from '../src/features/market-calendar/calendarDisplay.ts';
 
 const langs = ["ko", "en"];
 let hasError = false;
 const publicationCopy = JSON.parse(fs.readFileSync('src/features/market-calendar/publicationCopy.json', 'utf8'));
-const publicationKeys = [...Object.values(publicationCopy.exact), ...Object.values(publicationCopy.prefix), 'publicationUntranslated', 'otherSession'];
+const publicationKeys = [...Object.values(publicationCopy.exact), ...Object.values(publicationCopy.prefix), ...publicationCopy.patterns.map(p => p.key), 'specialPublicationDetail', 'reasonPublicationDetail', 'notePublicationDetail', 'scopePublicationDetail', 'otherSession'];
 for (const code of ['special_expected', 'forced_unknown', 'early_close', 'year_open']) {
   if (!publicationCopy.exact[code]) {
     console.error(`Market calendar publication code '${code}' has no display mapping`);
@@ -68,7 +69,7 @@ if (process.env.WORKLAZY_MCAL_DATA_DIR) {
     for (const row of rows) values.push(...[row.special, row.reason, ...row.notes].filter(Boolean));
   }
   for (const value of new Set(values)) {
-    if (!publicationCopy.exact[value] && !Object.keys(publicationCopy.prefix).some(prefix => value.startsWith(prefix))) {
+    if (!hasPublicationTextMapping(value)) {
       console.error(`Market calendar publication text has no translation mapping: ${value}`);
       hasError = true;
     }

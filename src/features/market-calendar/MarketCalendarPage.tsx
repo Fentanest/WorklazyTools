@@ -49,7 +49,7 @@ export function MarketCalendarPage() {
   const offset = new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
   const weekdays = Array.from({ length: 7 }, (_, i) => new Intl.DateTimeFormat(i18n.language, { weekday: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2026, 0, 4 + i))))
 
-  return <div data-tool-page="market-calendar" className="market-calendar space-y-6">
+  return <div data-tool-page="market-calendar" data-ad-unavailable={adIneligible ? true : undefined} className="market-calendar space-y-6">
     <PageHeader eyebrow={text('eyebrow')} title={text('title')} description={text('description')}>
       <button className="mcal-control" onClick={() => {
         setAdIneligible('marketCalendarUnpublished', true)
@@ -72,7 +72,7 @@ export function MarketCalendarPage() {
             {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
           </select></label>
         </div>
-        {scope && scope.validity !== 'valid' && <p role="status" className="mcal-warning">{text(scope.validity)}{scope.reason && <> · {text(publicationTextKey(scope.reason))}</>}</p>}
+        {scope && scope.validity !== 'valid' && <p role="status" className="mcal-warning">{text(scope.validity)}{scope.reason && <> · {text(publicationTextKey(scope.reason, 'scope'))}</>}</p>}
         {scope && isOld(scope.last_checked_at, now) && <p role="status" className="mcal-warning">{text('old')}</p>}
         {(!scope || !scope.included) && <p role="status" className="mcal-warning">{text('missingScope')}</p>}
         <p className="mb-3 text-sm text-muted-foreground">{text('localDates')} · {text('open')} / {text('closed')} / {text('unknown')}</p>
@@ -95,8 +95,8 @@ export function MarketCalendarPage() {
         <div aria-live="polite" className="space-y-4 mcal-detail">
           <p className="font-bold">{text(selected?.status ?? 'missing')}</p>
           {selected && <>
-            {selected.special && <p>{text('special')}: {text(publicationTextKey(selected.special))}</p>}
-            {selected.reason && <p>{text('reason')}: {text(publicationTextKey(selected.reason))}</p>}
+            {selected.special && <p>{text('special')}: {text(publicationTextKey(selected.special, 'special'))}</p>}
+            {selected.reason && <p>{text('reason')}: {text(publicationTextKey(selected.reason, 'reason'))}</p>}
             <h3>{text('sessions')}</h3>
             {selected.sessions.length ? <ul>{sortSessions(selected.sessions).map((s, i) => {
               const nameKey = sessionNameKey(venue, s.code)

@@ -252,21 +252,21 @@ export function AppShell() {
   const routeIdentity = `${location.key}:${location.pathname}`;
   const [contentReadyIdentity, setContentReadyIdentity] = useState<string | null>(null);
   const [adReadyIdentity, setAdReadyIdentity] = useState<string | null>(null);
-  const [expiredResultIdentity, setExpiredResultIdentity] = useState<string | null>(null);
+  const [unavailableAdIdentity, setUnavailableAdIdentity] = useState<string | null>(null);
   useEffect(() => {
     const main = document.getElementById("main-content");
     if (!main) return;
     const reconcile = () => {
       const next = main.querySelector(".tool-route-loading, [data-route-error]") ? null : routeIdentity;
       setContentReadyIdentity((current) => current === next ? current : next);
-      const expired = Boolean(main.querySelector('[data-testid="document-expired-result"]'));
-      setExpiredResultIdentity((current) => current === (expired ? routeIdentity : null) ? current : (expired ? routeIdentity : null));
-      const adNext = next && !expired ? routeIdentity : null;
+      const unavailable = Boolean(main.querySelector('[data-testid="document-expired-result"], [data-ad-unavailable]'));
+      setUnavailableAdIdentity((current) => current === (unavailable ? routeIdentity : null) ? current : (unavailable ? routeIdentity : null));
+      const adNext = next && !unavailable ? routeIdentity : null;
       setAdReadyIdentity((current) => current === adNext ? current : adNext);
     };
     reconcile();
     const observer = new MutationObserver(reconcile);
-    observer.observe(main, { childList: true, subtree: true });
+    observer.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-ad-unavailable"] });
     return () => observer.disconnect();
   }, [routeIdentity]);
   const readiness = documentReadiness(location.pathname, {
@@ -278,7 +278,7 @@ export function AppShell() {
   // Auto Ads can survive a React unmount. An unavailable/empty state reached
   // from an ad-bearing SPA document must become its own document. It then has
   // no AdSense script, so this transition cannot loop or request another ad.
-  const terminalAdState = readiness === "unavailable" || expiredResultIdentity === routeIdentity;
+  const terminalAdState = readiness === "unavailable" || unavailableAdIdentity === routeIdentity;
   const terminalAdDocumentTransition = terminalAdState && Boolean(document.querySelector("script[data-worklazy-adsense]"));
   const pageReady = readiness === "ready" && contentReadyIdentity === routeIdentity && routeMetadataSafe && !terminalAdDocumentTransition;
   const adReady = pageReady && adReadyIdentity === routeIdentity;

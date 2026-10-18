@@ -15,6 +15,9 @@ test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect owne
   assert.match(appShellSource, /readiness === "ready" && contentReadyIdentity === routeIdentity && routeMetadataSafe/);
   assert.doesNotMatch(appShellSource, /isAdFreePath|adFree/);
   assert.doesNotMatch(appShellSource, /PrivacyConsentBanner|resetPrivacyConsent|consentSettings/);
+  assert.match(appShellSource, /\[data-ad-unavailable\]/);
+  assert.match(appShellSource, /attributeFilter: \["data-ad-unavailable"\]/);
+  assert.match(appShellSource, /terminalAdState = readiness === "unavailable" \|\| unavailableAdIdentity === routeIdentity/);
   assert.match(appShellSource, /isVideoDirectPath\(location\.pathname/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/office-editor\/app"/);
   assert.match(appShellSource, /normalizedPath === "\/tools\/excel-merger\/xls-preserve"/);

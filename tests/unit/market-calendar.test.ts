@@ -2,10 +2,11 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { loadCalendar, isOld, sourceHref } from '../../src/features/market-calendar/loadCalendar.ts'
-import { groupSources, publicationTextKey, sessionNameKey, sortSessions } from '../../src/features/market-calendar/calendarDisplay.ts'
+import { groupSources, hasPublicationTextMapping, publicationTextKey, sessionNameKey, sortSessions } from '../../src/features/market-calendar/calendarDisplay.ts'
 import ko from '../../src/locales/ko/features.json' with { type: 'json' }
 import en from '../../src/locales/en/features.json' with { type: 'json' }
 import publicationCopy from '../../src/features/market-calendar/publicationCopy.json' with { type: 'json' }
+import publicationFixture from '../fixtures/market-calendar/publication-texts.json' with { type: 'json' }
 
 const row = { date: '20261119', venue: 'krx', status: 'unknown', sessions: [], special: null,
   sources: [{ id: 'weekend', url: 'urn:market-calendar:rule:weekend', quote: '주말' }], reason: '필수 expected 근거 미확보: krx-kospi-2026-exam', notes: [] }
@@ -106,8 +107,32 @@ test('publisher codes, reasons and notes have Korean and English display copy', 
   assert.equal(publicationTextKey(row.reason), 'requiredEvidenceMissing')
   assert.equal(publicationTextKey('special 불일치: ["주말", null]'), 'specialMismatch')
   assert.equal(publicationTextKey('nasdaq-2027-annual'), 'annualEvidenceMissing')
-  assert.equal(publicationTextKey('future_unknown_code'), 'publicationUntranslated')
-  assert.equal(publicationTextKey('toString'), 'publicationUntranslated')
+  assert.equal(publicationTextKey('future_unknown_code'), 'notePublicationDetail')
+  assert.equal(publicationTextKey('toString'), 'notePublicationDetail')
+})
+
+test('all texts from published revision 5e7da960 have meaningful translations', () => {
+  assert.equal(publicationFixture.ref, '5e7da960376adda15da1e01b31037ad5fff765f0')
+  assert.equal(publicationFixture.texts.length, 83)
+  for (const { value } of publicationFixture.texts) {
+    assert.ok(hasPublicationTextMapping(value), value)
+    const key = publicationTextKey(value)
+    assert.doesNotMatch(key, /PublicationDetail|publicationUntranslated/)
+    assert.ok(ko.marketCalendar[key])
+    assert.doesNotMatch(en.marketCalendar[key], /[가-힣]|translation.*not.*available/i)
+  }
+})
+
+test('new wording uses normalized labels, narrow patterns or contextual guidance', () => {
+  assert.equal(publicationTextKey(" New Year's  Day ", 'special'), 'newYearHoliday')
+  assert.equal(publicationTextKey('조기폐장 : 13:00:00 종료.', 'note'), 'earlyCloseAt13')
+  for (const context of ['special', 'reason', 'note', 'scope'] as const) {
+    const value = '새로 발행된 알 수 없는 문구 forced_unknown'
+    assert.equal(hasPublicationTextMapping(value), false)
+    const key = publicationTextKey(value, context)
+    assert.ok(ko.marketCalendar[key])
+    assert.doesNotMatch(en.marketCalendar[key], /[가-힣]|forced_unknown|untranslated|not yet available/i)
+  }
 })
 
 test('invalid publication paths are rejected before fetching files', async t => {
