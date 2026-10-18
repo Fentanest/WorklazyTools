@@ -66,7 +66,8 @@ export async function loadCalendar(root: string, signal?: AbortSignal): Promise<
       if (!validRows(rows, file.year)) throw new Error('Invalid calendar')
       return rows
     }))
-    return { status: 'ready', manifest, rows: years.flat() }
+    const rows = years.flat()
+    return rows.length ? { status: 'ready', manifest, rows } : { status: 'missing' }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     return { status: 'error' }

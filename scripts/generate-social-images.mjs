@@ -5,6 +5,7 @@ import puppeteer from "puppeteer-core";
 const outputDirectory = path.resolve("public/social/tools");
 
 const tools = [
+  tool("market-calendar", "#0879d9", "투자·거래 일정", "공식 거래 달력", "KRX · NXT · NYSE · Nasdaq · 공식 근거", "Investment research", "Official Market Calendar", "KRX · NXT · NYSE · Nasdaq · official sources"),
   tool("document-markdown", "#d53228", "문서 → Markdown", "문서 → Markdown", "워드 · 엑셀 · PPTX · 텍스트 PDF", "Document to Markdown", "Document to Markdown", "Word · Excel · PPTX · text PDF"),
   tool("document-to-pdf", "#d53228", "PDF 변환", "문서를 PDF로 변환", "워드·엑셀·PPT 변환 · 한글 인쇄", "PDF conversion", "Document to PDF", "Word, Excel & PPT · HWP via print"),
   tool("pdf-to-document", "#d53228", "PDF 변환", "PDF를 문서로 변환", "DOCX · XLSX · PPTX · HWPX · OCR", "PDF conversion", "PDF to Document", "DOCX · XLSX · PPTX · HWPX · OCR"),

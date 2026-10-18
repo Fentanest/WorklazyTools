@@ -45,6 +45,7 @@ export const socialImages = {
 } as const;
 
 const socialImageSlugByPath: Record<string, string> = {
+  "/tools/market-calendar": "market-calendar",
   "/tools/product-banner": "product-banner",
   "/tools/foliotrace": "foliotrace",
   "/tools/document-redactor": "document-redactor",

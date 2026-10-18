@@ -1,4 +1,17 @@
 import type { CalendarRow, Venue } from './loadCalendar.ts'
+import type { TranslationResources } from '../../i18n/resources.ts'
+import publicationCopy from './publicationCopy.json' with { type: 'json' }
+
+type CalendarTextKey = keyof TranslationResources['features']['marketCalendar']
+const exactCopy = publicationCopy.exact as Record<string, CalendarTextKey>
+const prefixCopy = Object.entries(publicationCopy.prefix) as [string, CalendarTextKey][]
+
+// Translate publisher wording only. Never infer or override a published status.
+// Unknown future wording uses a localized notice instead of leaking internal codes.
+export function publicationTextKey(value: string): CalendarTextKey {
+  return (Object.hasOwn(exactCopy, value) ? exactCopy[value] : undefined) ??
+    prefixCopy.find(([prefix]) => value.startsWith(prefix))?.[1] ?? 'publicationUntranslated'
+}
 
 // Display transformations only; keep the published rows unchanged.
 export function sortSessions(sessions: CalendarRow['sessions']) {

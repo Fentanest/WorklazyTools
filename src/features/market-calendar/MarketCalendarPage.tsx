@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
+import { setAdIneligible } from '../../app/adEligibility'
 import { useTranslation } from 'react-i18next'
 import { PageHeader, SectionCard } from '../../components/ui'
 import { ToolGuideWrapper } from '../../components/ToolGuideWrapper'
 import type { TranslationResources } from '../../i18n/resources'
 import { loadCalendar, isOld, sourceHref, venues, type Venue, type CalendarView } from './loadCalendar'
-import { groupSources, sessionNameKey, sortSessions } from './calendarDisplay'
+import { groupSources, publicationTextKey, sessionNameKey, sortSessions } from './calendarDisplay'
 import './market-calendar.css'
 
 export function MarketCalendarPage() {
@@ -36,6 +37,11 @@ export function MarketCalendarPage() {
   const year = years.includes(yearChoice) ? yearChoice : years[0] ?? yearChoice
   const scope = manifest?.scopes.find(s => s.venue === venue && s.year === year)
   const rows = view.status === 'ready' ? view.rows.filter(r => r.venue === venue && r.date.startsWith(`${year}${String(month).padStart(2, '0')}`)) : []
+  const adIneligible = view.status !== 'ready' || !scope?.included || rows.length === 0
+  useLayoutEffect(() => {
+    setAdIneligible('marketCalendarUnpublished', adIneligible)
+    return () => setAdIneligible('marketCalendarUnpublished', false)
+  }, [adIneligible])
   const byDay = new Map(rows.map(row => [Number(row.date.slice(6)), row]))
   const selected = byDay.get(day)
   const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
@@ -45,7 +51,11 @@ export function MarketCalendarPage() {
 
   return <div data-tool-page="market-calendar" className="market-calendar space-y-6">
     <PageHeader eyebrow={text('eyebrow')} title={text('title')} description={text('description')}>
-      <button className="mcal-control" onClick={() => setReload(n => n + 1)}>{text('reload')}</button>
+      <button className="mcal-control" onClick={() => {
+        setAdIneligible('marketCalendarUnpublished', true)
+        setView({ status: 'loading' })
+        setReload(n => n + 1)
+      }}>{text('reload')}</button>
     </PageHeader>
     {view.status !== 'ready' ? <SectionCard title={text(view.status === 'loading' ? 'loading' : 'missing')}>
       {view.status !== 'loading' && <p>{text(view.status === 'error' ? 'error' : 'empty')}</p>}
@@ -62,7 +72,7 @@ export function MarketCalendarPage() {
             {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
           </select></label>
         </div>
-        {scope && scope.validity !== 'valid' && <p role="status" className="mcal-warning">{text(scope.validity)} · {scope.reason}</p>}
+        {scope && scope.validity !== 'valid' && <p role="status" className="mcal-warning">{text(scope.validity)}{scope.reason && <> · {text(publicationTextKey(scope.reason))}</>}</p>}
         {scope && isOld(scope.last_checked_at, now) && <p role="status" className="mcal-warning">{text('old')}</p>}
         {(!scope || !scope.included) && <p role="status" className="mcal-warning">{text('missingScope')}</p>}
         <p className="mb-3 text-sm text-muted-foreground">{text('localDates')} · {text('open')} / {text('closed')} / {text('unknown')}</p>
@@ -85,16 +95,16 @@ export function MarketCalendarPage() {
         <div aria-live="polite" className="space-y-4 mcal-detail">
           <p className="font-bold">{text(selected?.status ?? 'missing')}</p>
           {selected && <>
-            {selected.special && <p>{text('special')}: {selected.special}</p>}
-            {selected.reason && <p>{text('reason')}: {selected.reason}</p>}
+            {selected.special && <p>{text('special')}: {text(publicationTextKey(selected.special))}</p>}
+            {selected.reason && <p>{text('reason')}: {text(publicationTextKey(selected.reason))}</p>}
             <h3>{text('sessions')}</h3>
             {selected.sessions.length ? <ul>{sortSessions(selected.sessions).map((s, i) => {
               const nameKey = sessionNameKey(venue, s.code)
               return <li key={i}>
-                <strong>{nameKey ? text(nameKey) : s.code}</strong> · {s.start}–{s.end} ({s.tz})
+                <strong>{text(nameKey ?? 'otherSession')}</strong> · {s.start}–{s.end} ({s.tz})
               </li>
             })}</ul> : <p>{text('noSessions')}</p>}
-            {selected.notes.length > 0 && <div><h3>{text('notes')}</h3><ul>{selected.notes.map((note, i) => <li key={i}>{note}</li>)}</ul></div>}
+            {selected.notes.length > 0 && <div><h3>{text('notes')}</h3><ul>{selected.notes.map((note, i) => <li key={i}>{text(publicationTextKey(note))}</li>)}</ul></div>}
             <h3>{text('sources')}</h3>
             {selected.sources.length ? <ul className="space-y-2">{groupSources(selected.sources).map(source => <li key={source.id}>
               {sourceHref(source.url) ? <a href={sourceHref(source.url)} target="_blank" rel="noopener noreferrer">{source.id} ↗</a> : <span>{source.id} · {source.url}</span>}

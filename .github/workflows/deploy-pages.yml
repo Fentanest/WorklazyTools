@@ -177,10 +177,11 @@ jobs:
           path: market-calendar-state
           persist-credentials: false
 
-      - name: Copy verified market calendar
-        if: steps.market-calendar.outcome == 'success'
-        continue-on-error: true # Missing or mismatched data leaves the calendar unavailable.
-        run: python3 scripts/copy-market-calendar.py market-calendar-state/public/v1 dist/data/market-calendar/v1
+      - name: Copy verified market calendar or restore deployed publication
+        # Also runs after checkout failure. The script records failures and
+        # verifies the current site's copy before restoring it into fresh dist.
+        # With no valid publication, the page displays its no-data state.
+        run: python3 scripts/copy-market-calendar.py market-calendar-state/public/v1 dist/data/market-calendar/v1 --fallback-published
 
       - name: Run unit tests
         run: npm run test:unit

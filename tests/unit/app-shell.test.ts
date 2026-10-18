@@ -68,6 +68,7 @@ test("repo-wide executable ad references stay inside the explicit runtime and ve
     "tests/excel-compare-smoke.mjs", // Owner: standard-route presence assertion.
     "tests/file-drop-result-smoke.mjs", // Owner: inert JSON ad marker for result-navigation/session regression; no provider request.
     "tests/helpers/ad-stub.mjs", // Owner: WU2 ad-eligibility smoke — exact-URL stub and fail-closed external blocking assertions.
+    "tests/market-calendar-ads-smoke.mjs", // Owner: seven publication states; local provider stub and external-request firewall.
     "tests/new-tools-smoke.mjs", // Owner: video-isolation absence and request assertions.
     "tests/office-editor-smoke.mjs", // Owner: office-isolation absence assertion.
     "tests/product-banner/t5b.browser.test.ts", // Owner: banner generator mock-provider and exported tracking-absence assertions.

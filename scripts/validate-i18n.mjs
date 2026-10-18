@@ -3,8 +3,25 @@ import path from "path";
 
 const langs = ["ko", "en"];
 let hasError = false;
+const publicationCopy = JSON.parse(fs.readFileSync('src/features/market-calendar/publicationCopy.json', 'utf8'));
+const publicationKeys = [...Object.values(publicationCopy.exact), ...Object.values(publicationCopy.prefix), 'publicationUntranslated', 'otherSession'];
+for (const code of ['special_expected', 'forced_unknown', 'early_close', 'year_open']) {
+  if (!publicationCopy.exact[code]) {
+    console.error(`Market calendar publication code '${code}' has no display mapping`);
+    hasError = true;
+  }
+}
+const internalTokens = /special_expected|forced_unknown|early_close|opening_auction|closing_auction|\bexpected\b|special 불일치/;
 
 for (const lang of langs) {
+  const calendar = JSON.parse(fs.readFileSync(`src/locales/${lang}/features.json`, 'utf8')).marketCalendar;
+  for (const key of publicationKeys) {
+    const value = calendar[key];
+    if (typeof value !== 'string' || !value.trim() || internalTokens.test(value) || lang === 'en' && /[가-힣]/.test(value)) {
+      console.error(`[${lang}] Invalid market calendar publication translation '${key}'`);
+      hasError = true;
+    }
+  }
   const guidePath = path.join("src/locales", lang, "guides.json");
   const guides = JSON.parse(fs.readFileSync(guidePath, "utf-8"));
   
@@ -40,7 +57,26 @@ for (const lang of langs) {
   }
 }
 
+// Optional real publication coverage, including dynamic reasons and scope codes.
+// No network or data-branch mutation is needed for this check.
+if (process.env.WORKLAZY_MCAL_DATA_DIR) {
+  const directory = process.env.WORKLAZY_MCAL_DATA_DIR;
+  const manifest = JSON.parse(fs.readFileSync(path.join(directory, 'manifest.json'), 'utf8'));
+  const values = manifest.scopes.map(scope => scope.reason).filter(Boolean);
+  for (const file of manifest.files) {
+    const rows = JSON.parse(fs.readFileSync(path.join(directory, file.path), 'utf8'));
+    for (const row of rows) values.push(...[row.special, row.reason, ...row.notes].filter(Boolean));
+  }
+  for (const value of new Set(values)) {
+    if (!publicationCopy.exact[value] && !Object.keys(publicationCopy.prefix).some(prefix => value.startsWith(prefix))) {
+      console.error(`Market calendar publication text has no translation mapping: ${value}`);
+      hasError = true;
+    }
+  }
+  console.log(`Checked ${new Set(values).size} distinct published calendar texts.`);
+}
+
 if (hasError) {
   process.exit(1);
 }
-console.log("i18n validation passed.");
+console.log(`i18n validation passed; ${publicationKeys.length} calendar mappings checked in each language.`);

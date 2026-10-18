@@ -12,7 +12,7 @@
 .market-calendar .mcal-day span { font-size: .8rem; }
 .market-calendar .mcal-open { background: var(--brand-soft); color: var(--brand-on-bg); }
 .market-calendar .mcal-closed { background: var(--muted); }
-.market-calendar .mcal-unknown { background: var(--wl-warningBg); color: var(--wl-warningText); border: 1px dashed var(--wl-warningText); }
+.market-calendar .mcal-unknown { background: var(--orange-soft); color: var(--foreground); border: 1px dashed var(--muted-foreground); }
 .market-calendar .mcal-day[aria-pressed="true"] { outline: 2px solid var(--primary); outline-offset: -2px; }
 .market-calendar .mcal-special { line-height: .5; }
 .market-calendar :is(.mcal-detail, .mcal-metadata) { overflow-wrap: anywhere; }
@@ -20,7 +20,7 @@
 .market-calendar .mcal-detail a { color: var(--brand-on-bg); text-decoration: underline; }
 .market-calendar blockquote { white-space: pre-wrap; margin-top: .5rem; max-height: 18rem; overflow: auto; }
 @media (max-width: 480px) {
-  .market-calendar .mcal-day { min-height: 65px; }
-  .market-calendar .mcal-day span { font-size: .65rem; }
+  .market-calendar .mcal-day { min-height: 65px; padding: .25rem 0; }
+  .market-calendar .mcal-day span { max-width: 100%; white-space: nowrap; font-size: .56rem; letter-spacing: -.02em; }
   .market-calendar .ui-section-card { padding: .75rem; }
 }

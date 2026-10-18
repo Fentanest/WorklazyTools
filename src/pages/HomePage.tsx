@@ -11,6 +11,7 @@ import { useToolCatalog } from "../i18n/useToolCatalog";
 import { cn } from "../lib/utils";
 
 const HOME_TOOL_IDS_KO = [
+  "market-calendar",
   "pdf-editor",
   "excel-merger",
   "excel-compare",
@@ -24,6 +25,7 @@ const HOME_TOOL_IDS_KO = [
 ] as const;
 
 const HOME_TOOL_IDS_EN = [
+  "market-calendar",
   "pdf-editor",
   "excel-merger",
   "excel-compare",

@@ -2,7 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { loadCalendar, isOld, sourceHref } from '../../src/features/market-calendar/loadCalendar.ts'
-import { groupSources, sessionNameKey, sortSessions } from '../../src/features/market-calendar/calendarDisplay.ts'
+import { groupSources, publicationTextKey, sessionNameKey, sortSessions } from '../../src/features/market-calendar/calendarDisplay.ts'
+import ko from '../../src/locales/ko/features.json' with { type: 'json' }
+import en from '../../src/locales/en/features.json' with { type: 'json' }
+import publicationCopy from '../../src/features/market-calendar/publicationCopy.json' with { type: 'json' }
 
 const row = { date: '20261119', venue: 'krx', status: 'unknown', sessions: [], special: null,
   sources: [{ id: 'weekend', url: 'urn:market-calendar:rule:weekend', quote: '주말' }], reason: '필수 expected 근거 미확보: krx-kospi-2026-exam', notes: [] }
@@ -82,6 +85,29 @@ test('last check becomes old only after 48 hours', () => {
 test('missing manifest displays no data', async t => {
   t.mock.method(globalThis, 'fetch', async () => new Response('', { status: 404 }))
   assert.deepEqual(await loadCalendar('/data/'), { status: 'missing' })
+})
+
+test('verified empty data is unavailable rather than an ad-ready calendar', async t => {
+  t.mock.method(globalThis, 'fetch', async (url: string) => new Response(url.endsWith('manifest.json')
+    ? JSON.stringify(makeManifest('[]')) : '[]'))
+  assert.deepEqual(await loadCalendar('/data/'), { status: 'missing' })
+})
+
+test('publisher codes, reasons and notes have Korean and English display copy', () => {
+  for (const [input, key] of Object.entries(publicationCopy.exact)) {
+    assert.equal(publicationTextKey(input), key)
+    for (const locale of [ko, en]) {
+      const value = locale.marketCalendar[key as keyof typeof locale.marketCalendar]
+      assert.ok(value?.trim(), key)
+      assert.doesNotMatch(value, /special_expected|forced_unknown|early_close|opening_auction|closing_auction|\bexpected\b|special 불일치/)
+    }
+    assert.doesNotMatch(en.marketCalendar[key as keyof typeof en.marketCalendar], /[가-힣]/)
+  }
+  assert.equal(publicationTextKey(row.reason), 'requiredEvidenceMissing')
+  assert.equal(publicationTextKey('special 불일치: ["주말", null]'), 'specialMismatch')
+  assert.equal(publicationTextKey('nasdaq-2027-annual'), 'annualEvidenceMissing')
+  assert.equal(publicationTextKey('future_unknown_code'), 'publicationUntranslated')
+  assert.equal(publicationTextKey('toString'), 'publicationUntranslated')
 })
 
 test('invalid publication paths are rejected before fetching files', async t => {
