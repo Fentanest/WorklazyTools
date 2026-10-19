@@ -189,6 +189,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+          retention-days: 1
 
   deploy:
     if: github.event_name != 'workflow_dispatch' || !inputs.validate_only
