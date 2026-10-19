@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { Settings } from 'luxon'
 import { dateCopyKeys, dateDescriptions, formatLastUpdated, koreaSessionRange, officialSources, type CalendarTextKey } from '../../src/features/market-calendar/calendarDisplay.ts'
 import type { CalendarRow } from '../../src/features/market-calendar/loadCalendar.ts'
 import ko from '../../src/locales/ko/features.json' with { type: 'json' }
@@ -28,6 +29,42 @@ test('last update is one readable Korea timestamp with no raw ISO or generation 
   assert.equal(formatLastUpdated(value, 'ko'), '2026년 10월 19일 오전 6:32 (한국 시간)')
   assert.equal(formatLastUpdated(value, 'en'), 'Oct 19, 2026, 6:32 AM KST')
   assert.equal(formatLastUpdated('not-a-date', 'ko'), null)
+})
+
+test('last update keeps Korean and English labels when ICU falls back to English', t => {
+  const DateTimeFormat = Intl.DateTimeFormat
+  Settings.resetCaches()
+  t.after(() => Settings.resetCaches())
+  t.mock.method(Intl, 'DateTimeFormat', function (_locales?: Intl.LocalesArgument, options?: Intl.DateTimeFormatOptions) {
+    return new DateTimeFormat('en-US', options)
+  })
+  assert.equal(new Intl.DateTimeFormat('ko').resolvedOptions().locale, 'en-US', 'simulate missing Korean ICU data')
+  const value = '2026-10-18T21:32:33.672905+00:00'
+  assert.equal(formatLastUpdated(value, 'ko'), '2026년 10월 19일 오전 6:32 (한국 시간)')
+  assert.equal(formatLastUpdated(value, 'en'), 'Oct 19, 2026, 6:32 AM KST')
+})
+
+test('last update ignores ICU textual parts, separators and day-period labels', t => {
+  const formatToParts = Intl.DateTimeFormat.prototype.formatToParts
+  Settings.resetCaches()
+  t.after(() => Settings.resetCaches())
+  t.mock.method(Intl.DateTimeFormat.prototype, 'formatToParts', function (this: Intl.DateTimeFormat, value?: Date | number) {
+    return [...formatToParts.call(this, value).map(part => ({
+      ...part,
+      value: part.type === 'literal' ? ' / ' : part.type === 'dayPeriod' ? 'ICU_PERIOD' : part.type === 'month' && !/^\d+$/.test(part.value) ? 'ICU_MONTH' : part.value,
+    })), { type: 'dayPeriod', value: 'ICU_PERIOD' }]
+  })
+  const probe = new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: true }).formatToParts(0)
+  assert.ok(probe.some(part => part.value === 'ICU_PERIOD'), 'simulate different ICU labels')
+  for (const [value, koValue, enValue] of [
+    ['2026-10-18T21:32:33.672905+00:00', '2026년 10월 19일 오전 6:32 (한국 시간)', 'Oct 19, 2026, 6:32 AM KST'],
+    ['2026-12-31T15:00:00Z', '2027년 1월 1일 오전 12:00 (한국 시간)', 'Jan 1, 2027, 12:00 AM KST'],
+    ['2026-10-19T03:05:00Z', '2026년 10월 19일 오후 12:05 (한국 시간)', 'Oct 19, 2026, 12:05 PM KST'],
+    ['2026-10-19T14:09:00Z', '2026년 10월 19일 오후 11:09 (한국 시간)', 'Oct 19, 2026, 11:09 PM KST'],
+  ]) {
+    assert.equal(formatLastUpdated(value, 'ko-KR'), koValue)
+    assert.equal(formatLastUpdated(value, 'en-US'), enValue)
+  }
 })
 
 test('U.S. hours include the correct Korea date across winter and summer time', () => {

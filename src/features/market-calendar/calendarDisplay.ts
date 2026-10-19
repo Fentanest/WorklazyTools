@@ -49,9 +49,22 @@ export function dateDescriptions(row: CalendarRow | undefined, text: Translate):
 }
 
 export function formatLastUpdated(value: string, language: string): string | null {
-  const date = DateTime.fromISO(value, { setZone: true }).setZone('Asia/Seoul').setLocale(language.startsWith('ko') ? 'ko' : 'en')
+  const date = DateTime.fromISO(value, { setZone: true })
   if (!date.isValid) return null
-  return language.startsWith('ko') ? date.toFormat('yyyy년 M월 d일 a h:mm') + ' (한국 시간)' : date.toFormat("MMM d, yyyy, h:mm a 'KST'")
+  // Read only numeric Gregorian fields: small-ICU may return English day periods
+  // for Korean, and textual month names/separators also vary by ICU version.
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul', calendar: 'gregory', numberingSystem: 'latn',
+    year: 'numeric', month: 'numeric', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(date.toJSDate())
+  const number = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find(part => part.type === type)?.value)
+  const year = number('year'), month = number('month'), day = number('day')
+  const hour = number('hour') % 24, minute = String(number('minute')).padStart(2, '0')
+  const clock = `${hour % 12 || 12}:${minute}`
+  if (language.startsWith('ko')) return `${year}년 ${month}월 ${day}일 ${hour < 12 ? '오전' : '오후'} ${clock} (한국 시간)`
+  const monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1]
+  return `${monthName} ${day}, ${year}, ${clock} ${hour < 12 ? 'AM' : 'PM'} KST`
 }
 
 export function koreaSessionRange(date: string, session: CalendarRow['sessions'][number], language: string): string | null {
