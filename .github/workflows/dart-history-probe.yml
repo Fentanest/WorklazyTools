@@ -44,4 +44,5 @@ jobs:
         with:
           name: dart-history-probe
           path: history-probe.json
+          retention-days: 1
           if-no-files-found: ignore
