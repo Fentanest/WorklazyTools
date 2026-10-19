@@ -38,13 +38,14 @@ try {
       await selectCalendarValue(page, 1, '2027');
       await page.waitForFunction(token => window.__heldDocumentToken !== token, before.documentToken);
       await page.locator('.mcal-grid').waitFor();
-      await page.waitForFunction(() => document.querySelectorAll('.mcal-warning').length >= 2);
+      // The user-facing UI has one pending message, not two internal-state warnings.
+      await page.getByText(language === 'ko' ? '이 거래소의 일정은 아직 확정되지 않았어요.' : 'The schedule for this exchange is not confirmed yet.', { exact: true }).waitFor();
       const after = await observe();
       const assertHeld = state => {
         assert.deepEqual(state.selection, ['nasdaq', '2027', '11']); assert.equal(state.caption, 'NASDAQ · 2027-11');
-        assert.match(state.warnings.join(' '), language === 'ko' ? /발행 보류/ : /on hold/);
-        assert.match(state.warnings.join(' '), language === 'ko' ? /연간 일정의 공식 근거/ : /Official evidence for the annual schedule/);
-        assert.match(state.warnings.join(' '), language === 'ko' ? /공개된 자료가 없습니다/ : /No published data/);
+        assert.match(state.warnings.join(' '), language === 'ko' ? /일정은 아직 확정되지 않았어요/ : /schedule for this exchange is not confirmed yet/);
+        assert.equal(new Set(state.warnings).size, state.warnings.length, 'no repeated warnings');
+        assert.doesNotMatch(state.warnings.join(' '), /발행|보류|근거|nasdaq-2027-annual|publication|evidence/i);
         assert.equal(state.ads, 0); assert.equal(state.residue, 0);
       };
       assertHeld(after); assert.equal(counters.attempt, 1, 'held document must not reload the SDK');

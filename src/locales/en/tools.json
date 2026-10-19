@@ -374,14 +374,14 @@
       ]
     },
     "market-calendar": {
-      "title": "Official market calendar",
-      "shortTitle": "Official market calendar",
-      "description": "Browse published schedules for KRX, NXT, NYSE and Nasdaq. Select a date for local session times and official sources.",
-      "eyebrow": "Market schedules · Official sources",
+      "title": "Stock market calendar",
+      "shortTitle": "Stock market calendar",
+      "description": "Check holidays and trading hours for KRX, NXT, NYSE and Nasdaq. U.S. market hours are also shown in Korea time.",
+      "eyebrow": "Market holidays · Trading hours",
       "highlights": [
-        "Monthly calendar",
-        "Local session times",
-        "Official sources"
+        "Market holidays",
+        "Opening and closing times",
+        "U.S. hours in Korea time"
       ]
     }
   }

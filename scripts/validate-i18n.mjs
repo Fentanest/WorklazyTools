@@ -5,10 +5,21 @@ import { hasPublicationTextMapping } from '../src/features/market-calendar/calen
 const langs = ["ko", "en"];
 let hasError = false;
 const publicationCopy = JSON.parse(fs.readFileSync('src/features/market-calendar/publicationCopy.json', 'utf8'));
-const publicationKeys = [...Object.values(publicationCopy.exact), ...Object.values(publicationCopy.prefix), ...publicationCopy.patterns.map(p => p.key), 'specialPublicationDetail', 'reasonPublicationDetail', 'notePublicationDetail', 'scopePublicationDetail', 'otherSession'];
-for (const code of ['special_expected', 'forced_unknown', 'early_close', 'year_open']) {
-  if (!publicationCopy.exact[code]) {
-    console.error(`Market calendar publication code '${code}' has no display mapping`);
+const decisions = [...Object.values(publicationCopy.exact), ...Object.values(publicationCopy.prefix), ...publicationCopy.patterns.map(p => p.key)];
+const publicationKeys = [...new Set(decisions.filter(value => typeof value === 'string'))];
+if (decisions.some(value => value !== null && typeof value !== 'string')) {
+  console.error('Every calendar text needs an explicit display key or null (hidden) decision');
+  hasError = true;
+}
+for (const code of ['special_expected', 'forced_unknown', 'early_close', 'year_open', '신정']) {
+  if (!Object.hasOwn(publicationCopy.exact, code)) {
+    console.error(`Market calendar publication code '${code}' has no display/hide decision`);
+    hasError = true;
+  }
+}
+for (const code of ['early_close', 'year_open', '신정']) {
+  if (typeof publicationCopy.exact[code] !== 'string') {
+    console.error(`User-facing calendar label '${code}' must remain visible`);
     hasError = true;
   }
 }
@@ -16,7 +27,7 @@ const internalTokens = /special_expected|forced_unknown|early_close|opening_auct
 
 for (const lang of langs) {
   const calendar = JSON.parse(fs.readFileSync(`src/locales/${lang}/features.json`, 'utf8')).marketCalendar;
-  for (const key of publicationKeys) {
+  for (const key of new Set([...publicationKeys, ...Object.keys(calendar)])) {
     const value = calendar[key];
     if (typeof value !== 'string' || !value.trim() || internalTokens.test(value) || lang === 'en' && /[가-힣]/.test(value)) {
       console.error(`[${lang}] Invalid market calendar publication translation '${key}'`);
@@ -70,7 +81,7 @@ if (process.env.WORKLAZY_MCAL_DATA_DIR) {
   }
   for (const value of new Set(values)) {
     if (!hasPublicationTextMapping(value)) {
-      console.error(`Market calendar publication text has no translation mapping: ${value}`);
+      console.error(`Market calendar publication text has no display/hide decision: ${value}`);
       hasError = true;
     }
   }
@@ -80,4 +91,4 @@ if (process.env.WORKLAZY_MCAL_DATA_DIR) {
 if (hasError) {
   process.exit(1);
 }
-console.log(`i18n validation passed; ${publicationKeys.length} calendar mappings checked in each language.`);
+console.log(`i18n validation passed; ${publicationKeys.length} visible calendar labels checked in each language; internal records have explicit hide decisions.`);

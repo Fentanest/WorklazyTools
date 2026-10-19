@@ -6,14 +6,14 @@ import { PageHeader, SectionCard } from '../../components/ui'
 import { UtilityPage } from '../../components/UtilitySurface'
 import { ToolGuideWrapper } from '../../components/ToolGuideWrapper'
 import type { TranslationResources } from '../../i18n/resources'
-import { loadCalendar, isOld, sourceHref, venues, type Venue, type CalendarView } from './loadCalendar'
-import { groupSources, publicationTextKey, sessionNameKey, sortSessions } from './calendarDisplay'
+import { loadCalendar, isOld, venues, type Venue, type CalendarView } from './loadCalendar'
+import { dateCopyKeys, dateDescriptions, displayClock, formatLastUpdated, koreaSessionRange, officialSources, sessionNameKey, sortSessions } from './calendarDisplay'
 import { calendarSelectionSearch, readCalendarSelection, type CalendarSelection } from './calendarSelection'
 import './market-calendar.css'
 
 export function MarketCalendarPage() {
   const { t, i18n } = useTranslation('features')
-  const text = (key: keyof TranslationResources['features']['marketCalendar']) => t(`marketCalendar.${key}`)
+  const text = (key: keyof TranslationResources['features']['marketCalendar'], values?: Record<string, string | number>) => t(`marketCalendar.${key}`, values)
   const [view, setView] = useState<CalendarView>({ status: 'loading' })
   const [defaultDate] = useState(() => new Date())
   const [parameters, setParameters] = useSearchParams()
@@ -50,6 +50,13 @@ export function MarketCalendarPage() {
   }, [adIneligible])
   const byDay = new Map(rows.map(row => [Number(row.date.slice(6)), row]))
   const selected = byDay.get(day)
+  const descriptions = dateDescriptions(selected, text)
+  const sources = officialSources(selected?.sources ?? [])
+  const updated = manifest ? formatLastUpdated(manifest.created_at, i18n.language) : null
+  const warnings = [...new Set([
+    (!scope || !scope.included || scope.validity === 'held') ? text('pendingScope') : scope.validity === 'stale' ? text('stale') : null,
+    scope && isOld(scope.last_checked_at, now) ? text('old') : null,
+  ].filter((value): value is string => Boolean(value)))]
   const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
   const count = new Date(Date.UTC(year, month, 0)).getUTCDate()
   const offset = new Date(Date.UTC(year, month - 1, 1)).getUTCDay()
@@ -78,10 +85,8 @@ export function MarketCalendarPage() {
             {Array.from({ length: 12 }, (_, i) => <option key={i} value={i + 1}>{i + 1}</option>)}
           </select></label>
         </div>
-        {scope && scope.validity !== 'valid' && <p role="status" className="mcal-warning">{text(scope.validity)}{scope.reason && <> · {text(publicationTextKey(scope.reason, 'scope'))}</>}</p>}
-        {scope && isOld(scope.last_checked_at, now) && <p role="status" className="mcal-warning">{text('old')}</p>}
-        {(!scope || !scope.included) && <p role="status" className="mcal-warning">{text('missingScope')}</p>}
-        <p className="mb-3 text-sm text-muted-foreground">{text('localDates')} · {text('open')} / {text('closed')} / {text('unknown')}</p>
+        {warnings.map(warning => <p key={warning} role="status" className="mcal-warning">{warning}</p>)}
+        <p className="mb-3 text-sm text-muted-foreground">{text('localDates')}</p>
         <table className="mcal-grid">
           <caption>{venue.toUpperCase()} · {year}-{String(month).padStart(2, '0')}</caption>
           <thead><tr>{weekdays.map((label, i) => <th scope="col" key={i}>{label}</th>)}</tr></thead>
@@ -92,38 +97,33 @@ export function MarketCalendarPage() {
               return <td key={column}>{d > 0 && d <= count && <button
                 className={`mcal-day mcal-${row?.status ?? 'missing'}`} aria-pressed={d === day}
                 aria-label={`${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')} ${text(row?.status ?? 'missing')}`}
-                onClick={() => select({ day: d })}><strong>{d}</strong><span>{text(row?.status ?? 'missing')}</span>{row?.special && <span className="mcal-special">•</span>}</button>}</td>
+                onClick={() => select({ day: d })}><strong>{d}</strong><span>{text(!row ? 'missingShort' : row.status === 'unknown' ? 'unknownShort' : row.status)}</span>{row && dateCopyKeys(row).length > 0 && <span className="mcal-special">•</span>}</button>}</td>
             })}
           </tr>)}</tbody>
         </table>
       </SectionCard>
       <SectionCard title={`${date} · ${venue.toUpperCase()}`}>
         <div aria-live="polite" className="space-y-4 mcal-detail">
-          <p className="font-bold">{text(selected?.status ?? 'missing')}</p>
+          {descriptions.map((description, i) => <p key={description} className={i === 0 ? 'font-bold' : undefined}>{description}</p>)}
           {selected && <>
-            {selected.special && <p>{text('special')}: {text(publicationTextKey(selected.special, 'special'))}</p>}
-            {selected.reason && <p>{text('reason')}: {text(publicationTextKey(selected.reason, 'reason'))}</p>}
-            <h3>{text('sessions')}</h3>
-            {selected.sessions.length ? <ul>{sortSessions(selected.sessions).map((s, i) => {
+            {selected.status === 'open' && selected.sessions.length > 0 && <><h3>{text('sessions')} · {text(venue === 'nyse' || venue === 'nasdaq' ? 'newYorkTime' : 'koreaTime')}</h3>
+            <ul className="space-y-2">{sortSessions(selected.sessions).map((s, i) => {
               const nameKey = sessionNameKey(venue, s.code)
+              const korea = koreaSessionRange(selected.date, s, i18n.language)
               return <li key={i}>
-                <strong>{text(nameKey ?? 'otherSession')}</strong> · {s.start}–{s.end} ({s.tz})
+                <strong>{text(nameKey ?? 'otherSession')}</strong> · {displayClock(s.start)}–{displayClock(s.end)}
+                {korea && <span className="block text-sm text-muted-foreground">{text('koreaTime')} · {korea}</span>}
               </li>
-            })}</ul> : <p>{text('noSessions')}</p>}
-            {selected.notes.length > 0 && <div><h3>{text('notes')}</h3><ul>{selected.notes.map((note, i) => <li key={i}>{text(publicationTextKey(note))}</li>)}</ul></div>}
-            <h3>{text('sources')}</h3>
-            {selected.sources.length ? <ul className="space-y-2">{groupSources(selected.sources).map(source => <li key={source.id}>
-              {sourceHref(source.url) ? <a href={sourceHref(source.url)} target="_blank" rel="noopener noreferrer">{source.id} ↗</a> : <span>{source.id} · {source.url}</span>}
-              <details><summary>{text('quote')}</summary>{source.quotes.map(quote => <blockquote key={quote}>{quote}</blockquote>)}</details>
-            </li>)}</ul> : <p>{text('noSources')}</p>}
+            })}</ul></>}
+            {sources.length > 0 && <div className="space-y-2">
+              <a href={sources[0].url} target="_blank" rel="noopener noreferrer">{text('sources')} ↗</a>
+              <details><summary>{text('quote')}</summary><blockquote>{sources[0].quotes[0]}</blockquote></details>
+              {sources.length > 1 && <details><summary>{text('moreSources')}</summary><ul>{sources.slice(1).map((source, i) => <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer">{text('sourceNumber', { number: i + 2 })} ↗</a></li>)}</ul></details>}
+            </div>}
           </>}
         </div>
       </SectionCard>
-      <div className="mcal-metadata text-sm text-muted-foreground">
-        <p>{text('published')}: <time dateTime={view.manifest.created_at}>{view.manifest.created_at}</time></p>
-        <p>{text('generation')}: {view.manifest.generation_id}</p>
-        <p>{text('checked')}: {scope?.last_checked_at ?? text('missing')}</p>
-      </div>
+      {updated && <p className="mcal-metadata text-sm text-muted-foreground"><time dateTime={manifest!.created_at}>{text('updated', { time: updated })}</time></p>}
     </>}
     <ToolGuideWrapper slug="market-calendar" />
   </div></UtilityPage>

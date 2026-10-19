@@ -2407,26 +2407,26 @@
     }
   },
   "market-calendar": {
-    "title": "Market calendar guide",
-    "description": "View the published schedule. Choose an exchange, year and month, then select a date.",
+    "title": "Check market holidays and hours",
+    "description": "Choose an exchange and a date to see why it is closed and when trading starts and ends.",
     "blocks": [
       {
-        "title": "Unknown and missing data",
+        "title": "When does trading start and end?",
         "paragraphs": [
-          "Unknown dates retain the published reason, such as an unpublished announcement, conflicting decisions or insufficient evidence. Missing dates are not inferred to be open or closed."
+          "Select a date to see trading hours. U.S. sessions show both New York and Korea time, including a different date when trading crosses midnight in Korea."
         ]
       },
       {
-        "title": "Freshness and timezones",
+        "title": "What does Pending mean?",
         "paragraphs": [
-          "Dates and sessions use the exchange’s local timezone, shown beside each session. Warnings flag checks older than 48 hours, stale data and held publication. Reload fetches the currently published edition."
+          "The schedule is not confirmed or is not available yet. Check the official notice linked in the date details before trading."
         ]
       }
     ],
     "faq": {
       "source": {
-        "q": "Does this page calculate market holidays?",
-        "a": "No. The calendar displays the published structured data: open, closed or unknown status, sessions, reasons and official sources."
+        "q": "Can I see U.S. market hours in Korea time?",
+        "a": "Yes. NYSE and Nasdaq sessions show both New York and Korea time. Calendar dates follow the exchange’s local date, and a different date in Korea is shown when needed."
       }
     }
   }

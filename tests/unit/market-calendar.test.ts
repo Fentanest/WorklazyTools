@@ -94,45 +94,46 @@ test('verified empty data is unavailable rather than an ad-ready calendar', asyn
   assert.deepEqual(await loadCalendar('/data/'), { status: 'missing' })
 })
 
-test('publisher codes, reasons and notes have Korean and English display copy', () => {
+test('every reviewed publisher text has an explicit display or hide decision', () => {
   for (const [input, key] of Object.entries(publicationCopy.exact)) {
     assert.equal(publicationTextKey(input), key)
+    assert.ok(hasPublicationTextMapping(input), input)
+    if (key === null) continue
     for (const locale of [ko, en]) {
       const value = locale.marketCalendar[key as keyof typeof locale.marketCalendar]
       assert.ok(value?.trim(), key)
-      assert.doesNotMatch(value, /special_expected|forced_unknown|early_close|opening_auction|closing_auction|\bexpected\b|special 불일치/)
+      assert.doesNotMatch(value, /special_expected|forced_unknown|early_close|registry|continuity|조문|전용|고정 입력|현행판/)
     }
     assert.doesNotMatch(en.marketCalendar[key as keyof typeof en.marketCalendar], /[가-힣]/)
   }
-  assert.equal(publicationTextKey(row.reason), 'requiredEvidenceMissing')
-  assert.equal(publicationTextKey('special 불일치: ["주말", null]'), 'specialMismatch')
-  assert.equal(publicationTextKey('nasdaq-2027-annual'), 'annualEvidenceMissing')
-  assert.equal(publicationTextKey('future_unknown_code'), 'notePublicationDetail')
-  assert.equal(publicationTextKey('toString'), 'notePublicationDetail')
+  assert.equal(publicationTextKey(row.reason), null)
+  assert.equal(publicationTextKey('special 불일치: ["주말", null]'), null)
+  assert.equal(publicationTextKey('nasdaq-2027-annual'), null)
+  assert.equal(hasPublicationTextMapping('future_unknown_code'), false)
+  assert.equal(publicationTextKey('toString'), undefined)
 })
 
-test('all texts from published revision 5e7da960 have meaningful translations', () => {
+test('the original 83-text publication remains fully classified, including hidden notes', () => {
   assert.equal(publicationFixture.ref, '5e7da960376adda15da1e01b31037ad5fff765f0')
   assert.equal(publicationFixture.texts.length, 83)
+  let visible = 0, hidden = 0
   for (const { value } of publicationFixture.texts) {
     assert.ok(hasPublicationTextMapping(value), value)
     const key = publicationTextKey(value)
-    assert.doesNotMatch(key, /PublicationDetail|publicationUntranslated/)
+    if (key === null) { hidden++; continue }
+    assert.ok(key)
+    visible++
     assert.ok(ko.marketCalendar[key])
     assert.doesNotMatch(en.marketCalendar[key], /[가-힣]|translation.*not.*available/i)
   }
+  assert.ok(visible > 0 && hidden > 0, 'coverage includes useful labels and explicitly hidden process records')
 })
 
-test('new wording uses normalized labels, narrow patterns or contextual guidance', () => {
-  assert.equal(publicationTextKey(" New Year's  Day ", 'special'), 'newYearHoliday')
-  assert.equal(publicationTextKey('조기폐장 : 13:00:00 종료.', 'note'), 'earlyCloseAt13')
-  for (const context of ['special', 'reason', 'note', 'scope'] as const) {
-    const value = '새로 발행된 알 수 없는 문구 forced_unknown'
-    assert.equal(hasPublicationTextMapping(value), false)
-    const key = publicationTextKey(value, context)
-    assert.ok(ko.marketCalendar[key])
-    assert.doesNotMatch(en.marketCalendar[key], /[가-힣]|forced_unknown|untranslated|not yet available/i)
-  }
+test('known special-day prefixes and new opaque notes never produce fallback paragraphs', () => {
+  assert.equal(publicationTextKey(" New Year's  Day "), 'newYearHoliday')
+  assert.equal(publicationTextKey('특수일: New Year’s Day'), 'newYearHoliday')
+  assert.equal(publicationTextKey('조기폐장 : 13:00:00 종료.'), 'earlyClose')
+  assert.equal(publicationTextKey('새로 발행된 문구 forced_unknown'), undefined)
 })
 
 test('invalid publication paths are rejected before fetching files', async t => {

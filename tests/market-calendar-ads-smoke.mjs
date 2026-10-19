@@ -56,9 +56,9 @@ try {
       }
       if (transition) {
         missing = true;
-        if (mode === 'ready-to-missing') await page.getByRole('button', { name: 'Reload published data' }).click();
+        if (mode === 'ready-to-missing') await page.getByRole('button', { name: 'Refresh', exact: true }).click();
         else await page.locator('aside a[href="/en/tools/market-calendar"]').click();
-        await page.getByText('No published market calendar is available.', { exact: true }).waitFor();
+        await page.getByText('No schedule is available yet. Please check again later.', { exact: true }).waitFor();
         await page.waitForFunction(token => window.__mcalDocumentToken !== token, initial.documentToken);
       }
       await page.waitForTimeout(650);
@@ -73,7 +73,7 @@ try {
           assert.notEqual(current.documentToken, initial.documentToken, 'common document transition must remove SDK callbacks and ads');
           await page.screenshot({ path: `${output}/ad-residue-${mode}.png`, fullPage: true });
           missing = false;
-          await page.getByRole('button', { name: 'Reload published data' }).click();
+          await page.getByRole('button', { name: 'Refresh', exact: true }).click();
           await page.locator('.mcal-grid').waitFor(); await page.locator('#mcal-rendered-auto-ad').waitFor();
           assert.equal(counters.attempt, 2, 'recovered valid calendar permits ads again');
           await observe('recovered');

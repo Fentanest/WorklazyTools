@@ -374,14 +374,14 @@
       ]
     },
     "market-calendar": {
-      "title": "공식 거래 달력",
-      "shortTitle": "공식 거래 달력",
-      "description": "KRX·NXT·NYSE·Nasdaq의 발행된 일정을 월 달력으로 확인하세요. 날짜를 선택하면 현지 세션 시각과 공식 근거가 표시됩니다.",
-      "eyebrow": "거래 일정 · 공식 근거",
+      "title": "주식시장 거래 달력",
+      "shortTitle": "주식시장 거래 달력",
+      "description": "KRX·NXT·NYSE·Nasdaq의 휴장일과 거래 시간을 확인하세요. 미국 시장은 한국 시간도 함께 보여줍니다.",
+      "eyebrow": "휴장일 · 거래시간",
       "highlights": [
-        "월 달력",
-        "현지 세션 시각",
-        "공식 근거"
+        "휴장일",
+        "개장·마감 시간",
+        "미국 시장 한국 시간"
       ]
     }
   }
