@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generation_id": "20261019T210000.232669Z",
-  "created_at": "2026-10-19T21:30:44.439683+00:00",
-  "source_manifest_sha256": "df7225e794b028c2a00712832a61b96f65890db3acb4265595a982e91e63e2cc",
+  "generation_id": "20261020T210000.196909Z",
+  "created_at": "2026-10-20T21:40:40.418694+00:00",
+  "source_manifest_sha256": "1cee3a9285790e3f588fb185f645d399774cd00d788efaee1ae01ca7621d876f",
   "files": [
     {
       "path": "calendar-2026.json",
@@ -13,8 +13,8 @@
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "e0078a78580cdf75889f032d351dced839b59f28e3c08d56288e4de581f56c21",
-      "source_sha256": "8a86cd14c61899183498d1d222e2922fcee19ff1ca79b2d57d44a59b715927e5"
+      "sha256": "f51f8bd83c38fd5aaafde4e75c73796a3dfa7127a7a16ca66f3f7b9de8c8532b",
+      "source_sha256": "f02823890b3c563c6d01d181649481ce405c47b147f658dc28a3b94c2e739366"
     }
   ],
   "scopes": [
@@ -23,7 +23,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "f586c446a36d692ed62d6ef24c56f1179393a52a353abf29b5c4fa2971e1ffed",
-      "last_checked_at": "2026-10-19T21:08:38.790613+00:00",
+      "last_checked_at": "2026-10-20T21:09:59.250029+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -34,7 +34,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "7638ec018fa03360a52509bb2d5b92bc2ebac5119bef7888cf5dccdab63de075",
-      "last_checked_at": "2026-10-19T21:08:38.790613+00:00",
+      "last_checked_at": "2026-10-20T21:09:59.250029+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -45,7 +45,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "16627d7800e681a1595cf3f81e41e64fa05812420a6a7b789153b77d5f0c085f",
-      "last_checked_at": "2026-10-19T21:08:38.790613+00:00",
+      "last_checked_at": "2026-10-20T21:09:59.250029+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -56,7 +56,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-19T21:08:38.790613+00:00",
+      "last_checked_at": "2026-10-20T21:09:59.250029+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -67,7 +67,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "7901a67ba8ec5e9c7148551eb5cc1735bedeb9cf70ad1d74fbfe369e7c9c76b8",
-      "last_checked_at": "2026-10-19T21:08:38.790613+00:00",
+      "last_checked_at": "2026-10-20T21:09:59.250029+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -78,15 +78,15 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-19T21:08:38.790613+00:00",
+      "last_checked_at": "2026-10-20T21:09:59.250029+00:00",
       "validity": "held",
       "reason": "nasdaq-2027-annual",
       "unpublished": true,
       "unpublished_evidence": [
         {
           "source_id": "nasdaq-holiday-schedule",
-          "fetched_at": "2026-10-19T21:00:56.794932+00:00",
-          "raw_sha256": "27cf4dc1c9234a07961c81f0e9b7545737302115bdcf4dc8e8e22ed1051a6244",
+          "fetched_at": "2026-10-20T21:00:54.902035+00:00",
+          "raw_sha256": "aa5790fcc3a74fe4758620d1e1ff9584937ab2b3738026bf390d9d9b5b5ecee3",
           "rule": "D12-nasdaq-holiday-schedule-year-absent-v1"
         }
       ]
@@ -96,7 +96,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-10-19T21:08:38.790613+00:00",
+      "last_checked_at": "2026-10-20T21:09:59.250029+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -106,8 +106,8 @@
       "venue": "nyse",
       "year": 2027,
       "included": true,
-      "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-19T21:08:38.790613+00:00",
+      "evidence_generation": "c3dc345f2bf23cd37d290c7437e2298ac42752ae53044edf4e466c4aaccc743f",
+      "last_checked_at": "2026-10-20T21:09:59.250029+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
