@@ -27,8 +27,8 @@ test('delisted reference lists only displayable rows with DART links, sorted by 
 test('FolioTrace page renders the delisted reference as the last section with both languages', () => {
   const page = fs.readFileSync('src/features/foliotrace/ui/FolioTracePage.tsx', 'utf8')
   assert.match(page, /delistedReference from "\.\.\/data\/delistedReference\.json"/)
-  assert.match(page, /참고: 2025년 말 보유 후 상장폐지된 종목 \(\{count\}종목\)/)
-  assert.match(page, /Reference: stocks held at end-2025 and later delisted \(\{count\}\)/)
+  assert.match(page, /참고: 2025년 말 보유 후 상장폐지\(결정\)된 종목 \(\{count\}종목\)/)
+  assert.match(page, /Reference: stocks held at end-2025 and later delisted or set for delisting \(\{count\}\)/)
   assert.ok(page.indexOf('foliotrace-delisted"') > page.indexOf('foliotrace-faq"'))
   assert.ok(page.indexOf('foliotrace-delisted"') < page.indexOf('<Sheet open='))
 })

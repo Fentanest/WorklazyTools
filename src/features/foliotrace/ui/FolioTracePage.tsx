@@ -195,8 +195,8 @@ const STR = {
     guideFaqTitle: "자주 묻는 질문",
     faqTitle: "자주 묻는 질문",
     faqDesc: "추정 범위·계산·출처에 대한 자주 묻는 질문입니다.",
-    delistedTitle: "참고: 2025년 말 보유 후 상장폐지된 종목 ({count}종목)",
-    delistedNote: "2025년 말 국민연금 공시 목록 기준 보유 주식 수입니다. 상장폐지되어 추적 대상에서 제외했습니다.",
+    delistedTitle: "참고: 2025년 말 보유 후 상장폐지(결정)된 종목 ({count}종목)",
+    delistedNote: "2025년 말 국민연금 공시 목록 기준 보유 주식 수입니다. 이후 상장폐지되었거나 상장폐지가 결정된 종목입니다.",
     delistedShares: "25년 말 보유",
     delistedUnit: "주",
     delistedDate: "이후 상장폐지",
@@ -372,8 +372,8 @@ const STR = {
     guideFaqTitle: "FAQ",
     faqTitle: "FAQ",
     faqDesc: "Frequently asked questions about scope, estimation, and sources.",
-    delistedTitle: "Reference: stocks held at end-2025 and later delisted ({count})",
-    delistedNote: "Shares held at the end of 2025 per the NPS disclosure list. These stocks were delisted and are no longer tracked.",
+    delistedTitle: "Reference: stocks held at end-2025 and later delisted or set for delisting ({count})",
+    delistedNote: "Shares held at the end of 2025 per the NPS disclosure list. These stocks were later delisted or are set to be delisted.",
     delistedShares: "Held at end-2025",
     delistedUnit: " shares",
     delistedDate: "Later delisted",
@@ -1032,8 +1032,8 @@ function ReadyView({
               <strong>{lang === "ko" ? item.nameKo : item.nameEn}</strong>
               <span>{t.delistedShares} <span className="foliotrace-num">{formatQty(item.holdingShares2025ye)}</span>{t.delistedUnit}</span>
               <span>
-                {t.delistedDate}: {item.delistedDate === null ? t.delistedPending :
-                  `${item.delistedDate}${item.dateEstimated ? ` ${t.delistedEstimated}` : ""}`}
+                {item.delistedDate === null ? t.delistedPending :
+                  `${t.delistedDate}: ${item.delistedDate}${item.dateEstimated ? ` ${t.delistedEstimated}` : ""}`}
               </span>
               <small>
                 {lang === "ko" ? item.reasonKo : item.reasonEn}
