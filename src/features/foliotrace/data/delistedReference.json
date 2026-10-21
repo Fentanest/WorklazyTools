@@ -3,28 +3,12 @@
   "scope": "nps-end-2025-holdings-later-delisted-reference",
   "items": [
     {
-      "nameKo": "HD현대인프라코어",
-      "nameEn": "HD Hyundai Infracore",
-      "stockCode": "042670",
-      "holdingShares2025ye": "24938599",
-      "delistedDate": "2026-01-01",
-      "dateEstimated": false,
-      "status": "DELISTED_MERGER",
-      "reasonKo": "HD현대건설기계(현 HD건설기계)에 흡수합병되어 소멸, 상장폐지",
-      "reasonEn": "Absorbed by HD Hyundai Construction Equipment (now HD CE) on 2026-01-01; delisted",
-      "evidenceRcept": [
-        "20260102000224",
-        "20250701000231"
-      ],
-      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260102000224"
-    },
-    {
       "nameKo": "IHQ",
       "nameEn": "IHQ",
       "stockCode": "003560",
       "holdingShares2025ye": "1149",
       "delistedDate": "2026-01-15",
-      "dateEstimated": true,
+      "dateEstimated": false,
       "status": "DELISTED_OTHER",
       "reasonKo": "감사의견 거절로 상장폐지 결정(2024-12-05), 효력정지 가처분 기각(2025-12-29) 후 정리매매(2026-01-06~14)를 거쳐 상장폐지",
       "reasonEn": "Delisting decided 2024-12-05 (audit opinion disclaimer); injunction dismissed 2025-12-29; liquidation trading 2026-01-06 to 01-14; delisted",
@@ -39,7 +23,7 @@
       "stockCode": "033180",
       "holdingShares2025ye": "4170",
       "delistedDate": "2026-01-15",
-      "dateEstimated": true,
+      "dateEstimated": false,
       "status": "DELISTED_OTHER",
       "reasonKo": "감사의견 거절로 상장폐지 결정(2024-12-05), 효력정지 가처분 기각(2025-12-29) 후 정리매매(2026-01-06~14)를 거쳐 상장폐지",
       "reasonEn": "Delisting decided 2024-12-05 (audit opinion disclaimer); injunction dismissed 2025-12-29; liquidation trading 2026-01-06 to 01-14; delisted",
@@ -54,7 +38,7 @@
       "stockCode": "057880",
       "holdingShares2025ye": "14626",
       "delistedDate": "2026-01-22",
-      "dateEstimated": true,
+      "dateEstimated": false,
       "status": "DELISTED_OTHER",
       "reasonKo": "회생절차 중 코스닥기업심사위원회 상장폐지 결정(2025-06-26), 효력정지 가처분 기각(2026-01-08) 후 정리매매(2026-01-13~21)를 거쳐 상장폐지",
       "reasonEn": "Delisting decided 2025-06-26 (rehabilitation proceedings); injunction dismissed 2026-01-08; liquidation trading 2026-01-13 to 01-21; delisted",
@@ -65,12 +49,28 @@
       "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260109900687"
     },
     {
+      "nameKo": "HD현대인프라코어",
+      "nameEn": "HD Hyundai Infracore",
+      "stockCode": "042670",
+      "holdingShares2025ye": "24938599",
+      "delistedDate": "2026-01-26",
+      "dateEstimated": false,
+      "status": "DELISTED_MERGER",
+      "reasonKo": "HD현대건설기계(현 HD건설기계)에 흡수합병되어 소멸, 상장폐지",
+      "reasonEn": "Absorbed by HD Hyundai Construction Equipment (now HD CE) on 2026-01-01; delisted",
+      "evidenceRcept": [
+        "20260102000224",
+        "20250701000231"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260102000224"
+    },
+    {
       "nameKo": "국보",
       "nameEn": "Kukbo",
       "stockCode": "001140",
       "holdingShares2025ye": "809",
       "delistedDate": "2026-01-27",
-      "dateEstimated": true,
+      "dateEstimated": false,
       "status": "DELISTED_OTHER",
       "reasonKo": "감사의견 거절로 상장폐지 결정(2025-05-19), 효력정지 가처분 기각(2026-01-09) 후 정리매매(2026-01-16~26)를 거쳐 상장폐지",
       "reasonEn": "Delisting decided 2025-05-19 (audit opinion disclaimer); injunction dismissed 2026-01-09; liquidation trading 2026-01-16 to 01-26; delisted",
@@ -100,7 +100,7 @@
       "nameEn": "Kolon ENP",
       "stockCode": "138490",
       "holdingShares2025ye": "183812",
-      "delistedDate": "2026-04-01",
+      "delistedDate": "2026-04-16",
       "dateEstimated": false,
       "status": "DELISTED_MERGER",
       "reasonKo": "코오롱인더스트리에 흡수합병되어 소멸, 상장폐지",
@@ -192,6 +192,31 @@
       "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260811000494"
     },
     {
+      "nameKo": "다원시스",
+      "nameEn": "다원시스",
+      "stockCode": "068240",
+      "holdingShares2025ye": "31410",
+      "delistedDate": null,
+      "dateEstimated": false,
+      "status": "DELISTING_DECIDED_PENDING",
+      "reasonKo": "상장폐지 결정 후 절차 진행 중(상장폐지 확정 전); 정리매매 보류(가처분 등)",
+      "reasonEn": "Delisting decided 2026-09-15; delisting process pending (liquidation trading on hold; not yet confirmed delisted)",
+      "evidenceRcept": [
+        "20260915900817",
+        "20260316902703",
+        "20260316902712",
+        "20260323902728",
+        "20260323902734",
+        "20260413901021",
+        "20260727900778",
+        "20260818900510",
+        "20260915900824",
+        "20260916900460",
+        "20260916900471"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260915900817"
+    },
+    {
       "nameKo": "대호에이엘",
       "nameEn": "Daeho A.L.",
       "stockCode": "069460",
@@ -207,6 +232,25 @@
         "20260401801648"
       ],
       "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260804800880"
+    },
+    {
+      "nameKo": "현대사료",
+      "nameEn": "현대사료",
+      "stockCode": "016790",
+      "holdingShares2025ye": "29337",
+      "delistedDate": null,
+      "dateEstimated": false,
+      "status": "DELISTING_DECIDED_PENDING",
+      "reasonKo": "상장폐지 결정 후 절차 진행 중(상장폐지 확정 전); 정리매매 보류(가처분 등)",
+      "reasonEn": "Delisting decided 2026-06-11; delisting process pending (liquidation trading on hold; not yet confirmed delisted)",
+      "evidenceRcept": [
+        "20260611900893",
+        "20260417900438",
+        "20260611900901",
+        "20260612900555",
+        "20260612900592"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260611900893"
     }
   ]
 }

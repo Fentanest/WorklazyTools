@@ -6,7 +6,7 @@ import reference from '../../src/features/foliotrace/data/delistedReference.json
 
 test('delisted reference lists only displayable rows with DART links, sorted by date then name', () => {
   assert.equal(reference.schemaVersion, 1)
-  assert.equal(reference.items.length, 13)
+  assert.equal(reference.items.length, 15)
   assert.ok(!reference.items.some((item) => item.nameKo === 'MTRON'))
   for (const item of reference.items) {
     assert.match(item.stockCode, /^[0-9A-Z]{6}$/)
@@ -19,7 +19,7 @@ test('delisted reference lists only displayable rows with DART links, sorted by 
   const keys = dated.map((item) => `${item.delistedDate}|${item.nameKo}`)
   assert.deepEqual(keys, [...keys].sort())
   const pending = reference.items.filter((item) => item.delistedDate === null)
-  assert.deepEqual(pending.map((item) => item.status), ['DELISTING_DECIDED_PENDING'])
+  assert.deepEqual(pending.map((item) => item.status), ['DELISTING_DECIDED_PENDING', 'DELISTING_DECIDED_PENDING', 'DELISTING_DECIDED_PENDING'])
   assert.equal(reference.items.at(-1)?.delistedDate, null)
   assert.equal(reference.items.find((item) => item.nameKo === '푸른소나무')?.nameEn, '푸른소나무')
 })
