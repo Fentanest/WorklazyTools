@@ -40,6 +40,11 @@ import type { FilingChangeDirection, Lang, QualityFilter, SortKey } from "./hold
 import { XIcon } from "lucide-react";
 import { getFaqsForPath } from "./faq";
 import indirectEvidence from "../data/indirectEvidence.json";
+import delistedReference from "../data/delistedReference.json";
+
+const delistedItems = [...delistedReference.items].sort((a, b) =>
+  (a.delistedDate === null ? 1 : 0) - (b.delistedDate === null ? 1 : 0) ||
+  (a.delistedDate ?? "").localeCompare(b.delistedDate ?? "") || a.nameKo.localeCompare(b.nameKo, "ko"));
 
 const STR = {
   ko: {
@@ -190,6 +195,14 @@ const STR = {
     guideFaqTitle: "자주 묻는 질문",
     faqTitle: "자주 묻는 질문",
     faqDesc: "추정 범위·계산·출처에 대한 자주 묻는 질문입니다.",
+    delistedTitle: "참고: 2025년 말 보유 후 상장폐지된 종목 ({count}종목)",
+    delistedNote: "2025년 말 국민연금 공시 목록 기준 보유 주식 수입니다. 상장폐지되어 추적 대상에서 제외했습니다.",
+    delistedShares: "25년 말 보유",
+    delistedUnit: "주",
+    delistedDate: "이후 상장폐지",
+    delistedEstimated: "(추정)",
+    delistedPending: "상장폐지 결정(확정 전)",
+    delistedSource: "DART 공시 보기",
     prevVerifiedReceipt: "이전에 확인한 접수",
     latestUnresolvedReceipt: "아직 확인하지 못한 최신 접수",
     retry: "게시된 자료 다시 불러오기",
@@ -359,6 +372,14 @@ const STR = {
     guideFaqTitle: "FAQ",
     faqTitle: "FAQ",
     faqDesc: "Frequently asked questions about scope, estimation, and sources.",
+    delistedTitle: "Reference: stocks held at end-2025 and later delisted ({count})",
+    delistedNote: "Shares held at the end of 2025 per the NPS disclosure list. These stocks were delisted and are no longer tracked.",
+    delistedShares: "Held at end-2025",
+    delistedUnit: " shares",
+    delistedDate: "Later delisted",
+    delistedEstimated: "(est.)",
+    delistedPending: "Delisting decided (pending)",
+    delistedSource: "Open DART filing",
     prevVerifiedReceipt: "Previously checked receipt",
     latestUnresolvedReceipt: "Latest unchecked receipt",
     retry: "Reload published data",
@@ -1002,6 +1023,25 @@ function ReadyView({
             </details>
           ))}
         </div>
+      </SectionCard>
+
+      <SectionCard title={t.delistedTitle.replace("{count}", String(delistedItems.length))} description={t.delistedNote}>
+        <ul className="foliotrace-delisted">
+          {delistedItems.map((item) => (
+            <li key={item.stockCode}>
+              <strong>{lang === "ko" ? item.nameKo : item.nameEn}</strong>
+              <span>{t.delistedShares} <span className="foliotrace-num">{formatQty(item.holdingShares2025ye)}</span>{t.delistedUnit}</span>
+              <span>
+                {t.delistedDate}: {item.delistedDate === null ? t.delistedPending :
+                  `${item.delistedDate}${item.dateEstimated ? ` ${t.delistedEstimated}` : ""}`}
+              </span>
+              <small>
+                {lang === "ko" ? item.reasonKo : item.reasonEn}
+                {" "}<a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">{t.delistedSource}</a>
+              </small>
+            </li>
+          ))}
+        </ul>
       </SectionCard>
 
       <Sheet open={selected !== null} onOpenChange={(open) => { if (!open) setSelectedCode(null); }}>

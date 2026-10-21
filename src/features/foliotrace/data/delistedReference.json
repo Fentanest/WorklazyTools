@@ -1,0 +1,212 @@
+{
+  "schemaVersion": 1,
+  "scope": "nps-end-2025-holdings-later-delisted-reference",
+  "items": [
+    {
+      "nameKo": "HD현대인프라코어",
+      "nameEn": "HD Hyundai Infracore",
+      "stockCode": "042670",
+      "holdingShares2025ye": "24938599",
+      "delistedDate": "2026-01-01",
+      "dateEstimated": false,
+      "status": "DELISTED_MERGER",
+      "reasonKo": "HD현대건설기계(현 HD건설기계)에 흡수합병되어 소멸, 상장폐지",
+      "reasonEn": "Absorbed by HD Hyundai Construction Equipment (now HD CE) on 2026-01-01; delisted",
+      "evidenceRcept": [
+        "20260102000224",
+        "20250701000231"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260102000224"
+    },
+    {
+      "nameKo": "IHQ",
+      "nameEn": "IHQ",
+      "stockCode": "003560",
+      "holdingShares2025ye": "1149",
+      "delistedDate": "2026-01-15",
+      "dateEstimated": true,
+      "status": "DELISTED_OTHER",
+      "reasonKo": "감사의견 거절로 상장폐지 결정(2024-12-05), 효력정지 가처분 기각(2025-12-29) 후 정리매매(2026-01-06~14)를 거쳐 상장폐지",
+      "reasonEn": "Delisting decided 2024-12-05 (audit opinion disclaimer); injunction dismissed 2025-12-29; liquidation trading 2026-01-06 to 01-14; delisted",
+      "evidenceRcept": [
+        "20251230800872"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20251230800872"
+    },
+    {
+      "nameKo": "KH 필룩스",
+      "nameEn": "KH FEELUX",
+      "stockCode": "033180",
+      "holdingShares2025ye": "4170",
+      "delistedDate": "2026-01-15",
+      "dateEstimated": true,
+      "status": "DELISTED_OTHER",
+      "reasonKo": "감사의견 거절로 상장폐지 결정(2024-12-05), 효력정지 가처분 기각(2025-12-29) 후 정리매매(2026-01-06~14)를 거쳐 상장폐지",
+      "reasonEn": "Delisting decided 2024-12-05 (audit opinion disclaimer); injunction dismissed 2025-12-29; liquidation trading 2026-01-06 to 01-14; delisted",
+      "evidenceRcept": [
+        "20251230800867"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20251230800867"
+    },
+    {
+      "nameKo": "푸른소나무",
+      "nameEn": "푸른소나무",
+      "stockCode": "057880",
+      "holdingShares2025ye": "14626",
+      "delistedDate": "2026-01-22",
+      "dateEstimated": true,
+      "status": "DELISTED_OTHER",
+      "reasonKo": "회생절차 중 코스닥기업심사위원회 상장폐지 결정(2025-06-26), 효력정지 가처분 기각(2026-01-08) 후 정리매매(2026-01-13~21)를 거쳐 상장폐지",
+      "reasonEn": "Delisting decided 2025-06-26 (rehabilitation proceedings); injunction dismissed 2026-01-08; liquidation trading 2026-01-13 to 01-21; delisted",
+      "evidenceRcept": [
+        "20260109900687",
+        "20250626900790"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260109900687"
+    },
+    {
+      "nameKo": "국보",
+      "nameEn": "Kukbo",
+      "stockCode": "001140",
+      "holdingShares2025ye": "809",
+      "delistedDate": "2026-01-27",
+      "dateEstimated": true,
+      "status": "DELISTED_OTHER",
+      "reasonKo": "감사의견 거절로 상장폐지 결정(2025-05-19), 효력정지 가처분 기각(2026-01-09) 후 정리매매(2026-01-16~26)를 거쳐 상장폐지",
+      "reasonEn": "Delisting decided 2025-05-19 (audit opinion disclaimer); injunction dismissed 2026-01-09; liquidation trading 2026-01-16 to 01-26; delisted",
+      "evidenceRcept": [
+        "20260112800447"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260112800447"
+    },
+    {
+      "nameKo": "세아특수강",
+      "nameEn": "SeAH Special Steel",
+      "stockCode": "019440",
+      "holdingShares2025ye": "40580",
+      "delistedDate": "2026-02-12",
+      "dateEstimated": false,
+      "status": "DELISTED_SHARE_EXCHANGE",
+      "reasonKo": "세아홀딩스와의 포괄적 주식교환으로 완전자회사 편입, 상장폐지",
+      "reasonEn": "Became wholly owned subsidiary of SeAH Holdings via share exchange (2026-01-26); delisted 2026-02-12",
+      "evidenceRcept": [
+        "20260126000203",
+        "20251030000267"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260126000203"
+    },
+    {
+      "nameKo": "코오롱ENP",
+      "nameEn": "Kolon ENP",
+      "stockCode": "138490",
+      "holdingShares2025ye": "183812",
+      "delistedDate": "2026-04-01",
+      "dateEstimated": false,
+      "status": "DELISTED_MERGER",
+      "reasonKo": "코오롱인더스트리에 흡수합병되어 소멸, 상장폐지",
+      "reasonEn": "Absorbed by Kolon Industries on 2026-04-01; delisted",
+      "evidenceRcept": [
+        "20260402000894",
+        "20251124000181"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260402000894"
+    },
+    {
+      "nameKo": "에코마케팅",
+      "nameEn": "Echo Marketing",
+      "stockCode": "230360",
+      "holdingShares2025ye": "15213",
+      "delistedDate": "2026-06-30",
+      "dateEstimated": false,
+      "status": "DELISTED_SHARE_EXCHANGE",
+      "reasonKo": "공개매수 후 비씨피이이에이비드코원 주식회사와의 포괄적 주식교환으로 완전자회사 편입, 상장폐지",
+      "reasonEn": "Became wholly owned subsidiary of BCPE EA Bidco via share exchange (2026-06-15); delisting scheduled 2026-06-30",
+      "evidenceRcept": [
+        "20260615000154",
+        "20260403002597"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260615000154"
+    },
+    {
+      "nameKo": "더존비즈온",
+      "nameEn": "Douzone Bizon",
+      "stockCode": "012510",
+      "holdingShares2025ye": "2415455",
+      "delistedDate": "2026-07-15",
+      "dateEstimated": false,
+      "status": "DELISTED_SHARE_EXCHANGE",
+      "reasonKo": "공개매수 후 도로니쿰 주식회사와의 포괄적 주식교환으로 완전자회사 편입, 상장폐지",
+      "reasonEn": "Became wholly owned subsidiary of Doronicum via share exchange (2026-06-30); delisting scheduled 2026-07-15",
+      "evidenceRcept": [
+        "20260630000093",
+        "20260427000630"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260630000093"
+    },
+    {
+      "nameKo": "현대홈쇼핑",
+      "nameEn": "Hyundai Home Shopping",
+      "stockCode": "057050",
+      "holdingShares2025ye": "425680",
+      "delistedDate": "2026-07-20",
+      "dateEstimated": false,
+      "status": "DELISTED_SHARE_EXCHANGE",
+      "reasonKo": "현대지에프홀딩스와의 포괄적 주식교환으로 완전자회사 편입, 상장폐지",
+      "reasonEn": "Became wholly owned subsidiary of Hyundai GF Holdings via share exchange (2026-06-30); delisting scheduled 2026-07-20",
+      "evidenceRcept": [
+        "20260630000880",
+        "20260211000381"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260630000880"
+    },
+    {
+      "nameKo": "신세계푸드",
+      "nameEn": "Shinsegae Food",
+      "stockCode": "031440",
+      "holdingShares2025ye": "14229",
+      "delistedDate": "2026-08-11",
+      "dateEstimated": false,
+      "status": "DELISTED_SHARE_EXCHANGE",
+      "reasonKo": "이마트와의 포괄적 주식교환으로 완전자회사 편입, 상장폐지",
+      "reasonEn": "Became wholly owned subsidiary of E-Mart via share exchange (2026-07-23); delisting scheduled 2026-08-11",
+      "evidenceRcept": [
+        "20260723000353",
+        "20260310002919"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260723000353"
+    },
+    {
+      "nameKo": "동양생명",
+      "nameEn": "Tongyang Life Insurance",
+      "stockCode": "082640",
+      "holdingShares2025ye": "7312823",
+      "delistedDate": "2026-08-31",
+      "dateEstimated": false,
+      "status": "DELISTED_SHARE_EXCHANGE",
+      "reasonKo": "우리금융지주와의 포괄적 주식교환으로 완전자회사 편입, 상장폐지",
+      "reasonEn": "Became wholly owned subsidiary of Woori Financial Group via share exchange (2026-08-11); delisting scheduled 2026-08-31",
+      "evidenceRcept": [
+        "20260811000494",
+        "20260424000498"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260811000494"
+    },
+    {
+      "nameKo": "대호에이엘",
+      "nameEn": "Daeho A.L.",
+      "stockCode": "069460",
+      "holdingShares2025ye": "174542",
+      "delistedDate": null,
+      "dateEstimated": false,
+      "status": "DELISTING_DECIDED_PENDING",
+      "reasonKo": "횡령·배임 혐의 발생으로 상장적격성 실질심사(2026-04-01), 기업심사위 상장폐지 결정(2026-06-16), 이의신청(2026-07-07) 후 상장공시위원회가 상장폐지 결정(2026-08-04). 상장폐지 확정 전(진행 중)",
+      "reasonEn": "Listing suitability review after alleged embezzlement/breach of trust; delisting decided 2026-06-16, appeal rejected 2026-08-04; delisting process pending (not yet confirmed delisted)",
+      "evidenceRcept": [
+        "20260804800880",
+        "20260616800841",
+        "20260401801648"
+      ],
+      "sourceUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260804800880"
+    }
+  ]
+}
