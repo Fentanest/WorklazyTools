@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generation_id": "20261021T210000.254137Z",
-  "created_at": "2026-10-21T21:41:36.783696+00:00",
-  "source_manifest_sha256": "6679561bc45f4c1289b24706d743cad84fcea53d0a4939942ec289de9e8175a0",
+  "generation_id": "20261022T210000.186462Z",
+  "created_at": "2026-10-22T21:38:53.444422+00:00",
+  "source_manifest_sha256": "944d28300f39ac94cb26dcb2f34bc62d8957d3eeed97af656afcdf8eec05a317",
   "files": [
     {
       "path": "calendar-2026.json",
@@ -13,8 +13,8 @@
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "f51f8bd83c38fd5aaafde4e75c73796a3dfa7127a7a16ca66f3f7b9de8c8532b",
-      "source_sha256": "f02823890b3c563c6d01d181649481ce405c47b147f658dc28a3b94c2e739366"
+      "sha256": "91a0590aee0a77b78f1f64aac94e63a44a6f23c96a80b1b18587130e18f4f58a",
+      "source_sha256": "1340e601df872ab7208a72d074126cc3888c4fde8d0dee6a2447ff51eefabb94"
     }
   ],
   "scopes": [
@@ -23,9 +23,9 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "f586c446a36d692ed62d6ef24c56f1179393a52a353abf29b5c4fa2971e1ffed",
-      "last_checked_at": "2026-10-21T21:11:17.900373+00:00",
-      "validity": "stale",
-      "reason": "collection:krx-2026-public_holidays",
+      "last_checked_at": "2026-10-22T21:09:40.939791+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -34,7 +34,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "7638ec018fa03360a52509bb2d5b92bc2ebac5119bef7888cf5dccdab63de075",
-      "last_checked_at": "2026-10-21T21:11:17.900373+00:00",
+      "last_checked_at": "2026-10-22T21:09:40.939791+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -45,9 +45,9 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "16627d7800e681a1595cf3f81e41e64fa05812420a6a7b789153b77d5f0c085f",
-      "last_checked_at": "2026-10-21T21:11:17.900373+00:00",
-      "validity": "stale",
-      "reason": "collection:nxt-2026-public_holidays",
+      "last_checked_at": "2026-10-22T21:09:40.939791+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -56,7 +56,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-21T21:11:17.900373+00:00",
+      "last_checked_at": "2026-10-22T21:09:40.939791+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -67,9 +67,9 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "7901a67ba8ec5e9c7148551eb5cc1735bedeb9cf70ad1d74fbfe369e7c9c76b8",
-      "last_checked_at": "2026-10-21T21:11:17.900373+00:00",
-      "validity": "stale",
-      "reason": "collection:krx-2027-public_holidays",
+      "last_checked_at": "2026-10-22T21:09:40.939791+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -78,15 +78,15 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-21T21:11:17.900373+00:00",
+      "last_checked_at": "2026-10-22T21:09:40.939791+00:00",
       "validity": "held",
       "reason": "nasdaq-2027-annual",
       "unpublished": true,
       "unpublished_evidence": [
         {
           "source_id": "nasdaq-holiday-schedule",
-          "fetched_at": "2026-10-21T21:01:03.242674+00:00",
-          "raw_sha256": "e8c69ce51b2eea9bccef703a989ea148b61f91ec4ba4c3b2e19148e984693155",
+          "fetched_at": "2026-10-22T21:00:57.074518+00:00",
+          "raw_sha256": "c9225209fe69d73a28139d2a92a91bd027b0bb77a4c12758324e2c903789f596",
           "rule": "D12-nasdaq-holiday-schedule-year-absent-v1"
         }
       ]
@@ -96,9 +96,9 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-10-21T21:11:17.900373+00:00",
-      "validity": "stale",
-      "reason": "collection:nxt-2027-public_holidays",
+      "last_checked_at": "2026-10-22T21:09:40.939791+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -107,7 +107,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "c3dc345f2bf23cd37d290c7437e2298ac42752ae53044edf4e466c4aaccc743f",
-      "last_checked_at": "2026-10-21T21:11:17.900373+00:00",
+      "last_checked_at": "2026-10-22T21:09:40.939791+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
