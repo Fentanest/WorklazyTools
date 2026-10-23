@@ -73,3 +73,26 @@ test("HWP file-read failure and cancellation never create an orphan Worker", asy
     assert.equal(created, 0);
   } finally { globalThis.Worker = original; }
 });
+
+test("HWP preserves safe worker guidance and cleans up dispatch/deserialization failures", async () => {
+  const original = globalThis.Worker;
+  const file = { name: "a.hwp", arrayBuffer: async () => new ArrayBuffer(2) } as File;
+  const options = { formatting: true, tables: true, metadata: true };
+  try {
+    for (const failure of ["password", "post", "deserialize"]) {
+      let worker: FakeWorker | undefined;
+      globalThis.Worker = class extends FakeWorker {
+        constructor() {
+          super(); worker = this; this.failPost = failure === "post";
+          queueMicrotask(() => {
+            if (failure === "password") this.send({ type: "error", error: { message: "Check the password or retry with an unlocked HWP copy." } });
+            if (failure === "deserialize") this.onmessageerror?.();
+          });
+        }
+      } as unknown as typeof Worker;
+      await assert.rejects(compareHwpFilePairs([{ beforeFile: file, afterFile: file }], options, undefined, "en"),
+        failure === "password" ? /Check the password/ : failure === "post" ? /Could not start/ : /Could not read/);
+      assert.equal(worker?.terminated, 1);
+    }
+  } finally { globalThis.Worker = original; }
+});

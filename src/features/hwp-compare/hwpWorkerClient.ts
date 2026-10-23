@@ -61,7 +61,9 @@ export async function compareHwpFilePairs(
       }
       if (!finish()) return;
       if (event.data?.type === "result" && Array.isArray(event.data.result)) resolve(event.data.result as HwpWorkerPairResult[]);
-      else reject(new Error(language === "en" ? "An error occurred while comparing HWP documents." : "HWP 문서 비교 중 오류가 발생했습니다."));
+      else reject(new Error(event.data?.type === "error" && typeof event.data.error?.message === "string"
+        ? event.data.error.message
+        : language === "en" ? "An error occurred while comparing HWP documents." : "HWP 문서 비교 중 오류가 발생했습니다."));
     };
     worker.onerror = (event) => {
       if (!finish()) return;
