@@ -1,4 +1,5 @@
 import copy
+import bisect
 import datetime
 import hashlib
 import io
@@ -131,7 +132,7 @@ def _property_revision(after_properties, before_properties, property_tag, change
 def _property_action(before, after, property_tag):
     left = _MANIFEST_NODE_KEYS.get(before)
     right = _MANIFEST_NODE_KEYS.get(after)
-    if left is None or right is None:
+    if left is None or right is None or left[0] != "before" or right[0] != "after":
         raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_SOURCE")
     for action in _MANIFEST["propertyActions"]:
         if _manifest_key(action["before"]) == left[1] and _manifest_key(action["after"]) == right[1] and action["property"] == _local_name(property_tag):
@@ -431,16 +432,77 @@ def _paragraph_merge_revision(first_before, second_before, after, include_format
     # A deleted empty paragraph mark records the structural merge. Accepting the
     # revision removes that boundary while leaving the after paragraph intact.
     deleted_boundary = ET.Element(W + "p", dict(first_before.attrib))
-    paragraph_properties = first_before.find(W + "pPr")
+    paragraph_properties = _project_properties(first_before.find(W + "pPr"), after.find(W + "pPr"), "pPr")
     if paragraph_properties is not None:
         deleted_boundary.append(_accepted_copy(paragraph_properties))
     _mark_paragraph_end(deleted_boundary, "del", writer)
     return [deleted_boundary, revised_after]
 
 
+def _project_properties(before, after, property_name):
+    if not _MANIFEST["options"]["formatting"]:
+        return copy.deepcopy(after) if after is not None else None
+    allowed = _MANIFEST_ALLOWED_PROPERTIES[property_name]
+    result = _effective_properties(after) if after is not None else ET.Element(W + property_name)
+    for child in list(result):
+        if child.tag in allowed: result.remove(child)
+    if before is not None:
+        for child in before:
+            if child.tag in allowed: result.append(_effective_properties(child))
+    order = [child.tag for child in before] if before is not None else []
+    order.extend(child.tag for child in result if child.tag not in order)
+    result[:] = sorted(list(result), key=lambda child: order.index(child.tag))
+    return result if len(result) or result.attrib else None
+
+
+def _restore_projected_tokens(tokens, before_start, projections):
+    result = []
+    ordered = sorted(projections, key=lambda item: item["beforeStart"])
+    cursor = bisect.bisect_right([item["beforeStart"] for item in ordered], before_start) - 1
+    for offset, token in enumerate(tokens):
+        position = before_start + offset
+        while cursor >= 0 and cursor < len(ordered) and ordered[cursor]["beforeStart"] + ordered[cursor]["length"] <= position: cursor += 1
+        if cursor < 0 or cursor >= len(ordered) or not ordered[cursor]["beforeStart"] <= position < ordered[cursor]["beforeStart"] + ordered[cursor]["length"]: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROJECTION")
+        projection = ordered[cursor]
+        after_properties = None
+        if projection["policy"] == "copy-revised-run":
+            source = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(projection["source"])))
+            if source is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
+            after_properties = source.find(W + "rPr")
+        revised = dict(token)
+        revised["properties"] = _project_properties(token["properties"], after_properties, "rPr")
+        result.append(revised)
+    return result
+
+
+def _restore_whole_properties(result, source, property_name):
+    origin = _MANIFEST_NODE_KEYS.get(source)
+    if origin is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
+    pairs = [pair for pair in _MANIFEST["restorePropertyPairs"] if pair["property"] == property_name and _manifest_key(pair["before"]) == origin[1]]
+    if not pairs: return
+    if len(pairs) != 1: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
+    after = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(pairs[0]["after"])))
+    if after is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
+    action = _property_action(source, after, W + property_name) if _MANIFEST["options"]["formatting"] else None
+    properties = _project_properties(source.find(W + property_name), after.find(W + property_name), property_name)
+    current = result.find(W + property_name)
+    if current is not None: result.remove(current)
+    if properties is not None: result.insert(0, properties)
+
+
 def _whole_paragraph_revision(source, kind, writer):
     paragraph = ET.Element(W + "p", dict(source.attrib))
     paragraph_properties = source.find(W + "pPr")
+    restoration = None
+    if kind == "del" and source in _MANIFEST_NODE_KEYS:
+        origin = _MANIFEST_NODE_KEYS[source][1]
+        matches = [entry for decision in _MANIFEST_DECISIONS for entry in decision.get("wholeRestoreStyles", []) if _manifest_key(entry["before"]) == origin]
+        if len(matches) > 1: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
+        restoration = matches[0] if matches else None
+        if restoration is not None:
+            after = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(restoration["afterParagraph"])))
+            if after is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
+            paragraph_properties = _project_properties(paragraph_properties, after.find(W + "pPr"), "pPr")
     if paragraph_properties is not None:
         paragraph.append(copy.deepcopy(paragraph_properties) if kind == "ins" else _accepted_copy(paragraph_properties))
     _mark_paragraph_end(paragraph, kind, writer)
@@ -448,6 +510,7 @@ def _whole_paragraph_revision(source, kind, writer):
         tokens, events = _styled_tokens(source, collect_events=True)
     else:
         tokens = _styled_tokens(source)
+        if restoration is not None: tokens = _restore_projected_tokens(tokens, 0, restoration["projections"])
         events = {}
     if kind == "del":
         if tokens:
@@ -638,7 +701,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
         else:
             emit_events(j1)
             if i1 < i2:
-                paragraph.append(_revision_container("del", before_tokens[i1:i2], writer, strip_history=True))
+                paragraph.append(_revision_container("del", _restore_projected_tokens(before_tokens[i1:i2], i1, _MANIFEST_ACTIVE_COMPARISON["restoreStyles"]) if _MANIFEST is not None else before_tokens[i1:i2], writer, strip_history=True))
             if j1 < j2:
                 emit_inserted(j1, j2)
     emit_events(len(after_tokens))
@@ -719,7 +782,7 @@ def _table_revision(before, after, include_formatting, writer):
             _consume_manifest_subtree("before", before_rows[before_row_index])
             row = _accepted_copy(before_rows[before_row_index])
             _mark_row(row, "del", writer)
-            _revisionize_deleted_row(row, writer)
+            _revisionize_deleted_row(row, writer, before_rows[before_row_index])
             revised_rows.append(row)
             continue
 
@@ -759,19 +822,29 @@ def _table_revision(before, after, include_formatting, writer):
 def _whole_table_revision(source, kind, writer):
     _consume_manifest_subtree("after" if kind == "ins" else "before", source)
     table = copy.deepcopy(source) if kind == "ins" else _accepted_copy(source)
-    for row in table.findall(W + "tr"):
-        _mark_row(row, kind, writer)
+    if kind == "del": _restore_whole_properties(table, source, "tblPr")
+    for index, row in enumerate(table.findall(W + "tr")):
+        original = source.findall(W + "tr")[index]
         if kind == "del":
-            _revisionize_deleted_row(row, writer)
+            _restore_whole_properties(row, original, "trPr")
+            _revisionize_deleted_row(row, writer, original)
+        _mark_row(row, kind, writer)
     return table
 
 
-def _revisionize_deleted_row(row, writer):
-    for cell in row.findall(W + "tc"):
-        for index, child in enumerate(list(cell)):
-            if child.tag == W + "p":
-                cell.remove(child)
-                cell.insert(index, _whole_paragraph_revision(child, "del", writer))
+def _revisionize_deleted_row(row, writer, source_row=None):
+    originals = list(source_row.iter(W + "p")) if source_row is not None else None
+    paragraphs = list(row.iter(W + "p"))
+    if originals is not None and len(originals) != len(paragraphs): raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+    if source_row is not None:
+        for cell, original in zip(row.findall(W + "tc"), source_row.findall(W + "tc")):
+            _restore_whole_properties(cell, original, "tcPr")
+    parents = {child: parent for parent in row.iter() for child in parent}
+    for index, paragraph in enumerate(paragraphs):
+        parent = parents[paragraph]
+        position = list(parent).index(paragraph)
+        parent.remove(paragraph)
+        parent.insert(position, _whole_paragraph_revision(originals[index] if originals is not None else paragraph, "del", writer))
 
 
 def _whole_content_control_revision(source, kind, writer, include_formatting, include_tables):
@@ -825,9 +898,13 @@ _MANIFEST_CONSUMED = {}
 _MANIFEST_ACTIVE_DECISION = None
 _MANIFEST_ACTIVE_COMPARISON = None
 _MANIFEST_PROPERTY_USED = set()
+_MANIFEST_SOURCE_NODES = {}
+_MANIFEST_ALLOWED_PROPERTIES = {}
 
 
 def _manifest_key(source):
+    if not isinstance(source, dict) or not isinstance(source.get("part"), str) or not isinstance(source.get("path"), list) or any(type(index) is not int or index < 0 for index in source["path"]):
+        raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_REF")
     return (source["part"], tuple(source["path"]))
 
 
@@ -934,6 +1011,7 @@ def _validate_manifest(before_path, after_path):
                 if any(pair["beforeIndex"] is None and pair["afterIndex"] is None for pair in decision[axis]):
                     raise ValueError("INVALID_COMPARISON_MANIFEST_TABLE_AXIS")
 
+    _validate_restore_styles(actual)
     _validate_formatting_manifest(actual, json.loads(WORKLAZY_FORMATTING_POLICY_JSON))
 
     note_mappings = {}
@@ -1004,6 +1082,105 @@ def _validate_manifest(before_path, after_path):
                 raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
 
 
+def _validate_restore_styles(actual):
+    if _MANIFEST.get("restoreStylePolicyVersion") != "worklazy-restore-style-1": raise ValueError("STALE_COMPARISON_MANIFEST")
+    def children(side, parent, kind):
+        part, path = parent
+        return sorted(key for key, source in actual[side].items() if key[0] == part and source["kind"] == kind and len(key[1]) == len(path) + 1 and key[1][:len(path)] == path)
+    expected_pairs = set()
+    for decision in _MANIFEST_DECISIONS:
+        if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision":
+            if "wholeRestoreStyles" in decision or "deletedFormattingPolicy" in decision or any("sourceSlices" in comparison or "restoreStyles" in comparison for comparison in decision.get("comparisons", [])):
+                raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
+        if decision["type"] == "table" and len(decision["before"]) == len(decision["after"]) == 1:
+            before, after = _manifest_key(decision["before"][0]), _manifest_key(decision["after"][0])
+            expected_pairs.add((before, after, "tblPr"))
+            left, right = children("before", before, "tr"), children("after", after, "tr")
+            for row in decision["rows"]:
+                if row["beforeIndex"] is None or row["afterIndex"] is None: continue
+                a, b = left[row["beforeIndex"]], right[row["afterIndex"]]
+                expected_pairs.add((a, b, "trPr"))
+                old_cells, new_cells = children("before", a, "tc"), children("after", b, "tc")
+                for column in decision["columns"]:
+                    x, y = column["beforeIndex"], column["afterIndex"]
+                    if x is not None and y is not None and x < len(old_cells) and y < len(new_cells): expected_pairs.add((old_cells[x], new_cells[y], "tcPr"))
+    pairs = _MANIFEST.get("restorePropertyPairs", [])
+    if len(pairs) != len(expected_pairs) or {(_manifest_key(pair["before"]), _manifest_key(pair["after"]), pair["property"]) for pair in pairs} != expected_pairs:
+        raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROPERTY_PAIRS")
+    for decision in _MANIFEST_DECISIONS:
+        if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision": continue
+        if not decision["after"]:
+            if decision.get("deletedFormattingPolicy") != "restore-before-unpaired": raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
+            continue
+        if not decision["before"]: continue
+        if decision.get("deletedFormattingPolicy") != "paired-revised": raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
+        shape = (len(decision["before"]), len(decision["after"]))
+        emitted = [0] if shape == (1, 1) else [1, 2] if shape == (1, 2) else [1]
+        for index, comparison in enumerate(decision["comparisons"]):
+            if index not in emitted and ("sourceSlices" in comparison or "restoreStyles" in comparison): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
+        whole_expected = {_manifest_key(ref): {} for ref in decision["before"]}
+        for index in emitted:
+            comparison = decision["comparisons"][index]
+            source_slices = comparison.get("sourceSlices")
+            if source_slices is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SLICES")
+            owners = []
+            for side in ("before", "after"):
+                expected = [{"source": ref, "range": [0, len(actual[side][_manifest_key(ref)].get("rawText", ""))]} for ref in decision[side]]
+                if shape == (1, 2): expected = [{"source": decision["before"][0], "range": decision["splitSlices"][index - 1]}] if side == "before" else [expected[index - 1]]
+                slices = source_slices[side]
+                if [(_manifest_key(item["source"]), item["range"]) for item in slices] != [(_manifest_key(item["source"]), item["range"]) for item in expected]: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SLICES")
+                raw = "".join(actual[side][_manifest_key(item["source"])]["rawText"][item["range"][0]:item["range"][1]] for item in slices)
+                if raw != comparison[side]: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SLICES")
+                if side == "after":
+                    for item in slices:
+                        ref = item["source"]; start, end = item["range"]
+                        runs = [(key, source["textRange"]) for key, source in actual[side].items() if key[0] == ref["part"] and source.get("paragraphPath") == ref["path"] and "textRange" in source]
+                        runs.sort(key=lambda pair: pair[1]); cursor = 0
+                        for offset in range(start, end):
+                            while cursor < len(runs) and runs[cursor][1][1] <= offset: cursor += 1
+                            if cursor >= len(runs) or not runs[cursor][1][0] <= offset < runs[cursor][1][1]: raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+                            owners.append(runs[cursor][0])
+            expected = {}; before = after = 0
+            for segment in comparison["segments"]:
+                size = len(segment["text"])
+                if segment["type"] != "added":
+                    for offset in range(size):
+                        cursor = after + (offset if segment["type"] == "equal" else 0)
+                        owner = owners[min(cursor, len(owners) - 1)] if owners else None
+                        expected[before + offset] = (segment["type"], cursor, owner)
+                if segment["type"] != "added": before += size
+                if segment["type"] != "deleted": after += size
+            covered = set()
+            for projection in comparison.get("restoreStyles", []):
+                start, size = projection["beforeStart"], projection["length"]
+                if type(start) is not int or type(size) is not int or size <= 0: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROJECTION")
+                for offset in range(size):
+                    position = start + offset
+                    owner = _manifest_key(projection["source"]) if projection.get("source") else None
+                    value = (projection["kind"], projection["afterStart"] + (offset if projection["kind"] == "equal" else 0), owner)
+                    if position in covered or expected.get(position) != value or projection["policy"] != ("copy-revised-run" if owner is not None else "inherit-after-default"): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROJECTION")
+                    covered.add(position)
+            if covered != set(expected): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_COVERAGE")
+            offset = 0
+            for item in source_slices["before"]:
+                for local in range(item["range"][1] - item["range"][0]): whole_expected[_manifest_key(item["source"])][item["range"][0] + local] = expected[offset + local]
+                offset += item["range"][1] - item["range"][0]
+        entries = decision.get("wholeRestoreStyles", [])
+        if len(entries) != len(whole_expected) or {_manifest_key(entry["before"]) for entry in entries} != set(whole_expected): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_COVERAGE")
+        for entry in entries:
+            if _manifest_key(entry["afterParagraph"]) != _manifest_key(decision["after"][0]): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
+            expected = whole_expected[_manifest_key(entry["before"])]; covered = set()
+            for projection in entry["projections"]:
+                if any(type(projection[field]) is not int for field in ("beforeStart", "afterStart", "length")) or projection["beforeStart"] < 0 or projection["afterStart"] < 0 or projection["length"] <= 0: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROJECTION")
+                for offset in range(projection["length"]):
+                    position = projection["beforeStart"] + offset
+                    owner = _manifest_key(projection["source"]) if projection.get("source") else None
+                    value = (projection["kind"], projection["afterStart"] + (offset if projection["kind"] == "equal" else 0), owner)
+                    if position in covered or expected.get(position) != value or projection["policy"] != ("copy-revised-run" if owner is not None else "inherit-after-default"): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROJECTION")
+                    covered.add(position)
+            if covered != set(expected): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_COVERAGE")
+
+
 def _validate_formatting_manifest(actual, policy):
     if _MANIFEST.get("formattingPolicyVersion") != policy["version"]:
         raise ValueError("STALE_COMPARISON_MANIFEST")
@@ -1047,7 +1224,7 @@ def _validate_formatting_manifest(actual, policy):
         action_scopes.add(action["scopeId"]); action_ids.add(action["id"])
         if action["families"] != scope["families"] or action["property"] != scope["property"] or any(_manifest_key(action[side]) != _manifest_key(scope[side]) for side in ("before", "after")):
             raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_ACTION")
-        if action["representation"] != ("preserve-after-history" if scope["afterFact"]["history"] else "revision"):
+        if action["representation"] != ("preserve-after-history" if scope["afterFact"]["history"] else "whole-node-revision" if any(decision["id"] == action.get("decisionId") and decision.get("moved") for decision in _MANIFEST_DECISIONS) else "revision"):
             raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_HISTORY")
     if action_scopes != {scope["id"] for scope in scopes if "comparisonId" not in scope and scope["families"]}:
         raise ValueError("INVALID_COMPARISON_MANIFEST_MISSING_PROPERTY_ACTION")
@@ -1187,7 +1364,7 @@ def _consume_manifest_subtree(side, node):
 
 
 def _install_manifest(manifest):
-    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION, _MANIFEST_ACTIVE_COMPARISON, _MANIFEST_PROPERTY_USED
+    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION, _MANIFEST_ACTIVE_COMPARISON, _MANIFEST_PROPERTY_USED, _MANIFEST_SOURCE_NODES, _MANIFEST_ALLOWED_PROPERTIES
     if not isinstance(manifest, dict) or manifest.get("version") != 1:
         raise ValueError("INVALID_COMPARISON_MANIFEST")
     _MANIFEST = manifest
@@ -1196,6 +1373,8 @@ def _install_manifest(manifest):
     _MANIFEST_ACTIVE_DECISION = None
     _MANIFEST_ACTIVE_COMPARISON = None
     _MANIFEST_PROPERTY_USED = set()
+    _MANIFEST_SOURCE_NODES = {}
+    _MANIFEST_ALLOWED_PROPERTIES = {name: {W + family for family in families} for name, families in json.loads(WORKLAZY_FORMATTING_POLICY_JSON)["enabled"].items()}
     _MANIFEST_NODE_KEYS = {}
     _MANIFEST_DECISIONS = []
     def visit(decisions):
@@ -1208,6 +1387,7 @@ def _install_manifest(manifest):
 def _register_manifest_root(root, part, side):
     def visit(node, path):
         _MANIFEST_NODE_KEYS[node] = (side, (part, tuple(path)))
+        _MANIFEST_SOURCE_NODES[(side, (part, tuple(path)))] = node
         for index, child in enumerate(node):
             visit(child, path + [index])
     visit(root, [])
@@ -1860,7 +2040,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
 
 
 def generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None):
-    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION, _MANIFEST_ACTIVE_COMPARISON, _MANIFEST_PROPERTY_USED
+    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION, _MANIFEST_ACTIVE_COMPARISON, _MANIFEST_PROPERTY_USED, _MANIFEST_SOURCE_NODES, _MANIFEST_ALLOWED_PROPERTIES
     try:
         return _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json)
     finally:
@@ -1873,3 +2053,5 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _MANIFEST_ACTIVE_DECISION = None
         _MANIFEST_ACTIVE_COMPARISON = None
         _MANIFEST_PROPERTY_USED = set()
+        _MANIFEST_SOURCE_NODES = {}
+        _MANIFEST_ALLOWED_PROPERTIES = {}

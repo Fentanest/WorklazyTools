@@ -30,6 +30,8 @@ export interface ComparisonDecision {
   after: DocumentSourceReference[];
   moved: boolean;
   screenFormattingFamilies?: string[];
+  deletedFormattingPolicy?: "restore-before-unpaired" | "paired-revised";
+  wholeRestoreStyles?: Array<{ before: DocumentSourceReference; afterParagraph: DocumentSourceReference; projections: RestoreStyleProjection[] }>;
   trackedRepresentation: "revision" | "preserve-after";
   trackedReason?: "existing-comment-contract";
   segments: WordDiffSegment[];
@@ -45,8 +47,10 @@ export interface ComparisonDecision {
 }
 export interface FormattingScope { id: string; before: DocumentSourceReference; after: DocumentSourceReference; property: string; beforeFact: PropertyFact; afterFact: PropertyFact; families: string[]; excludedFamilies: string[]; comparisonId?: string; beforeStart?: number; afterStart?: number; length?: number }
 export interface FormattingSpan { beforeStart: number; afterStart: number; length: number; families: string[]; history: boolean; scopeId: string }
-export interface PropertyAction { id: string; before: DocumentSourceReference; after: DocumentSourceReference; property: string; families: string[]; representation: "revision" | "preserve-after-history"; decisionId?: string; scopeId: string }
-export interface TextComparison { before: string; after: string; segments: WordDiffSegment[]; formatting?: { paragraphFamilies: string[]; paragraphHistory: boolean; paragraphScopeId: string; beforeSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; afterSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; spans: FormattingSpan[]; history: boolean } }
+export interface PropertyAction { id: string; before: DocumentSourceReference; after: DocumentSourceReference; property: string; families: string[]; representation: "revision" | "preserve-after-history" | "whole-node-revision"; decisionId?: string; scopeId: string }
+export interface SourceSlices { before: Array<{ source: DocumentSourceReference; range: [number, number] }>; after: Array<{ source: DocumentSourceReference; range: [number, number] }> }
+export interface RestoreStyleProjection { beforeStart: number; afterStart: number; length: number; kind: "equal" | "deleted"; policy: "copy-revised-run" | "inherit-after-default"; source?: DocumentSourceReference }
+export interface TextComparison { sourceSlices?: SourceSlices; restoreStyles?: RestoreStyleProjection[]; before: string; after: string; segments: WordDiffSegment[]; formatting?: { paragraphFamilies: string[]; paragraphHistory: boolean; paragraphScopeId: string; beforeSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; afterSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; spans: FormattingSpan[]; history: boolean } }
 export interface DocumentComparisonManifest {
   version: 1;
   policyVersion: "worklazy-document-1";
@@ -56,6 +60,8 @@ export interface DocumentComparisonManifest {
   decisions: ComparisonDecision[];
   formattingPolicyVersion: "worklazy-formatting-1";
   formattingScopes: FormattingScope[];
+  restoreStylePolicyVersion: "worklazy-restore-style-1";
+  restorePropertyPairs: Array<{ before: DocumentSourceReference; after: DocumentSourceReference; property: string }>;
   propertyExclusions: Array<{ side: "before" | "after"; source: DocumentSourceReference; property: string; reason: "unpaired-style" }>;
   propertyActions: PropertyAction[];
   formattingExcluded: string[];

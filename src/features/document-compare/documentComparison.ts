@@ -12,6 +12,7 @@ import type {
 } from "../excel-merger/types";
 import { alignDocumentSequence, alignSequence, type SequenceGroup, type SequencePair } from "./documentAlignment.ts";
 
+import { buildRestoreStyleProjections } from "./restoreStyleProjection.ts";
 import { buildWordFormatting, projectWordFormatting, type ManifestFormattingView } from "./wordFormatting.ts";
 import { completeManifestCoverage, freezeComparisonManifest } from "./comparisonManifest.ts";
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ManifestRecord } from "./comparisonManifest.ts";
@@ -82,7 +83,7 @@ export function compareDocumentModels(
     inputRevision: { before: before.sourceRevision, after: after.sourceRevision },
     options: { formatting: options.formatting, tables: options.tables, metadata: options.metadata },
     preservation: { comments: "preserve-after-existing-contract", existingRevisions: "preserve-after-history" },
-    formattingPolicyVersion: "worklazy-formatting-1", formattingScopes: [], propertyExclusions: [], propertyActions: [], formattingExcluded: [],
+    formattingPolicyVersion: "worklazy-formatting-1", formattingScopes: [], restoreStylePolicyVersion: "worklazy-restore-style-1", restorePropertyPairs: [], propertyExclusions: [], propertyActions: [], formattingExcluded: [],
     coverage: { before: [], after: [] },
     sources: { before: before.sourceInventory ?? [], after: after.sourceInventory ?? [] },
     exclusions: {
@@ -154,6 +155,7 @@ export function compareDocumentModels(
   const commentChanges: WordDiffItem[] = [];
   const commentViews = compareRecordList(options.metadata ? before.comments ?? [] : [], options.metadata ? after.comments ?? [] : [], "comment", commentChanges, options.formatting, manifest);
   changes.push(...commentChanges);
+  buildRestoreStyleProjections(manifest);
   buildWordFormatting(manifest, diffCharacters);
   projectWordFormatting(manifest, documentViews, headerFooter, note, changes, tables, language);
   const summary: WordCompareResult["summary"] = { added: 0, deleted: 0, changed: 0, format: 0, unchanged: 0, moved: 0 };

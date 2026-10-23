@@ -135,7 +135,10 @@ worker.onmessage = async (event: MessageEvent) => {
         if ([...result.manifest.coverage.before, ...result.manifest.coverage.after].some((item) => item.reason === "blank-paragraph")) {
           result.warnings.push(L("화면에서 비교하지 않는 빈 문단의 배치는 수정본 기준으로 유지됩니다.", "The layout of empty paragraphs omitted from the comparison is kept from the revised file."));
         }
-        if (!event.data.options.formatting || !event.data.options.tables || !event.data.options.metadata) {
+        if (!event.data.options.formatting) {
+          result.warnings.push(L("서식 비교를 끄면 대응하는 내용은 수정본 서식을 유지합니다. 수정본에 대응 문단이 없는 삭제 문단을 복원하면 원본 서식이 유지됩니다.", "When formatting comparison is off, paired content keeps the revised formatting. Restoring a wholly deleted paragraph without a revised counterpart keeps its original formatting."));
+        }
+        if (!event.data.options.tables || !event.data.options.metadata) {
           result.warnings.push(L("비교에서 제외한 서식·표·문서 정보는 수정본 기준으로 유지됩니다.", "Excluded formatting, tables and document information are kept from the revised file."));
         }
         if ((beforeModel.comments?.length || afterModel.comments?.length) && event.data.options.trackedDocument) {

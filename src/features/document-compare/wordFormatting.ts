@@ -92,7 +92,7 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
     const scopeId = `scope:${JSON.stringify([key(before), key(after), property])}`;
     manifest.formattingScopes.push({ id: scopeId, before, after, property, beforeFact: old, afterFact: next, families: names, excludedFamilies: excluded });
     if (excluded.length) manifest.formattingExcluded.push(decisionId ?? property);
-    if (names.length) manifest.propertyActions.push({ id: `format:${scopeId}`, scopeId, before, after, property, families: names, representation: next.history ? "preserve-after-history" : "revision", decisionId });
+    if (names.length) manifest.propertyActions.push({ id: `format:${scopeId}`, scopeId, before, after, property, families: names, representation: next.history ? "preserve-after-history" : decisions.some((decision) => decision.id === decisionId && decision.moved) ? "whole-node-revision" : "revision", decisionId });
   };
   for (const decision of decisions.filter((item) => item.type === "table" && item.before.length === 1 && item.after.length === 1)) {
     const before = manifest.sources.before.find((ref) => key(ref) === key(decision.before[0]))!, after = manifest.sources.after.find((ref) => key(ref) === key(decision.after[0]))!;
