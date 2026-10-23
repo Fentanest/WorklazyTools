@@ -25,7 +25,7 @@ export function TextComparePage() {
   const history=useRef(new TextHistory()),abort=useRef<AbortController|undefined>(undefined),generation=useRef(0),reads=useRef({left:0,right:0});
   const editors=useRef<Partial<Record<"left"|"right",HTMLTextAreaElement|null>>>({});
   const cancel=useCallback(()=>{generation.current++;abort.current?.abort();setBusy(false);},[]);
-  const change=(update:Partial<TextSnapshot>,record=true)=>{cancel();if(record)history.current.record(current.current);const next={...current.current,...update,revision:current.current.revision+1};current.current=next;setState(next);};
+  const change=(update:Partial<TextSnapshot>,record=true)=>{cancel();if("left" in update)reads.current.left++;if("right" in update)reads.current.right++;if(record)history.current.record(current.current);const next={...current.current,...update,revision:current.current.revision+1};current.current=next;setState(next);};
   useEffect(()=>()=>{generation.current++;abort.current?.abort();reads.current.left++;reads.current.right++;},[]);
   const compare=useCallback(async()=>{
     const snapshot=current.current;abort.current?.abort();const control=new AbortController();abort.current=control;const run=++generation.current;setBusy(true);setError("");

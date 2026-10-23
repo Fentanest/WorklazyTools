@@ -6,6 +6,7 @@ import puppeteer from 'puppeteer-core';
 const base=process.env.TEST_BASE_URL||'http://127.0.0.1:4173';
 const out=path.resolve(process.env.TEXT_COMPARE_SCREENSHOTS||'docs/jobs/todo/diffchecker-port-20261023/text-ui');await fs.mkdir(out,{recursive:true});
 const temporary=await fs.mkdtemp(path.join(os.tmpdir(),'text-compare-'));
+await fs.writeFile(path.join(temporary,'slow.txt'),'late file content');
 const browser=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
 let checks=0;
 try{
@@ -32,6 +33,14 @@ try{
   assert.equal(await page.$eval('[data-testid="text-compare-left"]',node=>node.value),'alpha SECRET\nnew\nomega\n');checks++;
   await button(language==='ko'?'되돌리기':'Undo');assert.equal(await page.$eval('[data-testid="text-compare-left"]',node=>node.value),'alpha SECRET\nold\nomega\n');checks++;
   await button(language==='ko'?'다시 적용':'Redo');assert.equal(await page.$eval('[data-testid="text-compare-left"]',node=>node.value),'alpha SECRET\nnew\nomega\n');checks++;
+  await page.evaluate(()=>{const original=File.prototype.arrayBuffer;window.__restoreTextRead=()=>{File.prototype.arrayBuffer=original;};File.prototype.arrayBuffer=async function(){if(this.name==='slow.txt')await new Promise(resolve=>{window.__releaseTextRead=resolve;});return original.call(this);};});
+  await (await page.$('#text-file-left')).uploadFile(path.join(temporary,'slow.txt'));
+  await page.waitForFunction(()=>typeof window.__releaseTextRead==='function');
+  await button(language==='ko'?'되돌리기':'Undo');
+  await page.evaluate(()=>{window.__releaseTextRead();window.__restoreTextRead();});
+  await new Promise(resolve=>setTimeout(resolve,150));
+  assert.equal(await page.$eval('[data-testid="text-compare-left"]',node=>node.value),'alpha SECRET\nold\nomega\n');checks++;
+  await button(language==='ko'?'다시 적용':'Redo');
   const text=await page.$eval('[data-tool-page="text-compare"]',node=>node.textContent);
   assert.ok(!text.includes('textCompare.')&&!text.includes('features:'));checks++;
   assert.ok(text.includes(language==='ko'?'파일이나 글이 서버로 전송되나요?':'Are my files or text sent to a server?'));checks++;
