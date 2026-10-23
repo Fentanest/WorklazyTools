@@ -34,6 +34,7 @@ export async function buildExcelCompareReport(
         ["rightFile", context.rightName],
         ...result.parameters,
         ...duplicateMetadata,
+        ...reportProvenance(result.records, duplicateLayout.rows),
         ...result.warnings.map((warning) => ["warning", warning] as [string, string]),
       ],
     },
@@ -94,4 +95,20 @@ function recordSheet(name: string, records: ExcelCompareStandardRecord[], contex
       item.reason,
     ]),
   };
+}
+
+function reportProvenance(records: ExcelCompareRecord[], duplicateRows: Array<{ record: ExcelCompareRecord }>): Array<[string, string]> {
+  const nextRows = new Map<string, number>();
+  const duplicateRanges = new Map<ExcelCompareRecord, [number, number]>();
+  duplicateRows.forEach((item, i) => {
+    const existing = duplicateRanges.get(item.record);
+    duplicateRanges.set(item.record, [existing?.[0] ?? i + 2, i + 2]);
+  });
+  return records.flatMap((record): Array<[string, string]> => {
+    if (!record.recordId) return [];
+    const sheet = record.status === "duplicate" ? "Duplicates" : record.status === "unmatched" || record.status === "error" ? "Errors" : `${record.status[0].toUpperCase()}${record.status.slice(1)}`;
+    const rows = record.status === "duplicate" ? duplicateRanges.get(record) ?? [] : [(nextRows.get(sheet) ?? 1) + 1];
+    if (record.status !== "duplicate") nextRows.set(sheet, rows[0]);
+    return [[`record:${record.recordId}`, JSON.stringify({ sheet, startRow: rows[0], endRow: rows.at(-1), status: record.status, matchingReason: record.matchingReason, reason: record.reason, leftRow: record.leftRow, rightRow: record.rightRow, leftColumn: record.leftColumn, rightColumn: record.rightColumn, sourceRows: record.status === "duplicate" ? undefined : record.sourceRows })]];
+  });
 }

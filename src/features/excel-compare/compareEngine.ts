@@ -2,11 +2,11 @@ import type { SpreadsheetBookData, SpreadsheetCellData, SpreadsheetSheetData } f
 import { alignSequenceWithBudget, type SequenceAlignmentPair } from "../../utils/sequenceAlignment.ts";
 import {
   cellText,
-  compareSpreadsheetCells,
   normalizeComparableText,
   normalizedCellIdentity,
   normalizeKeyPart,
 } from "./normalization.ts";
+import { compareCellsWithStringDates } from "./stringDates.ts";
 import { isReconcileConfigValid, type ReconcileConfig } from "./reconcileConfig.ts";
 import type {
   ExcelCompareDuplicateRecord,
@@ -17,6 +17,8 @@ import type {
 } from "./types.ts";
 
 export interface ExcelCompareEngineResult {
+  runId?: string;
+  originalSheets?: { left: SpreadsheetSheetData; right: SpreadsheetSheetData };
   records: ExcelCompareRecord[];
   summary: ExcelCompareSummary;
   warnings: string[];
@@ -65,11 +67,16 @@ export function compareSpreadsheetPair(
     : options.mode === "key"
       ? compareByKey(leftBook, rightBook, left, right, options, warnings, checkCanceled)
       : compareByReconciliation(left, right, options, warnings, checkCanceled);
+  if (records.some((item) => item.reason.includes("STRING_DATE_PARSE_FAILED"))) warnings.push("STRING_DATE_PARSE_FAILED");
+  const runId = globalThis.crypto.randomUUID();
+  records.forEach((item, index) => { item.recordId = `${runId}:${index}`; item.matchingReason = options.mode === "reconcile" ? `RECONCILIATION:${item.reason}` : options.mode === "key" ? `KEY:${options.key?.duplicatePolicy ?? "invalid"}:${options.columnMapping?.length ? "manual-columns" : "auto-columns"}` : `POSITION:${options.columnMapping?.length ? "manual-columns" : "auto-columns"}`; });
   return {
+    runId,
+    originalSheets: structuredClone({ left: leftSheet, right: rightSheet }),
     records,
     summary: summarize(records),
     warnings,
-    parameters: comparisonParameters(leftBook, rightBook, options),
+    parameters: [["runId", runId], ...comparisonParameters(leftBook, rightBook, options)],
   };
 }
 
@@ -343,6 +350,23 @@ function compareByReconciliation(
 }
 
 function alignColumns(left: SheetIndex, right: SheetIndex, options: ExcelComparePairOptions, checkCanceled: () => void) {
+  if (options.columnMapping?.length) {
+    const mapping = options.columnMapping;
+    const leftUsed = new Set<number>();
+    const rightUsed = new Set<number>();
+    for (const pair of mapping) {
+      if (!Number.isInteger(pair.leftColumn) || !Number.isInteger(pair.rightColumn)
+        || pair.leftColumn < 1 || pair.leftColumn > left.sheet.columnCount
+        || pair.rightColumn < 1 || pair.rightColumn > right.sheet.columnCount
+        || leftUsed.has(pair.leftColumn) || rightUsed.has(pair.rightColumn)) throw new Error("COLUMN_MAPPING_INVALID");
+      leftUsed.add(pair.leftColumn); rightUsed.add(pair.rightColumn);
+    }
+    return { budgetFallback: false, pairs: [
+      ...mapping.map((pair) => ({ beforeIndex: pair.leftColumn - 1, afterIndex: pair.rightColumn - 1 })),
+      ...Array.from({ length: left.sheet.columnCount }, (_, i) => i + 1).filter((i) => !leftUsed.has(i)).map((i) => ({ beforeIndex: i - 1, afterIndex: null })),
+      ...Array.from({ length: right.sheet.columnCount }, (_, i) => i + 1).filter((i) => !rightUsed.has(i)).map((i) => ({ beforeIndex: null, afterIndex: i - 1 })),
+    ] };
+  }
   const leftItems = Array.from({ length: left.sheet.columnCount }, (_, index) => axisItem(index + 1, columnContent(left, index + 1, options.left.headerRow, options)));
   const rightItems = Array.from({ length: right.sheet.columnCount }, (_, index) => axisItem(index + 1, columnContent(right, index + 1, options.right.headerRow, options)));
   return alignAxis(leftItems, rightItems, options.alignmentCellBudget, checkCanceled);
@@ -396,9 +420,9 @@ function compareRowPair(
       if (leftCell) records.push(record("removed", rows.beforeIndex, null, leftColumn, null, key, cellText(leftCell), "", "CELL", "REMOVED", displayKey));
       continue;
     }
-    const comparison = compareSpreadsheetCells(leftCell, rightCell, options.normalization, compareStyles);
+    const comparison = compareCellsWithStringDates(leftCell, rightCell, options, compareStyles);
     const reason = [...comparison.changes, ...comparison.notes].join("+");
-    records.push(record(comparison.equal ? "matched" : "changed", rows.beforeIndex, rows.afterIndex, leftColumn, rightColumn, key, comparison.leftText, comparison.rightText, comparison.changes.join("+"), reason || "MATCHED", displayKey));
+    records.push({ ...record(comparison.equal ? "matched" : "changed", rows.beforeIndex, rows.afterIndex, leftColumn, rightColumn, key, comparison.leftText, comparison.rightText, comparison.changes.join("+"), reason || "MATCHED", displayKey), dateNormalization: comparison.dateNormalization });
   }
   return records;
 }
@@ -566,7 +590,7 @@ function roundAmount(value: number, unit: number) {
 }
 
 function reconciliationRecord(status: ExcelCompareStandardRecord["status"], left: Array<{ row: number; amountText: string; partner: string }>, right: Array<{ row: number; amountText: string; partner: string }>, reason: string) {
-  return record(status, left[0]?.row ?? null, right[0]?.row ?? null, null, null, left[0]?.partner ?? right[0]?.partner ?? "", left.map((item) => item.amountText).join(" + "), right.map((item) => item.amountText).join(" + "), "RECONCILIATION", reason);
+  return { ...record(status, left[0]?.row ?? null, right[0]?.row ?? null, null, null, left[0]?.partner ?? right[0]?.partner ?? "", left.map((item) => item.amountText).join(" + "), right.map((item) => item.amountText).join(" + "), "RECONCILIATION", reason), sourceRows: { left: [...new Set(left.map((item) => item.row))], right: [...new Set(right.map((item) => item.row))] } };
 }
 
 function rowText(index: SheetIndex, row: number) {
@@ -612,6 +636,11 @@ function comparisonParameters(left: SpreadsheetBookData, right: SpreadsheetBookD
   const dateActive = reconcile?.leftDateColumn !== undefined && reconcile.rightDateColumn !== undefined;
   return [
     ["mode", options.mode],
+    ["stringDateMode", options.stringDates?.mode ?? "off"],
+    ["stringDateScope", "selected non-formula string pairs; VALUE only; keys/anchors/reconciliation unchanged"],
+    ["stringDateLeftColumns", parameterColumns(options.stringDates?.leftColumns)],
+    ["stringDateRightColumns", parameterColumns(options.stringDates?.rightColumns)],
+    ["columnMapping", options.mode === "reconcile" ? UNUSED_PARAMETER : options.columnMapping?.length ? JSON.stringify(options.columnMapping) : "AUTO"],
     ["leftFormat", left.format],
     ["rightFormat", right.format],
     ["leftDateSystem", left.date1904 ? "1904" : "1900"],

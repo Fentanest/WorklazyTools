@@ -57,10 +57,17 @@ export interface ExcelComparePairOptions {
     allowGroupedMatches: boolean;
     roundingUnit: number;
   };
+  /** One-based source columns; omitted columns remain explicit additions/removals. */
+  stringDates?: { mode: import("./stringDates.ts").StringDateMode; leftColumns: number[]; rightColumns: number[] };
+  columnMapping?: Array<{ leftColumn: number; rightColumn: number }>;
   alignmentCellBudget?: number;
 }
 
 interface ExcelCompareRecordBase {
+  dateNormalization?: { left: import("./stringDates.ts").ParsedStringDate; right: import("./stringDates.ts").ParsedStringDate };
+  recordId?: string;
+  matchingReason?: string;
+  sourceRows?: { left: number[]; right: number[] };
   leftRow: number | null;
   rightRow: number | null;
   leftColumn: number | null;
@@ -120,6 +127,9 @@ export interface ExcelComparePairResult {
   reportBuffer: ArrayBuffer;
   reportByteLength: number;
   reportName: string;
+  runId?: string;
+  parameters?: Array<[string, string]>;
+  originalSheets?: { left: import("../spreadsheet-core/inputAdapter.ts").SpreadsheetSheetData; right: import("../spreadsheet-core/inputAdapter.ts").SpreadsheetSheetData };
 }
 
 export interface ExcelCompareInspection {

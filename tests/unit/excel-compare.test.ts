@@ -694,3 +694,45 @@ async function replaceCustomWidthWithTrue(bytes: ArrayBuffer) {
   assert.ok(replacements > 0);
   return archive.generateAsync({ type: "arraybuffer" });
 }
+
+
+test("manual source-column mappings preserve original coordinates and explicit unmapped cells", () => {
+  const before = book([["duplicate", "duplicate", "extra"], ["A", "B", "keep"]]);
+  const after = book([["duplicate", "duplicate"], ["B", "A"]]);
+  const options = { ...baseOptions(), columnMapping: [{ leftColumn: 1, rightColumn: 2 }, { leftColumn: 2, rightColumn: 1 }] };
+  const result = compareSpreadsheetPair(before, after, options);
+  assert.deepEqual(result.records.filter((r) => r.status === "matched").map((r) => [r.leftColumn, r.rightColumn]), [[1, 2], [2, 1]]);
+  assert.equal(result.records.find((r) => r.leftColumn === 3)?.status, "removed");
+  assert.equal(before.sheets[0].cells.find((c) => c.row === 2)?.value, "A");
+  assert.equal(new Set(result.records.map((r) => r.recordId)).size, result.records.length);
+  assert.ok(result.records.every((r) => r.recordId?.startsWith(result.runId!)));
+  assert.throws(() => compareSpreadsheetPair(before, after, { ...options, columnMapping: [{ leftColumn: 1, rightColumn: 1 }, { leftColumn: 2, rightColumn: 1 }] }), /COLUMN_MAPPING_INVALID/);
+});
+
+
+test("string-date VALUE normalization leaves key grouping, reconcile and formula decisions unchanged", () => {
+  const before = book([["date", "amount"], ["01/02/2024", 5], ["2024-01-02", 5]]);
+  const after = book([["date", "amount"], ["2024-01-02", 5]]);
+  const strip = (result: ReturnType<typeof compareSpreadsheetPair>) => result.records.map(({ recordId, matchingReason, dateNormalization, ...record }) => record);
+  for (const mode of ["key", "reconcile"] as const) {
+    const configured: ExcelComparePairOptions = { ...baseOptions(), mode, key: { leftColumns: [1], rightColumns: [1], secondaryLeftColumns: [], secondaryRightColumns: [], duplicatePolicy: "error" }, reconcile: { leftAmountColumn: 2, rightAmountColumn: 2, leftDateColumn: 1, rightDateColumn: 1, dateToleranceDays: 0, allowGroupedMatches: false, roundingUnit: 0.01 } };
+    assert.deepEqual(strip(compareSpreadsheetPair(before, after, configured)), strip(compareSpreadsheetPair(before, after, { ...configured, stringDates: { mode: "US", leftColumns: [1], rightColumns: [1] } })));
+  }
+});
+
+test("manual mapped string-date columns share parsed values and XLSX provenance", async () => {
+  const options: ExcelComparePairOptions = { ...baseOptions(), columnMapping: [{ leftColumn: 1, rightColumn: 2 }], stringDates: { mode: "US", leftColumns: [1], rightColumns: [2] } };
+  const result = compareSpreadsheetPair(book([["left"], ["01/02/2024"]]), book([["other", "right"], ["", "2024-01-02"]]), options);
+  const matched = result.records.find((record) => record.leftColumn === 1 && record.rightColumn === 2)!;
+  assert.equal(matched.status, "matched");
+  assert.equal(matched.leftValue, "01/02/2024");
+  assert.equal(matched.dateNormalization?.left.normalizedDate, "date:2024-01-02");
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(await buildExcelCompareReport(result, { leftName: "left.xlsx", rightName: "right.xlsx", leftSheet: "Data", rightSheet: "Data" }) as never);
+  const parameters = workbook.getWorksheet("Parameters")!;
+  let provenance: Record<string, unknown> | undefined;
+  parameters.eachRow((row) => { if (row.getCell(1).value === `record:${matched.recordId}`) provenance = JSON.parse(String(row.getCell(2).value)); });
+  assert.equal(provenance?.sheet, "Matched");
+  assert.equal(provenance?.leftColumn, 1);
+  assert.equal(provenance?.rightColumn, 2);
+});

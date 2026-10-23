@@ -1,3 +1,4 @@
+import { ComparisonGrid } from "./ComparisonGrid.tsx";
 import { BlobWriter } from "@zip.js/zip.js";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "../../components/ui/sheet";
 import { AlertCircle, ArrowLeftRight, ChevronDown, ChevronUp, Download, FileSpreadsheet, Plus, Search, Trash2, X } from "lucide-react";
@@ -313,13 +314,15 @@ export function ExcelComparePage() {
    <OperationProgress {...operation} accent="green" title={t("features:excelCompare.progress.title")} />
 
    {(completed.length> 0 || failed.length> 0) && <Card as="section" className="mt-4 gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-results" aria-labelledby="excel-compare-results-title" onFocusCapture={(event) => scheduleResultFocusVisibility(event.target)}>
-    <div><p className="text-xs font-extrabold tracking-[.08em] text-primary uppercase dark:text-primary">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></div>
+    <div><p className="text-xs font-extrabold tracking-[.08em] text-primary uppercase dark:text-primary">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">{t("features:excelCompare.results.guideLink" as never)} &darr;</a></p></div>
     <div className="mt-3 grid grid-cols-2 gap-2 max-[620px]:grid-cols-1" data-testid="excel-report-downloads">
      {completed.map((item, index) => <Button render={<a href={item.url} download={item.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left" key={item.pairId}><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.pairReport", { number: index + 1 })}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{item.fileName} · {formatBytes(item.blob.size)}</small></span></Button>)}
      {zipResult && <Button render={<a href={zipResult.url} download={zipResult.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left"><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.zip")}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{zipResult.fileName} · {formatBytes(zipResult.size)}</small></span></Button>}
     </div>
     {completed.length> 0 && <p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.results.downloadCheck")}</p>}
     {failed.map((item) => <UtilityNotice className="mt-2" data-testid="excel-compare-error" kind="error" role="alert" key={`${item.pairId}-${item.leftName}`}><span className="flex flex-col"><strong>{item.leftName && item.rightName ? `${item.leftName} ↔ ${item.rightName}` : t("features:excelCompare.results.zip")}</strong>{item.message}</span></UtilityNotice>)}
+    {completed.some((item) => item.result.warnings.includes("STRING_DATE_PARSE_FAILED")) && <UtilityNotice className="mt-3">{t("features:excelCompare.reason.STRING_DATE_PARSE_FAILED" as never)}</UtilityNotice>}
+    {completed.map((item) => <ComparisonGrid key={item.pairId} result={item.result} statuses={statuses} search={search} t={translate} />)}
     {duplicateCount> 0 && <UtilityNotice className="mt-3" data-testid="excel-duplicate-guidance"><span><strong className="block">{t("features:excelCompare.results.duplicateCount", { count: duplicateCount })}</strong><span className="mt-1 block text-sm">{t("features:excelCompare.results.duplicateGuidance")}</span></span></UtilityNotice>}
     <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
      <div className="flex flex-wrap gap-1.5" data-testid="excel-status-filters" role="group" aria-label={t("features:excelCompare.results.filters")}>
@@ -353,7 +356,7 @@ function ResultRow({ item, pairIndex, record, t }: {
  t: LooseT;
 }) {
  if (record.status === "duplicate") {
-  return <tr data-status={record.status} data-testid="excel-duplicate-row">
+  return <tr data-status={record.status} data-record-id={record.recordId} data-run-id={item.result.runId} data-testid="excel-duplicate-row">
    <td className="min-w-14 whitespace-nowrap">{pairIndex + 1}</td>
    <td className="min-w-24 whitespace-nowrap"><span className="font-bold">{t("features:excelCompare.status.duplicate")}</span></td>
    <td className="min-w-20 whitespace-nowrap"><span className="sr-only">{t("features:excelCompare.results.groupedLocation")}</span><span aria-hidden="true">—</span></td>
@@ -363,7 +366,7 @@ function ResultRow({ item, pairIndex, record, t }: {
    <td className="min-w-28 whitespace-nowrap">{reasonText(record.reason, t)}</td>
   </tr>;
  }
- return <tr data-status={record.status}>
+ return <tr data-status={record.status} data-record-id={record.recordId} data-run-id={item.result.runId}>
   <td className="min-w-14 whitespace-nowrap">{pairIndex + 1}</td>
   <td className="min-w-24 whitespace-nowrap"><span className="font-bold">{t(`features:excelCompare.status.${record.status}`)}</span></td>
   <td className="min-w-20 whitespace-nowrap">{locationText(record.leftRow, record.rightRow, record.leftColumn, record.rightColumn)}</td>
@@ -655,6 +658,8 @@ function PairCard({ pair, index, mode, busy, t, updatePair, selectFile, changeSh
    </div>;
    })}
   </div>
+  {pair.leftInspection && pair.rightInspection && <fieldset className="mt-3 rounded-2xl border border-border p-3" data-testid="excel-string-dates"><legend>{t("features:excelCompare.dates.title")}</legend><p className="text-xs text-muted-foreground">{t("features:excelCompare.dates.description")}</p><UtilitySelect value={pair.stringDateMode ?? "off"} onChange={(event) => updatePair(pair.id, { stringDateMode: event.target.value as "off" | "US" | "EU" })}>{["off", "US", "EU"].map((value) => <option key={value} value={value}>{t(`features:excelCompare.dates.${value}`)}</option>)}</UtilitySelect>{pair.stringDateMode && pair.stringDateMode !== "off" && <div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1">{(["left", "right"] as const).map((side) => <ColumnPicker key={side} label={t(`features:excelCompare.dates.${side}`)} headers={side === "left" ? leftHeaders : rightHeaders} value={pair.stringDateColumns?.[side][pair[`${side}Sheet`]] ?? []} onChange={(columns) => updatePair(pair.id, { stringDateColumns: { left: pair.stringDateColumns?.left ?? {}, right: pair.stringDateColumns?.right ?? {}, [side]: { ...pair.stringDateColumns?.[side], [pair[`${side}Sheet`]]: columns } } })} />)}</div>}</fieldset>}
+  {mode !== "reconcile" && pair.leftInspection && pair.rightInspection && <fieldset className="mt-3 rounded-2xl border border-border p-3" data-testid="excel-column-mapping"><legend>{t("features:excelCompare.mapping.title")}</legend><p className="text-xs text-muted-foreground">{t("features:excelCompare.mapping.description")}</p><ToggleRow label={t("features:excelCompare.mapping.manual")} checked={!!pair.columnMapping?.length} onChange={(checked) => updatePair(pair.id, { columnMapping: checked ? Array.from({ length: Math.min(leftHeaders.length, rightHeaders.length) }, (_, i) => ({ leftColumn: i + 1, rightColumn: i + 1 })) : undefined })} />{pair.columnMapping?.map((mapping, index) => <UtilityField key={mapping.leftColumn}><span>{t("features:excelCompare.grid.left")} → {t("features:excelCompare.grid.right")}</span><UtilitySelect aria-label={t("features:excelCompare.grid.left")} value={mapping.leftColumn} onChange={(event) => updatePair(pair.id, { columnMapping: pair.columnMapping!.map((item, i) => i === index ? { ...item, leftColumn: Number(event.target.value) } : item.leftColumn === Number(event.target.value) ? { ...item, leftColumn: mapping.leftColumn } : item) })}>{leftHeaders.map((header, i) => <option key={i} value={i + 1}>{columnLabel(i + 1)} · {header}</option>)}</UtilitySelect><UtilitySelect aria-label={t("features:excelCompare.grid.right")} value={mapping.rightColumn} onChange={(event) => updatePair(pair.id, { columnMapping: pair.columnMapping!.map((item, i) => i === index ? { ...item, rightColumn: Number(event.target.value) } : item.rightColumn === Number(event.target.value) ? { ...item, rightColumn: mapping.rightColumn } : item) })}>{rightHeaders.map((header, i) => <option key={i} value={i + 1}>{columnLabel(i + 1)} · {header}</option>)}</UtilitySelect></UtilityField>)}</fieldset>}
   {mode === "key" && pair.leftInspection && pair.rightInspection && <div className="mt-3 rounded-2xl border border-border bg-muted/30 p-3" data-testid="excel-pair-mode-options">
    <h3 className="mb-3 font-heading text-base font-medium">{t("features:excelCompare.key.title")}</h3>
    <div className="grid grid-cols-2 gap-3 max-[720px]:grid-cols-1"><ColumnPicker label={t("features:excelCompare.key.leftPrimary")} headers={leftHeaders} value={pair.primaryLeft} onChange={(value) => updatePair(pair.id, { primaryLeft: value })} /><ColumnPicker label={t("features:excelCompare.key.rightPrimary")} headers={rightHeaders} value={pair.primaryRight} onChange={(value) => updatePair(pair.id, { primaryRight: value })} /></div>
@@ -732,7 +737,7 @@ function newPair(id: number): PairState {
 }
 
 function pairOptions(pair: PairState, mode: ExcelCompareMode, normalization: typeof DEFAULT_EXCEL_COMPARE_OPTIONS): ExcelComparePairOptions {
- return { mode, left: { sheetName: pair.leftSheet, headerRow: pair.leftHeaderRow }, right: { sheetName: pair.rightSheet, headerRow: pair.rightHeaderRow }, normalization, key: mode === "key" ? { leftColumns: pair.primaryLeft, rightColumns: pair.primaryRight, secondaryLeftColumns: pair.secondaryLeft, secondaryRightColumns: pair.secondaryRight, duplicatePolicy: pair.duplicatePolicy } : undefined, reconcile: mode === "reconcile" ? pair.reconcile : undefined };
+ return { mode, stringDates: { mode: pair.stringDateMode ?? "off", leftColumns: pair.stringDateColumns?.left[pair.leftSheet] ?? [], rightColumns: pair.stringDateColumns?.right[pair.rightSheet] ?? [] }, columnMapping: pair.columnMapping, left: { sheetName: pair.leftSheet, headerRow: pair.leftHeaderRow }, right: { sheetName: pair.rightSheet, headerRow: pair.rightHeaderRow }, normalization, key: mode === "key" ? { leftColumns: pair.primaryLeft, rightColumns: pair.primaryRight, secondaryLeftColumns: pair.secondaryLeft, secondaryRightColumns: pair.secondaryRight, duplicatePolicy: pair.duplicatePolicy } : undefined, reconcile: mode === "reconcile" ? pair.reconcile : undefined };
 }
 
 function pairReady(pair: PairState, mode: ExcelCompareMode) {
@@ -745,6 +750,7 @@ function pairReady(pair: PairState, mode: ExcelCompareMode) {
   || pair.leftHeaderInput !== String(pair.leftHeaderRow) || pair.rightHeaderInput !== String(pair.rightHeaderRow)
   || pair.leftHeaderRow < 1 || pair.leftHeaderRow> Math.max(1, leftSheet.rowCount)
   || pair.rightHeaderRow < 1 || pair.rightHeaderRow> Math.max(1, rightSheet.rowCount)) return false;
+ if (mode !== "reconcile" && pair.columnMapping?.some((mapping) => !validColumns([mapping.leftColumn], leftHeaders) || !validColumns([mapping.rightColumn], rightHeaders))) return false;
  if (mode === "key") return pair.primaryLeft.length> 0 && pair.primaryLeft.length === pair.primaryRight.length
   && validColumns(pair.primaryLeft, leftHeaders) && validColumns(pair.primaryRight, rightHeaders)
   && (pair.duplicatePolicy !== "secondary" || (pair.secondaryLeft.length === pair.secondaryRight.length
@@ -776,6 +782,6 @@ function reasonText(reason: string, t: LooseT) { return reason.split("+").map((c
 function safeError(error: unknown, t: LooseT) { const code = error && typeof error === "object" && "code" in error ? String(error.code) : "PROCESSING_FAILED"; return t(`features:excelCompare.error.${code}`, { defaultValue: t("features:excelCompare.error.PROCESSING_FAILED") }); }
 
 function resetPairFile(pair: PairState, side: "left" | "right", file: File | undefined): PairState {
- if (side === "left") return { ...pair, left: file, leftInspection: undefined, leftInspecting: Boolean(file), leftError: undefined, leftSheet: "", leftHeaderRow: 1, leftHeaderInput: "1", leftHeaderSelections: {}, leftHeaderAnnouncement: undefined };
- return { ...pair, right: file, rightInspection: undefined, rightInspecting: Boolean(file), rightError: undefined, rightSheet: "", rightHeaderRow: 1, rightHeaderInput: "1", rightHeaderSelections: {}, rightHeaderAnnouncement: undefined };
+ if (side === "left") return { ...pair, columnMapping: undefined, stringDateColumns: { left: {}, right: pair.stringDateColumns?.right ?? {} }, left: file, leftInspection: undefined, leftInspecting: Boolean(file), leftError: undefined, leftSheet: "", leftHeaderRow: 1, leftHeaderInput: "1", leftHeaderSelections: {}, leftHeaderAnnouncement: undefined };
+ return { ...pair, columnMapping: undefined, stringDateColumns: { right: {}, left: pair.stringDateColumns?.left ?? {} }, right: file, rightInspection: undefined, rightInspecting: Boolean(file), rightError: undefined, rightSheet: "", rightHeaderRow: 1, rightHeaderInput: "1", rightHeaderSelections: {}, rightHeaderAnnouncement: undefined };
 }
