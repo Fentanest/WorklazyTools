@@ -496,7 +496,7 @@ def _whole_paragraph_revision(source, kind, writer):
     restoration = None
     if kind == "del" and source in _MANIFEST_NODE_KEYS:
         origin = _MANIFEST_NODE_KEYS[source][1]
-        matches = [entry for decision in _MANIFEST_DECISIONS for entry in decision.get("wholeRestoreStyles", []) if _manifest_key(entry["before"]) == origin]
+        matches = [entry for decision in _MANIFEST_DECISIONS if decision.get("deletedFormattingPolicy") == "paired-revised" and decision["before"] and decision["after"] for entry in decision.get("wholeRestoreStyles", []) if _manifest_key(entry["before"]) == origin]
         if len(matches) > 1: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
         restoration = matches[0] if matches else None
         if restoration is not None:
@@ -1089,6 +1089,8 @@ def _validate_restore_styles(actual):
         return sorted(key for key, source in actual[side].items() if key[0] == part and source["kind"] == kind and len(key[1]) == len(path) + 1 and key[1][:len(path)] == path)
     expected_pairs = set()
     for decision in _MANIFEST_DECISIONS:
+        if any(field in decision for field in ("sourceSlices", "restoreStyles")) or any(any(field in comparison for field in ("wholeRestoreStyles", "deletedFormattingPolicy")) for comparison in decision.get("comparisons", [])):
+            raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
         if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision":
             if "wholeRestoreStyles" in decision or "deletedFormattingPolicy" in decision or any("sourceSlices" in comparison or "restoreStyles" in comparison for comparison in decision.get("comparisons", [])):
                 raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
@@ -1109,6 +1111,10 @@ def _validate_restore_styles(actual):
         raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROPERTY_PAIRS")
     for decision in _MANIFEST_DECISIONS:
         if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision": continue
+        has_comparison_projection = any("sourceSlices" in comparison or "restoreStyles" in comparison for comparison in decision.get("comparisons", []))
+        if not decision["before"] or not decision["after"]:
+            if "wholeRestoreStyles" in decision or has_comparison_projection or (not decision["before"] and "deletedFormattingPolicy" in decision):
+                raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
         if not decision["after"]:
             if decision.get("deletedFormattingPolicy") != "restore-before-unpaired": raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
             continue

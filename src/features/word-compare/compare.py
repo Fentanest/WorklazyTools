@@ -605,6 +605,7 @@ def _parse_document(data, include_tables, include_metadata):
                 author_label = f" · {comment['author']}" if comment["author"] else ""
                 anchor_location = comment_locations.get(comment_id, _l("연결 위치를 찾지 못한 문단", "Paragraph with unknown anchor"))
                 records["comment"].append({
+                    "commentId": comment_id,
                     "source": comment.get("source"),
                     "paragraphs": comment.get("paragraphs", []),
                     "section": "comment",
@@ -690,6 +691,7 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
 
     def record_of(record):
         return {
+            **({"commentId": record["commentId"]} if "commentId" in record else {}),
             "source": record.get("source"),
             "rawText": record.get("text", ""),
             "paragraphs": [{**item, "rawText": item["text"], "text": _display_text(item)} for item in record.get("paragraphs", [])],

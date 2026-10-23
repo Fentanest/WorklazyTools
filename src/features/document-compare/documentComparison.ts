@@ -18,6 +18,7 @@ import { completeManifestCoverage, freezeComparisonManifest } from "./comparison
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ManifestRecord } from "./comparisonManifest.ts";
 
 export interface ComparisonRecord {
+  commentId?: string;
   source?: DocumentSourceReference;
   rawText?: string;
   paragraphs?: ManifestRecord[];
@@ -75,6 +76,9 @@ export function compareDocumentModels(
   options: ComparisonOptions,
   language: "ko" | "en",
 ): WordCompareResult & { manifest: DocumentComparisonManifest } {
+  const rawBefore = before, rawAfter = after;
+  before = scopedComparisonModel(before, options);
+  after = scopedComparisonModel(after, options);
   const labels: ComparisonLanguage = language === "en"
     ? { emptyCell: (row, column) => `Empty cell ${row}:${column}`, table: (index) => `Table ${index}` }
     : { emptyCell: (row, column) => `빈 셀 ${row}:${column}`, table: (index) => `표 ${index}` };
@@ -89,7 +93,7 @@ export function compareDocumentModels(
     exclusions: {
       formatting: options.formatting ? "compare" : "preserve-after",
       tables: options.tables ? [] : [...before.sourceInventory ?? [], ...after.sourceInventory ?? []].filter((source) => source.kind === "tbl"),
-      metadata: options.metadata ? [] : [...before.headerFooter, ...after.headerFooter, ...before.notes, ...after.notes, ...before.comments ?? [], ...after.comments ?? []].flatMap((record) => record.source ? [record.source] : []),
+      metadata: options.metadata ? [] : [...rawBefore.headerFooter, ...rawAfter.headerFooter, ...rawBefore.notes, ...rawAfter.notes, ...rawBefore.comments ?? [], ...rawAfter.comments ?? []].flatMap((record) => record.source ? [record.source] : []),
     },
   };
   const changes: WordDiffItem[] = [];
@@ -150,27 +154,10 @@ export function compareDocumentModels(
     ));
   }
 
-  // Extraction retains every source node. Scope filtering belongs to this shared
-  // decision builder, including paragraphs flattened from metadata tables.
-  const scopedMetadata = (model: ComparisonModel, records: ComparisonRecord[]) => {
-    if (!options.metadata) return [];
-    if (options.tables) return records;
-    const tables = (model.sourceInventory ?? []).filter((source) => source.kind === "tbl");
-    const included = (record: ManifestRecord) => !record.source || !tables.some((table) =>
-      table.part === record.source!.part && table.path.every((index, depth) => record.source!.path[depth] === index));
-    return records.filter(included).flatMap((record) => {
-      if (!record.paragraphs?.length) return [record];
-      const paragraphs = record.paragraphs.filter(included);
-      if (paragraphs.length === record.paragraphs.length) return [record];
-      if (!paragraphs.length) return [];
-      const projected = combineRecords(paragraphs.map((item) => ({ ...item, format: (item as Partial<ComparisonRecord>).format ?? "", formatRuns: (item as Partial<ComparisonRecord>).formatRuns, location: record.location })))!;
-      return [{ ...record, ...projected, paragraphs, rawText: paragraphs.map((item) => item.rawText ?? item.text).join("\n") }];
-    });
-  };
-  const headerFooter = compareRecordList(scopedMetadata(before, before.headerFooter), scopedMetadata(after, after.headerFooter), "headerFooter", changes, options.formatting, manifest);
-  const note = compareRecordList(scopedMetadata(before, before.notes), scopedMetadata(after, after.notes), "note", changes, options.formatting, manifest);
+  const headerFooter = compareRecordList(before.headerFooter, after.headerFooter, "headerFooter", changes, options.formatting, manifest);
+  const note = compareRecordList(before.notes, after.notes, "note", changes, options.formatting, manifest);
   const commentChanges: WordDiffItem[] = [];
-  const commentViews = compareRecordList(scopedMetadata(before, before.comments ?? []), scopedMetadata(after, after.comments ?? []), "comment", commentChanges, options.formatting, manifest);
+  const commentViews = compareRecordList(before.comments ?? [], after.comments ?? [], "comment", commentChanges, options.formatting, manifest);
   changes.push(...commentChanges);
   buildRestoreStyleProjections(manifest);
   buildWordFormatting(manifest, diffCharacters);
@@ -195,6 +182,40 @@ export function compareDocumentModels(
     tables,
     views: { document: documentViews, headerFooter, note },
     warnings: [...new Set([...before.warnings, ...after.warnings, ...(manifest.formattingExcluded.length ? [language === "en" ? "Some advanced formatting is kept from the revised file and is not included in tracked formatting changes." : "일부 고급 서식은 수정본 기준으로 유지되며 변경 추적 서식 비교에 포함되지 않습니다."] : []), ...(manifest.formattingScopes.some((scope) => scope.families.length && scope.afterFact.history) ? [language === "en" ? "Some formatting keeps the revised file’s existing revision history." : "일부 서식은 수정본에 있는 기존 변경 기록을 유지합니다."] : [])])],
+  };
+}
+
+// Extraction retains every source node. Scope filtering belongs to this shared
+// decision builder, including paragraphs flattened from metadata tables.
+function scopedMetadata(model: ComparisonModel, records: ComparisonRecord[], options: ComparisonOptions) {
+  if (!options.metadata) return [];
+  if (options.tables) return records;
+  const tables = (model.sourceInventory ?? []).filter((source) => source.kind === "tbl");
+  const included = (record: ManifestRecord) => !record.source || !tables.some((table) =>
+    table.part === record.source!.part && table.path.every((index, depth) => record.source!.path[depth] === index));
+  return records.filter(included).flatMap((record) => {
+    if (!record.paragraphs?.length) return [record];
+    const paragraphs = record.paragraphs.filter(included);
+    if (paragraphs.length === record.paragraphs.length) return [record];
+    if (!paragraphs.length) return [];
+    const projected = combineRecords(paragraphs.map((item) => ({ ...item, format: (item as Partial<ComparisonRecord>).format ?? "", formatRuns: (item as Partial<ComparisonRecord>).formatRuns, location: record.location })))!;
+    return [{ ...record, ...projected, paragraphs, rawText: paragraphs.map((item) => item.rawText ?? item.text).join("\n") }];
+  });
+}
+
+function scopedComparisonModel(model: ComparisonModel, options: ComparisonOptions): ComparisonModel {
+  const comments = scopedMetadata(model, model.comments ?? [], options);
+  const byId = new Map(comments.filter((record) => record.commentId !== undefined).map((record) => [record.commentId!, record]));
+  const knownIds = new Set((model.comments ?? []).flatMap((record) => record.commentId === undefined ? [] : [record.commentId]));
+  const attached = (items: WordCellComment[] = []) => !options.metadata ? [] : items.flatMap((comment) => {
+    const projected = byId.get(comment.id);
+    return projected ? [{ ...comment, text: projected.text }] : knownIds.has(comment.id) ? [] : [{ ...comment }];
+  });
+  const record = <T extends { comments?: WordCellComment[] }>(item: T): T => ({ ...item, comments: attached(item.comments) });
+  return { ...model, comments,
+    headerFooter: scopedMetadata(model, model.headerFooter, options).map(record),
+    notes: scopedMetadata(model, model.notes, options).map(record),
+    blocks: model.blocks.map((block) => ({ ...record(block), ...(block.table ? { table: { ...block.table, grid: block.table.grid.map((row) => row.map(record)) } } : {}) })),
   };
 }
 
