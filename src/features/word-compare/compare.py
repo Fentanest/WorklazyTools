@@ -295,7 +295,7 @@ def _source_paths(root, part, archive=None):
             reference["textRange"] = [start, offsets[tuple(paragraph)]]
         if node.tag == W + "p":
             reference["rawText"] = _text(node)
-            opaque = [item for item in node.iter() if item.tag in {W + "drawing", W + "pict", W + "object", W + "hyperlink", W + "fldChar", W + "instrText", W + "footnoteReference", W + "endnoteReference"}]
+            opaque = [item for item in node.iter() if item.tag in {W + "drawing", W + "pict", W + "object", W + "hyperlink", W + "fldChar", W + "fldSimple", W + "instrText", W + "footnoteReference", W + "endnoteReference"}]
             if opaque:
                 def canonical(item):
                     if item.tag == W + "hyperlink":
@@ -328,6 +328,37 @@ def _source_paths(root, part, archive=None):
         for index, child in enumerate(node):
             visit(child, path + [index], paragraph)
     visit(root, [])
+    def classify(instruction):
+        command = instruction.strip().split(None, 1)[0].upper() if instruction.strip() else ""
+        if command in {"PAGE", "NUMPAGES", "SECTIONPAGES"}: return "pagination"
+        if command in {"DATE", "TIME", "CREATEDATE", "SAVEDATE", "PRINTDATE"}: return "automatic-date"
+        if command in {"TOC", "TOA", "INDEX"}: return "table-of-contents"
+        if command in {"REF", "PAGEREF", "SEQ", "LISTNUM"}: return "reference-numbering"
+        if command in {"DOCPROPERTY", "DOCVARIABLE", "MERGEFIELD"}: return "value"
+        return "other"
+    def reference(node):
+        return {"part": part, "path": result[id(node)]["path"]}
+    stack = []
+    for node in root.iter():
+        if node.tag == W + "fldSimple":
+            instruction = node.get(W + "instr", "")
+            result[id(node)]["field"] = {"kind": classify(instruction), "instruction": instruction, "cachedText": _text(node), "sources": [reference(node)]}
+        if node.tag == W + "fldChar":
+            kind = node.get(W + "fldCharType")
+            if kind == "begin": stack.append({"node": node, "instruction": "", "cachedText": "", "sources": [reference(node)], "separated": False})
+            elif kind == "separate" and stack: stack[-1]["separated"] = True
+            elif kind == "end" and stack:
+                field = stack.pop()
+                result[id(field["node"])]["field"] = {key: field[key] for key in ("instruction", "cachedText", "sources")}
+                result[id(field["node"])]["field"]["kind"] = classify(field["instruction"])
+        elif node.tag == W + "instrText" and stack and not stack[-1]["separated"]:
+            stack[-1]["instruction"] += node.text or ""
+            stack[-1]["sources"].append(reference(node))
+        elif node.tag == W + "t":
+            for field in stack:
+                if field["separated"]: field["cachedText"] += node.text or ""
+    for field in stack:
+        result[id(field["node"])]["field"] = {**{key: field[key] for key in ("instruction", "cachedText", "sources")}, "kind": "incomplete"}
     return result
 
 
@@ -507,6 +538,8 @@ def _parse_document(data, include_tables, include_metadata):
         comments = _read_comments(archive, numbering.fresh()) if include_metadata else {}
         comment_locations = {}
         root = ET.fromstring(archive.read("word/document.xml"))
+        if root.tag != W + "document":
+            raise ValueError(_l("지원하지 않는 Word 문서 형식입니다. 일반 DOCX로 다시 저장한 뒤 비교해 주세요.", "This Word XML format is not supported. Save it as a standard DOCX and compare again."))
         sources = _source_paths(root, "word/document.xml")
         body = root.find(W + "body")
         paragraph_index = 0
@@ -747,6 +780,7 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
         ))
 
     model = {
+        "fields": [source["field"] for source in records["sourceInventory"] if "field" in source],
         "sourceRevision": hashlib.sha256(bytes(document_bytes)).hexdigest(),
         "sourceInventory": records["sourceInventory"],
         "blocks": blocks,

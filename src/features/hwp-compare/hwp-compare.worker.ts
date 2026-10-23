@@ -1,3 +1,5 @@
+import { sniffDocumentFormat } from "../document-compare/documentFormat";
+import { documentCapabilities, documentProvenance } from "../document-compare/documentCapabilities";
 /// <reference lib="webworker" />
 
 import initRhwp, { HwpDocument } from "@rhwp/core";
@@ -72,6 +74,9 @@ worker.onmessage = async (event: MessageEvent<{ pairs: PairPayload[]; options: H
       progress(start + size * 0.38, L(`[${index + 1}/${pairs.length}] ${pair.afterName} 문서 구조를 읽는 중…`, `[${index + 1}/${pairs.length}] Reading the structure of ${pair.afterName}…`));
       const after = parseDocument(pair.afterName, pair.afterBuffer, pair.afterPassword, options);
       progress(start + size * 0.72, L(`[${index + 1}/${pairs.length}] 문단과 표의 대응 관계를 분석하는 중…`, `[${index + 1}/${pairs.length}] Matching paragraphs and tables…`));
+      before.capabilities = documentCapabilities(sniffDocumentFormat(pair.beforeBuffer) === "hwpx" ? "hwpx" : "hwp",before); after.capabilities = documentCapabilities(sniffDocumentFormat(pair.afterBuffer) === "hwpx" ? "hwpx" : "hwp",after);
+      before.provenance = await documentProvenance(pair.beforeBuffer,pair.beforeBuffer);
+      after.provenance = await documentProvenance(pair.afterBuffer,pair.afterBuffer);
       results.push({ result: compareDocumentModels(pair.beforeName, pair.afterName, before, after, options, currentLanguage) });
       progress(start + size, L(`[${index + 1}/${pairs.length}] HWP 비교 완료`, `[${index + 1}/${pairs.length}] HWP comparison complete`));
       await yieldToWorker();
@@ -121,13 +126,14 @@ function parseDocument(name: string, buffer: ArrayBuffer, password: string | und
         if (displayText) {
           blocks.push({
             type: "paragraph",
+            nativeSource: {format:"hwp",story:"body",section,paragraph},
             text: displayText,
             format: options.formatting ? bodyFormat(document, section, paragraph, text.length) : "",
             location: L(`제${section + 1}구역 ${paragraph + 1}문단`, `Section ${section + 1}, paragraph ${paragraph + 1}`),
           });
         }
         for (const table of tablesByParagraph.get(key) ?? []) {
-          blocks.push({ type: "table", text: flattenTable(table), format: "", location: table.location, table });
+          blocks.push({ type: "table", nativeSource:{format:"hwp",story:"body",section:table.section,paragraph:table.paragraph,control:table.control}, text: flattenTable(table), format: "", location: table.location, table });
         }
       }
     }
@@ -135,6 +141,7 @@ function parseDocument(name: string, buffer: ArrayBuffer, password: string | und
     const headerFooter = options.metadata ? readHeaderFooters(document, options.formatting) : [];
     const notes = options.metadata ? readNotes(document, options.formatting) : [];
     const warnings = [
+      L("그리기 개체와 일부 고급 구조는 원문 위치를 모두 추적하지 못하며, 긴 문단의 서식은 표본 위치를 비교합니다.", "Drawing objects and some advanced structures lack complete source mapping; formatting in long paragraphs is sampled."),
       L("HWP/HWPX 의 검토 메모와 변경 추적 기록은 비교하지 않습니다. 해당 기록이 있는 문서는 변경 내용을 모두 적용한 사본으로 비교해 주세요.", "Review comments and tracked changes in HWP/HWPX files are not compared. For files with these records, compare copies with the changes accepted."),
     ];
     if (options.tables && tables.some((table) => table.grid.some((row) => row.some((cell) => /병합|merged/i.test(cell.location))))) {

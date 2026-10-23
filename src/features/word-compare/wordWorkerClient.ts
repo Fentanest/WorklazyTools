@@ -1,6 +1,9 @@
+import type { FormattingMask } from "../document-compare/formattingMask";
 import type { WordCompareResult } from "../excel-merger/types";
 
 export interface WordCompareOptions {
+  requestedFormattingMask?: Partial<FormattingMask>;
+  formattingMask?: Partial<FormattingMask>;
   formatting: boolean;
   tables: boolean;
   metadata: boolean;

@@ -1,3 +1,4 @@
+import { formattingGroups, maskLabels } from "./formattingMask";
 import { AlertCircle, Download, FileText, Info, LockKeyhole, TextSearch } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
@@ -16,7 +17,7 @@ import { UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard } from "..
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import { createComparisonExcelReports, createComparisonReportArtifact } from "./comparisonResults";
-import { compareDocumentFilePairs } from "./documentCompareClient";
+import { compareDocumentFilePairs, inspectPairs } from "./documentCompareClient";
 import { fileKey, useDocumentCompareSession } from "./documentCompareSession";
 import { DocumentFileColumn } from "./DocumentFileColumn";
 import { DocumentPairingPreview } from "./DocumentPairingPreview";
@@ -28,6 +29,7 @@ export function DocumentComparePage() {
   const L = (ko: string, en: string) => language === "en" ? en : ko;
   const resultBasePath = useLocalizedPath("/tools/document-compare/results");
   const session = useDocumentCompareSession();
+  const [nativeOnly, setNativeOnly] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const operation = useOperationProgress();
@@ -75,6 +77,16 @@ export function DocumentComparePage() {
       : null);
   };
 
+  useEffect(() => {
+    let active=true;
+    setNativeOnly(false);
+    if (session.beforeFiles.length && session.beforeFiles.length===session.afterFiles.length) {
+      const pairs=session.beforeFiles.map((beforeFile,index)=>({beforeFile,afterFile:session.afterFiles[index]}));
+      void inspectPairs(pairs,language).then(pairs=>{if(active)setNativeOnly(pairs.every(pair=>!pair.formats.trackedDocxEligible));}).catch(()=>{});
+    }
+    return ()=>{active=false;};
+  },[session.beforeFiles,session.afterFiles,language]);
+
   const runComparison = async () => {
     if (pairingError) { setError(pairingError); return; }
     if (!ready) return;
@@ -93,6 +105,7 @@ export function DocumentComparePage() {
       }));
       const workerResults = await compareDocumentFilePairs(pairs, {
         formatting: session.formatting,
+        formattingMask: session.formattingMask,
         tables: session.tables,
         metadata: session.metadata,
         trackedDocument: session.trackedOutput,
@@ -113,6 +126,8 @@ export function DocumentComparePage() {
         const trackedBuffer = workerResults[index]?.trackedBuffer;
         return {
           pairNumber: index + 1,
+          originalBeforeUrl:URL.createObjectURL(pairs[index].beforeFile),
+          originalAfterUrl:URL.createObjectURL(pairs[index].afterFile),
           result,
           ...createComparisonReportArtifact(reports[index], index + 1, result.beforeName, result.afterName, language),
           trackedUrl: trackedBuffer ? URL.createObjectURL(new Blob([trackedBuffer], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })) : undefined,
@@ -208,6 +223,11 @@ export function DocumentComparePage() {
         <SectionCard className="!m-0" step={3} title={L("비교 범위", "Comparison scope")}>
           <div className="divide-y divide-border [&_[data-ui-component=toggle-row]]:min-h-[45px]" data-testid="document-scope-options">
             <ToggleRow label={L("서식 변경 포함", "Include formatting changes")} checked={session.formatting} onChange={(checked) => { session.setFormatting(checked); resetOutput(); }} />
+            <fieldset className="grid grid-cols-2 gap-2 px-3 py-2" disabled={!session.formatting || nativeOnly}>
+              <legend className="text-xs text-muted-foreground">{L("세부 서식 선택 (DOCX 쌍 전용)", "Formatting groups (DOCX pairs only)")}</legend>
+              {formattingGroups.map(group => <label key={group} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={session.formattingMask[group]} onChange={event => { session.setFormattingMask(current => ({...current,[group]:event.target.checked})); resetOutput(); }} />{maskLabels[group][language === "en" ? 1 : 0]}</label>)}
+            </fieldset>
+            <p className="px-3 py-2 text-xs text-muted-foreground">{L("DOC·HWP·HWPX 쌍은 서식 비교를 켜면 기존의 전체 서식 범위를 사용합니다. 선택한 세부 설정은 DOCX 쌍에 사용할 수 있도록 유지됩니다.","DOC, HWP and HWPX pairs use the full native formatting scope when enabled. Your detailed selection is kept for DOCX pairs.")}</p>
             <ToggleRow label={L("표 비교", "Compare tables")} checked={session.tables} onChange={(checked) => { session.setTables(checked); resetOutput(); }} />
             <ToggleRow label={L("기타 문서 영역", "Other document areas")} description={L("머리말·꼬리말, 메모, 각주·미주", "Headers, footers, comments, footnotes, and endnotes")} checked={session.metadata} onChange={(checked) => { session.setMetadata(checked); resetOutput(); }} />
           </div>

@@ -1,3 +1,5 @@
+import { DocumentFieldNotes } from "../document-compare/DocumentFieldNotes";
+import type { DocumentComparisonManifest } from "../document-compare/comparisonManifest";
 import { ArrowLeft, ArrowRight, Download, Info, MessageSquare, TextSearch } from "lucide-react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
@@ -28,6 +30,8 @@ export interface DocumentCompareResultPair {
   result: WordCompareResult;
   reportUrl?: string;
   reportFileName?: string;
+  originalBeforeUrl?: string;
+  originalAfterUrl?: string;
   trackedUrl?: string;
   trackedFileName?: string;
 }
@@ -103,6 +107,11 @@ export function DocumentCompareResultPage({
         {pair.trackedUrl && trackedLabel && <FileShareButton url={pair.trackedUrl} fileName={pair.trackedFileName || (language === "en" ? "worklazy-tracked-changes.docx" : "worklazy-변경추적.docx")} />}
       </PageHeader>
       <PrivacyBanner compact />
+      <DocumentFieldNotes manifest={(pair.result as WordCompareResult & {manifest?:DocumentComparisonManifest}).manifest} language={language} />
+      {(pair.originalBeforeUrl || pair.originalAfterUrl) && <div className="mt-3 flex flex-wrap gap-4 text-sm">
+        {pair.originalBeforeUrl && <a href={pair.originalBeforeUrl} download={pair.result.beforeName} data-original-file="before" className="underline">{L("수정 전 원본 파일", "Original before file")}</a>}
+        {pair.originalAfterUrl && <a href={pair.originalAfterUrl} download={pair.result.afterName} data-original-file="after" className="underline">{L("수정 후 원본 파일", "Original revised file")}</a>}
+      </div>}
 
       <Card as="section" className="mt-3 gap-0 overflow-visible rounded-4xl border border-border p-5 shadow-md" data-testid="document-result-view" key={`${pair.pairNumber}-${resultTab}-${showFullContent}`}>
         <ComparisonSummary result={pair.result} />

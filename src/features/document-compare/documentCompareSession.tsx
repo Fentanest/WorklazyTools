@@ -1,3 +1,4 @@
+import { defaultFormattingMask, type FormattingMask } from "./formattingMask";
 import { createContext, type Dispatch, type SetStateAction, useContext, useState } from "react";
 import { Outlet } from "react-router-dom";
 
@@ -10,6 +11,8 @@ export interface DocumentPairResult {
   result: WordCompareResult;
   reportUrl?: string;
   reportFileName?: string;
+  originalBeforeUrl?: string;
+  originalAfterUrl?: string;
   trackedUrl?: string;
   trackedFileName?: string;
 }
@@ -31,6 +34,8 @@ interface DocumentCompareSessionValue {
   setRewriteRevisionAuthor: Dispatch<SetStateAction<boolean>>;
   revisionAuthor: string;
   setRevisionAuthor: Dispatch<SetStateAction<string>>;
+  formattingMask: FormattingMask;
+  setFormattingMask: Dispatch<SetStateAction<FormattingMask>>;
   formatting: boolean;
   setFormatting: Dispatch<SetStateAction<boolean>>;
   tables: boolean;
@@ -53,6 +58,7 @@ export function DocumentCompareSessionProvider() {
   const [trackedOutput, setTrackedOutput] = useState(true);
   const [rewriteRevisionAuthor, setRewriteRevisionAuthor] = useState(false);
   const [revisionAuthor, setRevisionAuthor] = useState("Worklazy Tools");
+  const [formattingMask, setFormattingMask] = useState<FormattingMask>({...defaultFormattingMask});
   const [formatting, setFormatting] = useState(true);
   const [tables, setTables] = useState(true);
   const [metadata, setMetadata] = useState(true);
@@ -74,6 +80,8 @@ export function DocumentCompareSessionProvider() {
     setRewriteRevisionAuthor,
     revisionAuthor,
     setRevisionAuthor,
+    formattingMask,
+    setFormattingMask,
     formatting,
     setFormatting,
     tables,

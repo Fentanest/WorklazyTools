@@ -1,3 +1,5 @@
+import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
+import { normalizeFormattingMask, maskPolicyVersion, maskedSourceFormatting, type FormattingMask } from "./formattingMask.ts";
 import type {
   WordCellComment,
   WordCompareResult,
@@ -18,6 +20,7 @@ import { completeManifestCoverage, freezeComparisonManifest } from "./comparison
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ManifestRecord } from "./comparisonManifest.ts";
 
 export interface ComparisonRecord {
+  nativeSource?: {format:"doc"|"hwp";story:string;paragraph:number;section?:number;control?:number};
   commentId?: string;
   source?: DocumentSourceReference;
   rawText?: string;
@@ -36,6 +39,7 @@ export interface ComparisonTable {
 }
 
 export interface ComparisonBlock {
+  nativeSource?: ComparisonRecord["nativeSource"];
   source?: DocumentSourceReference;
   rawText?: string;
   type: "paragraph" | "table";
@@ -48,6 +52,9 @@ export interface ComparisonBlock {
 }
 
 export interface ComparisonModel {
+  capabilities?: DocumentCapabilities;
+  provenance?: DocumentProvenance;
+  fields?: Array<{kind:string; instruction:string; cachedText:string; sources:DocumentSourceReference[]}>;
   sourceRevision?: string;
   sourceInventory?: DocumentSourceReference[];
   blocks: ComparisonBlock[];
@@ -58,6 +65,8 @@ export interface ComparisonModel {
 }
 
 export interface ComparisonOptions {
+  requestedFormattingMask?: Partial<FormattingMask>;
+  formattingMask?: Partial<FormattingMask>;
   formatting: boolean;
   tables: boolean;
   metadata: boolean;
@@ -76,6 +85,9 @@ export function compareDocumentModels(
   options: ComparisonOptions,
   language: "ko" | "en",
 ): WordCompareResult & { manifest: DocumentComparisonManifest } {
+  const requested = normalizeFormattingMask(options.formattingMask);
+  if ((!before.sourceInventory || !after.sourceInventory) && Object.values(requested).some(enabled => !enabled)) throw new Error(language === "en" ? "Detailed formatting groups require two DOCX files." : "세부 서식 선택은 두 파일 모두 DOCX일 때 사용할 수 있습니다.");
+  const effective = Object.fromEntries(Object.entries(requested).map(([group, enabled]) => [group, options.formatting && enabled])) as FormattingMask;
   const rawBefore = before, rawAfter = after;
   before = scopedComparisonModel(before, options);
   after = scopedComparisonModel(after, options);
@@ -83,10 +95,13 @@ export function compareDocumentModels(
     ? { emptyCell: (row, column) => `Empty cell ${row}:${column}`, table: (index) => `Table ${index}` }
     : { emptyCell: (row, column) => `빈 셀 ${row}:${column}`, table: (index) => `표 ${index}` };
   const manifest: DocumentComparisonManifest = {
+    nativeSources: {before:before.blocks.flatMap(block=>block.nativeSource?[block.nativeSource]:[]),after:after.blocks.flatMap(block=>block.nativeSource?[block.nativeSource]:[])},
+    capabilities: {before:before.capabilities,after:after.capabilities}, provenance: {before:before.provenance,after:after.provenance}, fields:{before:before.fields ?? [],after:after.fields ?? []},
     version: 1, decisions: [], policyVersion: "worklazy-document-1",
     inputRevision: { before: before.sourceRevision, after: after.sourceRevision },
     options: { formatting: options.formatting, tables: options.tables, metadata: options.metadata },
     preservation: { comments: "preserve-after-existing-contract", existingRevisions: "preserve-after-history" },
+    formattingMask: {version: maskPolicyVersion, requested, effective, inactiveRequested: options.requestedFormattingMask ? normalizeFormattingMask(options.requestedFormattingMask) : undefined},
     formattingPolicyVersion: "worklazy-formatting-1", formattingScopes: [], restoreStylePolicyVersion: "worklazy-restore-style-1", restorePropertyPairs: [], propertyExclusions: [], propertyActions: [], formattingExcluded: [],
     coverage: { before: [], after: [] },
     sources: { before: before.sourceInventory ?? [], after: after.sourceInventory ?? [] },
@@ -181,7 +196,7 @@ export function compareDocumentModels(
     changes,
     tables,
     views: { document: documentViews, headerFooter, note },
-    warnings: [...new Set([...before.warnings, ...after.warnings, ...(manifest.formattingExcluded.length ? [language === "en" ? "Some advanced formatting is kept from the revised file and is not included in tracked formatting changes." : "일부 고급 서식은 수정본 기준으로 유지되며 변경 추적 서식 비교에 포함되지 않습니다."] : []), ...(manifest.formattingScopes.some((scope) => scope.families.length && scope.afterFact.history) ? [language === "en" ? "Some formatting keeps the revised file’s existing revision history." : "일부 서식은 수정본에 있는 기존 변경 기록을 유지합니다."] : [])])],
+    warnings: [...new Set([...before.warnings, ...after.warnings, ...(options.formatting && Object.values(requested).some(enabled=>!enabled) ? [language === "en" ? "Excluded formatting groups are kept from the revised file." : "비교에서 제외한 서식 항목은 수정본 기준으로 유지됩니다."] : []), ...(before.fields?.length || after.fields?.length ? [language === "en" ? "Word fields use their stored values. Page numbers, dates and tables of contents are not recalculated." : "Word 필드는 저장된 값을 비교하며 쪽 번호·날짜·목차를 다시 계산하지 않습니다."] : []), ...(manifest.formattingExcluded.length ? [language === "en" ? "Some advanced formatting is kept from the revised file and is not included in tracked formatting changes." : "일부 고급 서식은 수정본 기준으로 유지되며 변경 추적 서식 비교에 포함되지 않습니다."] : []), ...(manifest.formattingScopes.some((scope) => scope.families.length && scope.afterFact.history) ? [language === "en" ? "Some formatting keeps the revised file’s existing revision history." : "일부 서식은 수정본에 있는 기존 변경 기록을 유지합니다."] : [])])],
   };
 }
 
@@ -204,14 +219,20 @@ function scopedMetadata(model: ComparisonModel, records: ComparisonRecord[], opt
 }
 
 function scopedComparisonModel(model: ComparisonModel, options: ComparisonOptions): ComparisonModel {
-  const comments = scopedMetadata(model, model.comments ?? [], options);
+  const masked = Boolean(model.sourceInventory) && Object.values(normalizeFormattingMask(options.formattingMask)).some(enabled => !enabled);
+  const comments = scopedMetadata(model, model.comments ?? [], options).map(record => masked ? {...record,format:maskedSourceFormatting(model.sourceInventory!,record.source,normalizeFormattingMask(options.formattingMask)),formatRuns:undefined} : record);
   const byId = new Map(comments.filter((record) => record.commentId !== undefined).map((record) => [record.commentId!, record]));
   const knownIds = new Set((model.comments ?? []).flatMap((record) => record.commentId === undefined ? [] : [record.commentId]));
   const attached = (items: WordCellComment[] = []) => !options.metadata ? [] : items.flatMap((comment) => {
     const projected = byId.get(comment.id);
     return projected ? [{ ...comment, text: projected.text }] : knownIds.has(comment.id) ? [] : [{ ...comment }];
   });
-  const record = <T extends { comments?: WordCellComment[] }>(item: T): T => ({ ...item, comments: attached(item.comments) });
+  const record = <T extends { comments?: WordCellComment[] }>(item: T): T => {
+    const source=item as T & {rawText?:string;paragraphs?:ManifestRecord[]};
+    const unnumbered = model.sourceInventory && !normalizeFormattingMask(options.formattingMask).numbering
+      ? source.rawText ?? source.paragraphs?.map(paragraph=>paragraph.rawText ?? paragraph.text).join("\n") : undefined;
+    return {...item,...(unnumbered !== undefined ? {text:unnumbered} : {}),...(masked ? {format:"",formatRuns:undefined} : {}),comments:attached(item.comments)};
+  };
   return { ...model, comments,
     headerFooter: scopedMetadata(model, model.headerFooter, options).map(record),
     notes: scopedMetadata(model, model.notes, options).map(record),

@@ -1,3 +1,5 @@
+import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
+import type { FormattingMask } from "./formattingMask.ts";
 import type { WordDiffSegment, WordTableAxisPair } from "../excel-merger/types";
 
 /** Paths address actual XML children (including property nodes), never filtered paragraph indexes. */
@@ -52,12 +54,17 @@ export interface SourceSlices { before: Array<{ source: DocumentSourceReference;
 export interface RestoreStyleProjection { beforeStart: number; afterStart: number; length: number; kind: "equal" | "deleted"; policy: "copy-revised-run" | "inherit-after-default"; source?: DocumentSourceReference }
 export interface TextComparison { sourceSlices?: SourceSlices; restoreStyles?: RestoreStyleProjection[]; before: string; after: string; segments: WordDiffSegment[]; formatting?: { paragraphFamilies: string[]; paragraphHistory: boolean; paragraphScopeId: string; beforeSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; afterSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; spans: FormattingSpan[]; history: boolean } }
 export interface DocumentComparisonManifest {
+  nativeSources: {before:Array<{format:"doc"|"hwp";story:string;paragraph:number;section?:number;control?:number}>;after:Array<{format:"doc"|"hwp";story:string;paragraph:number;section?:number;control?:number}>};
+  capabilities: {before?:DocumentCapabilities;after?:DocumentCapabilities};
+  provenance: {before?:DocumentProvenance;after?:DocumentProvenance};
+  fields: {before:Array<{kind:string;instruction:string;cachedText:string;sources:DocumentSourceReference[]}>;after:Array<{kind:string;instruction:string;cachedText:string;sources:DocumentSourceReference[]}>};
   version: 1;
   policyVersion: "worklazy-document-1";
   inputRevision: { before?: string; after?: string };
   options: { formatting: boolean; tables: boolean; metadata: boolean };
   preservation: { comments: "preserve-after-existing-contract"; existingRevisions: "preserve-after-history" };
   decisions: ComparisonDecision[];
+  formattingMask: { version: "worklazy-formatting-mask-1"; requested: FormattingMask; inactiveRequested?: FormattingMask; effective: FormattingMask };
   formattingPolicyVersion: "worklazy-formatting-1";
   formattingScopes: FormattingScope[];
   restoreStylePolicyVersion: "worklazy-restore-style-1";

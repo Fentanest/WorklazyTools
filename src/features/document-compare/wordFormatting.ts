@@ -1,3 +1,4 @@
+import { formattingGroup } from "./formattingMask.ts";
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, FormattingScope, PropertyFact, TextComparison } from "./comparisonManifest.ts";
 
 const W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}";
@@ -6,9 +7,13 @@ const local = (name: string) => name.startsWith(W) ? name.slice(W.length) : name
 const key = (ref: DocumentSourceReference) => JSON.stringify([ref.part, ref.path]);
 const samePath = (a: number[], b: number[]) => JSON.stringify(a) === JSON.stringify(b);
 const emptyFact: PropertyFact = { supported: {}, unsupported: {}, history: false };
-function changed(before: PropertyFact | undefined, after: PropertyFact | undefined, supported = true) {
+function rawChanged(before: PropertyFact | undefined, after: PropertyFact | undefined, supported = true) {
   const a = before?.[supported ? "supported" : "unsupported"] ?? {}, b = after?.[supported ? "supported" : "unsupported"] ?? {};
   return [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((name) => JSON.stringify(a[name] ?? []) !== JSON.stringify(b[name] ?? []));
+}
+function changed(manifest: DocumentComparisonManifest, property: string, before: PropertyFact | undefined, after: PropertyFact | undefined, supported = true) {
+  const names = rawChanged(before, after);
+  return supported ? names.filter(name => manifest.formattingMask.effective[formattingGroup(property,name)]) : [...rawChanged(before,after,false), ...names.filter(name => !manifest.formattingMask.effective[formattingGroup(property,name)])];
 }
 interface StyleEntry { fact: PropertyFact; source: DocumentSourceReference }
 function rawStyles(manifest: DocumentComparisonManifest, side: "before" | "after", refs: DocumentSourceReference[], joinBreaks: boolean) {
@@ -31,8 +36,8 @@ function attachComparison(manifest: DocumentComparisonManifest, decision: Compar
   const oldParagraph = source("before", beforeRef).normalizedProperties?.pPr ?? emptyFact, newParagraph = source("after", afterRef).normalizedProperties?.pPr ?? emptyFact;
   const comparisonId = `${decision.id}:comparison:${decision.comparisons.indexOf(comparison)}`;
   const paragraphScopeId = `${comparisonId}:pPr`;
-  const paragraphFamilies = changed(oldParagraph, newParagraph);
-  manifest.formattingScopes.push({ id: paragraphScopeId, before: beforeRef, after: afterRef, property: "pPr", beforeFact: oldParagraph, afterFact: newParagraph, families: paragraphFamilies, excludedFamilies: changed(oldParagraph, newParagraph, false), comparisonId });
+  const paragraphFamilies = changed(manifest, "pPr", oldParagraph, newParagraph);
+  manifest.formattingScopes.push({ id: paragraphScopeId, before: beforeRef, after: afterRef, property: "pPr", beforeFact: oldParagraph, afterFact: newParagraph, families: paragraphFamilies, excludedFamilies: changed(manifest, "pPr", oldParagraph, newParagraph, false), comparisonId });
   const spans: NonNullable<TextComparison["formatting"]>["spans"] = [];
   let before = 0, after = 0;
   let previousScope: FormattingScope | undefined;
@@ -41,8 +46,8 @@ function attachComparison(manifest: DocumentComparisonManifest, decision: Compar
     if (segment.type === "equal") for (let offset = 0; offset < size; offset++) {
       const a = beforeStyles[before + offset], b = afterStyles[after + offset];
       if (!a || !b) { manifest.formattingExcluded.push(decision.id); continue; }
-      const names = changed(a.fact, b.fact), excluded = changed(a.fact, b.fact, false);
-      if (excluded.length) manifest.formattingExcluded.push(decision.id);
+      const names = changed(manifest, "rPr", a.fact, b.fact), excluded = changed(manifest, "rPr", a.fact, b.fact, false);
+      if (rawChanged(a.fact,b.fact,false).length) manifest.formattingExcluded.push(decision.id);
       if (previousScope && previousScope.beforeStart! + previousScope.length! === before + offset && previousScope.afterStart! + previousScope.length! === after + offset && key(previousScope.before) === key(a.source) && key(previousScope.after) === key(b.source)) previousScope.length!++;
       else {
         previousScope = { id: `${comparisonId}:rPr:${before + offset}:${after + offset}`, before: a.source, after: b.source, property: "rPr", beforeFact: a.fact, afterFact: b.fact, families: names, excludedFamilies: excluded, comparisonId, beforeStart: before + offset, afterStart: after + offset, length: 1 };
@@ -57,7 +62,7 @@ function attachComparison(manifest: DocumentComparisonManifest, decision: Compar
     if (segment.type !== "added") before += size;
     if (segment.type !== "deleted") after += size;
   }
-  if (changed(oldParagraph, newParagraph, false).length) manifest.formattingExcluded.push(decision.id);
+  if (rawChanged(oldParagraph,newParagraph,false).length) manifest.formattingExcluded.push(decision.id);
   comparison.formatting = { paragraphFamilies, paragraphHistory: newParagraph.history, paragraphScopeId, beforeSlices, afterSlices, spans, history: newParagraph.history || afterStyles.some((style) => style?.fact.history) };
 }
 export function buildWordFormatting(manifest: DocumentComparisonManifest, characterDiff: (before: string, after: string) => Array<{ type: "equal" | "added" | "deleted"; text: string }>) {
@@ -72,7 +77,7 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
     const screenFamilies = new Set<string>(); let oldOffset = 0, newOffset = 0;
     for (const segment of characterDiff(decision.beforeText, decision.afterText)) {
       const size = Array.from(segment.text).length;
-      if (segment.type === "equal") for (let offset = 0; offset < size; offset++) for (const family of changed(left[oldOffset + offset]?.fact, right[newOffset + offset]?.fact)) screenFamilies.add(family);
+      if (segment.type === "equal") for (let offset = 0; offset < size; offset++) for (const family of changed(manifest, "rPr", left[oldOffset + offset]?.fact, right[newOffset + offset]?.fact)) screenFamilies.add(family);
       if (segment.type !== "added") oldOffset += size;
       if (segment.type !== "deleted") newOffset += size;
     }
@@ -88,10 +93,10 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
   const add = (before: DocumentSourceReference | undefined, after: DocumentSourceReference | undefined, property: string, decisionId?: string) => {
     if (!before || !after) return;
     const old = before.normalizedProperties?.[property] ?? emptyFact, next = after.normalizedProperties?.[property] ?? emptyFact;
-    const names = changed(old, next), excluded = changed(old, next, false);
+    const names = changed(manifest, property, old, next), excluded = changed(manifest, property, old, next, false);
     const scopeId = `scope:${JSON.stringify([key(before), key(after), property])}`;
     manifest.formattingScopes.push({ id: scopeId, before, after, property, beforeFact: old, afterFact: next, families: names, excludedFamilies: excluded });
-    if (excluded.length) manifest.formattingExcluded.push(decisionId ?? property);
+    if (rawChanged(old,next,false).length) manifest.formattingExcluded.push(decisionId ?? property);
     if (names.length) manifest.propertyActions.push({ id: `format:${scopeId}`, scopeId, before, after, property, families: names, representation: next.history ? "preserve-after-history" : decisions.some((decision) => decision.id === decisionId && decision.moved) ? "whole-node-revision" : "revision", decisionId });
   };
   for (const decision of decisions.filter((item) => item.type === "table" && item.before.length === 1 && item.after.length === 1)) {
@@ -149,7 +154,16 @@ export function projectWordFormatting(manifest: DocumentComparisonManifest, docu
           if (view.kind === "format") view.kind = decision.moved ? "moved" : "unchanged";
           for (let index = changes.length - 1; index >= 0; index--) if (changes[index].kind === "format" && changes[index].beforeLocation === view.beforeLocation && changes[index].afterLocation === view.afterLocation) changes.splice(index, 1);
         }
-        if (families.length) pushChange(view, families);
+        if (families.length) {
+          pushChange(view, families);
+          if (view.tableIndex !== undefined) {
+            const table=tables[view.tableIndex]; table.kind="changed";
+            for (const side of ["before","after"] as const) for (const [r,row] of table[side].entries()) for (const [c,cell] of row.entries()) {
+              const source=(cell as unknown as {source?:DocumentSourceReference}).source;
+              if (source && decision[side].some(ref => ref.part===source.part && source.path.every((value,index)=>ref.path[index]===value)) && table[side+"Kinds" as "beforeKinds"|"afterKinds"][r][c]==="unchanged") table[side+"Kinds" as "beforeKinds"|"afterKinds"][r][c]="format";
+            }
+          }
+        }
       }
       visit(decision.children ?? [], view);
     }

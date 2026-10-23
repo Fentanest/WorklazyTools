@@ -1,3 +1,4 @@
+import { documentCapabilities, documentProvenance } from "../document-compare/documentCapabilities";
 /// <reference lib="webworker" />
 
 import acceptRevisionsScript from "./accept_revisions.py?raw";
@@ -124,6 +125,10 @@ worker.onmessage = async (event: MessageEvent) => {
 
         const beforeModel = extractWordModel(beforeBuffer, pairFormats.before, event.data.options, en ? "en" : "ko", extract);
         const afterModel = extractWordModel(afterBuffer, pairFormats.after, event.data.options, en ? "en" : "ko", extract);
+        beforeModel.capabilities = documentCapabilities(pairFormats.before === "doc" ? "doc" : "docx",beforeModel);
+        afterModel.capabilities = documentCapabilities(pairFormats.after === "doc" ? "doc" : "docx",afterModel);
+        beforeModel.provenance = await documentProvenance(pair.beforeBuffer,beforeBuffer,rewriteRevisionAuthor && docxPair);
+        afterModel.provenance = await documentProvenance(pair.afterBuffer,afterBuffer,rewriteRevisionAuthor && docxPair);
         const result = compareDocumentModels(
           pair.beforeName,
           pair.afterName,
@@ -162,6 +167,7 @@ worker.onmessage = async (event: MessageEvent) => {
               event.data.options.tables,
               event.data.options.metadata,
               JSON.stringify(result.manifest),
+              JSON.stringify(result.manifest.formattingMask.requested),
             );
             const trackedBytes = pyodide.FS.readFile(trackedPath) as Uint8Array;
             trackedBuffer = trackedBytes.slice().buffer;

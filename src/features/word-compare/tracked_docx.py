@@ -915,6 +915,11 @@ def _validate_manifest(before_path, after_path):
     for side, path in (("before", before_path), ("after", after_path)):
         with open(path, "rb") as source:
             model = json.loads(extract_document_model(source.read(), True, True, "en"))
+        if _MANIFEST.get("fields", {}).get(side) != model.get("fields", []):
+            raise ValueError("INVALID_COMPARISON_MANIFEST_FIELD_ANNOTATIONS")
+        provenance = _MANIFEST.get("provenance", {}).get(side)
+        if provenance is not None and provenance.get("comparisonSha256") != model["sourceRevision"]:
+            raise ValueError("STALE_COMPARISON_MANIFEST_PROVENANCE")
         inventory = model["sourceInventory"]
         entries = {_manifest_key(ref): ref for ref in inventory}
         supplied = _MANIFEST["sources"][side]
@@ -1187,9 +1192,18 @@ def _validate_restore_styles(actual):
             if covered != set(expected): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_COVERAGE")
 
 
+def _mask_enabled(property_name, name):
+    group = json.loads(WORKLAZY_FORMATTING_POLICY_JSON).get("maskGroups", {}).get(property_name, {}).get(name.rsplit("}", 1)[-1], "style" if property_name == "rPr" else "paragraph")
+    return _MANIFEST["formattingMask"]["effective"][group]
+
+
 def _validate_formatting_manifest(actual, policy):
     if _MANIFEST.get("formattingPolicyVersion") != policy["version"]:
         raise ValueError("STALE_COMPARISON_MANIFEST")
+    mask = _MANIFEST.get("formattingMask", {})
+    groups = {"fontFamily", "size", "style", "color", "paragraph", "numbering"}
+    if mask.get("version") != "worklazy-formatting-mask-1" or any(set(mask.get(field, {})) != groups or any(type(value) is not bool for value in mask[field].values()) for field in ("requested", "effective")) or mask["effective"] != {group: mask["requested"][group] and _MANIFEST["options"]["formatting"] for group in groups}:
+        raise ValueError("INVALID_COMPARISON_MANIFEST_FORMATTING_MASK")
     run_index = {}
     for side in ("before", "after"):
         for key, source in actual[side].items():
@@ -1214,6 +1228,9 @@ def _validate_formatting_manifest(actual, policy):
         for category, field in (("supported", "families"), ("unsupported", "excludedFamilies")):
             before, after = scope["beforeFact"][category], scope["afterFact"][category]
             required = {name for name in set(before) | set(after) if before.get(name, []) != after.get(name, [])}
+            supported_before, supported_after = scope["beforeFact"]["supported"], scope["afterFact"]["supported"]
+            disabled = {name for name in set(supported_before) | set(supported_after) if supported_before.get(name, []) != supported_after.get(name, []) and not _mask_enabled(property_name, name)}
+            required = required - disabled if category == "supported" else required | disabled
             if len(set(scope[field])) != len(scope[field]) or set(scope[field]) != required:
                 raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_DECLARATION")
         if "comparisonId" not in scope:
@@ -1380,7 +1397,7 @@ def _install_manifest(manifest):
     _MANIFEST_ACTIVE_COMPARISON = None
     _MANIFEST_PROPERTY_USED = set()
     _MANIFEST_SOURCE_NODES = {}
-    _MANIFEST_ALLOWED_PROPERTIES = {name: {W + family for family in families} for name, families in json.loads(WORKLAZY_FORMATTING_POLICY_JSON)["enabled"].items()}
+    _MANIFEST_ALLOWED_PROPERTIES = {name: {W + family for family in families if _mask_enabled(name, family)} for name, families in json.loads(WORKLAZY_FORMATTING_POLICY_JSON)["enabled"].items()}
     _MANIFEST_NODE_KEYS = {}
     _MANIFEST_DECISIONS = []
     def visit(decisions):
@@ -1914,7 +1931,7 @@ def _ensure_numbering_content_type(content_types_data):
     return _serialize_xml(root)
 
 
-def _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None):
+def _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None, formatting_mask_json=None):
     global _MANIFEST
     if manifest_json is None:
         # Read-only test/tool bridge; the browser always passes its already
@@ -1928,6 +1945,9 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
         _install_manifest(json.loads(manifest_json))
     except (KeyError, TypeError, IndexError, RecursionError) as error:
         raise ValueError("INVALID_COMPARISON_MANIFEST") from error
+    requested_mask = json.loads(formatting_mask_json) if formatting_mask_json is not None else {group: True for group in ("fontFamily", "size", "style", "color", "paragraph", "numbering")}
+    if _MANIFEST.get("formattingMask", {}).get("requested") != requested_mask:
+        raise ValueError("STALE_COMPARISON_MANIFEST_FORMATTING_MASK")
     if _MANIFEST.get("policyVersion") != "worklazy-document-1":
         raise ValueError("STALE_COMPARISON_MANIFEST")
     if _MANIFEST.get("options") != {"formatting": bool(include_formatting), "tables": bool(include_tables), "metadata": bool(include_metadata)}:
@@ -2045,10 +2065,10 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
     return writer.count
 
 
-def generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None):
+def generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None, formatting_mask_json=None):
     global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION, _MANIFEST_ACTIVE_COMPARISON, _MANIFEST_PROPERTY_USED, _MANIFEST_SOURCE_NODES, _MANIFEST_ALLOWED_PROPERTIES
     try:
-        return _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json)
+        return _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json, formatting_mask_json)
     finally:
         # Do not retain source nodes or text decisions after failure/cancellation.
         _MANIFEST = None
