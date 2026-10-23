@@ -553,12 +553,133 @@ for variant in ['before','after','out','accepted']:shutil.copyfile('/equal-envel
 console.log('Equal SDT namespace-alias/attribute-order envelope exports and roundtrips');
 console.log('14 unequal SDT ancestor/property/attribute envelope gates passed');
 console.log('5 source-envelope/anchor/hyperlink/paragraph-history split capability gates passed');
+// Merge output uses the same parent text decision; its before boundary and
+// resource ownership must reconstruct two populated original paragraphs.
+for(const [formatting,sizeEnabled,paragraphEnabled,sameResource] of [[false,true,true,false],[true,true,true,false],[true,false,false,false],[false,true,true,true]]) {
+ requested={fontFamily:true,size:sizeEnabled,style:true,color:true,paragraph:paragraphEnabled,numbering:true};
+ py.globals.set('requested_json',JSON.stringify(requested));py.globals.set('formatting',formatting);py.globals.set('same_resource',sameResource);
+ py.runPython(String.raw`
+def styled_word(value,size,font,color):return '<w:r><w:rPr><w:rFonts w:ascii="'+font+'"/><w:color w:val="'+color+'"/><w:sz w:val="'+size+'"/><w:lang w:val="ko-KR"/></w:rPr><w:t xml:space="preserve">'+value+'</w:t></w:r>'
+def para(value,alignment):return '<w:p><w:pPr><w:jc w:val="'+alignment+'"/></w:pPr>'+value+'</w:p>'
+def paragraph_alignment(path):
+ with zipfile.ZipFile(path) as z:return [node.find(W+'pPr/'+W+'jc').get(W+'val') if node.find(W+'pPr/'+W+'jc') is not None else None for part in ['word/document.xml','word/header1.xml'] if part in z.namelist() for node in ET.fromstring(z.read(part)).iter(W+'p') if ''.join(n.text or '' for n in node.iter(W+'t'))!='Stable body']
+for context in ['body','cell','header','nested SDT']:
+ for placement in ['plain','first','first-end','second-start','second','second-end','boundary-both','both','deleted-first','deleted-second','inserted','changed-text']:
+  texts=['First sentence. ','Second sentence.'];new_texts=['Revised first sentence. ','Revised second sentence.'] if placement=='changed-text' else texts
+  old=[];new=[];old_indices=[]
+  for i in [0,1]:
+   position=6 if placement in ['first','second','both','deleted-first','deleted-second','changed-text'] else len(texts[i]) if placement in ['first-end','second-end'] else 0
+   old_image=placement in (['first','first-end','both','boundary-both','deleted-first','changed-text'] if i==0 else ['second-start','second','second-end','boundary-both','both','deleted-second','changed-text'])
+   if placement=='boundary-both':position=len(texts[0]) if i==0 else 0
+   new_image=old_image and not placement.startswith('deleted') or placement=='inserted' and i==1
+   if old_image:old_indices.append(i)
+   after_index=0 if placement=='changed-text' else i
+   old_run=lambda value:styled_word(value,str(20+10*i),'Arial'+str(i),'FF0000') if value else ''
+   new_run=lambda value:styled_word(value,str(40+10*after_index),'Calibri'+str(after_index),'0000FF') if value else ''
+   old_picture=image_run(str(20+10*i),'Arial'+str(i),'FF0000','ko-KR').replace('docPr id="1"','docPr id="'+str(i+1)+'"') if old_image else ''
+   new_picture=image_run(str(40+10*after_index),'Calibri'+str(after_index),'0000FF','ko-KR').replace('docPr id="1"','docPr id="'+str(i+1)+'"') if new_image else ''
+   old.append(para(old_run(texts[i][:position])+old_picture+old_run(texts[i][position:]),['left','right'][i]))
+   new.append(new_run(new_texts[i][:position])+new_picture+new_run(new_texts[i][position:]))
+  before=''.join(old);after=para(''.join(new),'center')
+  for side,body,media in [('before',before,OLDPNG),('after',after,OLDPNG if same_resource else NEWPNG)]:
+   if context=='cell':body='<w:tbl><w:tr><w:tc>'+body+'</w:tc></w:tr></w:tbl>'
+   if context=='nested SDT':body=control(control(body))
+   package('/merge-'+side+'.docx',p(text('Stable body')) if context=='header' else body,media,'https://same.example',body if context=='header' else None)
+  a=extract_document_model(open('/merge-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/merge-after.docx','rb').read(),True,True,'en');manifest=worklazyComparisonManifestJson(a,b,formatting,True,True)
+  def descendants(items):return [d for item in items for d in [item]+descendants(item.get('children',[]))]
+  value=json.loads(manifest);decision=next(d for d in descendants(value['decisions']) if d.get('mergeProjection'))
+  generate_tracked_document('/merge-before.docx','/merge-after.docx','/merge-out.docx','events',formatting,True,True,manifest,requested_json)
+  accept_tracked_document('/merge-out.docx','/merge-accepted.docx')
+  with zipfile.ZipFile('/merge-out.docx') as source,zipfile.ZipFile('/merge-rejected.docx','w') as output:
+   for entry in source.infolist():output.writestr(entry,_serialize_xml(reject(_qname_safe_parse(source.read(entry.filename)))[0]) if entry.filename in ['word/document.xml','word/header1.xml'] else source.read(entry.filename))
+  assert view('/merge-accepted.docx')==view('/merge-after.docx'),(context,placement,'accept',view('/merge-accepted.docx'),view('/merge-after.docx'))
+  assert view('/merge-rejected.docx')==view('/merge-before.docx'),(context,placement,'reject',view('/merge-rejected.docx'),view('/merge-before.docx'))
+  assert paragraph_alignment('/merge-accepted.docx')==['center']
+  assert paragraph_alignment('/merge-rejected.docx')==(['left','right'] if formatting and json.loads(requested_json)['paragraph'] else ['center','center'])
+  # Every restored glyph keeps its own before run or the declared revised run.
+  with zipfile.ZipFile('/merge-rejected.docx') as z:
+   part='word/header1.xml' if context=='header' else 'word/document.xml'
+   for index,node in enumerate(ET.fromstring(z.read(part)).iter(W+'p')):
+    for run in node.iter(W+'r'):
+     if run.find(W+'t') is None:continue
+     prop=run.find(W+'rPr');after_index=0 if placement=='changed-text' else index
+     assert prop.find(W+'rFonts').get(W+'ascii')==('Arial'+str(index) if formatting else 'Calibri'+str(after_index)),(context,placement,index,'font',ET.tostring(run))
+     assert prop.find(W+'sz').get(W+'val')==str(20+10*index if formatting and json.loads(requested_json)['size'] else 40+10*after_index)
+  expected_images=[('Arial'+str(i) if formatting else 'Calibri'+str(0 if placement=='changed-text' else i),'FF0000' if formatting else '0000FF',str(20+10*i if formatting and json.loads(requested_json)['size'] else 40+10*(0 if placement=='changed-text' else i)),'ko-KR') for i in old_indices]
+  assert drawing_styles('/merge-rejected.docx')==expected_images,(context,placement,'image-scope',drawing_styles('/merge-rejected.docx'),expected_images)
+  if same_resource and not decision.get('objectEvents',{}).get('changed',False):
+   with zipfile.ZipFile('/merge-out.docx') as z:assert sum(len(list(ET.fromstring(z.read(part)).iter(W+'drawing'))) for part in ['word/document.xml','word/header1.xml'] if part in z.namelist())==len(drawing_styles('/merge-before.docx')),(context,placement,'physical matched events')
+  name='merge-'+context+'-'+placement+'-'+str(formatting)+'-'+str(json.loads(requested_json)['size'])+'-'+str(same_resource)
+  for variant in ['before','after','out','accepted','rejected']:shutil.copyfile('/merge-'+variant+'.docx','/p-packages/'+name+'-'+variant+'.docx')
+  for mutation in ['missing','before-boundary','after-boundary','source','fact','family','role','extra']:
+   bad=copy.deepcopy(value);d=next(d for d in descendants(bad['decisions']) if d['id']==decision['id']);projection=d['mergeProjection']
+   if mutation=='missing':del d['mergeProjection']
+   elif mutation=='before-boundary':projection['beforeBoundary']+=1
+   elif mutation=='after-boundary':projection['afterBoundary']+=1
+   elif mutation=='source':projection['properties'][1]['before']=projection['properties'][0]['before']
+   elif mutation=='fact':projection['properties'][1]['beforeFact']['history']=not projection['properties'][1]['beforeFact']['history']
+   elif mutation=='family':projection['properties'][1]['families'].append(W+'lang')
+   elif mutation=='role':
+    if projection['beforeEvents']:projection['beforeEvents'][0]['side']=not projection['beforeEvents'][0]['side']
+    else:projection['beforeBoundary']=True
+   else:projection['ignored']=1
+   if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+   try:generate_tracked_document('/merge-before.docx','/merge-after.docx','/bad.docx','events',formatting,True,True,json.dumps(bad),requested_json);raise AssertionError(mutation+' accepted')
+   except ValueError as error:assert 'INVALID_COMPARISON_MANIFEST_MERGE_PROJECTION' in str(error),(mutation,str(error))
+   assert not os.path.exists('/bad.docx')
+`);
+}
+console.log('192 populated-paragraph merge text/image/property/resource targets +1536 projection negatives passed');
+py.runPython(String.raw`
+for unsafe in ['unequal-control','outer-control','separate-controls','bookmark','paragraph-history','hyperlink','paragraph-attribute']:
+ first='First sentence. ';second='Second sentence.'
+ before=para(text(first)+image_run('20','Arial','FF0000','ko-KR'),'left')+para(text(second),'right')
+ after=para(text(first)+image_run('40','Calibri','0000FF','ko-KR')+text(second),'center')
+ if unsafe=='unequal-control':before=control(before,'original');after=control(after,'revised')
+ elif unsafe=='outer-control':before=control(control(before),'original');after=control(control(after),'revised')
+ elif unsafe=='separate-controls':before=control(para(text(first)+image_run('20','Arial','FF0000','ko-KR'),'left'))+control(para(text(second),'right'));after=control(after)
+ elif unsafe=='bookmark':before=before.replace('<w:p>','<w:p><w:bookmarkStart w:id="7" w:name="Anchor"/>',1).replace('</w:p>','<w:bookmarkEnd w:id="7"/></w:p>',1)
+ elif unsafe=='paragraph-history':after=after.replace('<w:pPr>','<w:pPr><w:rPr><w:ins w:id="31" w:author="Original author"/></w:rPr>',1)
+ elif unsafe=='hyperlink':before=para(link(first)+image_run('20','Arial','FF0000','ko-KR'),'left')+para(text(second),'right')
+ else:
+  before=before.replace('<w:p>','<w:p xmlns:test="urn:paragraph" xmlns:mc="'+MC+'" mc:Ignorable="test" test:state="original">')
+  after=after.replace('<w:p>','<w:p xmlns:test="urn:paragraph" xmlns:mc="'+MC+'" mc:Ignorable="test" test:state="revised">')
+ for side,body in [('before',before),('after',after)]:package('/unsafe-merge-'+side+'.docx',body,OLDPNG,'https://same.example')
+ if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+ try:generate_tracked_document('/unsafe-merge-before.docx','/unsafe-merge-after.docx','/bad.docx','events',False,True,True,None,requested_json);raise AssertionError(unsafe+' accepted')
+ except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE' in str(error),(unsafe,str(error))
+ assert not os.path.exists('/bad.docx')
+# Missing routing and missing matched-event consumption cannot silently emit.
+before=para(text('First sentence. ')+image_run('20','Arial','FF0000','ko-KR'),'left')+para(text('Second sentence.'),'right')
+after=para(text('First sentence. ')+image_run('40','Calibri','0000FF','ko-KR')+text('Second sentence.'),'center')
+for side,body in [('before',before),('after',after)]:package('/fault-merge-'+side+'.docx',body,OLDPNG,'https://same.example')
+a=extract_document_model(open('/fault-merge-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/fault-merge-after.docx','rb').read(),True,True,'en');manifest=worklazyComparisonManifestJson(a,b,False,True,True)
+saved_revision=_paragraph_revision;saved_consume=_consume_object
+for fault in ['routing','matched-consumption']:
+ def missing_route(*args):
+  result=saved_revision(*args)
+  for child in result:
+   if child.tag!=W+'pPr':_MANIFEST_MERGE_SIDES.pop(child,None);break
+  return result
+ def missing_before_event(source,positions=None):
+  if _MANIFEST_NODE_KEYS.get(source,('after',))[0]=='before':return
+  return saved_consume(source,positions)
+ if fault=='routing':_paragraph_revision=missing_route
+ else:_consume_object=missing_before_event
+ if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+ try:
+  try:generate_tracked_document('/fault-merge-before.docx','/fault-merge-after.docx','/bad.docx','events',False,True,True,manifest,requested_json);raise AssertionError(fault+' accepted')
+  except ValueError as error:assert ('MERGE_EMISSION' if fault=='routing' else 'OBJECT_CONSUMPTION') in str(error)
+  assert not os.path.exists('/bad.docx')
+ finally:_paragraph_revision=saved_revision;_consume_object=saved_consume
+`);
+console.log('7 actual merge source-envelope gates +2 emission/consumption fault controls passed');
 requested=undefined;
 console.log('49 paired image property package projections +252 source/family/fact negatives +2 metadata exclusions +4 absent-property targets +2 existing-history targets +2 malformed-history gates passed');
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages',{recursive:true});
 for(const name of py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages/'+name,py.FS.readFile('/p-packages/'+name));
 const artifacts=py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')).sort().map(name=>{const data=py.FS.readFile('/p-packages/'+name);return {name,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')};});
-fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p-split-package-artifacts.json',JSON.stringify({count:artifacts.length,artifacts},null,2)+'\n');
+fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-merge-package-artifacts.json',JSON.stringify({count:artifacts.length,artifacts},null,2)+'\n');
 console.log(JSON.stringify(py.globals.get('checks').toJs()));
 assert.ok(all.some(result=>result.manifest.decisions.some(decision=>decision.beforeText==='Old clause' && decision.afterText==='New clause' && decision.objectEvents?.unchangedLinks.length===1)),'TS must declare the unchanged hyperlink envelope');
 

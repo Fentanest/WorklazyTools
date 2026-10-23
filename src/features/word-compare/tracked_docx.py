@@ -639,18 +639,30 @@ def _paragraph_split_revision(before, first_after, second_after, include_formatt
 
 def _paragraph_merge_revision(first_before, second_before, after, include_formatting, writer):
     global _MANIFEST_ACTIVE_COMPARISON
+    projection=_MANIFEST_ACTIVE_DECISION["mergeProjection"]
     combined_tokens = _styled_tokens(first_before) + _styled_tokens(second_before)
     combined_before = _plain_paragraph_from_tokens(first_before, combined_tokens)
+    events={}
+    context=(_MANIFEST_ACTIVE_DECISION.get("objectEvents",{}).get("contexts") or [None])[0]
+    if context is not None:
+        for event in context["before"]:events.setdefault(event["start"],[]).append(_MANIFEST_SOURCE_NODES[("before",_manifest_key(event["source"]))])
+    _MANIFEST_SYNTHETIC_TOKENS[combined_before]=(combined_tokens,events)
     _MANIFEST_ACTIVE_COMPARISON = _MANIFEST_ACTIVE_DECISION["comparisons"][1]
     revised_after = _paragraph_revision(combined_before, after, include_formatting, writer)
-    # A deleted empty paragraph mark records the structural merge. Accepting the
-    # revision removes that boundary while leaving the after paragraph intact.
-    deleted_boundary = ET.Element(W + "p", dict(first_before.attrib))
-    paragraph_properties = _project_properties(first_before.find(W + "pPr"), after.find(W + "pPr"), "pPr")
-    if paragraph_properties is not None:
-        deleted_boundary.append(_accepted_copy(paragraph_properties))
-    _mark_paragraph_end(deleted_boundary, "del", writer)
-    return [deleted_boundary, revised_after]
+    first_attrs={name:value for name,value in first_before.attrib.items() if name not in {"{http://schemas.microsoft.com/office/word/2010/wordml}paraId","{http://schemas.microsoft.com/office/word/2010/wordml}textId"}}
+    paragraphs=[ET.Element(W+"p",first_attrs),ET.Element(W+"p",dict(after.attrib))]
+    properties=revised_after.find(W+"pPr")
+    if properties is not None:paragraphs[0].append(copy.deepcopy(properties))
+    action=projection["properties"][1]
+    properties=_property_revision(after.find(W+"pPr"),second_before.find(W+"pPr"),W+"pPr",W+"pPrChange",writer,action["families"],action["history"])
+    if properties is not None:paragraphs[1].append(properties)
+    for child in revised_after:
+        if child.tag==W+"pPr":continue
+        side=_MANIFEST_MERGE_SIDES.get(child)
+        if side not in (0,1):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_EMISSION")
+        paragraphs[side].append(child)
+    _mark_paragraph_end(paragraphs[0],"del",writer)
+    return paragraphs
 
 
 def _project_properties(before, after, property_name):
@@ -883,8 +895,9 @@ def _paragraph_revision(before, after, include_formatting, writer):
     formatting = (_MANIFEST_ACTIVE_COMPARISON or {}).get("formatting", {})
     paragraph_families = formatting.get("paragraphFamilies", []) if include_formatting else []
     spans = formatting.get("spans", []) if include_formatting else []
+    merge=(_MANIFEST_ACTIVE_DECISION or {}).get("mergeProjection")
     format_changed = bool(paragraph_families or spans or any(pair["families"] for pair in (_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents",{}).get("drawingProperties",[])))
-    object_changed=((_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents") or {}).get("changed",False)
+    object_changed=bool(merge) or ((_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents") or {}).get("changed",False)
     if before_text == after_text and not format_changed and not object_changed:
         result=copy.deepcopy(after);_consume_copied_objects(before);_consume_copied_objects(after);return result
 
@@ -897,6 +910,19 @@ def _paragraph_revision(before, after, include_formatting, writer):
     if revised_paragraph_properties is not None:
         paragraph.append(revised_paragraph_properties)
 
+    def append_nodes(values,before_position=None,event=None,after_position=None):
+        for value in values:
+            if merge:
+                if event is not None and _is_drawing_event(event):
+                    side,key=_MANIFEST_NODE_KEYS[event]
+                    entry=next(item for item in merge[side+"Events"] if _manifest_key(item["source"])==key)
+                    role=entry["side"]
+                elif before_position is not None:role=int(before_position>=merge["beforeBoundary"])
+                elif after_position is not None:role=int(after_position>=merge["afterBoundary"])
+                else:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_EMISSION")
+                _MANIFEST_MERGE_SIDES[value]=role
+            paragraph.append(value)
+    unchanged_drawings=(_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents",{}).get("unchangedDrawings",[]) if merge else []
     emitted_event_positions = set()
     emitted_wrappers = set()
 
@@ -905,20 +931,32 @@ def _paragraph_revision(before, after, include_formatting, writer):
             return
         emitted_event_positions.add(position)
         for event in after_events.get(position, []):
-            if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"ins",writer))
-            else:paragraph.append(copy.deepcopy(event))
+            if _is_drawing_event(event):
+                origin=_MANIFEST_NODE_KEYS[event][1]
+                pair=next((pair for pair in unchanged_drawings if _manifest_key(pair["after"])==origin),None)
+                if pair is None:append_nodes([_drawing_revision(event,"ins",writer)],event=event)
+                else:
+                    parent=_MANIFEST_SOURCE_NODES[("after",(origin[0],origin[1][:-1]))]
+                    run=ET.Element(W+"r");properties=parent.find(W+"rPr")
+                    if properties is not None:run.append(copy.deepcopy(properties))
+                    run.append(_source_copy(event));_consume_object(event);_consume_object(_MANIFEST_SOURCE_NODES[("before",_manifest_key(pair["before"]))])
+                    append_nodes([run],event=event)
+            else:append_nodes([copy.deepcopy(event)],after_position=position)
 
     emitted_before_events=set()
     def emit_before_events(position):
         if position in emitted_before_events:return
         emitted_before_events.add(position)
         for event in before_events.get(position,[]):
-            if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"del",writer))
+            if _is_drawing_event(event):
+                if any(_manifest_key(pair["before"])==_MANIFEST_NODE_KEYS[event][1] for pair in unchanged_drawings):continue
+                append_nodes([_drawing_revision(event,"del",writer)],event=event)
 
     def emit_deleted(start,end):
         cursor=start
-        for position in sorted({value for value in before_events if start<=value<=end}|{end}):
-            if cursor<position:paragraph.extend(_revision_containers("del",(_restore_projected_tokens(before_tokens[cursor:position],cursor,_MANIFEST_ACTIVE_COMPARISON["restoreStyles"]) if _MANIFEST is not None else before_tokens[cursor:position]),writer,strip_history=True))
+        boundaries={merge["beforeBoundary"]} if merge and start<merge["beforeBoundary"]<end else set()
+        for position in sorted({value for value in before_events if start<=value<=end}|{end}|boundaries):
+            if cursor<position:append_nodes(_revision_containers("del",(_restore_projected_tokens(before_tokens[cursor:position],cursor,_MANIFEST_ACTIVE_COMPARISON["restoreStyles"]) if _MANIFEST is not None else before_tokens[cursor:position]),writer,strip_history=True),before_position=cursor)
             emit_before_events(position);cursor=position
 
     def emit_existing_wrapper(token):
@@ -927,7 +965,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
             return False
         wrapper_id, wrapper_element = wrapper
         if wrapper_id not in emitted_wrappers:
-            paragraph.append(copy.deepcopy(wrapper_element))
+            append_nodes([copy.deepcopy(wrapper_element)],after_position=token["sourceOffset"])
             emitted_wrappers.add(wrapper_id)
         return True
 
@@ -953,7 +991,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
             link_pair=(_link_source_key(before_tokens[before_position]),_link_source_key(token))
             pair = (scope_id, families, preserve_history, _properties_signature(after_properties),link_pair)
             end = position + 1
-            while end < j2 and end not in after_events and i1+end-j1 not in before_events and after_tokens[end].get("wrapper") is None:
+            while end < j2 and end not in after_events and i1+end-j1 not in before_events and (not merge or i1+end-j1!=merge["beforeBoundary"]) and after_tokens[end].get("wrapper") is None:
                 next_families, next_history, next_scope_id = declared(i1 + (end - j1), end)
                 if (next_scope_id, next_families, next_history, _properties_signature(after_tokens[end]["properties"]),(_link_source_key(before_tokens[i1+end-j1]),_link_source_key(after_tokens[end]))) != pair:
                     break
@@ -961,16 +999,16 @@ def _paragraph_revision(before, after, include_formatting, writer):
             text = "".join(item["text"] for item in after_tokens[position:end])
             revised_properties = _property_revision(after_properties, before_properties, W + "rPr", W + "rPrChange", writer, families, preserve_history) if families else after_properties
             if any(value is not None for value in link_pair) and link_pair not in {(_manifest_key(pair["before"]),_manifest_key(pair["after"])) for pair in (_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents",{}).get("unchangedLinks",[])}:
-                paragraph.extend(_revision_containers("del",_restore_projected_tokens(before_tokens[before_position:before_position+end-position],before_position,_MANIFEST_ACTIVE_COMPARISON["restoreStyles"]),writer,strip_history=True))
-                paragraph.extend(_revision_containers("ins",after_tokens[position:end],writer))
+                append_nodes(_revision_containers("del",_restore_projected_tokens(before_tokens[before_position:before_position+end-position],before_position,_MANIFEST_ACTIVE_COMPARISON["restoreStyles"]),writer,strip_history=True),before_position=before_position)
+                append_nodes(_revision_containers("ins",after_tokens[position:end],writer),before_position=before_position)
             else:
-                paragraph.append(_linked_run(_token_run(text,revised_properties),token))
+                append_nodes([_linked_run(_token_run(text,revised_properties),token)],before_position=before_position)
                 _consume_link_tokens(before_tokens[before_position:before_position+end-position]);_consume_link_tokens(after_tokens[position:end])
             position = end
         emit_before_events(i1+j2-j1)
         emit_events(j2)
 
-    def emit_inserted(j1, j2):
+    def emit_inserted(j1, j2, before_position):
         position = j1
         while position < j2:
             emit_events(position)
@@ -984,7 +1022,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
                 if _properties_signature(after_tokens[end]["properties"]) != signature or _link_source_key(after_tokens[end])!=_link_source_key(token):
                     break
                 end += 1
-            paragraph.extend(_revision_containers("ins", after_tokens[position:end], writer))
+            append_nodes(_revision_containers("ins", after_tokens[position:end], writer),before_position=before_position)
             position = end
         emit_events(j2)
 
@@ -996,7 +1034,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
             if i1 < i2:
                 emit_deleted(i1,i2)
             if j1 < j2:
-                emit_inserted(j1, j2)
+                emit_inserted(j1, j2, i1)
     emit_before_events(len(before_tokens))
     emit_events(len(after_tokens))
     return paragraph
@@ -1195,6 +1233,7 @@ _MANIFEST_ACTIVE_COMPARISON = None
 _MANIFEST_PROPERTY_USED = set()
 _MANIFEST_SOURCE_NODES = {}
 _MANIFEST_ALLOWED_PROPERTIES = {}
+_MANIFEST_MERGE_SIDES = {}
 _MANIFEST_SYNTHETIC_TOKENS = {}
 _MANIFEST_OBJECT_EXPECTED = {}
 _MANIFEST_OBJECT_CONSUMED = {}
@@ -1205,6 +1244,18 @@ def _manifest_key(source):
         raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_REF")
     return (source["part"], tuple(source["path"]))
 
+
+def _source_envelope(nodes,side_name,value):
+    def canonical(node):
+        return (node.tag,tuple(sorted(node.attrib.items())),node.text if (node.text or "").strip() else "",tuple(canonical(child) for child in node),node.tail if (node.tail or "").strip() else "")
+    result=[]
+    for depth in range(1,len(value["path"])):
+        ancestor=nodes[side_name][(value["part"],tuple(value["path"][:depth]))]
+        if ancestor.tag==CONTENT_CONTROL_TAG:
+            result.append((ancestor.tag,tuple(sorted(ancestor.attrib.items())),ancestor.text if (ancestor.text or "").strip() else "",tuple(canonical(child) for child in ancestor if child.tag!=CONTENT_CONTROL_BODY_TAG)))
+        elif ancestor.tag==CONTENT_CONTROL_BODY_TAG:
+            result.append((ancestor.tag,tuple(sorted(ancestor.attrib.items())),ancestor.text if (ancestor.text or "").strip() else ""))
+    return result
 
 def _validate_manifest(before_path, after_path):
     """Validate ownership against raw input, without choosing correspondences."""
@@ -1272,6 +1323,22 @@ def _validate_manifest(before_path, after_path):
                 raw = "\n".join(actual[side][_manifest_key(ref)].get("rawText", "") for ref in decision[side])
                 if raw != decision[side + "Text"]:
                     raise ValueError("INVALID_COMPARISON_MANIFEST_TEXT_BOUNDS")
+        if shape==(2,1) and decision.get("trackedRepresentation")=="revision":
+            refs=decision["before"];target=decision["after"][0]
+            parent=nodes["before"][(refs[0]["part"],tuple(refs[0]["path"][:-1]))]
+            after_parent=nodes["after"][(target["part"],tuple(target["path"][:-1]))]
+            if parent.tag!=after_parent.tag or any(ref["part"]!=refs[0]["part"] or ref["path"][:-1]!=refs[0]["path"][:-1] for ref in refs):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
+            envelope=_source_envelope(nodes,"after",target)
+            if any(_source_envelope(nodes,"before",ref)!=envelope for ref in refs):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
+            noise=set(json.loads(WORKLAZY_FORMATTING_POLICY_JSON)["noiseAttributes"])|{"{http://schemas.microsoft.com/office/word/2010/wordml}paraId","{http://schemas.microsoft.com/office/word/2010/wordml}textId"}
+            attrs={name:value for name,value in nodes["after"][_manifest_key(target)].attrib.items() if name not in noise}
+            for merge_side in ("before","after"):
+                for ref in decision[merge_side]:
+                    paragraph=nodes[merge_side][_manifest_key(ref)];properties=paragraph.find(W+"pPr")
+                    if {name:value for name,value in paragraph.attrib.items() if name not in noise}!=attrs or any(child.tag not in {W+"pPr",W+"r",W+"commentRangeStart",W+"commentRangeEnd"} for child in paragraph):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
+                    if paragraph.find(W+"pPr/"+W+"sectPr") is not None or properties is not None and any(child.tag in TRACK_CHANGE_TAGS for child in properties.iter()):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
+                    for run in paragraph.findall(W+"r"):
+                        if any(child.tag not in {W+"rPr",W+"t",W+"tab",W+"br",W+"cr",W+"drawing",W+"commentReference","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"} for child in run):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
         allowed_pairs = {(decision["beforeText"], decision["afterText"])}
         if shape == (1, 2):
             slices = decision.get("splitSlices", [])
@@ -1369,19 +1436,8 @@ def _validate_manifest(before_path, after_path):
                     old_parent=nodes["before"][(old_ref["part"],tuple(old_ref["path"][:-1]))]
                     new_parent=nodes["after"][(new_refs[0]["part"],tuple(new_refs[0]["path"][:-1]))]
                     if any(value["part"]!=new_refs[0]["part"] or value["path"][:-1]!=new_refs[0]["path"][:-1] for value in new_refs) or old_parent.tag!=new_parent.tag:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
-                    def envelope(side_name,value):
-                        def canonical(node):
-                            return (node.tag,tuple(sorted(node.attrib.items())),node.text if (node.text or "").strip() else "",tuple(canonical(child) for child in node),node.tail if (node.tail or "").strip() else "")
-                        result=[]
-                        for depth in range(1,len(value["path"])):
-                            ancestor=nodes[side_name][(value["part"],tuple(value["path"][:depth]))]
-                            if ancestor.tag==CONTENT_CONTROL_TAG:
-                                result.append((ancestor.tag,tuple(sorted(ancestor.attrib.items())),ancestor.text if (ancestor.text or "").strip() else "",tuple(canonical(child) for child in ancestor if child.tag!=CONTENT_CONTROL_BODY_TAG)))
-                            elif ancestor.tag==CONTENT_CONTROL_BODY_TAG:
-                                result.append((ancestor.tag,tuple(sorted(ancestor.attrib.items())),ancestor.text if (ancestor.text or "").strip() else ""))
-                        return result
-                    old_envelope=envelope("before",old_ref)
-                    if any(envelope("after",value)!=old_envelope for value in new_refs):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+                    old_envelope=_source_envelope(nodes,"before",old_ref)
+                    if any(_source_envelope(nodes,"after",value)!=old_envelope for value in new_refs):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
                     for split_side in ("before","after"):
                         for value in owner[split_side]:
                             paragraph=nodes[split_side][_manifest_key(value)]
@@ -1396,7 +1452,7 @@ def _validate_manifest(before_path, after_path):
                 expected = [source for source in actual[side].values() if source.get("objectEvent") and source["part"] == key[0] and source["objectEvent"]["paragraphPath"] == list(key[1])]
                 # Per-paragraph coverage is checked here; exact whole-decision
                 # membership and TS slice contexts are verified below.
-                if len(owner["before"]) > 1 or len(owner["after"]) > 2 or (len(owner["after"])==2 and any(source["objectEvent"]["kind"]!="drawing" for side in ("before","after") for source in owner.get("objectEvents",{}).get(side,[]))) or declared is None or len(declared) != len(expected) or {_manifest_key(source): source for source in declared} != {_manifest_key(source): source for source in expected}:
+                if len(owner["before"]) > 2 or len(owner["after"]) > 2 or (len(owner["after"])==2 and any(source["objectEvent"]["kind"]!="drawing" for side in ("before","after") for source in owner.get("objectEvents",{}).get(side,[]))) or declared is None or len(declared) != len(expected) or {_manifest_key(source): source for source in declared} != {_manifest_key(source): source for source in expected}:
                     raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
             if ref.get("opaqueSignature") and event_owner is None:
                 if owner is None or len(owner["before"]) != 1 or len(owner["after"]) != 1:
@@ -1455,14 +1511,14 @@ def _validate_restore_styles(actual):
         if not any(expected.values()):
             if events is not None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
             continue
-        if events is None or events.get("policy") != "worklazy-source-events-4":raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+        if events is None or events.get("policy") != "worklazy-source-events-5":raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
         for side in ("before","after"):
             if events[side] != expected[side]:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
         if len(decision["after"])==2 and any(ref["objectEvent"]["kind"]!="drawing" for side in ("before","after") for ref in expected[side]):
             if events.get("propertiesSupported") is not True:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
             raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
         def run_fact(side,ref):return actual[side].get((ref["part"],tuple(ref["objectEvent"]["runPath"])),{}).get("normalizedProperties",{}).get("rPr",{"supported":{},"unsupported":{},"history":False})
-        indexes=[1,2] if len(decision["before"])==1 and len(decision["after"])==2 else [0]
+        indexes=[1,2] if len(decision["before"])==1 and len(decision["after"])==2 else [1] if len(decision["before"])==2 and len(decision["after"])==1 else [0]
         contexts=[];offset=0
         for index in indexes:
             comparison=decision["comparisons"][index]
@@ -1476,9 +1532,9 @@ def _validate_restore_styles(actual):
                     length=len(actual[side][_manifest_key(parent)].get("rawText",""))
                     for ref in expected[side]:
                         event=ref["objectEvent"];position=event["start"]
-                        if ref["part"]==parent["part"] and event["paragraphPath"]==parent["path"] and start<=position and (position<end or position==end==length and (side=="after" or index==indexes[-1])):
+                        if ref["part"]==parent["part"] and event["paragraphPath"]==parent["path"] and start<=position and (position<end or position==end==length and (side=="after" or len(decision["before"])==2 or index==indexes[-1])):
                             context[side].append({"source":ref,"start":position-start+displacement,"end":event["end"]-start+displacement})
-                    displacement+=end-start+1
+                    displacement+=end-start+(0 if len(decision["before"])==2 and len(decision["after"])==1 else 1)
             contexts.append(context);offset+=len(comparison["after"])+1
         if events.get("contexts")!=contexts:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_CONTEXTS")
         locations={side:{_manifest_key(item["source"]):(context,item) for context in contexts for item in context[side]} for side in ("before","after")}
@@ -1546,10 +1602,42 @@ def _validate_restore_styles(actual):
                 if source is not None:verified["source"]=source
             if restore!=verified:raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE")
         if events.get("propertiesSupported") is not True:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
+        unchanged_drawings=[{"before":pair["before"],"after":pair["after"]} for pair in projections if pair["before"]["objectEvent"]["signature"]==pair["after"]["objectEvent"]["signature"] and (not pair["families"] or pair["representation"]=="preserve-after-history")]
+        if events.get("unchangedDrawings")!=unchanged_drawings:raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_ACTIONS")
         unchanged=[{"before":a,"after":b} for a in expected["before"] if a["objectEvent"]["kind"]=="hyperlink" for b in expected["after"] if b["objectEvent"]["kind"]=="hyperlink" and a["objectEvent"]["signature"]==b["objectEvent"]["signature"] and position_of("before",a)==position_of("after",b) and position_of("before",a,True)==position_of("after",b,True)]
         if events.get("unchangedLinks")!=unchanged:raise ValueError("INVALID_COMPARISON_MANIFEST_LINK_ACTIONS")
         facts=lambda side:[(source["objectEvent"]["kind"],position_of(side,source),position_of(side,source,True),source["objectEvent"]["signature"]) for source in expected[side]]
         if type(events.get("changed")) is not bool or events["changed"] != (facts("before") != facts("after")):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+    for decision in _MANIFEST_DECISIONS:
+        value=decision.get("mergeProjection")
+        if decision["type"]!="paragraph" or decision.get("trackedRepresentation")!="revision" or len(decision["before"])!=2 or len(decision["after"])!=1:
+            if value is not None:raise ValueError("INVALID_COMPARISON_MANIFEST_MERGE_PROJECTION")
+            continue
+        if not isinstance(value,dict) or any(type(value.get(name)) is not int for name in ("beforeBoundary","afterBoundary")) or any(not isinstance(value.get(name),list) for name in ("properties","beforeEvents","afterEvents")) or any(not isinstance(item,dict) or type(item.get("history")) is not bool for item in value["properties"]) or any(not isinstance(item,dict) or type(item.get("side")) is not int or item["side"] not in (0,1) for name in ("beforeEvents","afterEvents") for item in value[name]):raise ValueError("INVALID_COMPARISON_MANIFEST_MERGE_PROJECTION")
+        comparison=decision["comparisons"][1];boundary=len(actual["before"][_manifest_key(decision["before"][0])].get("rawText",""));old=new=0
+        if boundary==len(comparison["before"]):target=len(comparison["after"])
+        else:
+            target=0
+            for segment in comparison["segments"]:
+                size=len(segment["text"])
+                if segment["type"]=="equal" and old<=boundary<=old+size:target=new+boundary-old;break
+                if segment["type"]=="deleted" and old<=boundary<old+size:target=new;break
+                if segment["type"]!="added":old+=size
+                if segment["type"]!="deleted":new+=size
+                target=new
+        properties=[]
+        for ref in decision["before"]:
+            after=decision["after"][0];empty={"supported":{},"unsupported":{},"history":False}
+            a=actual["before"][_manifest_key(ref)].get("normalizedProperties",{}).get("pPr",empty);b=actual["after"][_manifest_key(after)].get("normalizedProperties",{}).get("pPr",empty)
+            families=[name for name in dict.fromkeys(list(a["supported"])+list(b["supported"])) if a["supported"].get(name,[])!=b["supported"].get(name,[]) and _mask_enabled("pPr",name)]
+            properties.append({"before":ref,"after":after,"beforeFact":a,"afterFact":b,"families":families,"history":b["history"]})
+        events=decision.get("objectEvents",{});before_events=[{"source":ref,"side":int(ref["part"]!=decision["before"][0]["part"] or ref["objectEvent"]["paragraphPath"]!=decision["before"][0]["path"])} for ref in events.get("before",[])]
+        after_events=[]
+        for ref in events.get("after",[]):
+            pair=next((pair for pair in events.get("drawingProperties",[]) if _manifest_key(pair["after"])==_manifest_key(ref)),None)
+            role=next(item["side"] for item in before_events if _manifest_key(item["source"])==_manifest_key(pair["before"])) if pair else int(ref["objectEvent"]["start"]>=target)
+            after_events.append({"source":ref,"side":role})
+        if value!={"policy":"worklazy-merge-1","beforeBoundary":boundary,"afterBoundary":target,"properties":properties,"beforeEvents":before_events,"afterEvents":after_events}:raise ValueError("INVALID_COMPARISON_MANIFEST_MERGE_PROJECTION")
     for decision in _MANIFEST_DECISIONS:
         if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision": continue
         has_comparison_projection = any("sourceSlices" in comparison or "restoreStyles" in comparison for comparison in decision.get("comparisons", []))
@@ -1841,7 +1929,7 @@ def _install_manifest(manifest):
             _MANIFEST_DECISIONS.append(decision)
             visit(decision.get("children", []))
     visit(manifest["decisions"])
-    _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear()
+    _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
     for decision in _MANIFEST_DECISIONS:
         for side in ("before","after"):
             for ref in decision.get("objectEvents",{}).get(side,[]):
@@ -2530,4 +2618,4 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _MANIFEST_PROPERTY_USED = set()
         _MANIFEST_SOURCE_NODES = {}
         _MANIFEST_ALLOWED_PROPERTIES = {}
-        _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear()
+        _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()

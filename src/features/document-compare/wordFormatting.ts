@@ -136,7 +136,7 @@ const labels: Record<string, [string, string]> = {
   jc: ["정렬", "Alignment"], pStyle: ["문단 스타일", "Paragraph style"], spacing: ["간격", "Spacing"], ind: ["들여쓰기", "Indentation"], tblW: ["표 너비", "Table width"], shd: ["음영", "Shading"], vAlign: ["세로 정렬", "Vertical alignment"], trHeight: ["행 높이", "Row height"], pgSz: ["용지 크기", "Page size"], pgMar: ["쪽 여백", "Page margins"],
 };
 export function formattingLabels(names: string[], language: "ko" | "en") { return [...new Set(names.map((name) => labels[local(name)]?.[language === "en" ? 1 : 0] ?? (language === "en" ? "Formatting" : "서식")))]; }
-export function decisionFormattingFamilies(decision: ComparisonDecision) { return [...new Set([...decision.screenFormattingFamilies ?? [], ...decision.comparisons.flatMap((item) => [...item.formatting?.paragraphFamilies ?? [], ...item.formatting?.spans.flatMap((span) => span.families) ?? []])])]; }
+export function decisionFormattingFamilies(decision: ComparisonDecision) { return [...new Set([...decision.mergeProjection?.properties.flatMap(item=>item.families) ?? [], ...decision.screenFormattingFamilies ?? [], ...decision.comparisons.flatMap((item) => [...item.formatting?.paragraphFamilies ?? [], ...item.formatting?.spans.flatMap((span) => span.families) ?? []])])]; }
 
 import type { WordDiffItem, WordDocumentViewItem, WordTableComparison } from "../excel-merger/types";
 export interface ManifestFormattingView extends WordDocumentViewItem { comparisonDecisionId?: string; formattingLabels?: string[] }

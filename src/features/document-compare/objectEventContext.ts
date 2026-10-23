@@ -13,11 +13,11 @@ export function sourceEventBoundary(decision:ComparisonDecision,position:number)
   return next;
 }
 export function buildObjectEventContexts(manifest:DocumentComparisonManifest,decision:ComparisonDecision,before:DocumentSourceReference[],after:DocumentSourceReference[]):ObjectEventContext[] {
-  const indexes=decision.before.length===1 && decision.after.length===2?[1,2]:[0];
+  const indexes=decision.before.length===1 && decision.after.length===2?[1,2]:decision.before.length===2&&decision.after.length===1?[1]:[0];
   let offset=0;
   return indexes.map(comparisonIndex=>{
     const comparison=decision.comparisons[comparisonIndex],slices=comparisonSourceSlices(manifest,decision,comparisonIndex);
-    const events=(side:'before'|'after')=>slices[side].flatMap((slice,sliceIndex)=>(side==='before'?before:after).filter(ref=>ref.part===slice.source.part && JSON.stringify(ref.objectEvent!.paragraphPath)===JSON.stringify(slice.source.path) && ref.objectEvent!.start>=slice.range[0] && (ref.objectEvent!.start<slice.range[1] || ref.objectEvent!.start===slice.range[1] && (side==='after' || comparisonIndex===indexes.at(-1)) && slice.range[1]===Array.from(manifest.sources[side].find(item=>key(item)===key(slice.source))?.rawText??'').length)).map(source=>({source,start:source.objectEvent!.start-slice.range[0]+slices[side].slice(0,sliceIndex).reduce((sum,item)=>sum+item.range[1]-item.range[0]+1,0),end:source.objectEvent!.end-slice.range[0]+slices[side].slice(0,sliceIndex).reduce((sum,item)=>sum+item.range[1]-item.range[0]+1,0)})));
+    const events=(side:'before'|'after')=>slices[side].flatMap((slice,sliceIndex)=>(side==='before'?before:after).filter(ref=>ref.part===slice.source.part && JSON.stringify(ref.objectEvent!.paragraphPath)===JSON.stringify(slice.source.path) && ref.objectEvent!.start>=slice.range[0] && (ref.objectEvent!.start<slice.range[1] || ref.objectEvent!.start===slice.range[1] && (side==='after' || decision.before.length===2 || comparisonIndex===indexes.at(-1)) && slice.range[1]===Array.from(manifest.sources[side].find(item=>key(item)===key(slice.source))?.rawText??'').length)).map(source=>({source,start:source.objectEvent!.start-slice.range[0]+slices[side].slice(0,sliceIndex).reduce((sum,item)=>sum+item.range[1]-item.range[0]+(decision.before.length===2&&decision.after.length===1?0:1),0),end:source.objectEvent!.end-slice.range[0]+slices[side].slice(0,sliceIndex).reduce((sum,item)=>sum+item.range[1]-item.range[0]+(decision.before.length===2&&decision.after.length===1?0:1),0)})));
     const context={comparisonIndex,offset,afterParagraph:slices.after[0]?.source,before:events('before'),after:events('after')};
     offset+=Array.from(comparison.after).length+1;
     return context;

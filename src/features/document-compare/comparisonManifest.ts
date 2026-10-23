@@ -38,7 +38,8 @@ export interface ComparisonDecision {
   before: DocumentSourceReference[];
   after: DocumentSourceReference[];
   moved: boolean;
-  objectEvents?: {contexts:ObjectEventContext[];deletedDrawingStyles:DeletedDrawingStyleProjection[];drawingProperties:DrawingPropertyProjection[];unchangedLinks:Array<{before:DocumentSourceReference;after:DocumentSourceReference}>;propertiesSupported:boolean;policy:"worklazy-source-events-4";before:DocumentSourceReference[];after:DocumentSourceReference[];changed:boolean};
+  mergeProjection?: {policy:"worklazy-merge-1";beforeBoundary:number;afterBoundary:number;properties:Array<{before:DocumentSourceReference;after:DocumentSourceReference;beforeFact:PropertyFact;afterFact:PropertyFact;families:string[];history:boolean}>;beforeEvents:Array<{source:DocumentSourceReference;side:number}>;afterEvents:Array<{source:DocumentSourceReference;side:number}>};
+  objectEvents?: {unchangedDrawings:Array<{before:DocumentSourceReference;after:DocumentSourceReference}>;contexts:ObjectEventContext[];deletedDrawingStyles:DeletedDrawingStyleProjection[];drawingProperties:DrawingPropertyProjection[];unchangedLinks:Array<{before:DocumentSourceReference;after:DocumentSourceReference}>;propertiesSupported:boolean;policy:"worklazy-source-events-5";before:DocumentSourceReference[];after:DocumentSourceReference[];changed:boolean};
   screenFormattingFamilies?: string[];
   deletedFormattingPolicy?: "restore-before-unpaired" | "paired-revised";
   wholeRestoreStyles?: Array<{ before: DocumentSourceReference; afterParagraph: DocumentSourceReference; projections: RestoreStyleProjection[] }>;

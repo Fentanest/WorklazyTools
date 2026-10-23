@@ -14,6 +14,7 @@ import type {
 } from "../excel-merger/types";
 import { alignDocumentSequence, alignSequence, type SequenceGroup, type SequencePair } from "./documentAlignment.ts";
 
+import { buildMergeProjections } from "./mergeProjection.ts";
 import { buildObjectEventContexts, eventPosition } from "./objectEventContext.ts";
 import { buildDrawingRestoreProjections } from "./drawingRestoreProjection.ts";
 import { buildRestoreStyleProjections } from "./restoreStyleProjection.ts";
@@ -197,10 +198,11 @@ export function compareDocumentModels(
     });
     const propertiesSupported=true;
     const unchangedLinks=before.filter(a=>a.objectEvent!.kind==="hyperlink").flatMap(a=>after.filter(b=>b.objectEvent!.kind==="hyperlink" && a.objectEvent!.signature===b.objectEvent!.signature && position("before",a)===position("after",b) && position("before",a,true)===position("after",b,true)).map(b=>({before:a,after:b})));
-    if(before.length || after.length)decision.objectEvents={contexts,deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-4",before,after,changed:JSON.stringify(before.map(source=>[source.objectEvent!.kind,position("before",source),position("before",source,true),source.objectEvent!.signature]))!==JSON.stringify(after.map(source=>[source.objectEvent!.kind,position("after",source),position("after",source,true),source.objectEvent!.signature]))};
+    if(before.length || after.length)decision.objectEvents={unchangedDrawings:drawingProperties.filter(pair=>pair.before.objectEvent!.signature===pair.after.objectEvent!.signature && (!pair.families.length || pair.representation==="preserve-after-history")).map(pair=>({before:pair.before,after:pair.after})),contexts,deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-5",before,after,changed:JSON.stringify(before.map(source=>[source.objectEvent!.kind,position("before",source),position("before",source,true),source.objectEvent!.signature]))!==JSON.stringify(after.map(source=>[source.objectEvent!.kind,position("after",source),position("after",source,true),source.objectEvent!.signature]))};
   }};
   objectDecisions(manifest.decisions);
   buildDrawingRestoreProjections(manifest);
+  buildMergeProjections(manifest);
   buildRestoreStyleProjections(manifest);
   buildWordFormatting(manifest, diffCharacters);
   projectWordFormatting(manifest, documentViews, headerFooter, note, changes, tables, language);
