@@ -1,3 +1,4 @@
+import {pixelOptionMeaning} from "../image-compare/optionMeaning.ts";
 import type { ImageCompareResult } from '../image-compare/types.ts';
 import { IMAGE_LIMITS } from '../image-compare/types.ts';
 import { discardOwnedBuffer } from '../image-compare/memory.ts';
@@ -15,7 +16,7 @@ export function imageReportReservation(result: ImageCompareResult, retainedBytes
 export function imageExportSnapshot(result: ImageCompareResult, revision: number, projection: ImageExportProjection, language:'ko'|'en') {
   const quality=structuredClone(result.quality) as unknown as Json;
   return createExportSnapshot({language,tool:'image-compare',sources:(['left','right']as const).map(side=>({id:side,revision:`${revision}:${result.runId}`,label:result.sources[side].name})),
-    appliedOptions:{comparison:result.options as unknown as Json,transform:result.geometry.rightTransform as unknown as Json,quality,projection},
+    appliedOptions:{comparison:(result.optionMeaning??pixelOptionMeaning(result.options)).applied as unknown as Json,requestedComparison:(result.optionMeaning??pixelOptionMeaning(result.options)).requested as unknown as Json,inactiveOptions:[...(result.optionMeaning??pixelOptionMeaning(result.options)).inactive],transform:result.geometry.rightTransform as unknown as Json,quality,projection},
     coordinates:{unit:'working-pixels',workingExtent:{width:result.width,height:result.height},originalCanvasExtent:{width:result.quality.originalWidth,height:result.quality.originalHeight},sources:result.sources as unknown as Json,originalCanvasOrigin:{unit:'original-transformed-pixels',x:result.geometry.originX,y:result.geometry.originY},sourceMatrixInputUnit:'decoded-original-image-pixels',leftSourceToWorking:result.geometry.leftMatrix as unknown as Json,rightSourceToWorking:(result.geometry.rightProjective??result.geometry.rightMatrix)as unknown as Json,rightMatrixKind:result.geometry.rightProjective?'projective3':'affine6'},
     warnings:[...(result.quality.scale<1?[language==='ko'?'크기를 줄여 비교한 결과입니다. 원본 파일이나 원본 픽셀이 같다는 뜻은 아닙니다.':'Resized for comparison; this does not prove identical original files or pixels.']:[]),language==='ko'?'비교 이미지 전체를 저장합니다. 영역 상자·잘라보기·OCR 표시는 포함하지 않습니다.':'Saves the full comparison image, excluding region boxes, crop and OCR displays.'],completion:'complete',scope:{kind:'all',label:language==='ko'?'전체 비교 이미지':'Full comparison image'},
     rows:[{id:'working-metrics',status:'working-pixel-metrics',left:JSON.stringify({changed:result.changedPixelCount,comparable:result.comparablePixelCount,ratio:result.differenceRatio,addedBoundary:result.addedBoundaryPixelCount,removedBoundary:result.removedBoundaryPixelCount}),right:'',metadata:{quality}}],

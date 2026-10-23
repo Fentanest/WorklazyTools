@@ -1,3 +1,4 @@
+import {pixelOptionMeaning} from "./optionMeaning.ts";
 import { projectiveGeometry, warpRgba } from "./projective.ts";
 import type { Matrix3 } from "./alignmentTypes.ts";
 /// <reference lib="webworker" />
@@ -31,7 +32,7 @@ scope.onmessage = async ({ data }: MessageEvent<{ leftName: string; rightName: s
     left.close(); right.close(); left = undefined; right = undefined;
     scope.postMessage({ type: "progress", progress: 45 });
     const compared = compareRgba(a.rgba, b.rgba, geometry.width, geometry.height, a.valid, b.valid, data.options);
-    const result: ImageCompareResult = { ...compared, quality: { mode: geometry.scale===1?"full-resolution":"reduced-resolution",scale:geometry.scale,originalWidth:geometry.originalWidth,originalHeight:geometry.originalHeight,workingWidth:geometry.width,workingHeight:geometry.height,resizePasses:geometry.scale===1?0:1,samplingPassesPerSource:1,pixelUnits:"working-pixels", resources: assertImageBudget(sourcePixels, geometry.width * geometry.height, encodedBytes, data.previousViewBytes) }, runId: data.runId, engine: "pixelmatch-7.1.0-rgba-v1", width: geometry.width, height: geometry.height, left: a.rgba, right: b.rgba, leftValid: a.valid, rightValid: b.valid, sources: { left: leftMetadata, right: rightMetadata }, options: data.options, geometry: { ...geometry, rightTransform: data.transform } };
+    const result: ImageCompareResult = { ...compared, quality: { mode: geometry.scale===1?"full-resolution":"reduced-resolution",scale:geometry.scale,originalWidth:geometry.originalWidth,originalHeight:geometry.originalHeight,workingWidth:geometry.width,workingHeight:geometry.height,resizePasses:geometry.scale===1?0:1,samplingPassesPerSource:1,pixelUnits:"working-pixels", resources: assertImageBudget(sourcePixels, geometry.width * geometry.height, encodedBytes, data.previousViewBytes) }, runId: data.runId, engine: "pixelmatch-7.1.0-rgba-v1", width: geometry.width, height: geometry.height, left: a.rgba, right: b.rgba, leftValid: a.valid, rightValid: b.valid, sources: { left: leftMetadata, right: rightMetadata }, options: data.options, optionMeaning:pixelOptionMeaning(data.options), geometry: { ...geometry, rightTransform: data.transform } };
     scope.postMessage({ type: "result", result }, [result.left.buffer, result.right.buffer, result.leftValid.buffer, result.rightValid.buffer, result.changedMask.buffer, result.channelDelta.buffer, result.overlay.buffer, result.subtract.buffer] as ArrayBuffer[]);
   } catch (error) { scope.postMessage({ type: "error", code: error instanceof Error && /^[A-Z_]+$/u.test(error.message) ? error.message : "IMAGE_DECODE_FAILED" }); }
   finally { left?.close(); right?.close(); scope.close(); }
