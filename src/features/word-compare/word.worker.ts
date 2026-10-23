@@ -1,6 +1,5 @@
 /// <reference lib="webworker" />
 
-import alignmentScript from "./alignment.py?raw";
 import acceptRevisionsScript from "./accept_revisions.py?raw";
 import compareScript from "./compare.py?raw";
 import trackedDocxScript from "./tracked_docx.py?raw";
@@ -19,6 +18,7 @@ const PYODIDE_MODULE_URL = `${PYODIDE_BASE_URL}pyodide.mjs`;
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 const bridgeGlobal = worker as DedicatedWorkerGlobalScope & {
   worklazyDiffJson: (before: string, after: string) => string;
+  worklazyComparisonManifestJson: (...args: unknown[]) => string;
 };
 
 bridgeGlobal.worklazyDiffJson = (before, after) => {
@@ -27,6 +27,11 @@ bridgeGlobal.worklazyDiffJson = (before, after) => {
   }
   return JSON.stringify(diffText(before, after));
 };
+
+bridgeGlobal.worklazyComparisonManifestJson = (before, after, formatting, tables, metadata) => JSON.stringify(compareDocumentModels(
+  "", "", JSON.parse(before as string), JSON.parse(after as string),
+  { formatting: Boolean(formatting), tables: Boolean(tables), metadata: Boolean(metadata) }, "en",
+).manifest);
 
 worker.onmessage = async (event: MessageEvent) => {
   let extractFunction: { (...args: unknown[]): string; destroy?: () => void } | undefined;
@@ -70,7 +75,6 @@ worker.onmessage = async (event: MessageEvent) => {
       const loadedPyodide = await pyodideModule.loadPyodide({ indexURL: PYODIDE_BASE_URL });
       pyodide = loadedPyodide;
       progress(42, L("문서 비교 준비를 완료했습니다.", "Document comparison is ready."));
-      loadedPyodide.runPython(alignmentScript);
       loadedPyodide.runPython(compareScript);
       loadedPyodide.runPython(acceptRevisionsScript);
       loadedPyodide.runPython(trackedDocxScript);
@@ -118,7 +122,7 @@ worker.onmessage = async (event: MessageEvent) => {
 
         const beforeModel = extractWordModel(beforeBuffer, pairFormats.before, event.data.options, en ? "en" : "ko", extract);
         const afterModel = extractWordModel(afterBuffer, pairFormats.after, event.data.options, en ? "en" : "ko", extract);
-        const result: WordCompareResult = compareDocumentModels(
+        const result = compareDocumentModels(
           pair.beforeName,
           pair.afterName,
           beforeModel,
@@ -126,6 +130,12 @@ worker.onmessage = async (event: MessageEvent) => {
           event.data.options,
           en ? "en" : "ko",
         );
+        if (!event.data.options.formatting || !event.data.options.tables || !event.data.options.metadata) {
+          result.warnings.push(L("비교에서 제외한 서식·표·문서 정보는 수정본 기준으로 유지됩니다.", "Excluded formatting, tables and document information are kept from the revised file."));
+        }
+        if ((beforeModel.comments?.length || afterModel.comments?.length) && event.data.options.trackedDocument) {
+          result.warnings.push(L("변경 추적 파일의 메모와 기존 변경 기록은 수정본 기준으로 유지됩니다. 메모 본문의 변경은 Word에서 거부하여 원본으로 복원할 수 없습니다.", "Comments and existing revision history in the tracked file are kept from the revised file. Rejecting changes in Word does not restore original comment text."));
+        }
         if (event.data.options.trackedDocument && docxPair && pyodide && generateTracked) {
           progress(Math.min(endProgress - 1, startProgress + Math.round((endProgress - startProgress) * 0.7)), L(`[${activePair}/${pairs.length}] Word 변경 추적 파일 생성 중…`, `[${activePair}/${pairs.length}] Creating tracked-changes Word file…`));
           const trackedBeforePath = rewriteRevisionAuthor ? acceptedBeforePath : beforePath;
@@ -134,18 +144,27 @@ worker.onmessage = async (event: MessageEvent) => {
             pyodide.FS.writeFile(beforePath, new Uint8Array(pair.beforeBuffer));
             pyodide.FS.writeFile(afterPath, new Uint8Array(pair.afterBuffer));
           }
-          generateTracked(
-            trackedBeforePath,
-            trackedAfterPath,
-            trackedPath,
-            event.data.options.revisionAuthor,
-            event.data.options.formatting,
-            event.data.options.tables,
-            event.data.options.metadata,
-          );
-          const trackedBytes = pyodide.FS.readFile(trackedPath) as Uint8Array;
-          trackedBuffer = trackedBytes.slice().buffer;
-          transfers.push(trackedBuffer);
+          try {
+            generateTracked(
+              trackedBeforePath,
+              trackedAfterPath,
+              trackedPath,
+              event.data.options.revisionAuthor,
+              event.data.options.formatting,
+              event.data.options.tables,
+              event.data.options.metadata,
+              JSON.stringify(result.manifest),
+            );
+            const trackedBytes = pyodide.FS.readFile(trackedPath) as Uint8Array;
+            trackedBuffer = trackedBytes.slice().buffer;
+            transfers.push(trackedBuffer);
+          } catch (error) {
+            if (!/COMPARISON_MANIFEST|COMPARISON_DECISION|UNMAPPED_VISIBLE_XML_NODE|SHARED_DIFF|UNSUPPORTED_TRACKED_SOURCE/.test(String(error))) throw error;
+            result.warnings.push(L(
+              "일부 원문 위치를 변경 추적 파일에 안전하게 연결할 수 없어 DOCX 다운로드를 제공하지 않습니다. 화면 비교 결과를 확인해 주세요.",
+              "The tracked DOCX download is unavailable because some source locations could not be represented safely. Review the on-screen comparison.",
+            ));
+          }
         }
         results.push({ result, trackedBuffer });
       } finally {
@@ -198,7 +217,7 @@ function extractWordModel(
 ) {
   if (format === "doc") return extractLegacyDocModel(new Uint8Array(buffer), options, language);
   if (format === "docx" && extract) {
-    return JSON.parse(extract(new Uint8Array(buffer), options.tables, options.metadata, language)) as ComparisonModel;
+    return JSON.parse(extract(new Uint8Array(buffer), true, true, language)) as ComparisonModel;
   }
   throw new Error(language === "en" ? "The Word file format is not supported." : "지원하지 않는 Word 파일 형식입니다.");
 }

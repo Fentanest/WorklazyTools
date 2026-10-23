@@ -1,4 +1,4 @@
-import difflib
+import hashlib
 import io
 import json
 import re
@@ -235,6 +235,16 @@ def _run_style(run):
     return "|".join(values)
 
 
+def _source_paths(root, part):
+    result = {}
+    def visit(node, path):
+        result[id(node)] = {"part": part, "path": path}
+        for index, child in enumerate(node):
+            visit(child, path + [index])
+    visit(root, [])
+    return result
+
+
 def _paragraph_record(paragraph, section, location, numbering=None):
     text = _text(paragraph)
     list_label = numbering.label(paragraph) if numbering is not None else ""
@@ -348,17 +358,20 @@ def _read_comments(archive, numbering):
         return {}
 
     comments_root = ET.fromstring(archive.read("word/comments.xml"))
+    sources = _source_paths(comments_root, "word/comments.xml")
     comments = {}
     for comment_index, comment in enumerate(comments_root.findall(W + "comment"), 1):
         comment_id = comment.attrib.get(W + "id", str(comment_index))
         paragraphs = list(comment.iter(W + "p"))
-        paragraph_records = [_paragraph_record(paragraph, "comment", "", numbering) for paragraph in paragraphs]
+        paragraph_records = [{**_paragraph_record(paragraph, "comment", "", numbering), "source": sources[id(paragraph)]} for paragraph in paragraphs]
         format_runs = []
         for index, record in enumerate(paragraph_records):
             if index:
                 format_runs.append({"text": "\n", "style": "__paragraph-break__"})
             format_runs.extend(_display_format_runs(record))
         comments[comment_id] = {
+            "source": sources[id(comment)],
+            "paragraphs": paragraph_records,
             "id": comment_id,
             "author": comment.attrib.get(W + "author", "").strip(),
             "text": "\n".join(_text(paragraph) for paragraph in paragraphs).strip(),
@@ -398,12 +411,17 @@ def _parse_document(data, include_tables, include_metadata):
         "document": [],
         "documentBlocks": [],
         "tables": [],
+        "sourceInventory": [],
     }
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        for part in archive.namelist():
+            if re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments)\.xml", part):
+                records["sourceInventory"].extend(_source_paths(ET.fromstring(archive.read(part)), part).values())
         numbering = _NumberingResolver(archive)
         comments = _read_comments(archive, numbering.fresh()) if include_metadata else {}
         comment_locations = {}
         root = ET.fromstring(archive.read("word/document.xml"))
+        sources = _source_paths(root, "word/document.xml")
         body = root.find(W + "body")
         paragraph_index = 0
         table_index = 0
@@ -412,6 +430,7 @@ def _parse_document(data, include_tables, include_metadata):
                 if child.tag == W + "p":
                     paragraph_index += 1
                     record = _paragraph_record(child, "body", _l(f"본문 {paragraph_index}번째 문단", f"Body paragraph {paragraph_index}"), numbering)
+                    record["source"] = sources[id(child)]
                     comment_ids = _paragraph_comment_ids(child)
                     record["comments"] = [comments[item] for item in comment_ids if item in comments]
                     for comment_id in comment_ids:
@@ -427,7 +446,7 @@ def _parse_document(data, include_tables, include_metadata):
                         row_records = []
                         for cell_index, cell in enumerate(row.findall(W + "tc"), 1):
                             paragraphs = cell.findall(".//" + W + "p")
-                            paragraph_records = [_paragraph_record(p, "table", "", numbering) for p in paragraphs]
+                            paragraph_records = [{**_paragraph_record(p, "table", "", numbering), "source": sources[id(p)]} for p in paragraphs]
                             text = "\n".join(record["text"] for record in paragraph_records)
                             display_text = "\n".join(record["displayText"] for record in paragraph_records)
                             list_labels = "\n".join(record["listLabel"] for record in paragraph_records)
@@ -443,6 +462,8 @@ def _parse_document(data, include_tables, include_metadata):
                                     if comment_id not in comment_ids:
                                         comment_ids.append(comment_id)
                             record = {
+                                "source": sources[id(cell)],
+                                "paragraphs": paragraph_records,
                                 "section": "table",
                                 "location": _l(f"표 {table_index} · {row_index}행 {cell_index}열", f"Table {table_index} · row {row_index}, column {cell_index}"),
                                 "text": text,
@@ -465,6 +486,7 @@ def _parse_document(data, include_tables, include_metadata):
                     records["documentBlocks"].append({
                         "type": "table",
                         "tableIndex": table_index - 1,
+                        "source": sources[id(child)],
                     })
                 elif child.tag == W + "tbl":
                     for paragraph in child.iter(W + "p"):
@@ -478,6 +500,7 @@ def _parse_document(data, include_tables, include_metadata):
             for path in header_footer_paths:
                 story_numbering = numbering.fresh()
                 metadata_root = ET.fromstring(archive.read(path))
+                metadata_sources = _source_paths(metadata_root, path)
                 file_name = path.split("/")[-1]
                 area = _l("머리말", "Header") if file_name.startswith("header") else _l("꼬리말", "Footer")
                 area_number = re.search(r"\d+", file_name)
@@ -489,13 +512,15 @@ def _parse_document(data, include_tables, include_metadata):
                         _l(f"{label} · {index}번째 문단", f"{label} · paragraph {index}"),
                         story_numbering,
                     )
-                    if record["text"] or record["format"]:
-                        records["headerFooter"].append(record)
+                    record["source"] = metadata_sources[id(paragraph)]
+                    records["headerFooter"].append(record)
 
             for comment_id, comment in comments.items():
                 author_label = f" · {comment['author']}" if comment["author"] else ""
                 anchor_location = comment_locations.get(comment_id, _l("연결 위치를 찾지 못한 문단", "Paragraph with unknown anchor"))
                 records["comment"].append({
+                    "source": comment.get("source"),
+                    "paragraphs": comment.get("paragraphs", []),
                     "section": "comment",
                     "location": _l(f"{anchor_location} · 메모 {comment_id}{author_label}", f"{anchor_location} · comment {comment_id}{author_label}"),
                     "text": comment["text"],
@@ -509,6 +534,7 @@ def _parse_document(data, include_tables, include_metadata):
                 if path not in archive.namelist():
                     continue
                 notes_root = ET.fromstring(archive.read(path))
+                note_sources = _source_paths(notes_root, path)
                 story_numbering = numbering.fresh()
                 for note_index, note in enumerate(notes_root.findall(W + element_name), 1):
                     note_id = note.attrib.get(W + "id", str(note_index))
@@ -524,8 +550,8 @@ def _parse_document(data, include_tables, include_metadata):
                             _l(f"{note_name} {note_id} · {paragraph_index}번째 문단", f"{note_name} {note_id} · paragraph {paragraph_index}"),
                             story_numbering,
                         )
-                        if record["text"] or record["format"]:
-                            records["note"].append(record)
+                        record["source"] = note_sources[id(paragraph)]
+                        records["note"].append(record)
         records["warnings"] = numbering.unresolved
     return records
 
@@ -538,6 +564,8 @@ def _display_text(record):
 
 def _cell_payload(cell):
     return {
+        "source": cell.get("source"),
+        "paragraphs": [{**record, "rawText": record["text"], "text": _display_text(record)} for record in cell.get("paragraphs", [])],
         "text": _display_text(cell),
         "format": cell.get("format", ""),
         "formatRuns": _display_format_runs(cell),
@@ -576,6 +604,9 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
 
     def record_of(record):
         return {
+            "source": record.get("source"),
+            "rawText": record.get("text", ""),
+            "paragraphs": [{**item, "rawText": item["text"], "text": _display_text(item)} for item in record.get("paragraphs", [])],
             "text": _display_text(record),
             "format": record.get("format", ""),
             "formatRuns": _display_format_runs(record),
@@ -604,6 +635,7 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
         table = tables[table_index]
         blocks.append({
             "type": "table",
+            "source": block.get("source"),
             "text": " | ".join(
                 "\u241f".join(cell.get("text", "") for cell in row)
                 for row in table["grid"]
@@ -627,6 +659,8 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
         ))
 
     model = {
+        "sourceRevision": hashlib.sha256(bytes(document_bytes)).hexdigest(),
+        "sourceInventory": records["sourceInventory"],
         "blocks": blocks,
         "headerFooter": [record_of(record) for record in records["headerFooter"]],
         "notes": [record_of(record) for record in records["note"]],

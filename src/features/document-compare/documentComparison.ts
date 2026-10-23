@@ -12,7 +12,13 @@ import type {
 } from "../excel-merger/types";
 import { alignDocumentSequence, alignSequence, type SequenceGroup, type SequencePair } from "./documentAlignment.ts";
 
+import { freezeComparisonManifest } from "./comparisonManifest.ts";
+import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ManifestRecord } from "./comparisonManifest.ts";
+
 export interface ComparisonRecord {
+  source?: DocumentSourceReference;
+  rawText?: string;
+  paragraphs?: ManifestRecord[];
   text: string;
   format: string;
   formatRuns?: Array<{ text: string; style: string }>;
@@ -27,6 +33,8 @@ export interface ComparisonTable {
 }
 
 export interface ComparisonBlock {
+  source?: DocumentSourceReference;
+  rawText?: string;
   type: "paragraph" | "table";
   text: string;
   format: string;
@@ -37,6 +45,8 @@ export interface ComparisonBlock {
 }
 
 export interface ComparisonModel {
+  sourceRevision?: string;
+  sourceInventory?: DocumentSourceReference[];
   blocks: ComparisonBlock[];
   headerFooter: ComparisonRecord[];
   notes: ComparisonRecord[];
@@ -62,10 +72,22 @@ export function compareDocumentModels(
   after: ComparisonModel,
   options: ComparisonOptions,
   language: "ko" | "en",
-): WordCompareResult {
+): WordCompareResult & { manifest: DocumentComparisonManifest } {
   const labels: ComparisonLanguage = language === "en"
     ? { emptyCell: (row, column) => `Empty cell ${row}:${column}`, table: (index) => `Table ${index}` }
     : { emptyCell: (row, column) => `빈 셀 ${row}:${column}`, table: (index) => `표 ${index}` };
+  const manifest: DocumentComparisonManifest = {
+    version: 1, decisions: [], policyVersion: "worklazy-document-1",
+    inputRevision: { before: before.sourceRevision, after: after.sourceRevision },
+    options: { ...options },
+    preservation: { comments: "preserve-after-existing-contract", existingRevisions: "preserve-after-history" },
+    sources: { before: before.sourceInventory ?? [], after: after.sourceInventory ?? [] },
+    exclusions: {
+      formatting: options.formatting ? "compare" : "preserve-after",
+      tables: options.tables ? [] : [...before.blocks, ...after.blocks].filter((block) => block.type === "table").flatMap((block) => block.source ? [block.source] : []),
+      metadata: options.metadata ? [] : [...before.headerFooter, ...after.headerFooter, ...before.notes, ...after.notes, ...before.comments ?? [], ...after.comments ?? []].flatMap((record) => record.source ? [record.source] : []),
+    },
+  };
   const changes: WordDiffItem[] = [];
   const tables: WordTableComparison[] = [];
   const documentViews: WordDocumentViewItem[] = [];
@@ -73,7 +95,7 @@ export function compareDocumentModels(
     textOf: (item) => item.text,
     compatible: (left, right) => left.type === right.type,
     canGroup: (item) => item.type === "paragraph",
-    include: (item) => item.type === "table" || Boolean(item.text.trim()) || Boolean(item.comments?.length),
+    include: (item) => item.type === "table" ? options.tables : Boolean(item.text.trim()) || Boolean(item.comments?.length),
   });
 
   for (const group of blockGroups) {
@@ -84,6 +106,16 @@ export function compareDocumentModels(
     if (left?.type === "table" || right?.type === "table") {
       const table = compareTable(left?.table, right?.table, tables.length, changes, options.formatting, labels);
       tables.push(table);
+      const decision = decisionOf(leftBlocks, rightBlocks, group.moved, "table");
+      decision.rows = table.rowPairs;
+      decision.columns = table.columnPairs;
+      decision.children = [];
+      for (const row of table.rowPairs) for (const column of table.columnPairs) {
+        const a = row.beforeIndex === null || column.beforeIndex === null ? undefined : left?.table?.grid[row.beforeIndex]?.[column.beforeIndex] as (WordTableCell & ManifestRecord) | undefined;
+        const b = row.afterIndex === null || column.afterIndex === null ? undefined : right?.table?.grid[row.afterIndex]?.[column.afterIndex] as (WordTableCell & ManifestRecord) | undefined;
+        decision.children.push(...paragraphDecisions(a?.paragraphs ?? [], b?.paragraphs ?? []));
+      }
+      manifest.decisions.push(decision);
       const baseTableKind = tableViewKind(table);
       documentViews.push({
         kind: group.moved && baseTableKind === "unchanged" ? "moved" : baseTableKind,
@@ -94,12 +126,14 @@ export function compareDocumentModels(
         afterLocation: right?.location ?? "",
         before: left?.text ?? "",
         after: right?.text ?? "",
-        segments: diffText(left?.text ?? "", right?.text ?? ""),
+        segments: decision.segments,
         comments: [],
         moved: group.moved,
       });
       continue;
     }
+    const decision = decisionOf(leftBlocks, rightBlocks, group.moved);
+    manifest.decisions.push(decision);
     documentViews.push(compareRecord(
       combineRecords(leftBlocks),
       combineRecords(rightBlocks),
@@ -107,13 +141,14 @@ export function compareDocumentModels(
       changes,
       options.formatting,
       group,
+      decision,
     ));
   }
 
-  const headerFooter = compareRecordList(before.headerFooter, after.headerFooter, "headerFooter", changes, options.formatting);
-  const note = compareRecordList(before.notes, after.notes, "note", changes, options.formatting);
+  const headerFooter = compareRecordList(options.metadata ? before.headerFooter : [], options.metadata ? after.headerFooter : [], "headerFooter", changes, options.formatting, manifest);
+  const note = compareRecordList(options.metadata ? before.notes : [], options.metadata ? after.notes : [], "note", changes, options.formatting, manifest);
   const commentChanges: WordDiffItem[] = [];
-  const commentViews = compareRecordList(before.comments ?? [], after.comments ?? [], "comment", commentChanges, options.formatting);
+  const commentViews = compareRecordList(options.metadata ? before.comments ?? [] : [], options.metadata ? after.comments ?? [] : [], "comment", commentChanges, options.formatting, manifest);
   changes.push(...commentChanges);
   const summary: WordCompareResult["summary"] = { added: 0, deleted: 0, changed: 0, format: 0, unchanged: 0, moved: 0 };
   for (const change of changes) {
@@ -128,6 +163,7 @@ export function compareDocumentModels(
   return {
     beforeName,
     afterName,
+    manifest: freezeComparisonManifest(manifest),
     summary,
     changes,
     tables,
@@ -142,14 +178,69 @@ function compareRecordList(
   section: "headerFooter" | "note" | "comment",
   changes: WordDiffItem[],
   formatting: boolean,
+  manifest: DocumentComparisonManifest,
 ) {
-  return alignDocumentSequence(before, after, { textOf: (item) => item.text }).map((group) => compareRecord(
+  const groups = alignDocumentSequence(before, after, { textOf: (item) => item.text });
+  for (const group of groups) {
+    const left = group.beforeIndexes.map((index) => before[index]);
+    const right = group.afterIndexes.map((index) => after[index]);
+    const decision = decisionOf(left, right, group.moved);
+    if (section === "comment") {
+      decision.trackedRepresentation = "preserve-after";
+      decision.trackedReason = "existing-comment-contract";
+      decision.children = paragraphDecisions(left.flatMap((record) => record.paragraphs ?? []), right.flatMap((record) => record.paragraphs ?? []));
+      for (const child of decision.children) {
+        child.trackedRepresentation = "preserve-after";
+        child.trackedReason = "existing-comment-contract";
+      }
+    }
+    manifest.decisions.push(decision);
+  }
+  return groups.map((group) => compareRecord(
     combineRecords(group.beforeIndexes.map((index) => before[index])),
     combineRecords(group.afterIndexes.map((index) => after[index])),
     section,
     changes,
     formatting,
     group,
+    manifest.decisions.find((decision) => decision.id === decisionOf(group.beforeIndexes.map((index) => before[index]), group.afterIndexes.map((index) => after[index]), group.moved).id),
+  ));
+}
+
+
+function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = false, type: ComparisonDecision["type"] = "paragraph"): ComparisonDecision {
+  const beforeText = before.map((record) => record.rawText ?? record.text).join("\n");
+  const afterText = after.map((record) => record.rawText ?? record.text).join("\n");
+  const comparisons = [{ before: beforeText, after: afterText, segments: diffText(beforeText, afterText) }];
+  // Paragraph-break revisions use synthetic text slices. Their text decisions
+  // are fixed here too, so the XML emitter never chooses a second alignment.
+  if (before.length === 1 && after.length === 2) {
+    const a = Array.from(beforeText);
+    const tail = Array.from(after[1].rawText ?? after[1].text);
+    let suffix = 0;
+    while (suffix < a.length && suffix < tail.length && a[a.length - 1 - suffix] === tail[tail.length - 1 - suffix]) suffix++;
+    const boundary = a.length - suffix;
+    for (const [old, next] of [[a.slice(0, boundary).join(""), after[0].rawText ?? after[0].text], [a.slice(boundary).join(""), tail.join("")]]) {
+      comparisons.push({ before: old, after: next, segments: diffText(old, next) });
+    }
+  } else if (before.length === 2 && after.length === 1) {
+    const old = before.map((record) => record.rawText ?? record.text).join("");
+    comparisons.push({ before: old, after: afterText, segments: diffText(old, afterText) });
+  }
+  return {
+    comparisons,
+    trackedRepresentation: "revision",
+    id: JSON.stringify([type, before.map((record) => record.source ?? null), after.map((record) => record.source ?? null)]),
+    type, before: before.flatMap((record) => record.source ? [record.source] : []),
+    after: after.flatMap((record) => record.source ? [record.source] : []), moved,
+    segments: diffText(before.map((record) => record.text).join("\n"), after.map((record) => record.text).join("\n")),
+    textSegments: diffText(beforeText, afterText), beforeText, afterText,
+  };
+}
+
+function paragraphDecisions(before: ManifestRecord[], after: ManifestRecord[]): ComparisonDecision[] {
+  return alignDocumentSequence(before, after, { textOf: (record) => record.text }).map((group) => decisionOf(
+    group.beforeIndexes.map((index) => before[index]), group.afterIndexes.map((index) => after[index]), group.moved,
   ));
 }
 
@@ -179,6 +270,7 @@ function compareRecord(
   changes: WordDiffItem[],
   formatting: boolean,
   group?: SequenceGroup,
+  decision?: ComparisonDecision,
 ): WordDocumentViewItem {
   const beforeText = before?.text ?? "";
   const afterText = after?.text ?? "";
@@ -196,7 +288,7 @@ function compareRecord(
             ? "format"
             : "unchanged";
   const kind: WordViewKind = moved && baseKind === "unchanged" ? "moved" : baseKind;
-  const segments = diffText(beforeText, afterText);
+  const segments = decision?.segments ?? diffText(beforeText, afterText);
   if (kind !== "unchanged" && kind !== "comment") {
     changes.push({
       kind,

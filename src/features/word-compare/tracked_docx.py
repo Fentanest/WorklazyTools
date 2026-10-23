@@ -1,13 +1,13 @@
 import copy
 import datetime
-import difflib
+import hashlib
 import io
 import json
 import re
 import zipfile
 import xml.etree.ElementTree as ET
 
-from js import worklazyDiffJson
+from js import worklazyDiffJson, worklazyComparisonManifestJson
 
 
 WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -257,15 +257,8 @@ def _comparison_text(node):
     return "".join(parts)
 
 
-def _normalize_text(value):
-    return re.sub(r"\s+", " ", value or "").strip().casefold()
 
 
-def _table_cells(table):
-    return [
-        [_comparison_text(cell) for cell in row.findall(W + "tc")]
-        for row in table.findall(W + "tr")
-    ]
 
 
 def _content_control_blocks(content_control):
@@ -284,108 +277,16 @@ def _block_kind(element):
     return CONTENT_CONTROL_TAG
 
 
-def _block_table(element):
-    if element.tag == W + "tbl":
-        return element
-    if element.tag == CONTENT_CONTROL_TAG:
-        nested = _content_control_blocks(element)
-        if len(nested) == 1:
-            return _block_table(nested[0])
-    return None
 
 
-def _block_similarity(before, after):
-    before_kind = _block_kind(before)
-    after_kind = _block_kind(after)
-    if before_kind != after_kind:
-        return -1.0
-    if before_kind != W + "tbl":
-        return difflib.SequenceMatcher(
-            None,
-            _normalize_text(_comparison_text(before)),
-            _normalize_text(_comparison_text(after)),
-            autojunk=False,
-        ).ratio()
-    before_table = _block_table(before)
-    after_table = _block_table(after)
-    before_cells = [_normalize_text(cell) for row in _table_cells(before_table) for cell in row]
-    after_cells = [_normalize_text(cell) for row in _table_cells(after_table) for cell in row]
-    return difflib.SequenceMatcher(None, before_cells, after_cells, autojunk=False).ratio()
 
 
-def _align_elements_dynamic(before, after, similarity, gap_cost):
-    return align_dynamic_indices(before, after, similarity, gap_cost)
 
 
-def _alignment_key(element, similarity):
-    if similarity is _block_similarity:
-        kind = _block_kind(element)
-        if kind != W + "tbl":
-            label = "p" if kind == W + "p" else "sdt"
-            return (label, _normalize_text(_comparison_text(element)))
-        table = _block_table(element)
-        if table is not None:
-            return (
-                "tbl",
-                tuple(tuple(_normalize_text(cell) for cell in row) for row in _table_cells(table)),
-            )
-        if element.tag == W + "p":
-            return ("p", _normalize_text(_comparison_text(element)))
-        return ("sdt", _normalize_text(_comparison_text(element)))
-    if similarity is _row_similarity:
-        return tuple(
-            _normalize_text(_comparison_text(cell))
-            for cell in element.findall(W + "tc")
-        )
-    if similarity is _column_similarity:
-        return tuple(element)
-    return repr(element)
 
 
-def _align_elements(before, after, similarity=_block_similarity, gap_cost=ALIGNMENT_GAP_COST):
-    """Anchor identical content first, then compare only the changed spans.
-
-    A single global fuzzy alignment can drift around repeated blank paragraphs or
-    structurally similar clauses. Word documents contain many of both. Exact
-    accepted-content anchors keep unchanged document regions in place and make
-    the local fuzzy passes substantially faster in the browser.
-    """
-    before_keys = [_alignment_key(element, similarity) for element in before]
-    after_keys = [_alignment_key(element, similarity) for element in after]
-    matcher = difflib.SequenceMatcher(None, before_keys, after_keys, autojunk=False)
-    pairs = []
-    for tag, before_start, before_end, after_start, after_end in matcher.get_opcodes():
-        if tag == "equal":
-            pairs.extend(zip(range(before_start, before_end), range(after_start, after_end)))
-            continue
-        if tag == "delete":
-            pairs.extend((index, None) for index in range(before_start, before_end))
-            continue
-        if tag == "insert":
-            pairs.extend((None, index) for index in range(after_start, after_end))
-            continue
-        local_pairs = _align_elements_dynamic(
-            before[before_start:before_end],
-            after[after_start:after_end],
-            similarity,
-            gap_cost,
-        )
-        pairs.extend(
-            (
-                before_start + before_index if before_index is not None else None,
-                after_start + after_index if after_index is not None else None,
-            )
-            for before_index, after_index in local_pairs
-        )
-    return pairs
 
 
-def _tracked_common_prefix_length(left, right):
-    limit = min(len(left), len(right))
-    index = 0
-    while index < limit and left[index] == right[index]:
-        index += 1
-    return index
 
 
 def _tracked_common_suffix_length(left, right):
@@ -396,64 +297,8 @@ def _tracked_common_suffix_length(left, right):
     return index
 
 
-def _tracked_looks_like_paragraph_split(single_element, first_element, second_element):
-    if any(element is None or element.tag != W + "p" for element in (single_element, first_element, second_element)):
-        return False
-    single = _normalize_text(_comparison_text(single_element))
-    first = _normalize_text(_comparison_text(first_element))
-    second = _normalize_text(_comparison_text(second_element))
-    if len(single) < 20 or len(first) < 8 or len(second) < 8:
-        return False
-    prefix = _tracked_common_prefix_length(single, first)
-    suffix = _tracked_common_suffix_length(single, second)
-    minimum_prefix = min(24, max(8, round(min(len(single), len(first)) * 0.12)))
-    minimum_suffix = min(24, max(8, round(min(len(single), len(second)) * 0.12)))
-    covered = min(len(single), prefix + suffix) / len(single)
-    non_overlapping = prefix < len(single) - minimum_suffix // 2 and suffix < len(single) - minimum_prefix // 2
-    return prefix >= minimum_prefix and suffix >= minimum_suffix and covered >= PARAGRAPH_SPLIT_COVERAGE and non_overlapping
 
 
-def _tracked_group_paragraph_alignment(pairs, before, after):
-    groups = [
-        (
-            [] if before_index is None else [before_index],
-            [] if after_index is None else [after_index],
-        )
-        for before_index, after_index in pairs
-    ]
-    result = []
-    index = 0
-    while index < len(groups):
-        current_before, current_after = groups[index]
-        if index + 1 >= len(groups):
-            result.append((current_before, current_after))
-            break
-        next_before, next_after = groups[index + 1]
-
-        if not current_before and len(current_after) == 1 and len(next_before) == 1 and len(next_after) == 1:
-            if _tracked_looks_like_paragraph_split(before[next_before[0]], after[current_after[0]], after[next_after[0]]):
-                result.append((next_before, current_after + next_after))
-                index += 2
-                continue
-        if len(current_before) == 1 and len(current_after) == 1 and not next_before and len(next_after) == 1:
-            if _tracked_looks_like_paragraph_split(before[current_before[0]], after[current_after[0]], after[next_after[0]]):
-                result.append((current_before, current_after + next_after))
-                index += 2
-                continue
-        if len(current_before) == 1 and not current_after and len(next_before) == 1 and len(next_after) == 1:
-            if _tracked_looks_like_paragraph_split(after[next_after[0]], before[current_before[0]], before[next_before[0]]):
-                result.append((current_before + next_before, next_after))
-                index += 2
-                continue
-        if len(current_before) == 1 and len(current_after) == 1 and len(next_before) == 1 and not next_after:
-            if _tracked_looks_like_paragraph_split(after[current_after[0]], before[current_before[0]], before[next_before[0]]):
-                result.append((current_before + next_before, current_after))
-                index += 2
-                continue
-
-        result.append((current_before, current_after))
-        index += 1
-    return result
 
 
 def _paragraph_format_signature(paragraph):
@@ -683,7 +528,7 @@ def _whole_paragraph_revision(source, kind, writer):
 def _shared_text_opcodes(before, after):
     """Adapt shared TypeScript diff segments to code-point token ranges."""
     try:
-        encoded = worklazyDiffJson(before, after)
+        encoded = json.dumps(_MANIFEST_COMPARISONS[(before, after)]) if _MANIFEST is not None else worklazyDiffJson(before, after)
     except Exception as error:
         raise ValueError("SHARED_DIFF_CALL_FAILED") from error
     if not isinstance(encoded, str):
@@ -851,22 +696,10 @@ def _paragraph_revision(before, after, include_formatting, writer):
     return paragraph
 
 
-def _row_similarity(before_row, after_row):
-    before_values = [_normalize_text(_comparison_text(cell)) for cell in before_row.findall(W + "tc")]
-    after_values = [_normalize_text(_comparison_text(cell)) for cell in after_row.findall(W + "tc")]
-    return difflib.SequenceMatcher(None, before_values, after_values, autojunk=False).ratio()
 
 
-def _column_values(rows, column_index):
-    values = []
-    for row in rows:
-        cells = row.findall(W + "tc")
-        values.append(_normalize_text(_comparison_text(cells[column_index])) if column_index < len(cells) else "__missing_cell__")
-    return values
 
 
-def _column_similarity(before_column, after_column):
-    return difflib.SequenceMatcher(None, before_column, after_column, autojunk=False).ratio()
 
 
 def _mark_row(row, kind, writer):
@@ -920,12 +753,9 @@ def _cell_revision(before, after, include_formatting, writer):
 def _table_revision(before, after, include_formatting, writer):
     before_rows = before.findall(W + "tr")
     after_rows = after.findall(W + "tr")
-    row_pairs = _align_elements(before_rows, after_rows, _row_similarity, 0.55)
-    before_column_count = max((len(row.findall(W + "tc")) for row in before_rows), default=0)
-    after_column_count = max((len(row.findall(W + "tc")) for row in after_rows), default=0)
-    before_columns = [_column_values(before_rows, index) for index in range(before_column_count)]
-    after_columns = [_column_values(after_rows, index) for index in range(after_column_count)]
-    column_pairs = _align_elements(before_columns, after_columns, _column_similarity, 0.55)
+    decision = _manifest_decision(before, after)
+    row_pairs = [(pair["beforeIndex"], pair["afterIndex"]) for pair in decision["rows"]]
+    column_pairs = [(pair["beforeIndex"], pair["afterIndex"]) for pair in decision["columns"]]
 
     table = copy.deepcopy(after)
     revised_rows = []
@@ -1031,10 +861,158 @@ def _content_control_revision(before, after, include_formatting, writer, include
     return _revision_blocks(before_blocks, [after], include_formatting, writer, include_tables)
 
 
+# The TypeScript comparison result is the sole source of pairing decisions.
+# XML paths are registered against each parsed part before any node is copied.
+_MANIFEST = None
+_MANIFEST_NODE_KEYS = {}
+_MANIFEST_DECISIONS = []
+_MANIFEST_COMPARISONS = {}
+_MANIFEST_USED = set()
+
+
+def _manifest_key(source):
+    return (source["part"], tuple(source["path"]))
+
+
+def _install_manifest(manifest):
+    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_COMPARISONS, _MANIFEST_USED
+    if not isinstance(manifest, dict) or manifest.get("version") != 1:
+        raise ValueError("INVALID_COMPARISON_MANIFEST")
+    _MANIFEST = manifest
+    _MANIFEST_USED = set()
+    _MANIFEST_NODE_KEYS = {}
+    _MANIFEST_DECISIONS = []
+    _MANIFEST_COMPARISONS = {}
+    def visit(decisions):
+        for decision in decisions:
+            _MANIFEST_DECISIONS.append(decision)
+            for comparison in decision.get("comparisons", []):
+                _MANIFEST_COMPARISONS[(comparison["before"], comparison["after"])] = comparison["segments"]
+            visit(decision.get("children", []))
+    visit(manifest["decisions"])
+
+
+def _register_manifest_root(root, part, side):
+    def visit(node, path):
+        _MANIFEST_NODE_KEYS[id(node)] = (side, (part, tuple(path)))
+        for index, child in enumerate(node):
+            visit(child, path + [index])
+    visit(root, [])
+
+
+def _manifest_decision(before, after):
+    left = _MANIFEST_NODE_KEYS.get(id(before)) if before is not None else None
+    right = _MANIFEST_NODE_KEYS.get(id(after)) if after is not None else None
+    for decision in _MANIFEST_DECISIONS:
+        if left and any(_manifest_key(ref) == left[1] for ref in decision["before"]):
+            _MANIFEST_USED.add(decision["id"])
+            _MANIFEST_USED.update(child["id"] for child in decision.get("children", []))
+            return decision
+        if right and any(_manifest_key(ref) == right[1] for ref in decision["after"]):
+            _MANIFEST_USED.add(decision["id"])
+            _MANIFEST_USED.update(child["id"] for child in decision.get("children", []))
+            return decision
+    raise ValueError("MISSING_COMPARISON_DECISION")
+
+
+def _manifest_block_groups(before, after, include_tables=True):
+    left = {_MANIFEST_NODE_KEYS.get(id(node), (None, None))[1]: index for index, node in enumerate(before)}
+    right = {_MANIFEST_NODE_KEYS.get(id(node), (None, None))[1]: index for index, node in enumerate(after)}
+    result = []
+    for decision in _MANIFEST_DECISIONS:
+        a = [left[_manifest_key(ref)] for ref in decision["before"] if _manifest_key(ref) in left]
+        b = [right[_manifest_key(ref)] for ref in decision["after"] if _manifest_key(ref) in right]
+        if a or b:
+            _MANIFEST_USED.add(decision["id"])
+            if decision.get("moved") and a and b:
+                result.append((a, [], decision))
+                result.append(([], b, decision))
+            else:
+                result.append((a, b, decision))
+    # Screen intentionally suppresses empty paragraphs. Preserve their after
+    # XML without inventing a pairing or a visible revision.
+    covered = {index for _, indexes, _ in result for index in indexes}
+    for index, node in enumerate(after):
+        if index not in covered:
+            if node.tag == W + "tbl" and not include_tables:
+                result.append(([], [index], {"untracked": True}))
+                continue
+            if _comparison_text(node).strip():
+                raise ValueError("UNMAPPED_VISIBLE_XML_NODE")
+            result.append(([], [index], {"untracked": True}))
+    # Keep after order. Deletions remain at the source boundary preceding their
+    # next matched source node, rather than being collected at document end.
+    def position(item):
+        a, b, _ = item
+        if b:
+            return (b[0], 1)
+        next_positions = [ys[0] for xs, ys, _ in result if xs and ys and a and xs[0] > a[-1]]
+        return (min(next_positions) if next_positions else len(after), 0)
+    return sorted(result, key=position)
+
+
+def _manifest_flat_blocks(blocks):
+    result = []
+    for block in blocks:
+        if block.tag == CONTENT_CONTROL_TAG:
+            result.extend(_manifest_flat_blocks(_content_control_blocks(block)))
+        else:
+            result.append(block)
+    return result
+
+
+def _manifest_rewrap(after_blocks, emitted):
+    """Rebuild existing content-control envelopes around their emitted leaves."""
+    leaf_owner = {}
+    def assign(node, top):
+        if node.tag == CONTENT_CONTROL_TAG:
+            for child in _content_control_blocks(node):
+                assign(child, top)
+        else:
+            leaf_owner[id(node)] = top
+    for block in after_blocks:
+        assign(block, block)
+    replacements = {}
+    for source, nodes in emitted:
+        if source is not None:
+            replacements.setdefault(id(source), []).extend(nodes)
+    def rebuild(source):
+        if source.tag != CONTENT_CONTROL_TAG:
+            return replacements.get(id(source), [])
+        result = copy.deepcopy(source)
+        content = result.find(CONTENT_CONTROL_BODY_TAG)
+        if content is not None:
+            children = []
+            for child in _content_control_blocks(source):
+                children.extend(rebuild(child))
+            _replace_blocks(content, children)
+        return [result]
+    output = []
+    seen = set()
+    for source, nodes in emitted:
+        owner = leaf_owner.get(id(source)) if source is not None else None
+        if owner is None or owner.tag != CONTENT_CONTROL_TAG:
+            output.extend(nodes)
+        elif id(owner) not in seen:
+            output.extend(rebuild(owner))
+            seen.add(id(owner))
+    return output
+
+
+
 def _revision_blocks(before_blocks, after_blocks, include_formatting, writer, include_tables=True):
-    revised = []
-    alignment = _tracked_group_paragraph_alignment(_align_elements(before_blocks, after_blocks), before_blocks, after_blocks)
-    for before_indexes, after_indexes in alignment:
+    original_after_blocks = after_blocks
+    before_blocks = _manifest_flat_blocks(before_blocks)
+    after_blocks = _manifest_flat_blocks(after_blocks)
+    emitted = []
+    alignment = _manifest_block_groups(before_blocks, after_blocks, include_tables)
+    for before_indexes, after_indexes, decision in alignment:
+        revised = []
+        target = after_blocks[after_indexes[0]] if after_indexes else None
+        emitted.append((target, revised))
+        if decision.get("untracked"):
+            revised.extend(copy.deepcopy(after_blocks[index]) for index in after_indexes)
+            continue
         if len(before_indexes) == 1 and len(after_indexes) == 2:
             before = before_blocks[before_indexes[0]]
             first_after = after_blocks[after_indexes[0]]
@@ -1083,7 +1061,7 @@ def _revision_blocks(before_blocks, after_blocks, include_formatting, writer, in
             revised.append(_table_revision(before, after, include_formatting, writer))
         else:
             revised.append(copy.deepcopy(after))
-    return revised
+    return _manifest_rewrap(original_after_blocks, emitted)
 
 
 def _replace_blocks(container, replacements):
@@ -1100,9 +1078,11 @@ def _replace_blocks(container, replacements):
         container.insert(insertion_index + offset, replacement)
 
 
-def _revisionize_xml_part(before_data, after_data, include_formatting, writer, container_tag=None, include_tables=True):
+def _revisionize_xml_part(before_data, after_data, include_formatting, writer, container_tag=None, include_tables=True, part="word/document.xml"):
     before_root = _parse_xml(before_data)
     after_root = _parse_xml(after_data)
+    _register_manifest_root(before_root, part, "before")
+    _register_manifest_root(after_root, part, "after")
     before_container = before_root.find(W + container_tag) if container_tag else before_root
     after_container = after_root.find(W + container_tag) if container_tag else after_root
     if before_container is None or after_container is None:
@@ -1121,6 +1101,9 @@ def _revisionize_xml_part(before_data, after_data, include_formatting, writer, c
 def _revisionize_notes(before_data, after_data, include_formatting, writer, note_tag, include_tables=True):
     before_root = _parse_xml(before_data)
     after_root = _parse_xml(after_data)
+    part = "word/footnotes.xml" if note_tag == "footnote" else "word/endnotes.xml"
+    _register_manifest_root(before_root, part, "before")
+    _register_manifest_root(after_root, part, "after")
     before_notes = {note.get(W + "id", ""): note for note in before_root.findall(W + note_tag)}
     for after_note in after_root.findall(W + note_tag):
         before_note = before_notes.get(after_note.get(W + "id", ""))
@@ -1135,6 +1118,8 @@ def _revisionize_notes(before_data, after_data, include_formatting, writer, note
 def _revisionize_comments(before_data, after_data, include_formatting, writer):
     before_root = _parse_xml(before_data)
     after_root = _parse_xml(after_data)
+    _register_manifest_root(before_root, "word/comments.xml", "before")
+    _register_manifest_root(after_root, "word/comments.xml", "after")
     before_comments = {comment.get(W + "id", ""): comment for comment in before_root.findall(W + "comment")}
     for after_comment in after_root.findall(W + "comment"):
         before_comment = before_comments.get(after_comment.get(W + "id", ""))
@@ -1391,7 +1376,26 @@ def _ensure_numbering_content_type(content_types_data):
     return _serialize_xml(root)
 
 
-def generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata):
+def _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None):
+    global _MANIFEST
+    if manifest_json is None:
+        # Read-only test/tool bridge; the browser always passes its already
+        # computed screen manifest. Pairing remains TypeScript-owned here too.
+        with open(before_path, "rb") as source:
+            before_model = extract_document_model(source.read(), True, True)
+        with open(after_path, "rb") as source:
+            after_model = extract_document_model(source.read(), True, True)
+        manifest_json = worklazyComparisonManifestJson(before_model, after_model, bool(include_formatting), bool(include_tables), bool(include_metadata))
+    _install_manifest(json.loads(manifest_json))
+    if _MANIFEST.get("policyVersion") != "worklazy-document-1":
+        raise ValueError("STALE_COMPARISON_MANIFEST")
+    if _MANIFEST.get("options") != {"formatting": bool(include_formatting), "tables": bool(include_tables), "metadata": bool(include_metadata)}:
+        raise ValueError("STALE_COMPARISON_MANIFEST")
+    for side, path in (("before", before_path), ("after", after_path)):
+        with open(path, "rb") as source:
+            revision = hashlib.sha256(source.read()).hexdigest()
+        if revision != _MANIFEST.get("inputRevision", {}).get(side):
+            raise ValueError("STALE_COMPARISON_MANIFEST")
     with zipfile.ZipFile(before_path, "r") as before_archive, zipfile.ZipFile(after_path, "r") as after_archive:
         writer = _RevisionWriter(author, _next_revision_id(before_archive, after_archive))
         before_names = set(before_archive.namelist())
@@ -1462,6 +1466,7 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
                         bool(include_formatting),
                         writer,
                         include_tables=bool(include_tables),
+                        part=name,
                     )
             for name, note_tag in (("word/footnotes.xml", "footnote"), ("word/endnotes.xml", "endnote")):
                 if name in after_archive.namelist() and name in before_names:
@@ -1474,10 +1479,30 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
                         bool(include_tables),
                     )
 
+        for decision in _MANIFEST_DECISIONS:
+            if decision.get("trackedRepresentation") == "preserve-after":
+                continue
+            if decision["id"] not in _MANIFEST_USED and (decision["beforeText"] or decision["afterText"]):
+                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+
         with zipfile.ZipFile(output_path, "w") as output_archive:
             for entry in after_archive.infolist():
                 output_archive.writestr(entry, replacements.get(entry.filename, after_archive.read(entry.filename)))
             for name, data in additions.items():
                 output_archive.writestr(name, data)
 
+    _MANIFEST = None
     return writer.count
+
+
+def generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None):
+    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_COMPARISONS, _MANIFEST_USED
+    try:
+        return _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json)
+    finally:
+        # Do not retain source nodes or text decisions after failure/cancellation.
+        _MANIFEST = None
+        _MANIFEST_NODE_KEYS = {}
+        _MANIFEST_DECISIONS = []
+        _MANIFEST_COMPARISONS = {}
+        _MANIFEST_USED = set()

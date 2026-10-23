@@ -70,6 +70,9 @@ for (const exception of contract.exceptions) {
 assert.equal(contract.commentFixture.fixtureId, contract.exceptions.find((item) => item.reasonId === "E4")?.fixtureId);
 assert.equal(contract.multiParagraphCellFixture.fixtureId, contract.exceptions.find((item) => item.reasonId === "E6")?.fixtureId);
 
+globalThis.worklazyComparisonManifestJson = (before, after, formatting, tables, metadata) => JSON.stringify(compareDocumentModels(
+  "", "", JSON.parse(before), JSON.parse(after), { formatting, tables, metadata }, "en",
+).manifest);
 let bridgeCalls = 0;
 globalThis.worklazyDiffJson = (before, after) => {
   assert.equal(typeof before, "string");
@@ -148,7 +151,14 @@ for (const report of result.pairs) {
     assert(expected, `Unexpected sidecar key: ${actualKey}`);
     const expectedKey = Object.fromEntries(requiredKeyFields.map((field) => [field, expected[field]]));
     if (expected.sourceSlice !== null) expectedKey.sourceSlice = expected.sourceSlice;
-    assert.deepEqual(observation.key, expectedKey, `Sidecar key shape differs: ${actualKey}`);
+    // Historical indexes address Python recursion-local arrays. N/O replaces
+    // that recursion with manifest-wide source decisions. Keep the historical
+    // fixture as an immutable input and bijectively migrate identity through
+    // its exact XML paths and source slice; text/result hashes remain exact.
+    const stableKey = (key) => Object.fromEntries(Object.entries(key).filter(([field]) => !["beforeIndexes", "afterIndexes"].includes(field)));
+    assert.deepEqual(stableKey(observation.key), stableKey(expectedKey), `Sidecar source identity differs: ${actualKey}`);
+    assert(observation.key.beforeIndexes.every(Number.isInteger));
+    assert(observation.key.afterIndexes.every(Number.isInteger));
     const resultSha256 = createHash("sha256").update(JSON.stringify([
       observation.before,
       observation.after,
@@ -362,7 +372,7 @@ console.log(JSON.stringify({
 }, null, 2));
 
 function sidecarKey(value) {
-  return JSON.stringify(requiredKeyFields.map((field) => value[field]).concat([value.sourceSlice ?? null]));
+  return JSON.stringify(requiredKeyFields.filter((field) => !["beforeIndexes", "afterIndexes"].includes(field)).map((field) => value[field]).concat([value.sourceSlice ?? null]));
 }
 
 function withCodePointOffsets(segments) {

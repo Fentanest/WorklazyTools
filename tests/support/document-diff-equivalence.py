@@ -331,6 +331,17 @@ def _paragraph_revision(before, after, include_formatting, writer):
     return result
 
 
+def _semantic_model(value):
+    # Source paths identify the concrete input snapshot. Generated revision
+    # property nodes legitimately change paths; semantic package comparison
+    # still includes all text, formatting, paragraphs, comments and tables.
+    if isinstance(value, dict):
+        return {key: _semantic_model(item) for key, item in value.items() if key not in {"source", "sourceInventory", "sourceRevision"}}
+    if isinstance(value, list):
+        return [_semantic_model(item) for item in value]
+    return value
+
+
 def _run_pair(pair_spec, before_path, after_path):
     global _observations, _part_by_hash, _pair_id, _node_paths, _synthetic_sources
     pair_id = pair_spec["pairId"]
@@ -410,8 +421,8 @@ def _run_pair(pair_spec, before_path, after_path):
         "preservedPackageParts": preserved_package_parts,
         "commentsPreserved": comments_preserved,
         "mutatedPackageParts": mutated_package_parts,
-        "acceptedMatchesAfter": accepted_model == after_model,
-        "acceptedMatchesAcceptedAfter": accepted_model == accepted_after_model,
+        "acceptedMatchesAfter": _semantic_model(accepted_model) == _semantic_model(after_model),
+        "acceptedMatchesAcceptedAfter": _semantic_model(accepted_model) == _semantic_model(accepted_after_model),
         "acceptedTextMatchesAcceptedAfter": _model_text(accepted_model) == _model_text(accepted_after_model),
         "packageRejectRows": _package_reject_rows(
             package_bytes,
