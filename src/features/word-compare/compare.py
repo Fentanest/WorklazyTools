@@ -389,7 +389,11 @@ def _source_paths(root, part, archive=None):
                 for child in node: event_walk(child)
         event_walk(paragraph)
         event_paths=[result[id(node)]["path"] for node in paragraph.iter() if "objectEvent" in result[id(node)]]
-        unsupported = any(node.tag in {W + "object", W + "fldChar", W + "fldSimple", W + "instrText", W + "footnoteReference", W + "endnoteReference", W + "ins", W + "del", W + "moveFrom", W + "moveTo", W + "rPrChange", W + "pPrChange", W + "sectPrChange"} or (node.tag==W+"pict" and not any(result[id(node)]["path"][:len(path)]==path for path in event_paths)) for node in paragraph.iter())
+        # A legal property-history snapshot on an image run is preserved with
+        # that revised run. Content/revision wrappers remain unsupported.
+        history_tags={W+name for name in policy.get("enabled",{}).get("rPr",[])+["rPr","lang","rStyle","szCs"]}
+        run_histories={id(change) for run in paragraph.iter(W+"r") for change in run.findall(W+"rPr/"+W+"rPrChange") if len(change)==1 and change[0].tag==W+"rPr" and all(child.tag in history_tags and not (child.text or "").strip() and not (child.tail or "").strip() for child in change[0].iter())}
+        unsupported = any(node.tag in {W + "object", W + "fldChar", W + "fldSimple", W + "instrText", W + "footnoteReference", W + "endnoteReference", W + "ins", W + "del", W + "moveFrom", W + "moveTo", W + "pPrChange", W + "sectPrChange"} or (node.tag==W+"rPrChange" and id(node) not in run_histories) or (node.tag==W+"pict" and not any(result[id(node)]["path"][:len(path)]==path for path in event_paths)) for node in paragraph.iter())
         if invalid_qname: result[id(paragraph)]["unsupportedObjectQName"] = True
         if events: result[id(paragraph)]["objectEventsSupported"] = not unsupported and not invalid_qname and all(event["supported"] for event in events)
     def classify(instruction):

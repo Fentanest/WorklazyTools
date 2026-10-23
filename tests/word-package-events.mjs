@@ -1,6 +1,6 @@
-import assert from 'node:assert/strict';import fs from 'node:fs';import {loadPyodide} from 'pyodide';
+import assert from 'node:assert/strict';import fs from 'node:fs';import {createHash} from 'node:crypto';import {loadPyodide} from 'pyodide';
 import {compareDocumentModels,diffText} from '../src/features/document-compare/documentComparison.ts';
-const all=[];let last;globalThis.worklazyDiffJson=(a,b)=>JSON.stringify(diffText(a,b));globalThis.worklazyComparisonManifestJson=(a,b,formatting,tables,metadata)=>{last=compareDocumentModels('before','after',JSON.parse(a),JSON.parse(b),{formatting,tables,metadata},'en');all.push(last);return JSON.stringify(last.manifest)};
+const all=[];let last,requested;globalThis.worklazyDrawingMask=json=>{requested=JSON.parse(json)};globalThis.worklazyDiffJson=(a,b)=>JSON.stringify(diffText(a,b));globalThis.worklazyComparisonManifestJson=(a,b,formatting,tables,metadata)=>{last=compareDocumentModels('before','after',JSON.parse(a),JSON.parse(b),{formatting,tables,metadata,formattingMask:requested},'en');all.push(last);return JSON.stringify(last.manifest)};
 const py=await loadPyodide();py.globals.set('WORKLAZY_FORMATTING_POLICY_JSON',fs.readFileSync('src/features/word-compare/formatting-policy.json','utf8'));
 for(const name of ['compare','accept_revisions','tracked_docx'])py.runPython(fs.readFileSync(`src/features/word-compare/${name}.py`,'utf8'));
 py.runPython(String.raw`
@@ -183,6 +183,19 @@ for filename in os.listdir('/p-packages'):
      target=relationship.get('Target');target=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
      assert target in z.namelist(),(filename,part,target)
      assert any(n.get('PartName')=='/'+target or n.get('Extension')==target.rsplit('.',1)[-1] for n in types)
+# Package-local IDs are addresses, never semantic image changes.
+import shutil
+def volatile_ids():
+ with zipfile.ZipFile('/after.docx') as source:entries={name:source.read(name) for name in source.namelist()}
+ entries['word/document.xml']=entries['word/document.xml'].replace(b'rIdImage',b'rIdRenamed').replace(b'docPr id="1"',b'docPr id="999"')
+ entries['word/_rels/document.xml.rels']=entries['word/_rels/document.xml.rels'].replace(b'rIdImage',b'rIdRenamed')
+ with zipfile.ZipFile('/after.docx','w') as output:
+  for name,data in entries.items():output.writestr(name,data)
+checks.append(check('volatile relationship identifiers',p(text('Volatile stable')+'<w:r>'+image()+'</w:r>'),p(text('Volatile stable')+'<w:r>'+image()+'</w:r>'),new=OLDPNG,setup=volatile_ids))
+volatile_manifest=json.loads(worklazyComparisonManifestJson(extract_document_model(open('/before.docx','rb').read(),True,True,'en'),extract_document_model(open('/after.docx','rb').read(),True,True,'en'),False,True,True))
+assert not any(d.get('objectEvents',{}).get('changed') for d in volatile_manifest['decisions'])
+# Restore the original independent negative-fixture scope.
+for side in ['before','after']:shutil.copyfile('/p-packages/numbering-merge-resource-relationship-'+side+'.docx','/'+side+'.docx')
 # Source-bound negative controls, including real but unrelated valid event refs.
 a=extract_document_model(open('/before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/after.docx','rb').read(),True,True,'en');value=json.loads(worklazyComparisonManifestJson(a,b,False,True,True))
 for mutation in ['missing','duplicate','changed-flag','wrong-position']:
@@ -218,29 +231,136 @@ for mutation in ['missing-image','missing-mime','duplicate-relationship','undefi
  except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE' in str(error)
  assert not os.path.exists('/bad.docx')
 
-# Object-only run formatting has no text span. Until an explicit run-property
-# projection is declared, excluded changes must not leak into restored images.
-for side,size in [('before','20'),('after','40')]:
- with zipfile.ZipFile('/p-packages/flowed-image-boundary-'+side+'.docx') as source,zipfile.ZipFile('/styled-'+side+'.docx','w') as output:
-  for entry in source.infolist():
-   data=source.read(entry.filename)
-   if entry.filename=='word/document.xml':
-    root=ET.fromstring(data);run=next(node for node in root.iter(W+'r') if node.find(W+'drawing') is not None);properties=ET.Element(W+'rPr');ET.SubElement(properties,W+'sz',{W+'val':size});run.insert(0,properties);data=ET.tostring(root)
-   output.writestr(entry,data)
-a=extract_document_model(open('/styled-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/styled-after.docx','rb').read(),True,True,'en');value=json.loads(worklazyComparisonManifestJson(a,b,False,True,True));assert any(not d['objectEvents']['propertiesSupported'] for d in value['decisions'] if d.get('objectEvents'))
-enabled=json.loads(worklazyComparisonManifestJson(a,b,True,True,True));assert any(not d['objectEvents']['propertiesSupported'] for d in enabled['decisions'] if d.get('objectEvents'))
-for forged in [False,True]:
- bad=copy.deepcopy(value)
- if forged:
-  for d in bad['decisions']:
-   if d.get('objectEvents'):d['objectEvents']['propertiesSupported']=True
- try:
-  generate_tracked_document('/styled-before.docx','/styled-after.docx','/bad.docx','events',False,True,True,json.dumps(bad));raise AssertionError('unsupported image formatting accepted')
- except ValueError as error:assert ('INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES' if forged else 'UNSUPPORTED_TRACKED_SOURCE_OBJECT_PROPERTIES') in str(error)
 
 `);
+// P2: independent package/style targets replace P1's temporary size opt-out.
+for(const [formatting,sizeEnabled,colorEnabled,sameImage,fontEnabled,styleEnabled] of [[true,true,true,false,true,true],[true,false,true,false,true,true],[false,true,true,false,true,true],[true,true,true,true,true,true],[true,false,false,true,true,true],[true,true,true,false,false,false],[true,false,false,true,false,false]]) {
+ requested={fontFamily:fontEnabled,size:sizeEnabled,style:styleEnabled,color:colorEnabled,paragraph:true,numbering:true};
+ py.globals.set('requested_json',JSON.stringify(requested));py.globals.set('formatting',formatting);py.globals.set('same_image',sameImage);
+ py.runPython(String.raw`
+import shutil
+for context in ['body','header','cell','adjacent','object-only','flowed','mixed-run']:
+ def styled(size,color,font,bold,language):return '<w:r><w:rPr><w:rFonts w:ascii="'+font+'"/><w:b w:val="'+bold+'"/><w:color w:val="'+color+'"/><w:sz w:val="'+size+'"/><w:lang w:val="'+language+'"/></w:rPr>'+image()+'</w:r>'
+ for side,size,color,font,bold,language in [('before','20','FF0000','Arial','0','en-US'),('after','40','0000FF','Calibri','1','ko-KR')]:
+  paragraph=p(('' if context=='object-only' else text(('😀 old ' if side=='before' else '😀 longer prefix ') if context=='flowed' else 'Same '))+styled(size,color,font,bold,language)+(styled(str(int(size)+10),color,font,bold,language) if context=='adjacent' else '')+('' if context in ['object-only','flowed'] else text(' text')))
+  if context=='mixed-run':paragraph=p(styled(size,color,font,bold,language).replace(image(),'<w:t>Same </w:t>'+image()+'<w:t> text</w:t>'))
+  package('/style-'+side+'.docx',p(text('Stable body')) if context=='header' else '<w:tbl><w:tr><w:tc>'+paragraph+'</w:tc></w:tr></w:tbl>' if context=='cell' else paragraph,OLDPNG if side=='before' or same_image else NEWPNG,'https://same.example',paragraph if context=='header' else None)
+ a=extract_document_model(open('/style-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/style-after.docx','rb').read(),True,True,'en')
+ manifest=worklazyComparisonManifestJson(a,b,formatting,True,True)
+ generate_tracked_document('/style-before.docx','/style-after.docx','/style-out.docx','events',formatting,True,True,manifest,requested_json)
+ accept_tracked_document('/style-out.docx','/style-accepted.docx')
+ with zipfile.ZipFile('/style-out.docx') as source,zipfile.ZipFile('/style-rejected.docx','w') as output:
+  for entry in source.infolist():output.writestr(entry,_serialize_xml(reject(_qname_safe_parse(source.read(entry.filename)))[0]) if entry.filename in ['word/document.xml','word/header1.xml'] else source.read(entry.filename))
+ def styles(path):
+  with zipfile.ZipFile(path) as z:
+   values=[]
+   for part in ['word/document.xml','word/header1.xml']:
+    if part not in z.namelist():continue
+    for run in ET.fromstring(z.read(part)).iter(W+'r'):
+     if run.find(W+'drawing') is not None:
+      props=run.find(W+'rPr');values.append(tuple(props.find(W+name).get(W+attribute) for name,attribute in [('rFonts','ascii'),('b','val'),('color','val'),('sz','val'),('lang','val')]))
+   return values
+ count=2 if context=='adjacent' else 1
+ expected_after=[('Calibri','1','0000FF',str(40+10*i),'ko-KR') for i in range(count)]
+ mask=json.loads(requested_json)
+ expected_reject=[('Arial' if formatting and mask['fontFamily'] else 'Calibri','0' if formatting and mask['style'] else '1','FF0000' if formatting and mask['color'] else '0000FF',str((20 if formatting and mask['size'] else 40)+10*i),'ko-KR') for i in range(count)]
+ assert styles('/style-accepted.docx')==expected_after,(context,'accept',styles('/style-accepted.docx'))
+ assert styles('/style-rejected.docx')==expected_reject,(context,'reject',styles('/style-rejected.docx'),expected_reject)
+ assert view('/style-accepted.docx')==view('/style-after.docx')
+ assert view('/style-rejected.docx')==view('/style-before.docx')
+ name='properties-'+context+'-'+str(formatting)+'-'+str(mask['size'])+'-'+str(mask['color'])+'-'+str(same_image)+'-'+str(mask['fontFamily'])+'-'+str(mask['style'])
+ for variant in ['before','after','out','accepted','rejected']:shutil.copyfile('/style-'+variant+'.docx','/p-packages/'+name+'-'+variant+'.docx')
+ # Missing/extra/forged scope facts cannot be recovered or repaired by Python.
+ value=json.loads(manifest)
+ for mutation in ['missing','duplicate','source','family','fact','unrelated']:
+  bad=copy.deepcopy(value)
+  def descendants(items):return [d for item in items for d in [item]+descendants(item.get('children',[]))]
+  decision=next(d for d in descendants(bad['decisions']) if d.get('objectEvents',{}).get('drawingProperties'));pairs=decision['objectEvents']['drawingProperties']
+  if mutation=='unrelated':
+   if len(pairs)<2:continue
+   pairs[0]['before']=copy.deepcopy(pairs[1]['before'])
+  elif mutation=='missing':pairs.clear()
+  elif mutation=='duplicate':pairs.append(copy.deepcopy(pairs[0]))
+  elif mutation=='source':pairs[0]['before']['path'].append(0)
+  elif mutation=='family':pairs[0]['families'].append(W+'lang')
+  else:pairs[0]['beforeFact']['history']=not pairs[0]['beforeFact']['history']
+  if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+  try:generate_tracked_document('/style-before.docx','/style-after.docx','/bad.docx','events',formatting,True,True,json.dumps(bad),requested_json);raise AssertionError(mutation+' accepted')
+  except ValueError as error:assert 'INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES' in str(error)
+  assert not os.path.exists('/bad.docx')
+`);
+ if(sameImage)assert.equal(last.summary.format>0,formatting&&(fontEnabled||styleEnabled||sizeEnabled||colorEnabled),'image-only run formatting must follow the same selected scope on screen');
+}
+requested={fontFamily:true,size:true,style:true,color:true,paragraph:true,numbering:true};
+py.globals.set('requested_json',JSON.stringify(requested));
+py.runPython(String.raw`
+# Master scope and metadata scope are independent: excluded stories remain
+# exactly the revised package bytes even when their drawing styles differ.
+for formatting in [False,True]:
+ for side,size,media in [('before','20',OLDPNG),('after','40',NEWPNG)]:package('/scope-'+side+'.docx',p(text('Stable body')),media,'https://same.example',p('<w:r><w:rPr><w:sz w:val="'+size+'"/></w:rPr>'+image()+'</w:r>'))
+ a=extract_document_model(open('/scope-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/scope-after.docx','rb').read(),True,True,'en');manifest=worklazyComparisonManifestJson(a,b,formatting,True,False)
+ generate_tracked_document('/scope-before.docx','/scope-after.docx','/scope-out.docx','events',formatting,True,False,manifest,requested_json)
+ accept_tracked_document('/scope-out.docx','/scope-accepted.docx')
+ with zipfile.ZipFile('/scope-out.docx') as output,zipfile.ZipFile('/scope-after.docx') as after:
+  for part in ['word/header1.xml','word/_rels/header1.xml.rels']:assert output.read(part)==after.read(part)
+ assert view('/scope-out.docx',True)==view('/scope-after.docx')
+ assert view('/scope-accepted.docx')==view('/scope-after.docx')
+ for variant in ['before','after','out','accepted']:shutil.copyfile('/scope-'+variant+'.docx','/p-packages/properties-excluded-metadata-'+str(formatting)+'-'+variant+'.docx')
+# Absent explicit run properties project to revised defaults when formatting is
+# excluded, and included absent families are genuinely removed on reject.
+for original_has_properties in [False,True]:
+ for side in ['before','after']:
+  props='<w:rPr><w:sz w:val="20"/></w:rPr>' if (side=='before')==original_has_properties else ''
+  package('/absence-'+side+'.docx',p(text('Same ' )+'<w:r>'+props+image()+'</w:r>'),OLDPNG if side=='before' else NEWPNG,'https://same.example')
+ for formatting in [False,True]:
+  a=extract_document_model(open('/absence-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/absence-after.docx','rb').read(),True,True,'en');manifest=worklazyComparisonManifestJson(a,b,formatting,True,True)
+  generate_tracked_document('/absence-before.docx','/absence-after.docx','/absence-out.docx','events',formatting,True,True,manifest,requested_json)
+  accept_tracked_document('/absence-out.docx','/absence-accepted.docx')
+  with zipfile.ZipFile('/absence-out.docx') as output:
+   root=reject(ET.fromstring(output.read('word/document.xml')))[0];size=root.find('.//'+W+'r/'+W+'rPr/'+W+'sz')
+   assert (size is not None)==(original_has_properties if formatting else not original_has_properties)
+   if size is not None:assert size.get(W+'val')=='20'
+  assert view('/absence-accepted.docx')==view('/absence-after.docx')
+  assert view('/absence-out.docx',True)==view('/absence-before.docx')
+  for variant in ['before','after','out','accepted']:shutil.copyfile('/absence-'+variant+'.docx','/p-packages/properties-absence-'+str(original_has_properties)+'-'+str(formatting)+'-'+variant+'.docx')
+# Existing revised property history remains on the inserted source event; the
+# restored deleted event uses revised effective properties, as declared by TS.
+for side,size,media in [('before','20',OLDPNG),('after','40',NEWPNG)]:
+ history='<w:rPrChange w:id="77" w:author="Original author"><w:rPr><w:sz w:val="30"/></w:rPr></w:rPrChange>' if side=='after' else ''
+ package('/history-'+side+'.docx',p('<w:r><w:rPr><w:sz w:val="'+size+'"/>'+history+'</w:rPr>'+image()+'</w:r>'),media,'https://same.example')
+for formatting in [False,True]:
+ a=extract_document_model(open('/history-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/history-after.docx','rb').read(),True,True,'en');manifest=worklazyComparisonManifestJson(a,b,formatting,True,True)
+ value=json.loads(manifest);pair=next(d['objectEvents']['drawingProperties'][0] for d in value['decisions'] if d.get('objectEvents'))
+ assert pair['representation']=='preserve-after-history'
+ generate_tracked_document('/history-before.docx','/history-after.docx','/history-out.docx','events',formatting,True,True,manifest,requested_json)
+ accept_tracked_document('/history-out.docx','/history-accepted.docx')
+ with zipfile.ZipFile('/history-out.docx') as output:
+  root=ET.fromstring(output.read('word/document.xml'))
+  assert root.find('.//'+W+'ins/'+W+'r/'+W+'rPr/'+W+'rPrChange').get(W+'author')=='Original author'
+  restored=reject(root)[0]
+  assert restored.find('.//'+W+'rPr/'+W+'sz').get(W+'val')=='40'
+ assert view('/history-accepted.docx')==view('/history-after.docx')
+ assert view('/history-out.docx',True)==view('/history-before.docx')
+ for variant in ['before','after','out','accepted']:shutil.copyfile('/history-'+variant+'.docx','/p-packages/properties-history-'+str(formatting)+'-'+variant+'.docx')
+
+# The new narrow property-history allowance must not accept malformed payloads.
+with zipfile.ZipFile('/history-after.docx') as source:entries={name:source.read(name) for name in source.namelist()}
+entries['word/document.xml']=entries['word/document.xml'].replace(b'</w:rPrChange>',b'<w:rPr/></w:rPrChange>')
+with zipfile.ZipFile('/malformed-history.docx','w') as output:
+ for name,data in entries.items():output.writestr(name,data)
+for formatting in [False,True]:
+ if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+ try:generate_tracked_document('/history-before.docx','/malformed-history.docx','/bad.docx','events',formatting,True,True);raise AssertionError('malformed property history accepted')
+ except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE' in str(error)
+ assert not os.path.exists('/bad.docx')
+
+`);
+requested=undefined;
+console.log('49 paired image property package projections +252 source/family/fact negatives +2 metadata exclusions +4 absent-property targets +2 existing-history targets +2 malformed-history gates passed');
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages',{recursive:true});
 for(const name of py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages/'+name,py.FS.readFile('/p-packages/'+name));
+const artifacts=py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')).sort().map(name=>{const data=py.FS.readFile('/p-packages/'+name);return {name,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')};});
+fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p2-package-artifacts.json',JSON.stringify({count:artifacts.length,artifacts},null,2)+'\n');
 console.log(JSON.stringify(py.globals.get('checks').toJs()));
 assert.ok(all.some(result=>result.manifest.decisions.some(decision=>decision.beforeText==='Old clause' && decision.afterText==='New clause' && decision.objectEvents?.unchangedLinks.length===1)),'TS must declare the unchanged hyperlink envelope');
 

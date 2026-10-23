@@ -1,5 +1,5 @@
 import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
-import { normalizeFormattingMask, maskPolicyVersion, maskedSourceFormatting, type FormattingMask } from "./formattingMask.ts";
+import { normalizeFormattingMask, formattingGroup, maskPolicyVersion, maskedSourceFormatting, type FormattingMask } from "./formattingMask.ts";
 import type {
   WordCellComment,
   WordCompareResult,
@@ -180,11 +180,6 @@ export function compareDocumentModels(
     const events=(side:"before"|"after")=>decision[side].flatMap(parent=>manifest.sources[side].filter(source=>source.objectEvent && source.part===parent.part && JSON.stringify(source.objectEvent.paragraphPath)===JSON.stringify(parent.path)));
     const before=events("before"),after=events("after");
     const runFact=(side:"before"|"after",event:DocumentSourceReference)=>manifest.sources[side].find(source=>source.part===event.part && JSON.stringify(source.path)===JSON.stringify(event.objectEvent!.runPath))?.normalizedProperties?.rPr??{supported:{},unsupported:{},history:false};
-    const propertiesSupported=before.filter(source=>source.objectEvent!.kind==="drawing").every(a=>after.filter(source=>source.objectEvent!.kind==="drawing").every(b=>{
-      const old=runFact("before",a),next=runFact("after",b);
-      const differs=(family:"supported"|"unsupported",name:string)=>JSON.stringify(old[family][name]??[])!==JSON.stringify(next[family][name]??[]);
-      return !old.history&&!next.history && ![...Object.keys(old.unsupported),...Object.keys(next.unsupported)].some(name=>differs("unsupported",name)) && ![...Object.keys(old.supported),...Object.keys(next.supported)].some(name=>differs("supported",name));
-    }));
     const boundary=(position:number)=>{
       if(position===Array.from(decision.beforeText).length)return Array.from(decision.afterText).length;
       let old=0,next=0;
@@ -195,8 +190,19 @@ export function compareDocumentModels(
       }
       return next;
     };
+    // Pair drawing events only at the TS text mapping's same boundary, in source
+    // order. Identity is the actual source reference, never a volatile rId.
+    const available=after.filter(source=>source.objectEvent!.kind==="drawing");
+    const drawingProperties=before.filter(source=>source.objectEvent!.kind==="drawing").flatMap(a=>{
+      const index=available.findIndex(b=>boundary(a.objectEvent!.start)===b.objectEvent!.start);
+      if(index<0)return [];
+      const b=available.splice(index,1)[0],old=runFact("before",a),next=runFact("after",b);
+      const names=[...new Set([...Object.keys(old.supported),...Object.keys(next.supported)])].filter(name=>JSON.stringify(old.supported[name]??[])!==JSON.stringify(next.supported[name]??[]));
+      return [{representation:next.history?"preserve-after-history" as const:"revision" as const,before:a,after:b,beforeFact:old,afterFact:next,families:names.filter(name=>manifest.formattingMask.effective[formattingGroup("rPr",name)]),excludedFamilies:[...new Set([...Object.keys(old.unsupported),...Object.keys(next.unsupported)])].filter(name=>JSON.stringify(old.unsupported[name]??[])!==JSON.stringify(next.unsupported[name]??[])).concat(names.filter(name=>!manifest.formattingMask.effective[formattingGroup("rPr",name)]))}];
+    });
+    const propertiesSupported=before.filter(source=>source.objectEvent!.kind==="drawing").every(a=>drawingProperties.some(pair=>pair.before===a) || after.filter(source=>source.objectEvent!.kind==="drawing").every(b=>JSON.stringify(runFact("before",a))===JSON.stringify(runFact("after",b))));
     const unchangedLinks=before.filter(a=>a.objectEvent!.kind==="hyperlink").flatMap(a=>after.filter(b=>b.objectEvent!.kind==="hyperlink" && a.objectEvent!.signature===b.objectEvent!.signature && boundary(a.objectEvent!.start)===b.objectEvent!.start && boundary(a.objectEvent!.end)===b.objectEvent!.end).map(b=>({before:a,after:b})));
-    if(before.length || after.length)decision.objectEvents={unchangedLinks,propertiesSupported,policy:"worklazy-source-events-1",before,after,changed:JSON.stringify(before.map(source=>[source.objectEvent!.kind,boundary(source.objectEvent!.start),boundary(source.objectEvent!.end),source.objectEvent!.signature]))!==JSON.stringify(after.map(source=>[source.objectEvent!.kind,source.objectEvent!.start,source.objectEvent!.end,source.objectEvent!.signature]))};
+    if(before.length || after.length)decision.objectEvents={drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-2",before,after,changed:JSON.stringify(before.map(source=>[source.objectEvent!.kind,boundary(source.objectEvent!.start),boundary(source.objectEvent!.end),source.objectEvent!.signature]))!==JSON.stringify(after.map(source=>[source.objectEvent!.kind,source.objectEvent!.start,source.objectEvent!.end,source.objectEvent!.signature]))};
   }};
   objectDecisions(manifest.decisions);
   buildRestoreStyleProjections(manifest);
@@ -218,6 +224,7 @@ export function compareDocumentModels(
     if(!changes.some(change=>change.beforeLocation===view.beforeLocation && change.afterLocation===view.afterLocation && change.kind!=="format"))changes.push({kind:"changed",section:view.section,location:view.afterLocation||view.beforeLocation,beforeLocation:view.beforeLocation,afterLocation:view.afterLocation,before:view.before,after:view.after,segments:view.segments});
   }};
   objectViews(manifest.decisions);
+  const objectFormattingHistory=(items:ComparisonDecision[]):boolean=>items.some(decision=>decision.objectEvents?.drawingProperties.some(pair=>pair.families.length && pair.representation==="preserve-after-history") || objectFormattingHistory(decision.children??[]));
   const unsupportedObjectFormatting=(items:ComparisonDecision[]):boolean=>items.some(decision=>decision.objectEvents?.propertiesSupported===false || unsupportedObjectFormatting(decision.children??[]));
   const summary: WordCompareResult["summary"] = { added: 0, deleted: 0, changed: 0, format: 0, unchanged: 0, moved: 0 };
   for (const change of changes) {
@@ -238,7 +245,7 @@ export function compareDocumentModels(
     changes,
     tables,
     views: { document: documentViews, headerFooter, note },
-    warnings: [...new Set([...before.warnings, ...after.warnings, ...(unsupportedObjectFormatting(manifest.decisions)?[language==="en"?"Some formatting attached to images could not be compared. Review the original files alongside the result.":"이미지에 연결된 서식 일부는 비교하지 못했습니다. 원본 파일을 함께 확인해 주세요."]:[]), ...(options.formatting && Object.values(requested).some(enabled=>!enabled) ? [language === "en" ? "Excluded formatting groups are kept from the revised file." : "비교에서 제외한 서식 항목은 수정본 기준으로 유지됩니다."] : []), ...(before.fields?.length || after.fields?.length ? [language === "en" ? "Word fields use their stored values. Page numbers, dates and tables of contents are not recalculated." : "Word 필드는 저장된 값을 비교하며 쪽 번호·날짜·목차를 다시 계산하지 않습니다."] : []), ...(manifest.formattingExcluded.length ? [language === "en" ? "Some advanced formatting is kept from the revised file and is not included in tracked formatting changes." : "일부 고급 서식은 수정본 기준으로 유지되며 변경 추적 서식 비교에 포함되지 않습니다."] : []), ...(manifest.formattingScopes.some((scope) => scope.families.length && scope.afterFact.history) ? [language === "en" ? "Some formatting keeps the revised file’s existing revision history." : "일부 서식은 수정본에 있는 기존 변경 기록을 유지합니다."] : [])])],
+    warnings: [...new Set([...before.warnings, ...after.warnings, ...(unsupportedObjectFormatting(manifest.decisions)?[language==="en"?"Some formatting attached to images could not be compared. Review the original files alongside the result.":"이미지에 연결된 서식 일부는 비교하지 못했습니다. 원본 파일을 함께 확인해 주세요."]:[]), ...(options.formatting && Object.values(requested).some(enabled=>!enabled) ? [language === "en" ? "Excluded formatting groups are kept from the revised file." : "비교에서 제외한 서식 항목은 수정본 기준으로 유지됩니다."] : []), ...(before.fields?.length || after.fields?.length ? [language === "en" ? "Word fields use their stored values. Page numbers, dates and tables of contents are not recalculated." : "Word 필드는 저장된 값을 비교하며 쪽 번호·날짜·목차를 다시 계산하지 않습니다."] : []), ...(manifest.formattingExcluded.length ? [language === "en" ? "Some advanced formatting is kept from the revised file and is not included in tracked formatting changes." : "일부 고급 서식은 수정본 기준으로 유지되며 변경 추적 서식 비교에 포함되지 않습니다."] : []), ...((manifest.formattingScopes.some((scope) => scope.families.length && scope.afterFact.history) || objectFormattingHistory(manifest.decisions)) ? [language === "en" ? "Some formatting keeps the revised file’s existing revision history." : "일부 서식은 수정본에 있는 기존 변경 기록을 유지합니다."] : [])])],
   };
 }
 

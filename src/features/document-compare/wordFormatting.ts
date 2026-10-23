@@ -81,6 +81,10 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
       if (segment.type !== "added") oldOffset += size;
       if (segment.type !== "deleted") newOffset += size;
     }
+    for(const pair of decision.objectEvents?.drawingProperties ?? []) {
+      for(const family of pair.families)screenFamilies.add(family);
+      if(pair.excludedFamilies.some(name=>!Object.hasOwn(pair.beforeFact.supported,name)&&!Object.hasOwn(pair.afterFact.supported,name)))manifest.formattingExcluded.push(decision.id);
+    }
     decision.screenFormattingFamilies = [...screenFamilies];
     if (decision.before.length === 1 && decision.after.length === 1) attachComparison(manifest, decision, decision.comparisons[0], left, right, decision.before[0], decision.after[0], [{ source: decision.before[0], range: [0, left.length] }], [{ source: decision.after[0], range: [0, right.length] }]);
     if (decision.before.length === 1 && decision.after.length === 2) for (let index = 0; index < 2; index++) {
