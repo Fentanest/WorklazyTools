@@ -6,7 +6,7 @@ import {
   normalizedCellIdentity,
   normalizeKeyPart,
 } from "./normalization.ts";
-import { compareCellsWithStringDates } from "./stringDates.ts";
+import { compareCellsWithStringDates,stringDatePolicy } from "./stringDates.ts";
 import { isReconcileConfigValid, type ReconcileConfig } from "./reconcileConfig.ts";
 import type {
   ExcelCompareDuplicateRecord,
@@ -633,11 +633,16 @@ function comparisonParameters(left: SpreadsheetBookData, right: SpreadsheetBookD
   const normalization = options.normalization;
   const key = options.mode === "key" ? options.key : undefined;
   const reconcile = options.mode === "reconcile" ? options.reconcile : undefined;
+  const datePolicy=stringDatePolicy(options);
   const dateActive = reconcile?.leftDateColumn !== undefined && reconcile.rightDateColumn !== undefined;
   return [
     ["mode", options.mode],
-    ["stringDateMode", options.stringDates?.mode ?? "off"],
-    ["stringDateScope", "selected non-formula string pairs; VALUE only; keys/anchors/reconciliation unchanged"],
+    ["stringDateMode", datePolicy.requestedMode],
+    ["stringDateRequestedMode",datePolicy.requestedMode],
+    ["stringDateAppliedMode",datePolicy.appliedMode],
+    ["stringDatePolicyActive",String(datePolicy.active)],
+    ["stringDateInactiveReason",datePolicy.inactiveReason],
+    ["stringDateScope",options.mode==="reconcile"?"INACTIVE: requested string-date policy retained; reconciliation date parsing and tolerances unchanged":"selected non-formula string pairs; VALUE only; keys/anchors/reconciliation unchanged"],
     ["stringDateLeftColumns", parameterColumns(options.stringDates?.leftColumns)],
     ["stringDateRightColumns", parameterColumns(options.stringDates?.rightColumns)],
     ["columnMapping", options.mode === "reconcile" ? UNUSED_PARAMETER : options.columnMapping?.length ? JSON.stringify(options.columnMapping) : "AUTO"],

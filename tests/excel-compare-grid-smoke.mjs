@@ -6,6 +6,7 @@ import puppeteer from "puppeteer-core";
 import ExcelJS from "exceljs";
 
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
+const testLanguage=process.env.EXCEL_GRID_LANG||"en";
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "excel-grid-smoke-"));
 await fs.writeFile(path.join(temporary, "left.csv"), "Date,Amount\n01/02/2024,5\n02/30/2024,8");
 await fs.writeFile(path.join(temporary, "right.csv"), "Amount,Date\n5,2024-01-02\n8,2024-02-29");
@@ -20,13 +21,13 @@ try {
   await cdp.send("Network.enable");
   await cdp.send("Network.setBlockedURLs", { urls: ["*googlesyndication.com*", "*doubleclick.net*", "*google-analytics.com*", "*googletagmanager.com*"] });
   page.on("pageerror", (error) => console.error("Browser error:", error.message));
-  await page.goto(`${baseUrl}/en/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
-  if (process.env.EXCEL_GRID_HANDOFF) await page.evaluate(async () => {
+  await page.goto(`${baseUrl}/${testLanguage}/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+  if (process.env.EXCEL_GRID_HANDOFF) await page.evaluate(async (testLanguage) => {
     const { default: i18n } = await import('/src/i18n/config.ts');
     const handoff = await fetch('/docs/jobs/todo/diffchecker-port-20261023/excel-shared-handoff.json').then((response) => response.json());
     for (const language of ['ko','en']) { const nested = {}; for (const [key,value] of Object.entries(handoff.localeEntries[language])) { const parts=key.split('.'); let target=nested; for(const part of parts.slice(0,-1)) target=target[part] ??= {}; target[parts.at(-1)]=value; } i18n.addResourceBundle(language,'features',nested,true,true); }
-    await i18n.changeLanguage('en');
-  });
+    await i18n.changeLanguage(testLanguage);
+  },testLanguage);
   await page.waitForSelector('[data-testid="excel-compare-page"] input[type=file]');
   const input = await page.$('[data-testid="excel-compare-page"] input[type=file]');
   await input.uploadFile(path.join(temporary, "left.csv"), path.join(temporary, "right.csv"));
@@ -38,6 +39,10 @@ try {
   await page.click('[data-testid="excel-string-dates"] fieldset:nth-of-type(1) button');
   const dateButtons = await page.$$('[data-testid="excel-string-dates"] fieldset:nth-of-type(2) button');
   await dateButtons[1].click();
+  assert.equal(await page.$eval('[data-testid="excel-date-policy"]',el=>el.dataset.applied),'US');
+  await page.click('[data-excel-mode="reconcile"]');assert.equal(await page.$eval('[data-testid="excel-date-policy"]',el=>el.dataset.requested),'US');assert.equal(await page.$eval('[data-testid="excel-date-policy"]',el=>el.dataset.applied),'off');assert.equal(await page.$eval('[data-testid="excel-date-policy"]',el=>el.dataset.inactiveReason),'reconcile');assert.ok((await page.$eval('[data-testid="excel-date-policy"]',el=>el.textContent)).includes(testLanguage==='ko'?'회계대사에서는 적용하지':'Inactive in reconciliation'));if(process.env.EXCEL_POLICY_SCREENSHOT)await (await page.$('[data-testid="excel-string-dates"]')).screenshot({path:process.env.EXCEL_POLICY_SCREENSHOT});
+  await page.select('[data-testid="excel-string-dates"] select','EU');assert.equal(await page.$eval('[data-testid="excel-date-policy"]',el=>el.dataset.requested),'EU');assert.equal(await page.$eval('[data-testid="excel-date-policy"]',el=>el.dataset.applied),'off');await page.click('[data-excel-mode="position"]');assert.equal(await page.$eval('[data-testid="excel-date-policy"]',el=>el.dataset.applied),'EU');await page.select('[data-testid="excel-string-dates"] select','US');
+
   await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
   await page.waitForSelector('[data-testid="excel-comparison-grid"]');
   await page.click('[data-testid="excel-comparison-grid"] > summary');

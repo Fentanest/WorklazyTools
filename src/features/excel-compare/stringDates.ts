@@ -5,6 +5,13 @@ import type { ExcelComparePairOptions } from "./types.ts";
 export type StringDateMode = "off" | "US" | "EU";
 export interface ParsedStringDate { parseStatus: "parsed" | "invalid"; normalizedDate?: string }
 
+/** Describes requested versus eligible VALUE policy; does not alter any matcher. */
+export function stringDatePolicy(options:Pick<ExcelComparePairOptions,'mode'|'stringDates'>){
+ const requestedMode=options.stringDates?.mode??'off';
+ const inactiveReason=requestedMode==='off'?'off':options.mode==='reconcile'?'reconcile':!options.stringDates?.leftColumns.length||!options.stringDates.rightColumns.length?'noColumns':'none';
+ return {requestedMode,appliedMode:inactiveReason==='none'?requestedMode:'off' as StringDateMode,active:inactiveReason==='none',inactiveReason};
+}
+
 /** Calendar tuples only: no Date.parse, epoch conversion, timezone or partial-year guesses. */
 export function parseStringDate(value: string, mode: Exclude<StringDateMode, "off">): ParsedStringDate {
   const parts = /^(\d{4}-\d{2}-\d{2}|\d{2}([/.-])\d{2}\2\d{4})(?:[ T](\d{2}):(\d{2}):(\d{2}))?$/u.exec(value);

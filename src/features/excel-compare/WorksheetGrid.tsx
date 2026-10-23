@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Button } from "../../components/ui/button";
 import type { SpreadsheetCellData, SpreadsheetSheetData } from "../spreadsheet-core/inputAdapter.ts";
 import { cellText } from "./normalization.ts";
@@ -14,12 +14,16 @@ const HIGHLIGHTS: Record<ExcelCompareStatus, string> = {
   unmatched: "bg-muted", matched: "",
 };
 
-export function WorksheetGrid({ sheet, cells, records, side, hiddenRows, hiddenColumns, descending, runId, t }: {
+export interface WorksheetGridView {rowOffset:number;columnOffset:number;selected?:{row:number;column:number}}
+export function WorksheetGrid({view,onViewChange,viewportHeight=480, sheet, cells, records, side, hiddenRows, hiddenColumns, descending, runId, t }: {
+  view:WorksheetGridView;onViewChange:(update:Partial<WorksheetGridView>)=>void;viewportHeight?:number;
   sheet: SpreadsheetSheetData; cells: ReadonlyMap<string, SpreadsheetCellData>; records: readonly ExcelCompareRecord[]; side: "left" | "right";
   hiddenRows: ReadonlySet<number>; hiddenColumns: ReadonlySet<number>; descending: boolean; runId?: string; t: Translate;
 }) {
-  const [rowOffset, setRowOffset] = useState(1), [columnOffset, setColumnOffset] = useState(1);
-  const [selected, setSelected] = useState<{ row: number; column: number }>();
+  const {rowOffset,columnOffset,selected}=view;
+  const setRowOffset=(value:number|((previous:number)=>number))=>onViewChange({rowOffset:typeof value==='function'?value(rowOffset):value});
+  const setColumnOffset=(value:number)=>onViewChange({columnOffset:value});
+  const setSelected=(value:{row:number;column:number})=>onViewChange({selected:value});
   const decisions = useMemo(() => worksheetRecordIndex(records, side), [records, side]);
   const rows = worksheetAxisWindow(sheet.rowCount, rowOffset, PAGE_ROWS, hiddenRows, descending);
   const columns = worksheetAxisWindow(sheet.columnCount, columnOffset, PAGE_COLUMNS, hiddenColumns);
@@ -35,7 +39,7 @@ export function WorksheetGrid({ sheet, cells, records, side, hiddenRows, hiddenC
       <label className="text-xs">{t("features:excelCompare.grid.rowOffset")}<input data-axis="row" className="mt-1 w-full rounded border border-input bg-background p-2" type="number" min={1} max={Math.max(1, sheet.rowCount)} value={rowOffset} onChange={(event) => setRowOffset(Math.max(1, Number(event.target.value) || 1))} /></label>
       <label className="text-xs">{t("features:excelCompare.grid.columnOffset")}<input data-axis="column" className="mt-1 w-full rounded border border-input bg-background p-2" type="number" min={1} max={Math.max(1, sheet.columnCount)} value={columnOffset} onChange={(event) => setColumnOffset(Math.max(1, Number(event.target.value) || 1))} /></label>
     </div>
-    <div className="max-h-[480px] overflow-auto rounded border border-border" tabIndex={0} role="region" aria-label={`${t(`features:excelCompare.grid.${side}`)} ${sheet.name}`}>
+    <div className="overflow-auto rounded border border-border" style={{maxHeight:viewportHeight}} tabIndex={0} role="region" aria-label={`${t(`features:excelCompare.grid.${side}`)} ${sheet.name}`}>
       <table className="w-full border-collapse text-xs" data-testid="excel-original-matrix"><thead className="sticky top-0 z-10 bg-muted"><tr><th className="border border-border p-2" scope="col">#</th>{columns.map((column) => <th className="min-w-28 border border-border p-2" scope="col" key={column} data-source-column={column}>{columnAddress(column)}</th>)}</tr></thead><tbody>
         {rows.map((row) => <tr key={row} data-source-row={row}><th className="sticky left-0 border border-border bg-muted p-2" scope="row">{row}</th>{columns.map((column) => {
           const cell = cells.get(`${row}:${column}`), address = cell?.address ?? `${columnAddress(column)}${row}`;
