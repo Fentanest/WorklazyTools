@@ -1,0 +1,14 @@
+import {workingGeometry,applyMatrix,inverseMatrix} from '../../src/features/image-compare/geometry.ts';
+import {IDENTITY_TRANSFORM} from '../../src/features/image-compare/types.ts';
+import assert from 'node:assert/strict';import test from 'node:test';
+import {snapshotFeatureRois,roiRelativePoint,validateFeatureRoi} from '../../src/features/image-compare/alignmentRoi.ts';
+import {validateAlignment} from '../../src/features/image-compare/alignmentPolicy.ts';
+import {IDENTITY_PROJECTIVE} from '../../src/features/image-compare/projective.ts';
+test('ROI snapshots use original frame bounds and retain independently of mutable controls',()=>{const request={left:{x:100,y:80,width:200,height:200}},snapshot=snapshotFeatureRois(request,640,400,640,400);request.left.x=500;assert.equal(snapshot.left.x,100);assert.deepEqual(snapshot.right,{x:0,y:0,width:640,height:400});assert.deepEqual(roiRelativePoint({x:140,y:120},snapshot.left),{x:40,y:40});for(const roi of [{x:-1,y:0,width:64,height:64},{x:600,y:0,width:64,height:64},{x:0,y:0,width:63,height:64},{x:0,y:0,width:NaN,height:64},{x:.5,y:0,width:64,height:64}])assert.throws(()=>validateFeatureRoi(roi,640,400),/ALIGNMENT_ROI/);});
+test('fit and holdout coverage are ROI-relative while global folding and source-coordinate guards remain full-frame',()=>{
+ const roi={x:100,y:80,width:200,height:200},rois={left:roi,right:roi},points=Array.from({length:16},(_,i)=>({source:{x:110+i%4*55,y:90+Math.floor(i/4)*55},target:{x:110+i%4*55,y:90+Math.floor(i/4)*55}})),holdout=[points[0],points[3],points[12],points[15]],dims={lw:640,lh:400,rw:640,rh:400};
+ assert.throws(()=>validateAlignment(IDENTITY_PROJECTIVE,points,holdout,dims),/DISTRIBUTION/);const metrics=validateAlignment(IDENTITY_PROJECTIVE,points,holdout,dims,0,rois);assert.ok(metrics.sourceCoverage>.6&&metrics.holdoutSourceCoverage>.6);assert.equal(metrics.overlapRatio,1);
+ assert.throws(()=>validateAlignment([-1,0,640,0,1,0,0,0,1],points,holdout,dims,0,rois),/GEOMETRY/);assert.throws(()=>validateAlignment(IDENTITY_PROJECTIVE,points,[points[0],points[1],points[4],points[5]],dims,0,rois),/DISTRIBUTION/);assert.throws(()=>validateAlignment(IDENTITY_PROJECTIVE,points.map(p=>({...p,source:{x:1,y:1}})),holdout,dims,0,rois),/ALIGNMENT_ROI/);
+});
+
+test('ROI bounds remain original-coordinate values when Y uses reduced working resolution',()=>{const g=workingGeometry(1920,1080,1920,1080,IDENTITY_TRANSFORM),roi={x:1800,y:900,width:100,height:100},snapshot=snapshotFeatureRois({left:roi},1920,1080,1920,1080);assert.ok(g.scale<1&&roi.x>g.width);const working=applyMatrix(g.leftMatrix,roi.x,roi.y),back=applyMatrix(inverseMatrix(g.leftMatrix),working.x,working.y);assert.ok(working.x<g.width);assert.ok(Math.abs(back.x-1800)<1e-8&&Math.abs(back.y-900)<1e-8);assert.deepEqual(snapshot.left,roi);});

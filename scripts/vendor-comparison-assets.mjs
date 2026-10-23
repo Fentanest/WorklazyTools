@@ -15,7 +15,8 @@ for (const [name, hash, size] of [
   await fs.writeFile(path.join(destination, name), bytes);
 }
 await build({ entryPoints: [path.join(root, "src/features/image-compare/regions.worker.ts")], outfile: path.join(destination, "regions-v2.worker.js"), bundle: true, format: "iife", platform: "browser", target: "es2022", legalComments: "inline" });
-await build({ entryPoints: [path.join(root, "src/features/image-compare/alignment.worker.ts")], outfile: path.join(destination, "alignment-v1.worker.js"), bundle: true, format: "iife", platform: "browser", target: "es2022", legalComments: "inline" });
+await build({ entryPoints: [path.join(root, "src/features/image-compare/alignment.worker.ts")], outfile: path.join(destination, "alignment-v2.worker.js"), bundle: true, format: "iife", platform: "browser", target: "es2022", legalComments: "inline" });
+await fs.rm(path.join(destination,"alignment-v1.worker.js"),{force:true}); // Retire pre-ROI result schema.
 await fs.rm(path.join(destination, "regions.worker.js"), { force: true }); // Retire the pre-budget owned adapter.
 console.log("Comparison assets verified: OpenCV 4.13.0-dev JS/WASM and owned classic region/alignment workers.");
 

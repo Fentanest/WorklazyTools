@@ -1,13 +1,15 @@
-import type { AlignmentCandidate, AlignmentMatch, Matrix3 } from "./alignmentTypes.ts";
+import {snapshotFeatureRois} from "./alignmentRoi.ts";
+import type { AlignmentCandidate, AlignmentMatch, Matrix3, AlignmentFeatureRois } from "./alignmentTypes.ts";
 import { validateAlignment } from "./alignmentPolicy.ts";
 // Native OpenCV binding boundary; every returned object with native ownership is deleted below.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AlignmentCv=Record<string,any>;
-export function alignWithCv(cv:AlignmentCv,left:{rgba:Uint8ClampedArray;width:number;height:number},right:{rgba:Uint8ClampedArray;width:number;height:number},mode:AlignmentCandidate['mode'],sourceRevision:string,encodedBytes=0):AlignmentCandidate{
+export function alignWithCv(cv:AlignmentCv,left:{rgba:Uint8ClampedArray;width:number;height:number},right:{rgba:Uint8ClampedArray;width:number;height:number},mode:AlignmentCandidate['mode'],sourceRevision:string,encodedBytes=0,featureRois?:AlignmentFeatureRois):AlignmentCandidate{
   if(mode!=='affine'&&mode!=='homography')throw new Error('ALIGNMENT_OPTIONS');
+  const rois=snapshotFeatureRois(featureRois,left.width,left.height,right.width,right.height);
   const base:Array<{delete():void}>=[];const own=<T extends {delete():void}>(value:T)=>{base.push(value);return value;};
   try{
-    const images=[left,right].map(image=>{const rgba=own(new cv.Mat(image.height,image.width,cv.CV_8UC4)),gray=own(new cv.Mat()),mask=own(new cv.Mat(image.height,image.width,cv.CV_8UC1));rgba.data.set(image.rgba);const maskData=mask.data;for(let p=0;p<image.width*image.height;p++)maskData[p]=image.rgba[p*4+3]>=16?255:0;cv.cvtColor(rgba,gray,cv.COLOR_RGBA2GRAY);return {gray,mask};});
+    const images=[left,right].map((image,index)=>{const rgba=own(new cv.Mat(image.height,image.width,cv.CV_8UC4)),gray=own(new cv.Mat()),mask=own(new cv.Mat(image.height,image.width,cv.CV_8UC1));rgba.data.set(image.rgba);const maskData=mask.data,roi=index?rois.right:rois.left;for(let p=0;p<image.width*image.height;p++){const x=p%image.width,y=Math.floor(p/image.width);maskData[p]=image.rgba[p*4+3]>=16&&(!featureRois||x>=roi.x&&y>=roi.y&&x<roi.x+roi.width&&y<roi.y+roi.height)?255:0;}cv.cvtColor(rgba,gray,cv.COLOR_RGBA2GRAY);return {gray,mask};});
     let lastError='ALIGNMENT_NO_FEATURES';
     for(const inverted of [false,true])for(const profile of ['strict','lenient'] as const){
       const objects:Array<{delete():void}>=[];const take=<T extends {delete():void}>(value:T)=>{objects.push(value);return value;};
@@ -31,8 +33,8 @@ export function alignWithCv(cv:AlignmentCv,left:{rgba:Uint8ClampedArray;width:nu
         }
         const inlierMatches=training.filter((_,i)=>inlierFlags[i]);
         if(inlierMatches.length<(mode==='homography'?Math.max(10,Math.ceil(training.length*(profile==='strict'?.15:.1))):8))throw new Error('ALIGNMENT_INLIERS');
-        const metrics=validateAlignment(matrix,inlierMatches,holdout,{lw:left.width,lh:left.height,rw:right.width,rh:right.height},encodedBytes);
-        return {id:crypto.randomUUID(),sourceRevision,mode,profile,inverted,matrix,matches:selected.length,trainingMatches:training.length,inliers:inlierMatches.length,inlierRatio:inlierMatches.length/training.length,...metrics};
+        const metrics=validateAlignment(matrix,inlierMatches,holdout,{lw:left.width,lh:left.height,rw:right.width,rh:right.height},encodedBytes,featureRois?rois:undefined);
+        return {featureRois:featureRois?rois:undefined,coverageReference:featureRois?"feature-roi":"full-frame",originalDimensions:{left:{width:left.width,height:left.height},right:{width:right.width,height:right.height}},id:crypto.randomUUID(),sourceRevision,mode,profile,inverted,matrix,matches:selected.length,trainingMatches:training.length,inliers:inlierMatches.length,inlierRatio:inlierMatches.length/training.length,...metrics};
       }catch(error){if(error instanceof Error&&['IMAGE_MEMORY_LIMIT','IMAGE_SIZE_LIMIT'].includes(error.message))throw error;lastError=error instanceof Error&&error.message.startsWith('ALIGNMENT_')?error.message:'ALIGNMENT_FIT';}
       finally{for(const object of objects.reverse())object.delete();}
     }
