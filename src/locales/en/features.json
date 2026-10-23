@@ -2961,7 +2961,7 @@
     },
     "regions": {
       "title": "Find changed regions",
-      "description": "Scan channel differences (0–255) separately. Minimum area and maximum-area fraction refer to bounding rectangles, not changed-pixel counts. Maximum area is a splitting target; oversized regions are retained. Results use working pixels.",
+      "description": "Region scans use their own color-difference threshold and may differ from the pixel count above. Nearby differences are grouped into boxes; area means the whole box, not changed-pixel count. Large regions are split where possible, otherwise retained.",
       "diffThreshold": "Channel threshold (0–255)",
       "groupingRadius": "Grouping radius (0–32 pixels)",
       "minArea": "Minimum bounding area (pixels²)",
@@ -3009,7 +3009,7 @@
       "revert": "Restore previous alignment",
       "apply": "Apply this candidate",
       "reject": "Close candidate and keep current alignment",
-      "metrics": "Fitting inliers {{inliers}} / {{training}} · {{holdout}} independent validation points · median validation error {{error}} pixels",
+      "metrics": "{{holdout}} checked reference points · alignment error about {{error}} px",
       "warning": "These figures are not an accuracy probability. Inspect repeated patterns and genuine edits before applying. Applying replaces manual alignment; interpolation can change edge pixels in the preview.",
       "failed": "No reliable alignment candidate was found. Original files and the current alignment were preserved. Use manual alignment instead.",
       "roi": {
@@ -3070,11 +3070,12 @@
       "resultLanguage": "Current recognition result language: {{language}}"
     },
     "working": {
-      "quality": "Working scale {{scale}}% · {{width}}×{{height}} working pixels (original comparison extent {{originalWidth}}×{{originalHeight}}) · {{passes}} resize pass(es) · sampled once per source from originals",
-      "caution": "Reduced-resolution comparison: small differences may disappear. Counts and region areas describe working pixels, not exact original-pixel differences. Original files and source coordinates are preserved.",
-      "regionUnits": "Radius and minimum area use original-image pixels. Scans use scaled, rounded working values (positive values have a minimum of 1).",
-      "effective": "Effective working radius {{radius}} px · minimum area {{area}} px² · scale {{scale}}%",
-      "preview": "Baseline {{baseline}}, preview {{preview}} working pixels. Difference counts at different resolutions are not directly comparable. Alignment errors use original coordinates."
+      "quality": "Comparison size {{width}} × {{height}} pixels · resolution scale {{scale}}%",
+      "caution": "These images were reduced for comparison. Small differences may be missed. Counts and region sizes refer to this comparison resolution; original files are unchanged.",
+      "regionUnits": "Enter distances and areas for the original images. Reduced comparison images use proportionally adjusted, rounded values.",
+      "effective": "This scan: distance {{radius}} px · minimum area {{area}} px² · resolution scale {{scale}}%",
+      "preview": "Current comparison: {{baseline}} · preview: {{preview}} pixels. Difference counts at different sizes cannot be compared directly.",
+      "notCompared": "not compared yet"
     },
     "undo": "Undo",
     "redo": "Redo",
