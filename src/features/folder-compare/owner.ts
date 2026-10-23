@@ -2,6 +2,7 @@ import { Admission, FolderRun, fileSource, pairEntries } from './core.ts';
 import type { FolderEntry, FolderRow, FolderSource, MatchOptions } from './core.ts';
 import { directorySource, type ReadonlyDirectory } from './directory.ts';
 import { zipSource } from './zip.ts';
+import { ReadWork, materialize, renameCandidates } from './selected.ts';
 export type SourceInput = { kind: 'files'; files: File[] } | { kind: 'zip'; file: File } | { kind: 'directory'; handle: ReadonlyDirectory };
 export interface EntryView { id: string; path: string; size: number; directory: boolean; issue?: string }
 export interface RowView { key: string; left: EntryView[]; right: EntryView[]; pairing: FolderRow['pairing']; content: FolderRow['content']; integrity: FolderRow['integrity']; reason?: string }
@@ -16,13 +17,33 @@ export class FolderOwner {
   private tail: Promise<void> = Promise.resolve();
   private sources: FolderSource[] = [];
   private canceled = false;
+  private rows: FolderRow[] = [];
+  private work = new ReadWork();
   cancel() { this.canceled = true; this.controller?.abort(); this.run.cancel(); }
   async clear(revision: number) {
     this.revision = revision; this.cancel(); this.run.invalidate();
     const work = this.tail.catch(() => {}).then(() => this.closeSources());
     this.tail = work; await work;
   }
-  private async closeSources() { const sources = this.sources; this.sources = []; await Promise.allSettled(sources.map(s => s.close())); }
+  private async closeSources() { const sources = this.sources; this.sources = []; this.rows = []; await Promise.allSettled(sources.map(s => s.close())); }
+  private operation<T>(revision: number, task: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    this.cancel(); const control = new AbortController(); this.controller = control;
+    const work = this.tail.catch(() => {}).then(async () => {
+      if (revision !== this.revision) throw new Error('stale-source');
+      control.signal.throwIfAborted(); return task(control.signal);
+    }).finally(() => { if (this.controller === control) this.controller = undefined; });
+    this.tail = work.then(() => {}, () => {}); return work;
+  }
+  selected(revision: number, leftId: string, rightId: string, limit: number) {
+    return this.operation(revision, async signal => {
+      const left = this.sources[0]?.entries.find(e => e.id === leftId), right = this.sources[1]?.entries.find(e => e.id === rightId);
+      if (!left || !right) throw new Error('stale-source');
+      if (left.size > limit || right.size > limit) throw new Error('selected-limit');
+      const a = await materialize(left, limit, this.work, signal);
+      const b = await materialize(right, limit, this.work, signal); return [a, b] as const;
+    });
+  }
+  renames(revision: number) { return this.operation(revision, signal => renameCandidates(this.rows, this.work, signal)); }
   compare(revision: number, left: SourceInput, right: SourceInput, options: MatchOptions, emit: (view: FolderView) => void): Promise<void> {
     this.revision = revision; this.cancel(); this.run.invalidate();
     const control = new AbortController(); this.controller = control; this.canceled = false;
@@ -30,6 +51,7 @@ export class FolderOwner {
     const work = this.tail.catch(() => {}).then(async () => {
       if (!current()) return;
       await this.closeSources(); if (!current()) return;
+      this.rows = []; this.work = new ReadWork();
       const admission = new Admission(); let rows: FolderRow[] = [], warnings: string[] = [], last = 0;
       const publish = (phase: FolderView['phase'], force = false) => {
         if (!current() || (!force && performance.now() - last < 120)) return;
@@ -56,13 +78,13 @@ export class FolderOwner {
         const keys = pairEntries(strip(a.entries, left), strip(b.entries, right), { ...options, stripRoot: false });
         const originals = new Map([...a.entries, ...b.entries].map(e => [e.id, e]));
         rows = keys.map(r => ({ ...r, left: r.left.map(e => originals.get(e.id)!), right: r.right.map(e => originals.get(e.id)!) }));
-        publish('comparing', true);
+        this.rows = rows; publish('comparing', true);
         await this.run.compare(rows, () => publish('comparing'));
         publish(control.signal.aborted || this.canceled ? 'canceled' : 'done', true);
       } catch {
         if (current()) publish(control.signal.aborted ? 'canceled' : 'error', true);
         await this.closeSources();
-      } finally { if (current()) this.controller = undefined; }
+      } finally { if (this.controller === control) this.controller = undefined; }
     });
     this.tail = work; return work;
   }
