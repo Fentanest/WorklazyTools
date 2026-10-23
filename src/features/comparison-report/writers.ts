@@ -1,5 +1,6 @@
+import { encodeReportXlsxSheet } from './xlsxText.ts';
 import { REPORT_LABELS } from './labels.ts';
-import { writeXlsxReport, sanitizeXlsxText } from '../../utils/xlsxReport.ts';
+import { writeXlsxReport } from '../../utils/xlsxReport.ts';
 import { assertGeneratedXlsxReport, assertReceivedXlsxReport } from '../excel-compare/reportIntegrity.ts';
 import { createIncrementalZipArchiveWriter } from '../../utils/zipArchive.ts';
 import { createSafeFileName } from '../../utils/fileNameSafety.ts';
@@ -9,9 +10,8 @@ export async function writeSnapshotXlsx(snapshot: ExportSnapshot, signal: AbortS
   assertSnapshot(snapshot);signal.throwIfAborted(); assertReport(snapshot.rows.length <= REPORT_LIMITS.xlsxRows, 'REPORT_XLSX_LIMIT');
   const metadata = Object.entries(reportMetadata(snapshot)).map(([key, value]) => [key, JSON.stringify(value)]);
   const rows = snapshot.rows.map(row => [row.id, row.status, row.left, row.right, JSON.stringify(row.coordinates ?? null), JSON.stringify(row.metadata ?? null)]);
-  for (const row of [...metadata, ...rows]) for (const value of row) assertReport(value.length <= REPORT_LIMITS.xlsxCellUnits && sanitizeXlsxText(value) === value, 'REPORT_XLSX_LIMIT');
   const labels=REPORT_LABELS[snapshot.language];
-  const raw = await writeXlsxReport({ creator: 'Worklazy Tools', sheets: [{ name: labels.metadata, headers: [labels.field, labels.value], rows: metadata }, { name: labels.results, headers: [labels.id, labels.status, labels.left, labels.right, labels.coordinates, labels.metadata], rows }] });
+  const raw = await writeXlsxReport({ creator: 'Worklazy Tools', sheets: [{ name: labels.metadata, headers: [labels.field, labels.value], rows: metadata }, { name: labels.results, headers: [labels.id, labels.status, labels.left, labels.right, labels.coordinates, labels.metadata], rows }].map(encodeReportXlsxSheet) });
   signal.throwIfAborted(); const buffer = new Uint8Array(raw).slice().buffer;
   await assertGeneratedXlsxReport(buffer); assertReceivedXlsxReport(buffer, buffer.byteLength); signal.throwIfAborted();
   return assertOutput(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));

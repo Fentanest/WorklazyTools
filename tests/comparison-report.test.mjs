@@ -28,8 +28,8 @@ test('XLSX strings remain literal and exact on readback, oversized/unsafe cells 
  assert(wb.getWorksheet('Metadata').getColumn(2).values.some(v=>String(v).includes('partial')));
  const huge=createExportSnapshot({...input(),rows:[{...input().rows[0],left:'가'.repeat(32768)}]});await assert.rejects(writeSnapshotXlsx(huge,signal()),/XLSX_LIMIT/);
  assert.equal(JSON.parse(await writeSnapshotTxt(huge).text()).rows[0].left,huge.rows[0].left);
- const unsafe=createExportSnapshot({...input(),rows:[{...input().rows[0],left:'a\0b'}]});await assert.rejects(writeSnapshotXlsx(unsafe,signal()),/XLSX_LIMIT/);
- assert.equal(JSON.parse(await writeSnapshotTxt(unsafe).text()).rows[0].left,'a\0b');
+ const unsafe=createExportSnapshot({...input(),rows:[{...input().rows[0],left:'a\ud800b'}]});await assert.rejects(writeSnapshotXlsx(unsafe,signal()),/XLSX_LIMIT/);
+ assert.equal(JSON.parse(await writeSnapshotTxt(unsafe).text()).rows[0].left,'a\ud800b');
 });
 test('sequential ZIP exposes no artifact after producer or final close failures; originals stay full',async()=>{
  const model=createExportSnapshot({...input(),rawSources:{left:'한글\n원문 😀',right:'수정\t원문'}});
