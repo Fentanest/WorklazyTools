@@ -1338,6 +1338,12 @@
           "Choose a single pane, changes docked left/right/top/bottom, a split with a selected source, or three columns/rows. Narrow screens stack panes with scrolling inside each table. Adjust split size with arrow keys. Switching layout never reruns comparison.",
           "Date-string normalization applies only to selected-column value comparison. It is inactive in reconciliation; the screen and Parameters sheet distinguish requested settings from applied policy."
         ]
+      },
+      {
+        "title": "When a comparison finishes without a report",
+        "paragraphs": [
+          "XLSX export stops if a cell is too long or contains text the export cannot preserve. Text is not replaced or truncated, and comparison results stay on screen. If any report in a batch fails, the combined ZIP is unavailable; completed individual reports remain downloadable."
+        ]
       }
     ],
     "faq": {
@@ -2499,6 +2505,13 @@
         "title": "Review alignment before applying",
         "paragraphs": [
           "Automatic alignment is a suggestion. Repeated patterns or sparse content can produce an unintended match. Inspect the preview before applying or rejecting it. Do not directly compare counts calculated at different working resolutions."
+        ]
+      },
+      {
+        "title": "Undo settings and compare transparency",
+        "paragraphs": [
+          "Undo and redo changes to comparison settings and alignment. Restoring a step compares the original files again and clears previous recognition results and edited transcripts. Choosing a new file preserves comparison settings and starts a new history. Reset settings restores the defaults.",
+          "Alpha threshold is inactive on white or black backgrounds. Its saved value applies again with a transparent background."
         ]
       }
     ],

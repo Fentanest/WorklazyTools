@@ -2377,7 +2377,13 @@
       "downloadCheck": "If a downloaded file appears empty, run the comparison and download it again. If it continues, tell us the saved file size and browser name.",
       "empty": "No rows match the current filters and search.",
       "showMore": "Show more ({{remaining}} remaining)",
-      "guideLink": "First time? Read the guide"
+      "guideLink": "First time? Read the guide",
+      "reportUnavailable": "Comparison {{number}} complete · XLSX report unavailable",
+      "reportError": {
+        "COMPARISON_XLSX_TEXT_UNSUPPORTED": "Some text is too long for a workbook cell or contains characters this export cannot preserve. Nothing was replaced or truncated; comparison results remain available.",
+        "REPORT_GENERATION_FAILED": "The report could not be created. Comparison results remain available. Try a smaller result selection or retry."
+      },
+      "bundleUnavailable": "The combined ZIP is unavailable because some reports could not be created. Available individual reports can still be downloaded."
     },
     "status": {
       "matched": "Matched",
@@ -3069,6 +3075,13 @@
       "regionUnits": "Radius and minimum area use original-image pixels. Scans use scaled, rounded working values (positive values have a minimum of 1).",
       "effective": "Effective working radius {{radius}} px · minimum area {{area}} px² · scale {{scale}}%",
       "preview": "Baseline {{baseline}}, preview {{preview}} working pixels. Difference counts at different resolutions are not directly comparable. Alignment errors use original coordinates."
-    }
+    },
+    "undo": "Undo",
+    "redo": "Redo",
+    "swap": "Swap images",
+    "resetSettings": "Reset settings",
+    "historyHint": "Undo up to 20 recent steps. Choosing a new file starts a new history.",
+    "alphaInactive": "Alpha threshold is inactive on white or black backgrounds. Its saved value applies again with a transparent background.",
+    "resultAlphaInactive": "Alpha threshold was not used for this result."
   }
 }
