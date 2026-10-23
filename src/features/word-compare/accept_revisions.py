@@ -102,6 +102,31 @@ def _remove_paragraph_mark(paragraph, kind):
             run_properties.remove(marker)
 
 
+def _fully_deleted_plain_paragraph(paragraph):
+    # The terminal deleted-mark rule applies only to entirely deleted text.
+    # Keep anchors, objects, section boundaries and prior property history.
+    saw_text = False
+    for child in paragraph:
+        if child.tag == W + "pPr":
+            if any(node.tag in PROPERTY_CHANGE_TAGS or node.tag == W + "sectPr" for node in child.iter()):
+                return False
+            continue
+        if child.tag != W + "del" or not len(child):
+            return False
+        for run in child:
+            if run.tag != W + "r":
+                return False
+            for item in run:
+                if item.tag == W + "rPr":
+                    if any(node.tag in PROPERTY_CHANGE_TAGS for node in item.iter()):
+                        return False
+                elif item.tag == W + "delText":
+                    saw_text = True
+                else:
+                    return False
+    return saw_text
+
+
 def _merge_deleted_paragraph_marks(parent):
     for child in list(parent):
         _merge_deleted_paragraph_marks(child)
@@ -115,6 +140,12 @@ def _merge_deleted_paragraph_marks(parent):
 
         next_paragraph = parent[index + 1] if index + 1 < len(parent) else None
         if next_paragraph is None or next_paragraph.tag != W + "p":
+            # OfficeDev RevisionProcessor terminal paragraph rule: no following
+            # block (body sectPr is not a block), or the following block is a table.
+            terminal = next_paragraph is None or next_paragraph.tag in {W + "tbl", W + "sectPr"}
+            if parent.tag == W + "body" and terminal and _fully_deleted_plain_paragraph(paragraph):
+                parent.remove(paragraph)
+                continue
             _remove_paragraph_mark(paragraph, "del")
             index += 1
             continue
