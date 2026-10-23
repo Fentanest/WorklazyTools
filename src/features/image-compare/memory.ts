@@ -52,3 +52,15 @@ export function assertAlignmentBudget(sourcePixels:number,encodedBytes:number,re
   if(estimate>IMAGE_LIMITS.memoryBytes)throw new Error("IMAGE_MEMORY_LIMIT");
   return estimate;
 }
+
+/** Decode must fit at original dimensions; only the derived working canvas may shrink. */
+export function selectWorkingResolution(sourcePixels:number,width:number,height:number,encodedBytes:number,previousViewBytes=0){
+  const decode=imageMemoryEstimate(sourcePixels,0,encodedBytes,previousViewBytes).stages.decode;
+  if(decode>IMAGE_LIMITS.memoryBytes)throw new Error('IMAGE_MEMORY_LIMIT');
+  const fits=(scale:number)=>{const w=Math.max(1,Math.ceil(width*scale)),h=Math.max(1,Math.ceil(height*scale));return w<=IMAGE_LIMITS.dimension&&h<=IMAGE_LIMITS.dimension&&w*h<=IMAGE_LIMITS.outputPixels&&imageMemoryEstimate(sourcePixels,w*h,encodedBytes,previousViewBytes).estimatedPeakBytes<=IMAGE_LIMITS.memoryBytes;};
+  if(fits(1))return {scale:1,width,height};
+  if(!fits(0))throw new Error('IMAGE_MEMORY_LIMIT');
+  let low=0,high=1;for(let i=0;i<48;i++){const mid=(low+high)/2;if(fits(mid))low=mid;else high=mid;}
+  if(low<=0)throw new Error('IMAGE_MEMORY_LIMIT');
+  return {scale:low,width:Math.max(1,Math.ceil(width*low)),height:Math.max(1,Math.ceil(height*low))};
+}

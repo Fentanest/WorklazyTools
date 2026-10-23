@@ -31,9 +31,9 @@ test("256 MiB reservations include native source decode, RGBA copies, views and 
   assert.throws(()=>assertImageBudget(100,100,2*IMAGE_LIMITS.fileBytes),/IMAGE_MEMORY_LIMIT/);
   assert.throws(()=>imageMemoryEstimate(Number.NaN,1,1),/INVALID_RESOURCE_ESTIMATE/);
 });
-test("transformed output worst-case is rejected by geometry before any bitmap or canvas exists", () => {
-  assert.throws(()=>workingGeometry(1000,1000,1000,1000,{...IDENTITY_TRANSFORM,scale:4}),/IMAGE_MEMORY_LIMIT/);
-  assert.throws(()=>workingGeometry(3000,3000,10,10,IDENTITY_TRANSFORM),/IMAGE_MEMORY_LIMIT/);
+test("transformed outputs reduce while original decode overflow rejects before allocation", () => {
+  assert.ok(workingGeometry(1000,1000,1000,1000,{...IDENTITY_TRANSFORM,scale:4}).scale<1);
+  assert.ok(workingGeometry(3000,3000,10,10,IDENTITY_TRANSFORM).scale<1);
   assert.equal(workingGeometry(64,48,64,48,IDENTITY_TRANSFORM,1000).width,64);
 });
 

@@ -1,4 +1,4 @@
-import { assertImageBudget } from "./memory.ts";
+import { selectWorkingResolution } from "./memory.ts";
 import { IMAGE_LIMITS, type Matrix, type Transform } from "./types.ts";
 
 export function validateDimensions(width: number, height: number, output = false) {
@@ -24,10 +24,11 @@ export function workingGeometry(leftWidth: number, leftHeight: number, rightWidt
   const originX = Math.floor(Math.min(0, ...points.map((p) => p.x))), originY = Math.floor(Math.min(0, ...points.map((p) => p.y)));
   const width = Math.ceil(Math.max(leftWidth, ...points.map((p) => p.x))) - originX;
   const height = Math.ceil(Math.max(leftHeight, ...points.map((p) => p.y))) - originY;
-  validateDimensions(width, height, true);
-  assertImageBudget(leftWidth * leftHeight + rightWidth * rightHeight, width * height, encodedBytes, previousViewBytes);
+  if(![width,height].every(v=>Number.isSafeInteger(v)&&v>0&&v<=160000))throw new Error('IMAGE_SIZE_LIMIT');
+  const working=selectWorkingResolution(leftWidth*leftHeight+rightWidth*rightHeight,width,height,encodedBytes,previousViewBytes);
   rightMatrix[4] -= originX; rightMatrix[5] -= originY;
-  return { width, height, originX, originY, leftMatrix: [1, 0, 0, 1, -originX || 0, -originY || 0] as Matrix, rightMatrix };
+  const scale=working.scale;
+  return { ...working, originalWidth:width,originalHeight:height,originX,originY,leftMatrix:[scale,0,0,scale,(-originX||0)*scale,(-originY||0)*scale] as Matrix,rightMatrix:rightMatrix.map(v=>v*scale) as Matrix };
 }
 
 export function sourcePolygon(matrix: Matrix, bounds: { x: number; y: number; width: number; height: number }) {

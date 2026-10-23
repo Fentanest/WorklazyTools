@@ -1,4 +1,4 @@
-import { assertImageBudget } from "./memory.ts";
+import { selectWorkingResolution } from "./memory.ts";
 import { validateDimensions } from "./geometry.ts";
 import type { Matrix3, Point } from "./alignmentTypes.ts";
 export const IDENTITY_PROJECTIVE: Matrix3 = [1,0,0,0,1,0,0,0,1];
@@ -33,10 +33,12 @@ export function projectiveGeometry(lw:number,lh:number,rw:number,rh:number,matri
   const area=polygonArea(corners)/(rw*rh);if(area<.25||area>4)throw new Error("ALIGNMENT_GEOMETRY");
   const originX=Math.floor(Math.min(0,...corners.map(p=>p.x))),originY=Math.floor(Math.min(0,...corners.map(p=>p.y)));
   const width=Math.ceil(Math.max(lw,...corners.map(p=>p.x)))-originX,height=Math.ceil(Math.max(lh,...corners.map(p=>p.y)))-originY;
-  validateDimensions(width,height,true);assertImageBudget(lw*lh+rw*rh,width*height,encodedBytes,previousViewBytes);
+  if(![width,height].every(v=>Number.isSafeInteger(v)&&v>0&&v<=160000))throw new Error('IMAGE_SIZE_LIMIT');
+  const working=selectWorkingResolution(lw*lh+rw*rh,width,height,encodedBytes,previousViewBytes);
   const shifted=matrix.slice() as Matrix3;
   for(let j=0;j<3;j++){shifted[j]-=originX*matrix[6+j];shifted[3+j]-=originY*matrix[6+j];}
-  return {width,height,originX,originY,leftMatrix:[1,0,0,1,-originX||0,-originY||0] as [number,number,number,number,number,number],rightMatrix:[shifted[0],shifted[3],shifted[1],shifted[4],shifted[2],shifted[5]] as [number,number,number,number,number,number],rightProjective:shifted};
+  for(let j=0;j<6;j++)shifted[j]*=working.scale;
+  return {...working,originalWidth:width,originalHeight:height,originX,originY,leftMatrix:[working.scale,0,0,working.scale,(-originX||0)*working.scale,(-originY||0)*working.scale] as [number,number,number,number,number,number],rightMatrix:[shifted[0],shifted[3],shifted[1],shifted[4],shifted[2],shifted[5]] as [number,number,number,number,number,number],rightProjective:shifted};
 }
 /** CPU inverse bilinear/premultiplied-alpha sampling preserves RGBA; validity is geometric coverage, separate from alpha. */
 export function warpRgba(source:Uint8ClampedArray,sw:number,sh:number,width:number,height:number,matrix:Matrix3){

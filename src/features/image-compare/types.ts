@@ -8,9 +8,9 @@ export interface ImageMetadata { name: string; bytes: number; mime: string; widt
 export interface RegionOptions { diffThreshold: number; groupingRadius: number; minArea: number; maxAreaFraction: number }
 export const DEFAULT_REGION_OPTIONS: RegionOptions = { diffThreshold: 20, groupingRadius: 7, minArea: 53, maxAreaFraction: 0.15 };
 export interface Region { sourcePolygons?: { left: Array<{ x: number; y: number }>; right: Array<{ x: number; y: number }> }; id: string; bounds: Bounds; bboxArea: number; changedPixelCount: number; sourcePassId: string; groupingRadius: number; satisfiedMaxArea: boolean }
-export interface RegionPass { nativeHeapBytes: number; id: string; sourceRunId: string; options: RegionOptions; regions: Region[]; rawChangedPixelCount: number; engine: string }
+export interface RegionPass { nativeHeapBytes: number; id: string; sourceRunId: string; options: RegionOptions; requestedOptions?:RegionOptions; workingScale?:number; optionUnits?:"original-image-pixels"; regions: Region[]; rawChangedPixelCount: number; engine: string }
 export interface ImageCompareResult {
-  quality: { mode: "full-resolution"; scale: 1; resources: ReturnType<typeof import("./memory.ts").imageMemoryEstimate> };
+  quality: { mode: "full-resolution"|"reduced-resolution"; scale:number; originalWidth:number;originalHeight:number;workingWidth:number;workingHeight:number;resizePasses:0|1;/** One geometric sampling pass directly from each original; never from a prior working result. */ samplingPassesPerSource:1;pixelUnits:"working-pixels"; resources: ReturnType<typeof import("./memory.ts").imageMemoryEstimate> };
   runId: string; engine: "pixelmatch-7.1.0-rgba-v1"; width: number; height: number;
   left: Uint8ClampedArray; right: Uint8ClampedArray; leftValid: Uint8Array; rightValid: Uint8Array;
   changedMask: Uint8Array; channelDelta: Uint8Array; overlay: Uint8ClampedArray; subtract: Uint8ClampedArray;

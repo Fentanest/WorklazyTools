@@ -28,7 +28,7 @@ test("manual geometry is reversible, bounded and always expressed against source
   const matrix = transformMatrix(100,80,{ ...IDENTITY_TRANSFORM, x: -3, degrees: 37, flipX: true, scale: 1.2 });
   const transformed = applyMatrix(matrix,4,7), original = applyMatrix(inverseMatrix(matrix),transformed.x,transformed.y);
   assert.ok(Math.abs(original.x-4)<1e-10 && Math.abs(original.y-7)<1e-10);
-  assert.deepEqual(workingGeometry(10,10,10,10,IDENTITY_TRANSFORM),{ width:10,height:10,originX:0,originY:0,leftMatrix:[1,0,0,1,0,0],rightMatrix:[1,0,0,1,0,0] });
+  assert.deepEqual(workingGeometry(10,10,10,10,IDENTITY_TRANSFORM),{ width:10,height:10,scale:1,originalWidth:10,originalHeight:10,originX:0,originY:0,leftMatrix:[1,0,0,1,0,0],rightMatrix:[1,0,0,1,0,0] });
   assert.deepEqual(sourcePolygon([1,0,0,1,3,4],{ x:7,y:11,width:2,height:3 }),[{x:4,y:7},{x:6,y:7},{x:6,y:10},{x:4,y:10}]);
   assert.equal(workingGeometry(10,10,10,10,{ ...IDENTITY_TRANSFORM,degrees:90 }).width,10);
   assert.throws(() => validateDimensions(100000,100000),/IMAGE_SIZE_LIMIT/);
