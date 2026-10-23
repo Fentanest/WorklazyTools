@@ -2961,7 +2961,7 @@
     },
     "quality": "Reserved memory estimate {{memory}} / {{budget}} MiB",
     "fileLimit": "Each file must be 32 MiB or smaller. Choose smaller copies.",
-    "memoryLimit": "The images or alignment exceed the 256 MiB safety budget. Resolution is not reduced automatically; choose smaller copies or reduce offsets, rotation or scale.",
+    "memoryLimit": "The image sizes or alignment settings exceed the processing limit. Choose smaller copies or reduce offsets, rotation or scale. Working resolution is reduced automatically where possible and shown with the result.",
     "dimensionLimit": "The image or transformed canvas exceeds safe size limits. Choose smaller copies or use a smaller alignment transform.",
     "alignment": {
       "title": "Automatic alignment candidate (experimental)",
@@ -2996,8 +2996,8 @@
     "ocr": {
       "title": "Recognized text comparison",
       "description": "Recognize the full currently aligned comparison images on a white background. Raw recognition text is kept separate from comparison text, including low-score words.",
-      "budget": "Estimated OCR processing memory {{memory}} MiB / 256 MiB budget; not a measured peak",
-      "memoryLimit": "OCR requires at most 400,000 working pixels within a 256 MiB reserved budget, including retained region scans. Delete unneeded scans or compare smaller source copies.",
+      "budget": "Text recognition stays within the browser processing limit.",
+      "memoryLimit": "The images or retained results are too large for text recognition. Delete unneeded region scans or compare smaller image copies.",
       "language": "Language for next recognition",
       "languages": {
         "kor+eng": "Korean and English",
