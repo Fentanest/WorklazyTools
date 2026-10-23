@@ -1,3 +1,4 @@
+import { hasNativeHeader } from "./nativeHeader";
 import { formattingGroups, maskLabels } from "./formattingMask";
 import { AlertCircle, Download, FileText, Info, LockKeyhole, TextSearch } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -17,7 +18,7 @@ import { UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard } from "..
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import { createComparisonExcelReports, createComparisonReportArtifact } from "./comparisonResults";
-import { compareDocumentFilePairs, inspectPairs } from "./documentCompareClient";
+import { compareDocumentFilePairs } from "./documentCompareClient";
 import { fileKey, useDocumentCompareSession } from "./documentCompareSession";
 import { DocumentFileColumn } from "./DocumentFileColumn";
 import { DocumentPairingPreview } from "./DocumentPairingPreview";
@@ -81,11 +82,11 @@ export function DocumentComparePage() {
     let active=true;
     setNativeOnly(false);
     if (session.beforeFiles.length && session.beforeFiles.length===session.afterFiles.length) {
-      const pairs=session.beforeFiles.map((beforeFile,index)=>({beforeFile,afterFile:session.afterFiles[index]}));
-      void inspectPairs(pairs,language).then(pairs=>{if(active)setNativeOnly(pairs.every(pair=>!pair.formats.trackedDocxEligible));}).catch(()=>{});
+      void Promise.all([...session.beforeFiles,...session.afterFiles].map(hasNativeHeader))
+        .then(native=>{if(active)setNativeOnly(native.every(Boolean));}).catch(()=>{});
     }
     return ()=>{active=false;};
-  },[session.beforeFiles,session.afterFiles,language]);
+  },[session.beforeFiles,session.afterFiles]);
 
   const runComparison = async () => {
     if (pairingError) { setError(pairingError); return; }
