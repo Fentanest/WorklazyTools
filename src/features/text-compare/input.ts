@@ -1,5 +1,5 @@
 export type TextEncoding = "utf-8" | "utf-16le" | "utf-16be";
-export interface TextSource { name: string; text: string; encoding: TextEncoding; bom: boolean }
+export interface TextSource { name: string; text: string; encoding: TextEncoding; bom: boolean; sourceRevision?:string; bytes?:number; mime?:string }
 export const MAX_TEXT_BYTES = 4 * 1024 * 1024;
 
 export function decodeText(bytes: Uint8Array, name: string, requested?: TextEncoding): TextSource {

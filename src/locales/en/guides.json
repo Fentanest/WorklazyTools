@@ -2440,6 +2440,13 @@
         "paragraphs": [
           "Choose files up to 4 MB each. UTF-8 and UTF-16 with a BOM are supported. Large or highly repetitive text can use less detailed highlighting or reach a processing limit. Select the download encoding and BOM option, and check important content in the saved file.Each input supports up to 200,000 lines."
         ]
+      },
+      {
+        "title": "New files, reset and undo",
+        "paragraphs": [
+          "Opening a new file starts fresh undo history while keeping comparison settings. Reset inputs and settings clears both inputs, settings and history. Original files stay unchanged.",
+          "Trim lines and remove empty lines combines both operations into one undoable step. Line operations use LF/CRLF endings; sorting follows character-code order and keeps duplicates."
+        ]
       }
     ],
     "faq": {

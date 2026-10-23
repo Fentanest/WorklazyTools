@@ -2843,7 +2843,8 @@
       "sort": "Sort lines (character-code order)",
       "trim": "Trim each line",
       "removeEmpty": "Remove empty lines",
-      "lineSpaces": "Replace line breaks with spaces"
+      "lineSpaces": "Replace line breaks with spaces",
+      "trimRemoveEmpty": "Trim lines and remove empty lines"
     },
     "apply": "Apply",
     "transformHint": "Selected text in an editor is transformed on its own. With no selection, the entire text is used. Transformations can be undone.",
@@ -2890,9 +2891,11 @@
     "plain": "Plain text",
     "lineLimit": "Split each input into at most 200,000 lines before comparing.",
     "denseLine": "Detailed colors are omitted for this line. The original text and comparison result are unchanged.",
-    "historyHelp": "Undo keeps up to 20 steps. Large texts may retain fewer steps.",
+    "historyHelp": "Undo keeps up to 20 steps; large text or ignore rules may retain fewer. Opening a new file starts fresh history and keeps comparison settings.",
     "originalEncoding": "Keep each file’s original encoding and BOM",
-    "searchLimit": "Only some matches are highlighted because there are many. Matching rows and original text remain visible."
+    "searchLimit": "Only some matches are highlighted because there are many. Matching rows and original text remain visible.",
+    "reset": "Reset inputs and settings",
+    "resetHelp": "Clears inputs, settings and undo history. Original files stay unchanged."
   },
   "imageCompare": {
     "eyebrow": "Image comparison",

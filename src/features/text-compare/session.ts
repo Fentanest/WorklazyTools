@@ -6,12 +6,14 @@ export class TextHistory {
   private maxEntries:number;private maxBytes:number;
   constructor(maxEntries=20,maxBytes=64*1024*1024){this.maxEntries=maxEntries;this.maxBytes=maxBytes;}
   get canUndo(){return this.past.length>0;} get canRedo(){return this.future.length>0;}
+  clear(){this.past=[];this.future=[];}
   record(snapshot:TextSnapshot) {
     this.past.push(structuredClone(snapshot));this.future=[];
     this.trim();
   }
   private trim(){
-    const size=(s:TextSnapshot)=>2*(s.left.length+s.right.length+(s.sources?.left?.text.length??0)+(s.sources?.right?.text.length??0));
+    // Bounded reservation for strings, rules and small record metadata; not measured heap/RSS.
+    const size=(s:TextSnapshot)=>256+2*(s.left.length+s.right.length+(s.sources?.left?.text.length??0)+(s.sources?.right?.text.length??0)+(s.sources?.left?.name.length??0)+(s.sources?.right?.name.length??0))+s.options.ignoreRules.reduce((sum,rule)=>sum+64+2*rule.length,0);
     let bytes=[...this.past,...this.future].reduce((n,s)=>n+size(s),0);
     while(this.past.length+this.future.length>this.maxEntries||bytes>this.maxBytes){const removed=(this.past.length?this.past:this.future).shift()!;bytes-=size(removed);}
   }

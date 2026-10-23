@@ -86,9 +86,9 @@ test("very large repeated-line fallback has no argument-count limit",()=>{
   assert.equal(result.rows.length,150000);assert.equal(result.quality,"line-coarse");assert.equal(result.counts.changed,150000);
 });
 test("undo and redo share a bounded history budget",()=>{
-  const history=new TextHistory(3,100),small={left:"a",right:"b",options:defaults,revision:1};
+  const history=new TextHistory(3,1024),small={left:"a",right:"b",options:defaults,revision:1};
   history.record(small);history.record(small);
-  assert.deepEqual(history.undo({...small,left:"x".repeat(100)}),small);
+  assert.deepEqual(history.undo({...small,left:"x".repeat(1000)}),small);
   assert.equal(history.canRedo,false);assert.equal(history.canUndo,false);
 });
 test("input line admission and long character spans remain bounded",()=>{
@@ -141,4 +141,13 @@ test("whole-document transforms preserve CRLF and mixed terminator positions",()
   assert.equal(transformText("a\r\n  \r\nb\r\n","removeEmpty"),"a\r\nb\r\n");
   assert.equal(transformText("a\r\n  \rb\n","trim"),"a\r\nb\n");
   assert.equal(transformText("PRE| b \r\n a |POST","trim",4,12),"PRE|b\r\na|POST");
+});
+
+test("combined trim preset preserves LF/CRLF in one transformation",()=>{
+ assert.equal(transformText(" a \r\n  \r\n b \n","trimRemoveEmpty"),"a\r\nb\n");
+ assert.equal(transformText("PREFIX| a \r\n \r\n b |END","trimRemoveEmpty",7,18),"PREFIX|a\r\nb|END");
+});
+test("history clearing and option-string reservation bound both undo and redo",()=>{
+ const history=new TextHistory(20,1024),source={left:"a",right:"b",options:defaults,revision:1};history.record(source);history.undo(source);assert.equal(history.canRedo,true);history.clear();assert.equal(history.canUndo,false);assert.equal(history.canRedo,false);
+ history.record({...source,options:{...defaults,ignoreRules:['x'.repeat(500)]}});assert.equal(history.canUndo,false);
 });

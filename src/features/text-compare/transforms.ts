@@ -1,4 +1,4 @@
-export type TextTransform="lowercase"|"sort"|"trim"|"removeEmpty"|"lineSpaces";
+export type TextTransform="lowercase"|"sort"|"trim"|"removeEmpty"|"trimRemoveEmpty"|"lineSpaces";
 // Explicit operations adapted from extracted module79063. Preserve raw terminators
 // when changing line contents; sorting reuses the original terminator positions.
 // TextTools is unchanged. The approved line policy remains LF/CRLF; lone CR is content.
@@ -15,7 +15,7 @@ export function transformText(text:string,action:TextTransform,start=0,end=text.
     if(action==="sort"){
       const bodies=lines.map(line=>line.body).sort();
       changed=lines.map((line,index)=>bodies[index]+line.ending).join("");
-    }else changed=lines.filter(line=>action!=="removeEmpty"||line.body.trim()!=="").map(line=>(action==="trim"?line.body.trim():line.body)+line.ending).join("");
+    }else changed=lines.filter(line=>(action!=="removeEmpty"&&action!=="trimRemoveEmpty")||line.body.trim()!=="").map(line=>((action==="trim"||action==="trimRemoveEmpty")?line.body.trim():line.body)+line.ending).join("");
   }
   return text.slice(0,start)+changed+text.slice(end);
 }
