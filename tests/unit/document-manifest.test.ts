@@ -21,3 +21,10 @@ test("DOC and HWP source-less paragraphs retain their own section text decisions
   const ids = result.manifest.decisions.map((decision) => decision.id);
   assert.equal(new Set(ids).size, ids.length);
 });
+
+
+test("worker output controls do not change the comparison scope schema", () => {
+  const options = { formatting: true, tables: false, metadata: true, trackedDocument: true, revisionAuthor: "Reviewer", rewriteRevisionAuthor: false };
+  const result = compareDocumentModels("before", "after", model("original"), model("revised"), options, "en");
+  assert.deepEqual(result.manifest.options, { formatting: true, tables: false, metadata: true });
+});

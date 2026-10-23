@@ -6,7 +6,9 @@ const fixtures = JSON.parse(fs.readFileSync("tests/fixtures/document-compare/for
 const results = [];
 globalThis.worklazyDiffJson = (a, b) => JSON.stringify(diffText(a, b));
 globalThis.worklazyComparisonManifestJson = (a, b, formatting, tables, metadata) => {
-  const result = compareDocumentModels("before", "after", JSON.parse(a), JSON.parse(b), { formatting, tables, metadata }, "en");
+  const options = { formatting, tables, metadata, trackedDocument: true, revisionAuthor: "format-test", rewriteRevisionAuthor: false };
+  const result = compareDocumentModels("before", "after", JSON.parse(a), JSON.parse(b), options, "en");
+  assert.deepEqual(result.manifest.options, { formatting, tables, metadata });
   results.push(result);
   return JSON.stringify(result.manifest);
 };
@@ -64,6 +66,8 @@ fixture('/before.docx','section','<w:sectPr><w:pgMar w:top="1440"/></w:sectPr>')
 fixture('/after.docx','section','<w:sectPr><w:pgMar w:top="720"/></w:sectPr>')
 a=extract_document_model(open('/before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/after.docx','rb').read(),True,True,'en')
 value=json.loads(worklazyComparisonManifestJson(a,b,True,True,True))
+generate_tracked_document('/before.docx','/after.docx','/explicit.docx','format-test',True,True,True,json.dumps(value))
+checks.append('explicit-worker-shaped-manifest')
 for mutation in ('missing-action','forged-fact','missing-scope'):
     corrupt=copy.deepcopy(value)
     if mutation == 'missing-action': corrupt['propertyActions']=[]
@@ -144,7 +148,7 @@ for case,before_runs,after_runs in [
     checks.append(case)
 `);
 const checks = py.globals.get("checks").toJs();
-assert.equal(checks.length, 32);
+assert.equal(checks.length, 33);
 for (const [index, fixture] of fixtures.entries()) {
   assert.equal(results[index].summary.format > 0, fixture.expectAction, `${fixture.id} screen formatting`);
   if (fixture.expectAction) assert([...results[index].views.document, ...results[index].views.headerFooter].some((view) => view.formattingLabels?.length), `${fixture.id} descriptive labels`);

@@ -80,7 +80,7 @@ export function compareDocumentModels(
   const manifest: DocumentComparisonManifest = {
     version: 1, decisions: [], policyVersion: "worklazy-document-1",
     inputRevision: { before: before.sourceRevision, after: after.sourceRevision },
-    options: { ...options },
+    options: { formatting: options.formatting, tables: options.tables, metadata: options.metadata },
     preservation: { comments: "preserve-after-existing-contract", existingRevisions: "preserve-after-history" },
     formattingPolicyVersion: "worklazy-formatting-1", formattingScopes: [], propertyExclusions: [], propertyActions: [], formattingExcluded: [],
     coverage: { before: [], after: [] },
