@@ -31,10 +31,23 @@ try{
    await begun;
    const next=session.run([{id:'new',before:new File([new Uint8Array(bytes)],'new-before.pdf'),after:new File([new Uint8Array(bytes)],'new-after.pdf')}]);
    await new Promise(resolve=>setTimeout(resolve,30));const beforeRelease=reads.slice();release();const canceled=await previous;const result=await next;
-   return {observations,beforeRelease,canceled,status:result?.pairs[0].status,finalReads:reads.slice()};
+   const finalReads=reads.slice(),auxiliary=[];
+   const input={id:'aux',before:new File([new Uint8Array(bytes)],'aux-before.pdf'),after:new File([new Uint8Array(bytes)],'aux-after.pdf')};
+   for(const action of ['run','select','suggest','dispose']){
+    const owned=new PdfCompareSession(),preview=await owned.select(input,{before:0,after:0});
+    let begin,finish;const started=new Promise(resolve=>begin=resolve),cleanup=new Promise(resolve=>finish=resolve),events=[];
+    owned.ownPreviewResource(preview,()=>events.push('release'));
+    const work=owned.runAuxiliary(async signal=>{events.push('start');signal.addEventListener('abort',()=>events.push('abort'));begin();await cleanup;events.push('disposed');},new AbortController().signal).catch(error=>error.name);
+    await started;const readCount=reads.length;
+    const next=action==='run'?owned.run([input]):action==='select'?owned.select(input,{before:0,after:0}):action==='suggest'?owned.suggest(input):owned.dispose();
+    await new Promise(resolve=>setTimeout(resolve,20));const blocked=reads.length===readCount&&events.join(',')==='start,abort';finish();const canceledWork=await work;await next;await owned.dispose();
+    auxiliary.push({action,blocked,canceledWork,events});
+   }
+   return {observations,beforeRelease,canceled,status:result?.pairs[0].status,finalReads,auxiliary};
   }finally{release?.();File.prototype.arrayBuffer=original;await session.dispose();}
  },bytes);
  for(const row of findings.observations){assert.equal(row.terminations,1);assert.equal(row.status,row.mode==='valid'?'resolved':row.mode==='abort-late'?'AbortError':row.mode==='post'?'Error':'PdfCompareError');}
  assert.deepEqual(findings.beforeRelease,['old.pdf']);assert.equal(findings.canceled,'AbortError');assert.equal(findings.status,'complete');assert.deepEqual(findings.finalReads,['old.pdf','new-before.pdf','new-after.pdf']);
- console.log(JSON.stringify({status:'passed',checks:14,findings}));await context.close();
+ for(const row of findings.auxiliary){assert.equal(row.blocked,true);assert.equal(row.canceledWork,'AbortError');assert.deepEqual(row.events,['start','abort','disposed','release']);}
+ console.log(JSON.stringify({status:'passed',checks:26,findings}));await context.close();
 }finally{await browser.close();}

@@ -1679,6 +1679,13 @@
           "Find suggested matches by page appearance, then review and apply them. Blank or ambiguous pages remain unpaired. Suggestions support 32 MB and 200 pages per file; existing page-number and manual comparison remain available.",
           "The slider reveals original and revised pages together. Color difference shows differences before the sensitivity filter, while displayed counts retain the selected sensitivity."
         ]
+      },
+      {
+        "title": "Read text in scanned pages",
+        "paragraphs": [
+          "Select a page to recognize and compare text from its visible image separately. Choose a recognition language and run text recognition. Large pages may use a smaller recognition image or exceed the processing limit.",
+          "Raw recognition text, word positions and review notes stay separate. Correct misread text and enable corrected transcripts to use it in the text comparison. Extracted PDF text, pixel differences and the existing PDF report above stay unchanged."
+        ]
       }
     ],
     "faq": {
@@ -1696,7 +1703,7 @@
       },
       "new_faq_3": {
         "q": "If the text result from a scanned PDF is empty, does it mean there is no content?",
-        "a": "No. If the text shapes are embedded in an image, there might be no text for the PDF to extract. Check the visual comparison, and if you need searchable text, use the PDF OCR tool separately."
+        "a": "No. Text stored as an image may have no extractable text. Review the page image and its separate recognition comparison. Use the PDF OCR tool if you need a searchable PDF file."
       },
       "new_faq_4": {
         "q": "What should I check first if all pages look different?",
