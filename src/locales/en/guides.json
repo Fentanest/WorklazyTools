@@ -1672,6 +1672,13 @@
         "paragraphs": [
           "If a revision adds a cover, the first body page may need to be matched with page 2 instead of page 1. When document structures differ, use manual page matching and verify that each pair contains corresponding content before comparing."
         ]
+      },
+      {
+        "title": "Suggested pages and views",
+        "paragraphs": [
+          "Find suggested matches by page appearance, then review and apply them. Blank or ambiguous pages remain unpaired. Suggestions support 32 MB and 200 pages per file; existing page-number and manual comparison remain available.",
+          "The slider reveals original and revised pages together. Color difference shows differences before the sensitivity filter, while displayed counts retain the selected sensitivity."
+        ]
       }
     ],
     "faq": {
@@ -2437,6 +2444,104 @@
       "save": {
         "q": "Will the original file be overwritten?",
         "a": "No. Copied changes and transformations affect the editors. Save TXT downloads a new file."
+      }
+    }
+  },
+  "imageCompare": {
+    "title": "Image comparison guide",
+    "description": "Inspect color, opacity and recognized-text differences, and review alignment suggestions.",
+    "blocks": [
+      {
+        "title": "How to compare",
+        "items": [
+          "Choose original and revised PNG, JPEG or WebP files.",
+          "Set opacity and sensitivity options, then compare.",
+          "Choose split, fade, slider or another view.",
+          "If positions differ, review an alignment suggestion before applying it."
+        ]
+      },
+      {
+        "title": "Resolution and changed regions",
+        "paragraphs": [
+          "Large images may use a smaller comparison resolution. Check the working dimensions and scale: small changes can be missed, and original files remain unchanged. If a processing limit is reached, resize or crop the images before selecting them again.",
+          "Keep up to three region scans. A bounding rectangle’s area differs from its changed-pixel count. Radius and area settings use original units; the applied working values are shown separately."
+        ]
+      },
+      {
+        "title": "Review recognized text",
+        "paragraphs": [
+          "Recognized text can differ from the actual document. Check it against the image even when scores are high. Raw recognition, corrected text and review notes remain separate; corrections affect comparison only when you opt in.",
+          "Recognition uses a white background and the current alignment, up to 400,000 working pixels. If retained region scans prevent recognition, remove unnecessary scan results and try again."
+        ]
+      },
+      {
+        "title": "Review alignment before applying",
+        "paragraphs": [
+          "Automatic alignment is a suggestion. Repeated patterns or sparse content can produce an unintended match. Inspect the preview before applying or rejecting it. Do not directly compare counts calculated at different working resolutions."
+        ]
+      }
+    ],
+    "faq": {
+      "privacy": {
+        "q": "Are images uploaded to a server?",
+        "a": "No. Comparison and text recognition run in your browser without uploading original images."
+      },
+      "zero": {
+        "q": "Do zero changed pixels mean identical original files?",
+        "a": "No. Counts use the chosen sensitivity, opacity and working resolution. Also check image sizes, added or removed coverage and any resolution reduction."
+      },
+      "ocr": {
+        "q": "Can recognition errors appear as changes?",
+        "a": "Yes. Compare recognized words with the source crops and, if needed, use corrected text. Recognition scores do not guarantee correctness."
+      }
+    }
+  },
+  "folderCompare": {
+    "title": "Folder and ZIP comparison guide",
+    "description": "Compare file contents in two folders or ZIP archives, then inspect selected pairs with existing tools.",
+    "blocks": [
+      {
+        "title": "How to compare",
+        "items": [
+          "Choose a folder or ZIP on each side. Originals are not changed.",
+          "Review path-matching options and start comparison.",
+          "Inspect files with different contents and files present on only one side.",
+          "Select individual pairs for document, spreadsheet, image or text comparison."
+        ]
+      },
+      {
+        "title": "File contents versus detailed comparison",
+        "paragraphs": [
+          "File-content comparison reads the actual contents to completion. Files can look the same while storing different data. Detailed comparison uses the existing document, Excel, PDF, image and text tools without changing byte status.",
+          "Excel details compare only the selected sheets and headers by position. Other sheets are excluded. For images, check overlapping, added and removed coverage together with the working resolution."
+        ]
+      },
+      {
+        "title": "Limits and supported inputs",
+        "paragraphs": [
+          "The entire job allows up to 50,000 entries, 1 GiB of expanded content and 256 MiB per entry. ZIP directory reads also have a 2 MiB limit. Detailed comparison allows 4 MiB per text file or 16 MiB per other file, plus each tool’s own limits.",
+          "Empty folders, permissions and filesystem metadata are not fully compared. Encrypted ZIP entries and symbolic links are unsupported. Word and HWP comparisons require matching document families."
+        ]
+      },
+      {
+        "title": "Rename candidates",
+        "paragraphs": [
+          "Only byte-verified identical contents form rename-candidate groups. Duplicate contents are not arbitrarily paired. No filesystem names or locations are changed. Additional rereads are bounded to 3 GiB and 10,000 byte verifications."
+        ]
+      }
+    ],
+    "faq": {
+      "writes": {
+        "q": "Can comparison change original files?",
+        "a": "No. It is read-only: files are not copied, edited, deleted, synchronized or renamed."
+      },
+      "cancel": {
+        "q": "Does cancellation discard completed results?",
+        "a": "Completed results remain. Unfinished entries are labeled canceled or unknown. Results from an older selection cannot replace a new job."
+      },
+      "same": {
+        "q": "Why can bytes differ when detailed comparison shows no changes?",
+        "a": "Stored metadata or content outside the selected tool’s scope can differ. Check the detailed tool’s scope and warnings."
       }
     }
   }

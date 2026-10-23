@@ -40,6 +40,8 @@ const ImageStudioPage = lazy(() => import("../features/image-studio/ImageStudioP
 const TextMergerPage = lazy(() => import("../features/text-merger/TextMergerPage").then((module) => ({ default: module.TextMergerPage })));
 const TextToolsPage = lazy(() => import("../features/text-tools/TextToolsPage").then((module) => ({ default: module.TextToolsPage })));
 const TextComparePage = lazy(() => import("../features/text-compare/TextComparePage").then((module) => ({ default: module.TextComparePage })));
+const ImageComparePage = lazy(() => import("../features/image-compare/ImageComparePage").then((module) => ({ default: module.ImageComparePage })));
+const FolderComparePage = lazy(() => import("../features/folder-compare/FolderComparePage").then((module) => ({ default: module.FolderComparePage })));
 const TextFormatterPage = lazy(() => import("../features/text-formatter/TextFormatterPage").then((module) => ({ default: module.TextFormatterPage })));
 const WorkCalculatorPage = lazy(() => import("../features/work-calculator/WorkCalculatorPage").then((module) => ({ default: module.WorkCalculatorPage })));
 const TimezoneCalculatorPage = lazy(() => import("../features/timezone-calculator/TimezoneCalculatorPage").then((module) => ({ default: module.TimezoneCalculatorPage })));
@@ -116,6 +118,8 @@ export function App() {
           <Route path="tools/text-merger" element={<LazyToolRoute label="Text Merger"><TextMergerPage /></LazyToolRoute>} />
           <Route path="tools/text-tools" element={<LazyToolRoute label="Text Tools"><TextToolsPage /></LazyToolRoute>} />
           <Route path="tools/text-compare" element={<LazyToolRoute label="Text compare"><TextComparePage /></LazyToolRoute>} />
+          <Route path="tools/image-compare" element={<LazyToolRoute label="Image compare"><ImageComparePage /></LazyToolRoute>} />
+          <Route path="tools/folder-compare" element={<LazyToolRoute label="Folder compare"><FolderComparePage /></LazyToolRoute>} />
           <Route path="tools/text-formatter" element={<LazyToolRoute label="Formatter"><TextFormatterPage /></LazyToolRoute>} />
           <Route path="tools/work-calculator" element={<LazyToolRoute label="Workday Calculator"><WorkCalculatorPage /></LazyToolRoute>} />
           <Route path="tools/timezone-calculator" element={<LazyToolRoute label="World Time Planner"><TimezoneCalculatorPage /></LazyToolRoute>} />

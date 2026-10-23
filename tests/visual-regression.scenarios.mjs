@@ -52,6 +52,7 @@ const interactionProfiles = Object.freeze([enDarkDesktop]);
 const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, koLightMobile320, enLightMobile320]);
 const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
+  "image-compare", "folder-compare",
   "text-compare",
   "product-banner",
   "document-redactor",
@@ -203,6 +204,22 @@ const bottomScenarioFor = (route) => {
 };
 
 const interactionDefinitions = Object.freeze({
+  "image-compare": Object.freeze({
+    stateId: "interaction-pixel-result",
+    fixture: {kind: "generated-png", fileName: "comparison-image.png", width: 240, height: 160},
+    actions: [
+      {type: "upload", selector: "[data-tool-page='image-compare'] input[type='file']", elementIndex: 0},
+      {type: "upload", selector: "[data-tool-page='image-compare'] input[type='file']", elementIndex: 1},
+      {type: "click", selector: "[data-testid='image-compare-run']"},
+      {type: "wait", selector: "[data-testid='image-result']"},
+    ],
+    assertSelector: "[data-testid='image-views']",
+  }),
+  "folder-compare": Object.freeze({
+    stateId: "interaction-path-options",
+    actions: [{type: "click", selector: "[data-tool-page='folder-compare'] input[type='checkbox']", elementIndex: 0}],
+    assertSelector: "[data-tool-page='folder-compare'] input[type='checkbox']:checked",
+  }),
   "text-compare": Object.freeze({
     stateId: "interaction-comparison-result",
     actions: [

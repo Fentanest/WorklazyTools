@@ -33,6 +33,19 @@ test('explicit ZIP root view does not strip FileList subdirectories or alter ori
     assert.equal(result.rows[0].right[0].path, 'archive/sub/a.txt'); assert.equal(result.rows[0].left[0].path, 'sub/a.txt');
   } finally { await owner.clear(2); }
 });
+test('omitted ZIP root directory cannot collide with its same-named child file', async () => {
+  const writer=new ZipWriter(new BlobWriter(),{useWebWorkers:false});
+  await writer.add('archive/',undefined,{directory:true});
+  await writer.add('archive/archive',new BlobReader(new Blob(['same'])));
+  const input={kind:'zip',file:new File([await writer.close()],'archive.zip')};
+  const owner=new FolderOwner();let result;
+  try{
+    await owner.compare(1,input,fileInput(file('archive','same')),{stripRoot:true},v=>{result=v;});
+    assert.equal(result.rows.length,1);assert.equal(result.rows[0].key,'archive');
+    assert.equal(result.rows[0].pairing,'matched');assert.equal(result.rows[0].content,'equal');
+    assert.equal(result.rows[0].left[0].path,'archive/archive');
+  }finally{await owner.clear(2);}
+});
 test('owner replacement and clear await delayed reads before next source admission', async () => {
   const ready = deferred(), release = deferred(); const owner = new FolderOwner(); const publications = [];
   const delayed = { size: 1, name: 'a', slice() { ready.resolve(); return { arrayBuffer: async () => { await release.promise; return new Uint8Array([1]).buffer; } }; } };

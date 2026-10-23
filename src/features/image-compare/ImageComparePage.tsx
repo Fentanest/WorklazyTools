@@ -11,7 +11,7 @@ import { ImageViews, type ImageT } from "./ImageViews.tsx";
 import { applyMatrix, inverseMatrix } from "./geometry.ts";
 import { DEFAULT_PIXEL_OPTIONS, DEFAULT_REGION_OPTIONS, IDENTITY_TRANSFORM, type ImageCompareResult, type RegionPass, type Transform } from "./types.ts";
 export function ImageComparePage() {
-  const { t: translate } = useTranslation(); const i18nT = translate as unknown as ImageT; const t: ImageT = (key, values) => i18nT(`features:imageCompare.${key}`, values);
+  const { t: translate } = useTranslation(); const i18nT = translate as unknown as ImageT; const t: ImageT = (key, values) => i18nT(`features:imageCompare.${key === "working" ? "processing" : key}`, values);
   const [left, setLeft] = useState<File>(), [right, setRight] = useState<File>();
   const [options, setOptions] = useState({ ...DEFAULT_PIXEL_OPTIONS }), [transform, setTransform] = useState({ ...IDENTITY_TRANSFORM });
   const [autoMatrix,setAutoMatrix]=useState<Matrix3>(),[alignmentMode,setAlignmentMode]=useState<AlignmentCandidate['mode']>('affine');

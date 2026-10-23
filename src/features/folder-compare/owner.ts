@@ -73,7 +73,8 @@ export class FolderOwner {
         warnings = [...new Set([...a.warnings, ...b.warnings])];
         // ZIP root stripping is a ZIP view option; FileList and DirectoryHandle already omit their selected root.
         const strip = (entries: readonly FolderEntry[], input: SourceInput) => input.kind === 'zip' && options.stripRoot
-          ? entries.map(e => ({ ...e, rawPath: e.rawPath.split('/').slice(1).join('/') || e.rawPath })) : entries;
+          ? entries.filter(e => e.issue || !e.directory || e.rawPath.replace(/\/$/, '').includes('/'))
+            .map(e => ({ ...e, rawPath: e.rawPath.split('/').slice(1).join('/') || e.rawPath })) : entries;
         // Matching views retain immutable entry identities and originals in result rows.
         const keys = pairEntries(strip(a.entries, left), strip(b.entries, right), { ...options, stripRoot: false });
         const originals = new Map([...a.entries, ...b.entries].map(e => [e.id, e]));

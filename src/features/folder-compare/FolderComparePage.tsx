@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PrivacyBanner } from '../../components/PrivacyBanner';
+import { ToolGuideWrapper } from '../../components/ToolGuideWrapper';
 import { PageHeader } from '../../components/ui';
 import { Button } from '../../components/ui/button';
 import { UtilityField, UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard, UtilitySelect } from '../../components/UtilitySurface';
@@ -127,5 +128,6 @@ export function FolderComparePage() {
       <div className="flex items-center gap-3"><Button variant="outline" disabled={currentPage === 0} onClick={() => setPage(currentPage - 1)}>{tr('previous')}</Button><span>{tr('page')} {currentPage + 1} / {pageCount}</span><Button variant="outline" disabled={currentPage + 1 >= pageCount} onClick={() => setPage(currentPage + 1)}>{tr('next')}</Button></div>
     </UtilitySectionCard>}
     {pair && <SelectedPanel key={pair.leftId + ':' + pair.rightId} pair={pair} session={session.current} language={language} label={label} request={(leftId, rightId, limit, signal) => request('selected', { leftId, rightId, limit }, signal)} />}
+    <ToolGuideWrapper slug="folderCompare" />
   </UtilityPage>;
 }

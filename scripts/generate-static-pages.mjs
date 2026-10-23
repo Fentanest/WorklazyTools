@@ -16,6 +16,7 @@ const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData
 
 const toolRoutes = ["product-banner",
   "text-compare",
+  "image-compare", "folder-compare",
   "foliotrace",
   "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "pdf-converter", "document-markdown", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",

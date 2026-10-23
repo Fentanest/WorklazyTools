@@ -36,3 +36,4 @@ public/vendor/markitdown/
 
 # Rebuilt from pinned vendor/comparison sources.
 /public/vendor/opencv/
+/public/vendor/comparison/

@@ -9,14 +9,14 @@ export const FOLDER_COPY = {
     distinction: 'Byte equality is exact file-content equality. A semantic comparison is a separate, opt-in result and does not change byte status.',
     pending: 'Pending', equal: 'Equal bytes', different: 'Different bytes', unreadable: 'Unreadable', unknown: 'Not compared', ambiguous: 'Ambiguous paths', 'left-only': 'Original only', 'right-only': 'Revised only',
     verified: 'Integrity verified', failed: 'Integrity failed', unchecked: 'Integrity unchecked', entries: 'entries', completed: 'processed', details: 'Original paths and entry details', workerError: 'The comparison could not continue. Please start a new comparison.', pickerError: 'The folder could not be opened. Use folder upload if this browser does not support directory access.' },
-  ko: { title: '폴더 비교', eyebrow: '로컬 파일 도구', description: '폴더 또는 ZIP의 경로와 파일 바이트를 정확하게 비교합니다.',
-    left: '원본', right: '수정본', files: '폴더 선택', zip: 'ZIP 선택', directory: '읽기 권한으로 폴더 열기', none: '선택한 소스 없음',
+  ko: { title: '폴더 비교', eyebrow: '로컬 파일 도구', description: '폴더나 ZIP의 파일 내용을 확인하고, 필요한 파일 쌍을 상세 비교합니다.',
+    left: '원본', right: '수정본', files: '폴더 선택', zip: 'ZIP 선택', directory: '읽기 권한으로 폴더 열기', none: '선택한 폴더·ZIP 없음',
     compare: '비교', cancel: '취소', options: '경로 대응 옵션', nfc: '대응 경로에 Unicode NFC 적용', ignoreCase: '대응 경로의 대소문자 무시', stripRoot: 'ZIP 경로의 첫 구성 요소 제외',
     result: '비교 결과', search: '경로 필터', all: '모든 상태', previous: '이전', next: '다음', page: '페이지',
-    loading: '폴더 항목을 읽는 중…', comparing: '파일 바이트를 비교하는 중…', done: '비교 완료', canceled: '취소되었습니다. 완료한 행은 유지됩니다.', error: '소스를 읽지 못했습니다. 접근 권한, ZIP 무결성 및 크기 제한을 확인하세요.',
+    loading: '폴더 항목을 읽는 중…', comparing: '파일 내용을 끝까지 확인하는 중…', done: '비교 완료', canceled: '취소되었습니다. 완료한 행은 유지됩니다.', error: '파일 목록을 읽지 못했습니다. 접근 권한, ZIP 손상 여부와 크기 제한을 확인하세요.',
     privacy: '읽기 전용: 파일을 복사·변경·삭제·동기화하지 않습니다.', limits: '전체 작업: 50,000개 항목, 압축 해제 논리 크기 1GiB, 항목당 256MiB. ZIP 메타데이터 읽기는 2MiB로 제한합니다.',
-    snapshot: '파일은 관찰 시점의 스냅샷입니다. 빈 폴더·권한·파일 시스템 메타데이터는 완전하게 비교하지 않습니다. 암호화 ZIP 항목과 심볼릭 링크는 지원하지 않습니다.',
-    distinction: '바이트 일치는 파일 내용의 정확한 일치입니다. 의미 비교는 별도로 선택하는 결과이며 바이트 상태를 바꾸지 않습니다.',
-    pending: '대기', equal: '바이트 일치', different: '바이트 다름', unreadable: '읽기 실패', unknown: '비교하지 않음', ambiguous: '경로 중복', 'left-only': '원본에만 있음', 'right-only': '수정본에만 있음',
-    verified: '무결성 검증됨', failed: '무결성 실패', unchecked: '무결성 미검증', entries: '개 항목', completed: '개 처리', details: '원본 경로 및 항목 정보', workerError: '비교를 계속할 수 없습니다. 새 비교를 시작하세요.', pickerError: '폴더를 열지 못했습니다. 디렉터리 접근을 지원하지 않는 브라우저에서는 폴더 선택을 이용하세요.' }
+    snapshot: '선택한 시점의 파일을 비교합니다. 빈 폴더·접근 권한 등은 완전하게 비교하지 않습니다. 암호화 ZIP과 심볼릭 링크는 지원하지 않습니다.',
+    distinction: '파일 내용이 같아도 이름이나 저장 시각은 다를 수 있습니다. 문서·표·이미지의 상세 비교는 별도로 선택하며, 파일 내용 상태를 바꾸지 않습니다.',
+    pending: '대기', equal: '파일 내용 같음', different: '파일 내용 다름', unreadable: '읽기 실패', unknown: '비교하지 않음', ambiguous: '경로 중복', 'left-only': '원본에만 있음', 'right-only': '수정본에만 있음',
+    verified: '읽기 검증 완료', failed: '읽기 검증 실패', unchecked: '읽기 미검증', entries: '개 항목', completed: '개 처리', details: '원본 경로 및 항목 정보', workerError: '비교를 계속할 수 없습니다. 새 비교를 시작하세요.', pickerError: '폴더를 열지 못했습니다. 디렉터리 접근을 지원하지 않는 브라우저에서는 폴더 선택을 이용하세요.' }
 } as const;
