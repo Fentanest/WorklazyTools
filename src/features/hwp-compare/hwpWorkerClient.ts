@@ -24,7 +24,6 @@ export async function compareHwpFilePairs(
   language: "ko" | "en" = "ko",
   signal?: AbortSignal,
 ) {
-  const worker = new Worker(new URL("./hwp-compare.worker.ts", import.meta.url), { type: "module" });
   const payloads: Array<{
     beforeName: string;
     afterName: string;
@@ -45,6 +44,8 @@ export async function compareHwpFilePairs(
     });
   }
   const transfer = payloads.flatMap((pair) => [pair.beforeBuffer, pair.afterBuffer]);
+  if (signal?.aborted) throw new DOMException(language === "en" ? "HWP comparison was cancelled." : "HWP 문서 비교를 취소했습니다.", "AbortError");
+  const worker = new Worker(new URL("./hwp-compare.worker.ts", import.meta.url), { type: "module" });
 
   return new Promise<HwpWorkerPairResult[]>((resolve, reject) => {
     let settled = false;
@@ -53,19 +54,24 @@ export async function compareHwpFilePairs(
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) { abort(); return; }
     worker.onmessage = (event: MessageEvent) => {
-      if (event.data.type === "progress") {
+      if (settled) return;
+      if (event.data?.type === "progress") {
         onProgress?.(event.data.progress, event.data.message);
         return;
       }
       if (!finish()) return;
-      if (event.data.type === "result") resolve(event.data.result as HwpWorkerPairResult[]);
-      else reject(new Error(event.data.error?.message || (language === "en" ? "An error occurred while comparing HWP documents." : "HWP 문서 비교 중 오류가 발생했습니다.")));
+      if (event.data?.type === "result" && Array.isArray(event.data.result)) resolve(event.data.result as HwpWorkerPairResult[]);
+      else reject(new Error(language === "en" ? "An error occurred while comparing HWP documents." : "HWP 문서 비교 중 오류가 발생했습니다."));
     };
     worker.onerror = (event) => {
       if (!finish()) return;
       event.preventDefault();
       reject(new Error(language === "en" ? "Could not start HWP comparison. Reload the page and try again." : "HWP 문서 비교를 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."));
     };
-    worker.postMessage({ pairs: payloads, options, language }, transfer);
+    worker.onmessageerror = () => {
+      if (finish()) reject(new Error(language === "en" ? "Could not read the comparison result." : "비교 결과를 읽지 못했습니다."));
+    };
+    try { worker.postMessage({ pairs: payloads, options, language }, transfer); }
+    catch { if (finish()) reject(new Error(language === "en" ? "Could not start HWP comparison." : "HWP 문서 비교를 시작하지 못했습니다.")); }
   });
 }
