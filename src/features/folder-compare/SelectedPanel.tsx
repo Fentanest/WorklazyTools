@@ -34,7 +34,7 @@ export function SelectedPanel({ pair, session, request, language, label }: { pai
   return <UtilitySectionCard title={label('deep')} description={pair.name} className="mt-4">
     <p className="mb-3 text-sm">{label('deepLimits')}</p>
     <UtilitySelect aria-label={label('deepKind')} value={kind} onChange={event => { invalidate(); setSheets(undefined); setKind(event.target.value as DeepKind); }}>
-      {(['text', 'excel', 'image', 'pdf', 'word'] as const).map(value => <option key={value} value={value}>{label(value)}</option>)}
+      {(['text', 'excel', 'image', 'pdf', 'word', 'hwp'] as const).map(value => <option key={value} value={value}>{label(value)}</option>)}
     </UtilitySelect>
     {kind === 'excel' && <div className="my-3"><p>{label('position')}</p>{(['left', 'right'] as const).map((side, index) => <div key={side} className="my-2 flex flex-wrap gap-2"><UtilityField>{label(side)} {label('headerRow')}<UtilityInput type="number" min={1} value={excel[side].headerRow} onChange={e => { invalidate(); setSheets(undefined); setExcel(previous => ({ ...previous, [side]: { sheetName: '', headerRow: Math.max(1, Number(e.target.value) || 1) } })); }} /></UtilityField><UtilityField>{label('sheet')}<UtilitySelect aria-label={`${label(side)} ${label('sheet')}`} value={excel[side].sheetName} onChange={e => { invalidate(); setExcel(previous => ({ ...previous, [side]: { ...previous[side], sheetName: e.target.value } })); }}><option value="">{label('chooseSheet')}</option>{sheets?.[index].sheets.map(sheet => <option key={sheet.name}>{sheet.name}</option>)}</UtilitySelect></UtilityField></div>)}
       <Button variant="outline" disabled={busy} onClick={() => execute(true)}>{label('inspect')}</Button>

@@ -119,14 +119,15 @@ export async function compareBytes(left: FolderEntry, right: FolderEntry, signal
     return { equal, integrity: 'verified' };
   } finally { await Promise.all([a.close(), b?.close()]); }
 }
-/** Serial ownership bounds buffers and prevents an obsolete run from committing results. */
+/** Updates are synchronous per-row deltas; snapshots belong to the consumer and are never cloned per file.
+ * Serial ownership bounds buffers and prevents an obsolete run from committing results. */
 export class FolderRun {
   private generation = 0;
   private controller?: AbortController;
   private tail: Promise<void> = Promise.resolve();
   cancel() { this.controller?.abort(); }
   invalidate() { this.generation++; this.cancel(); }
-  async compare(rows: FolderRow[], update: (rows: FolderRow[]) => void) {
+  async compare(rows: FolderRow[], update: (changed: FolderRow | undefined, final: boolean) => void) {
     this.invalidate(); const generation = this.generation; const controller = new AbortController(); this.controller = controller;
     const previous = this.tail;
     const work = previous.catch(() => {}).then(async () => {
@@ -142,9 +143,9 @@ export class FolderRun {
           if (generation !== this.generation) return;
           row.content = result.equal ? 'equal' : 'different'; row.integrity = result.integrity;
         } catch { if (generation !== this.generation) return; row.content = controller.signal.aborted ? 'canceled' : 'unreadable'; row.integrity = controller.signal.aborted ? 'unchecked' : 'failed'; }
-        if (generation === this.generation) update([...rows]);
+        if (generation === this.generation) update(row, false);
       }
-      if (generation === this.generation) { this.controller = undefined; update([...rows]); }
+      if (generation === this.generation) { this.controller = undefined; update(undefined, true); }
     });
     this.tail = work;
     return work;

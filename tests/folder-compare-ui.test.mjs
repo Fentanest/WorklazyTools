@@ -80,6 +80,13 @@ test('static standalone Folder UI runs actual worker, filters, options, replacem
     const image = value => { const png = new PNG({ width: 2, height: 2 }); for (let i = 0; i < png.data.length; i += 4) { png.data[i] = value; png.data[i + 3] = 255; } return PNG.sync.write(png); };
     await loadPair('image.png', image(0), image(255)); await page.getByRole('combobox', { name: 'Comparison tool' }).selectOption('image');
     await page.getByRole('button', { name: 'Compare selected pair', exact: true }).click(); await page.getByText('Changed pixels:', { exact: false }).waitFor();
+    const coverageImage = width => { const png = new PNG({ width, height: 1 }); for (let i = 0; i < png.data.length; i += 4) png.data[i + 3] = 255; return PNG.sync.write(png); };
+    await loadPair('coverage.png', coverageImage(1), coverageImage(2)); await page.getByRole('combobox', { name: 'Comparison tool' }).selectOption('image');
+    await page.getByRole('button', { name: 'Compare selected pair', exact: true }).click();
+    await page.getByText('Added coverage pixels: 1 · Removed coverage pixels: 0', { exact: true }).waitFor();
+    await page.getByText('Comparable overlap pixels: 1', { exact: true }).waitFor();
+    await page.getByText('Changed pixels: 0 (0.000%)', { exact: true }).waitFor();
+    if (process.env.FOLDER_UI_SCREENSHOT) await page.screenshot({ path: process.env.FOLDER_UI_SCREENSHOT.replace(/\.png$/, '-coverage.png'), fullPage: true });
     const pdf = async size => { const doc = await PDFDocument.create(); doc.addPage([size, 100]); return Buffer.from(await doc.save()); };
     await loadPair('page.pdf', await pdf(100), await pdf(120)); await page.getByRole('combobox', { name: 'Comparison tool' }).selectOption('pdf');
     await page.getByRole('button', { name: 'Compare selected pair', exact: true }).click(); await page.locator('summary').filter({ hasText: 'pixels' }).waitFor();
@@ -89,6 +96,16 @@ test('static standalone Folder UI runs actual worker, filters, options, replacem
     await page.waitForFunction(() => ![...document.querySelectorAll('button')].find(e => e.textContent === 'Compare selected pair')?.disabled);
     await page.getByText(/^Complete: \d+$/).waitFor();
     assert.equal(await page.getByText('Could not compare this pair.', { exact: false }).count(), 0);
+    const hwp = await fs.readFile('tests/fixtures/document-converters/sample.hwp'), hwpx = await fs.readFile('tests/fixtures/document-converters/sample.hwpx');
+    for (const [name, before, after] of [['same.hwp', hwp, hwp], ['same.hwpx', hwpx, hwpx], ['mixed.hwpx', hwp, hwpx]]) {
+      await loadPair(name, before, after); await page.getByRole('combobox', { name: 'Comparison tool' }).selectOption('hwp');
+      await page.getByRole('button', { name: 'Compare selected pair', exact: true }).click(); await page.getByText(/^Complete: \d+$/).waitFor();
+      assert.equal(await page.getByText('Could not compare this pair.', { exact: false }).count(), 0);
+      await page.getByText('Review comments and tracked changes in HWP/HWPX files are not compared.', { exact: false }).first().waitFor();
+    }
+    await loadPair('mismatch.docx', await fs.readFile('tests/fixtures/document-compare/oracle/base-before.docx'), hwp);
+    await page.getByRole('combobox', { name: 'Comparison tool' }).selectOption('hwp'); await page.getByRole('button', { name: 'Compare selected pair', exact: true }).click();
+    await page.getByText('Could not compare this pair.', { exact: false }).waitFor();
     await page.getByLabel('Original Choose ZIP', { exact: true }).setInputFiles({ name: 'before.zip', mimeType: 'application/zip', buffer: await makeZip('before.txt', 'same contents') });
     await page.getByLabel('Revised Choose ZIP', { exact: true }).setInputFiles({ name: 'after.zip', mimeType: 'application/zip', buffer: await makeZip('after.txt', 'same contents') });
     await page.getByRole('button', { name: 'Compare', exact: true }).click(); await page.getByRole('status').filter({ hasText: 'Comparison finished' }).waitFor();
@@ -100,7 +117,42 @@ test('static standalone Folder UI runs actual worker, filters, options, replacem
     assert.equal(await page.locator('[data-testid=folder-tree] summary').filter({ hasText: 'Original only' }).count(), 1);
     assert.equal(await page.locator('[data-testid=folder-tree] summary').filter({ hasText: 'Revised only' }).count(), 1);
     await page.getByRole('textbox', { name: 'Filter paths' }).fill('missing'); assert.equal(await page.locator('[data-testid=folder-tree] summary').count(), 0);
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    if (process.env.FOLDER_UI_SCREENSHOT) {
+      await page.evaluate(() => scrollTo(0, 0)); await page.waitForTimeout(100);
+      await page.screenshot({ path: process.env.FOLDER_UI_SCREENSHOT.replace(/\.png$/, '-mobile.png') });
+      await page.getByRole('heading', { name: 'Selected pair details', exact: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: process.env.FOLDER_UI_SCREENSHOT.replace(/\.png$/, '-mobile-detail.png') });
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto(url + '?language=ko'); await page.getByRole('heading', { name: '폴더 비교', exact: true }).waitFor();
+    await page.goto(url);
+    await page.evaluate(async () => {
+      const root = await navigator.storage.getDirectory();
+      const directory = await root.getDirectoryHandle('folder-readonly-fixture', { create: true });
+      const file = await directory.getFileHandle('native.txt', { create: true }); const writer = await file.createWritable(); await writer.write('snapshot'); await writer.close();
+      window.fixtureDirectory = directory; window.pickerModes = [];
+      FileSystemFileHandle.prototype.createWritable = () => { throw new Error('Product attempted filesystem write'); };
+      FileSystemDirectoryHandle.prototype.removeEntry = () => { throw new Error('Product attempted filesystem removal'); };
+      window.showDirectoryPicker = async options => { window.pickerModes.push(options.mode); return directory; };
+    });
+    const pickerButtons = page.getByRole('button', { name: 'Open folder with read permission', exact: true });
+    await pickerButtons.nth(0).click(); await pickerButtons.nth(1).click();
+    await page.getByRole('button', { name: 'Compare', exact: true }).click(); await page.getByRole('status').filter({ hasText: 'Comparison finished' }).waitFor();
+    await page.locator('[data-testid=folder-tree] summary').filter({ hasText: 'native.txt — Equal bytes' }).waitFor();
+    assert.deepEqual(await page.evaluate(() => window.pickerModes), ['read', 'read']);
+    assert.deepEqual(await page.evaluate(async () => { const entries = []; for await (const child of window.fixtureDirectory.values()) entries.push(child.name); const file = await window.fixtureDirectory.getFileHandle('native.txt'); return { entries, text: await (await file.getFile()).text() }; }), { entries: ['native.txt'], text: 'snapshot' });
+    await page.evaluate(() => { window.showDirectoryPicker = async () => { throw new DOMException('Canceled', 'AbortError'); }; });
+    await pickerButtons.nth(0).click(); assert.equal(await page.getByText('The folder could not be opened.', { exact: false }).count(), 0);
+    await page.evaluate(() => { window.showDirectoryPicker = async () => { throw new DOMException('Denied', 'NotAllowedError'); }; });
+    await pickerButtons.nth(0).click(); await page.getByText('The folder could not be opened.', { exact: false }).waitFor();
+    await page.evaluate(() => { window.showDirectoryPicker = () => new Promise(resolve => { window.resolveFixturePicker = () => resolve(window.fixtureDirectory); }); });
+    await pickerButtons.nth(0).click();
+    await page.getByLabel('Original Choose ZIP', { exact: true }).setInputFiles({ name: 'newer.zip', mimeType: 'application/zip', buffer: await makeZip('newer.txt', 'snapshot') });
+    await page.evaluate(() => window.resolveFixturePicker());
+    await page.getByText('newer.zip', { exact: true }).waitFor();
+    assert.equal(await page.getByText('The folder could not be opened.', { exact: false }).count(), 0);
     assert.deepEqual(errors, []); assert.deepEqual(external, []);
   } finally { if (browser) await browser.close(); if (server) await server.httpServer.close(); await fs.rm(out, { recursive: true, force: true }); }
 });

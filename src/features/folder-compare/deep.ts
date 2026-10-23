@@ -1,11 +1,12 @@
+import { compactImageResult, type CompactImageResult } from './imageProjection.ts';
 import type { ExcelComparePairOptions } from '../excel-compare/types.ts';
-export type DeepKind = 'text' | 'excel' | 'image' | 'pdf' | 'word';
+export type DeepKind = 'text' | 'excel' | 'image' | 'pdf' | 'word' | 'hwp';
 export type DeepResult =
   | { kind: 'text'; value: import('../text-compare/resultTypes.ts').TextResult }
   | { kind: 'excel'; value: import('../excel-compare/types.ts').ExcelComparePairResult }
-  | { kind: 'image'; value: Pick<import('../image-compare/types.ts').ImageCompareResult, 'changedPixelCount' | 'differenceRatio' | 'width' | 'height'> }
+  | { kind: 'image'; value: CompactImageResult }
   | { kind: 'pdf'; value: import('../pdf-compare/types.ts').ComparisonResult }
-  | { kind: 'word'; value: import('../word-compare/wordWorkerClient.ts').WordWorkerPairResult[] };
+  | { kind: 'word' | 'hwp'; value: import('../word-compare/wordWorkerClient.ts').WordWorkerPairResult[] };
 export const deepLimit = (kind: DeepKind) => (kind === 'text' ? 4 : 16) * 1024 ** 2;
 /** All heavy engines are existing consumers. PDF runs here on the main thread with DOM canvas. */
 export async function compareSelected(kind: DeepKind, files: readonly [File, File], signal: AbortSignal, language: 'ko' | 'en', excel?: ExcelComparePairOptions): Promise<DeepResult> {
@@ -25,17 +26,17 @@ export async function compareSelected(kind: DeepKind, files: readonly [File, Fil
   if (kind === 'image') {
     const [{ compareImages }, { DEFAULT_PIXEL_OPTIONS, IDENTITY_TRANSFORM }] = await Promise.all([import('../image-compare/client.ts'), import('../image-compare/types.ts')]);
     const result = await compareImages(left, right, DEFAULT_PIXEL_OPTIONS, IDENTITY_TRANSFORM, signal, () => {});
-    return { kind, value: { changedPixelCount: result.changedPixelCount, differenceRatio: result.differenceRatio, width: result.width, height: result.height } };
+    return { kind, value: compactImageResult(result, signal) };
   }
   if (kind === 'pdf') {
     if (typeof document === 'undefined') throw new Error('canvas-required');
     const { comparePdfPairs } = await import('../pdf-compare/engine.ts');
     return { kind, value: await comparePdfPairs([{ id: 'selected', before: left, after: right }], { signal }) };
   }
-  const [{ sniffDocumentFormat, validateDocumentPairFormats }, { compareWordFilePairs }] = await Promise.all([import('../document-compare/documentFormat.ts'), import('../word-compare/wordWorkerClient.ts')]);
+  const [{ sniffDocumentFormat, validateDocumentPairFormats }, { compareDocumentFilePairs }] = await Promise.all([import('../document-compare/documentFormat.ts'), import('../document-compare/documentCompareClient.ts')]);
   const before = await left.arrayBuffer(); signal.throwIfAborted(); const after = await right.arrayBuffer(); signal.throwIfAborted();
-  if (validateDocumentPairFormats(sniffDocumentFormat(before), sniffDocumentFormat(after), language).family !== 'word') throw new Error('unsupported-document');
-  return { kind, value: await compareWordFilePairs([{ beforeFile: left, afterFile: right }], { formatting: true, tables: true, metadata: true, trackedDocument: false, rewriteRevisionAuthor: false, revisionAuthor: '' }, undefined, language, signal) };
+  if (validateDocumentPairFormats(sniffDocumentFormat(before), sniffDocumentFormat(after), language).family !== (kind === 'word' ? 'word' : 'hwp')) throw new Error('unsupported-document');
+  return { kind, value: await compareDocumentFilePairs([{ beforeFile: left, afterFile: right }], { formatting: true, tables: true, metadata: true, trackedDocument: false, rewriteRevisionAuthor: false, revisionAuthor: '' }, undefined, language, signal) };
 }
 /** Serializes materialization, inspections and main-thread consumers across row/source replacements. */
 export class DeepSession {
