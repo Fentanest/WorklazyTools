@@ -24,7 +24,7 @@ test('raster adapter rejects retained-history overflow before reading/copying pi
  const {recognizeRasterOcrPair}=await import('../../src/features/ocr-compare/client.ts');let reads=0,workers=0;
  const originalWorker=globalThis.Worker;Object.defineProperty(globalThis,'Worker',{configurable:true,value:class{constructor(){workers++;throw new Error('must not start');}}});
  try{for(const count of [1,3,undefined]){
-  const input={runId:'boundary',width:800,height:500,encodedBytes:0,retainedRegionPasses:count,leftTransform:[1,0,0,0,1,0,0,0,1],rightTransform:[1,0,0,0,1,0,0,0,1],get left(){reads++;throw new Error('must not read');},get right(){reads++;throw new Error('must not read');}};
+  const input={runId:'boundary',width:800,height:500,encodedBytes:0,retainedRegionPasses:count,retainedCallerBytes:0,leftTransform:[1,0,0,0,1,0,0,0,1],rightTransform:[1,0,0,0,1,0,0,0,1],get left(){reads++;throw new Error('must not read');},get right(){reads++;throw new Error('must not read');}};
   await assert.rejects(recognizeRasterOcrPair(input as never,'eng','paragraphs',new AbortController().signal,()=>{}),/OCR_MEMORY_LIMIT/);
  }assert.equal(reads,0);assert.equal(workers,0);}finally{Object.defineProperty(globalThis,'Worker',{configurable:true,value:originalWorker});}
 });
