@@ -6,6 +6,8 @@ import { DEFAULT_TEXT_OPTIONS as defaults } from "../../src/features/text-compar
 import { decodeText, encodeText } from "../../src/features/text-compare/input.ts";
 import { mergeRow, TextHistory } from "../../src/features/text-compare/session.ts";
 import { transformText } from "../../src/features/text-compare/transforms.ts";
+import { textRenderPieces, MAX_TEXT_RENDER_PIECES } from "../../src/features/text-compare/viewProjection.ts";
+import { applyEditorChange, rawEditorOffset, editorText } from "../../src/features/text-compare/editor.ts";
 
 test("text input preserves encoding, BOM, CRLF and final newline",()=>{
   for(const encoding of ["utf-8","utf-16le","utf-16be"] as const) for(const bom of [true,false]) {
@@ -18,6 +20,7 @@ test("Ignore finds original literal matches, unions overlaps and never cascades"
   assert.deepEqual(literalSpans("abXcd",["X","abcd"]),[{start:2,end:3,rules:[0]}]);
   assert.equal(mapText("abXcd",{...defaults,ignoreRules:["X","abcd"]}).value,"abcd");
   assert.deepEqual(literalSpans("abcabc",["abc","bc"]),[{start:0,end:6,rules:[0,1]}]);
+  assert.deepEqual(literalSpans("abc",["abc","abc","bc"]),[{start:0,end:3,rules:[0,2]}]);
   assert.equal(mapText(".* A",{...defaults,ignoreRules:[".*"]}).value," A");
   assert.throws(()=>literalSpans("a",[""]),/IGNORE_RULE_INVALID/);
 });
@@ -94,4 +97,27 @@ test("input line admission and long character spans remain bounded",()=>{
   const result=compareTexts("a".repeat(60000),"b".repeat(60000),{...defaults,mode:"character"});
   assert.equal(result.quality,"line-coarse");assert.equal(result.counts.changed,1);
   assert.equal(result.rows[0].left?.raw.length,60000);
+});
+test("dense single-line highlighting is bounded without changing raw comparison results",()=>{
+  const left=Array.from({length:1000},(_,i)=>String.fromCharCode(0x4e00+i)+"X").join("");
+  const right=Array.from({length:1000},(_,i)=>String.fromCharCode(0x4e00+i)+"Y").join("");
+  const result=compareTexts(left,right,{...defaults,mode:"character"}),before=structuredClone(result);
+  const rendered=textRenderPieces(result.rows[0].left!,result.rows[0].leftMarks,"plain");
+  assert.equal(rendered.coarse,true);assert.ok(rendered.pieces.length<=MAX_TEXT_RENDER_PIECES);
+  assert.equal(rendered.pieces.map(p=>p.text).join(""),left);assert.deepEqual(result,before);
+});
+test("linear rendering keeps changed/ignored spans and code colors separate",()=>{
+  const result=compareTexts('"abIGNOREcd": 3','"xyIGNOREuv": 4',{...defaults,mode:"word",ignoreRules:["IGNORE"]});
+  const row=result.rows[0],rendered=textRenderPieces(row.left!,row.leftMarks,"json");
+  assert.equal(rendered.coarse,false);assert.equal(rendered.pieces.map(p=>p.text).join(""),row.left?.raw);
+  assert.equal(rendered.pieces.filter(p=>p.mark==="ignored").map(p=>p.text).join(""),"IGNORE");
+});
+test("textarea edits and selection offsets preserve unrelated CRLF/mixed endings",()=>{
+  assert.equal(applyEditorChange("a\r\nold\r\nz\r\n","a\nnew\nz\n"),"a\r\nnew\r\nz\r\n");
+  const mixed="a\r\nb\rc\nz",normalized=editorText(mixed);
+  assert.equal(applyEditorChange(mixed,normalized.replace("c","C")),"a\r\nb\rC\nz");
+  assert.equal(applyEditorChange("a\r\nb","a\nb\nnew"),"a\r\nb\r\nnew");
+  assert.equal(rawEditorOffset("a\r\n👩‍💻old",3),4);
+  const raw="a\r\n old \r\nz";const start=rawEditorOffset(raw,2),end=rawEditorOffset(raw,7);
+  assert.equal(transformText(raw,"trim",start,end),"a\r\nold\r\nz");
 });

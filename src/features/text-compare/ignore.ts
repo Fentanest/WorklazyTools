@@ -5,7 +5,9 @@ import type { MappedText, RemovedSpan, TextOptions } from "./resultTypes.ts";
 export function literalSpans(raw: string, rules: string[]): RemovedSpan[] {
   if (rules.length > 100 || rules.some(rule => !rule.length || rule.length > 512)) throw new Error("IGNORE_RULE_INVALID");
   const found: RemovedSpan[] = [];
-  Array.from(new Set(rules)).forEach((rule, id) => {
+  const seen=new Set<string>();
+  rules.forEach((rule, id) => {
+    if(seen.has(rule))return;seen.add(rule);
     let offset = raw.indexOf(rule);
     while (offset >= 0) {
       found.push({ start: offset, end: offset + rule.length, rules: [id] });

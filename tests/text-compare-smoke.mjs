@@ -7,6 +7,8 @@ const base=process.env.TEST_BASE_URL||'http://127.0.0.1:4173';
 const out=path.resolve(process.env.TEXT_COMPARE_SCREENSHOTS||'docs/jobs/todo/diffchecker-port-20261023/text-ui');await fs.mkdir(out,{recursive:true});
 const temporary=await fs.mkdtemp(path.join(os.tmpdir(),'text-compare-'));
 await fs.writeFile(path.join(temporary,'slow.txt'),'late file content');
+await fs.writeFile(path.join(temporary,'crlf.txt'),Buffer.from('\ufeffalpha\r\nold\r\nomega\r\n','utf16le'));
+for(const side of ['left','right'])await fs.writeFile(path.join(temporary,`dense-${side}.txt`),Array.from({length:10000},(_,i)=>String.fromCharCode(0x4e00+i)+(side==='left'?'X':'Y')).join(''));
 const browser=await puppeteer.launch({executablePath:'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
 let checks=0;
 try{
@@ -51,6 +53,23 @@ try{
   await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:path.join(out,`${language}-desktop.png`),fullPage:true});
   await page.setViewport({width:390,height:844});await page.screenshot({path:path.join(out,`${language}-mobile.png`),fullPage:true});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));checks++;
+  if(language==='en'){
+   await page.select('[data-testid="text-compare-mode"]','character');
+   await (await page.$('#text-file-left')).uploadFile(path.join(temporary,'dense-left.txt'));await (await page.$('#text-file-right')).uploadFile(path.join(temporary,'dense-right.txt'));
+   await page.waitForFunction(()=>document.querySelector('[data-testid="text-compare-right"]').value.length===20000);
+   const began=performance.now();await button('Compare');await page.waitForSelector('[data-testid="text-render-coarse"]');
+   assert.ok(await page.$$eval('[data-testid="text-diff-view"] pre span',nodes=>nodes.length)<=512);
+   assert.equal(await page.$eval('[data-side="left"] pre',node=>node.textContent.length),20000);checks+=2;
+   console.log('Dense line rendered ms:',Math.round(performance.now()-began));
+   await (await page.$('#text-file-left')).uploadFile(path.join(temporary,'crlf.txt'));
+   await page.waitForFunction(()=>document.querySelector('[data-testid="text-compare-left"]').value==='alpha\nold\nomega\n');
+   await page.focus('[data-testid="text-compare-left"]');await page.keyboard.down('Control');await page.keyboard.press('A');await page.keyboard.up('Control');await page.keyboard.type('alpha\n EDITED \nomega\n');
+   await page.$eval('[data-testid="text-compare-left"]',node=>node.setSelectionRange(6,14));
+   await page.$$eval('summary',items=>items.find(item=>item.textContent.trim()==='Transform text').click());
+   await page.select('select:has(option[value="both"])','left');await page.select('select:has(option[value="trim"])','trim');await button('Apply');
+   await button('Save TXT');for(let n=0;n<40;n++){if(await fs.stat(download).then(()=>true,()=>false))break;await new Promise(resolve=>setTimeout(resolve,50));}
+   assert.equal((await fs.readFile(download)).toString('utf16le'),'\ufeffalpha\r\nEDITED\r\nomega\r\n');checks++;await fs.rm(download);
+  }
   assert.deepEqual(errors,[]);checks++;
   await page.close();
  }
