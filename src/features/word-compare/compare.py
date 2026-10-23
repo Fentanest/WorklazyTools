@@ -266,6 +266,10 @@ def _source_paths(root, part, archive=None):
                                             if target_path in archive.namelist():
                                                 payload += archive.read(target_path)
                 reference["opaqueSignature"] = hashlib.sha256(payload).hexdigest()
+                property_runs = [(character, canonical(run.find(W + "rPr")) if run.find(W + "rPr") is not None else None) for run in node.iter(W + "r") for character in _text(run)]
+                properties = node.find(W + "pPr")
+                copy_payload = (canonical(properties) if properties is not None else None, property_runs)
+                reference["copySignature"] = hashlib.sha256(json.dumps(copy_payload, ensure_ascii=False).encode("utf-8")).hexdigest()
         result[id(node)] = reference
         for index, child in enumerate(node):
             visit(child, path + [index])

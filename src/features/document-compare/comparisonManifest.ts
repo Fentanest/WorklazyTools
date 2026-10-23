@@ -7,6 +7,7 @@ export interface DocumentSourceReference {
   kind?: string;
   rawText?: string;
   opaqueSignature?: string;
+  copySignature?: string;
 }
 export interface ManifestRecord {
   source?: DocumentSourceReference;
@@ -49,12 +50,17 @@ export interface SourceCoverage {
   source: DocumentSourceReference;
   disposition: "decision" | "preserve-after" | "unsupported";
   decisionId?: string;
-  reason?: "blank-paragraph" | "excluded-table" | "excluded-metadata" | "opaque-content" | "unmapped-source";
+  reason?: "blank-paragraph" | "excluded-table" | "excluded-metadata" | "opaque-content" | "unmapped-source" | "existing-comment-contract";
 }
 
 export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
   const decisions: ComparisonDecision[] = [];
-  const visit = (items: ComparisonDecision[]) => { for (const item of items) { decisions.push(item); visit(item.children ?? []); } };
+  const unsafeAncestors = new Set<string>();
+  const visit = (items: ComparisonDecision[], unsafe = false) => { for (const item of items) {
+    decisions.push(item);
+    if (unsafe) unsafeAncestors.add(item.id);
+    visit(item.children ?? [], unsafe || item.moved || item.before.length !== 1 || item.after.length !== 1);
+  } };
   visit(manifest.decisions);
   const key = (ref: DocumentSourceReference) => JSON.stringify([ref.part, ref.path]);
   const descendant = (ref: DocumentSourceReference, parent: DocumentSourceReference) => ref.part === parent.part && parent.path.every((value, index) => ref.path[index] === value);
@@ -65,10 +71,13 @@ export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
       const decision = decisions.find((item) => item[side].some((ref) => key(ref) === key(source)));
       if (!manifest.options.metadata && source.part !== "word/document.xml") return { source, disposition: "preserve-after", reason: "excluded-metadata" };
       if (!manifest.options.tables && tables.some((table) => descendant(source, table))) return { source, disposition: "preserve-after", reason: "excluded-table" };
+      if (decision?.trackedRepresentation === "preserve-after") return { source, disposition: "decision", decisionId: decision.id };
+      const commentOwner = source.part === "word/comments.xml" ? decisions.find((item) => item.trackedReason === "existing-comment-contract" && item[side].some((ref) => descendant(source, ref))) : undefined;
+      if (commentOwner) return { source, disposition: "preserve-after", decisionId: commentOwner.id, reason: "existing-comment-contract" };
       if (source.opaqueSignature) {
         const before = decision?.before.length === 1 ? manifest.sources.before.find((ref) => key(ref) === key(decision.before[0])) : undefined;
         const after = decision?.after.length === 1 ? manifest.sources.after.find((ref) => key(ref) === key(decision.after[0])) : undefined;
-        if (!before || !after || before.opaqueSignature !== after.opaqueSignature) return { source, disposition: "unsupported", reason: "opaque-content" };
+        if (!before || !after || (decision && unsafeAncestors.has(decision.id)) || decision?.moved || before.rawText !== after.rawText || before.copySignature !== after.copySignature || before.opaqueSignature !== after.opaqueSignature) return { source, disposition: "unsupported", reason: "opaque-content" };
       }
       if (decision) return { source, disposition: "decision", decisionId: decision.id };
       if (source.kind === "p" && !source.rawText?.trim() && !source.opaqueSignature) return { source, disposition: "preserve-after", reason: "blank-paragraph" };

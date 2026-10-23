@@ -909,6 +909,16 @@ def _validate_manifest(before_path, after_path):
         if not isinstance(decision_id, str) or decision_id in ids:
             raise ValueError("INVALID_COMPARISON_MANIFEST_DUPLICATE_DECISION")
         ids.add(decision_id)
+        representation = decision.get("trackedRepresentation")
+        reason = decision.get("trackedReason")
+        if representation not in {"revision", "preserve-after"}:
+            raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
+        if representation == "preserve-after":
+            refs = decision["before"] + decision["after"]
+            if reason != "existing-comment-contract" or not refs or any(ref["part"] != "word/comments.xml" for ref in refs):
+                raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
+        elif reason is not None:
+            raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
         before_refs, after_refs = decision["before"], decision["after"]
         shape = (len(before_refs), len(after_refs))
         if shape not in {(1, 0), (0, 1), (1, 1), (1, 2), (2, 1)}:
@@ -919,6 +929,9 @@ def _validate_manifest(before_path, after_path):
                 if key not in actual[side] or key in owners[side]:
                     raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_OWNERSHIP")
                 kind = actual[side][key]["kind"]
+                if representation == "preserve-after" and kind != "comment":
+                    if kind != "p" or not any(actual[side].get((key[0], key[1][:length]), {}).get("kind") == "comment" for length in range(len(key[1]))):
+                        raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
                 expected_kind = "tbl" if decision["type"] == "table" else "p"
                 if kind != expected_kind and not (kind == "comment" and decision.get("trackedReason") == "existing-comment-contract"):
                     raise ValueError("INVALID_COMPARISON_MANIFEST_NODE_KIND")
@@ -1005,8 +1018,23 @@ def _validate_manifest(before_path, after_path):
                 if item["disposition"] != "preserve-after":
                     raise ValueError("INVALID_COMPARISON_MANIFEST_EXCLUSION")
                 continue
+            comment_owner = next((candidate for candidate in _MANIFEST_DECISIONS if candidate.get("trackedReason") == "existing-comment-contract" and any(parent["part"] == key[0] and key[1][:len(parent["path"])] == tuple(parent["path"]) for parent in candidate[side])), None)
+            if comment_owner is not None:
+                if owner is not None:
+                    if item["disposition"] != "decision" or item.get("decisionId") != owner["id"]:
+                        raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
+                elif item["disposition"] != "preserve-after" or item.get("decisionId") != comment_owner["id"] or item.get("reason") != "existing-comment-contract":
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
+                continue
             if ref.get("opaqueSignature"):
                 if owner is None or len(owner["before"]) != 1 or len(owner["after"]) != 1:
+                    raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+                unsafe_parent = any(parent["type"] == "table" and (parent.get("moved") or len(parent["before"]) != 1 or len(parent["after"]) != 1) and any(ref["part"] == key[0] and key[1][:len(ref["path"])] == tuple(ref["path"]) for ref in parent[side]) for parent in _MANIFEST_DECISIONS)
+                if unsafe_parent or owner.get("moved") or owner["beforeText"] != owner["afterText"]:
+                    raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+                before_copy = actual["before"][_manifest_key(owner["before"][0])].get("copySignature")
+                after_copy = actual["after"][_manifest_key(owner["after"][0])].get("copySignature")
+                if before_copy != after_copy:
                     raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
                 old = actual["before"][_manifest_key(owner["before"][0])].get("opaqueSignature")
                 new = actual["after"][_manifest_key(owner["after"][0])].get("opaqueSignature")

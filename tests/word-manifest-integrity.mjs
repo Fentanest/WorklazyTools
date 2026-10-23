@@ -66,6 +66,55 @@ package('/after.docx', para('Stable anchor'))
 value = manifest()
 assert any(item['disposition'] == 'unsupported' for item in value['coverage']['before'])
 refused('deleted image-only paragraph', value)
+# Identical drawing identities do not make a delete/insert move lossless.
+opaque = '<w:p><w:r><w:drawing><w:testObject/></w:drawing><w:t>Movable drawing paragraph</w:t></w:r></w:p>'
+package('/before.docx', opaque + para('First anchor unique') + para('Second anchor unique'))
+package('/after.docx', para('First anchor unique') + para('Second anchor unique') + opaque)
+value = manifest()
+assert any(item['moved'] for item in value['decisions'])
+refused('moved unchanged opaque signature', value)
+opaque_table = '<w:tbl><w:tr><w:tc>' + opaque + '</w:tc></w:tr></w:tbl>'
+package('/before.docx', opaque_table); package('/after.docx', opaque_table)
+value = manifest(); value['decisions'][0]['moved'] = True
+refused('opaque descendant of table move path', value)
+# A stationary structural copy keeps the original drawing node intact.
+package('/before.docx', opaque); package('/after.docx', opaque)
+export(manifest())
+with zipfile.ZipFile('/out.docx') as archive:
+    assert len(ET.fromstring(archive.read('word/document.xml')).findall('.//' + W + 'drawing')) == 1
+scenarios.append('unchanged opaque structural copy')
+# Same relationship ID is not identity when the embedded resource bytes differ.
+linked = '<w:p><w:r><w:drawing><a:blip xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId1"/></w:drawing><w:t>Resource anchor</w:t></w:r></w:p>'
+for path, media in (('/before.docx', b'original-resource'), ('/after.docx', b'revised-resource')):
+    package(path, linked)
+    with zipfile.ZipFile(path, 'a') as archive:
+        archive.writestr('word/_rels/document.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image.png"/></Relationships>')
+        archive.writestr('word/media/image.png', media)
+refused('same rId changed resource bytes', manifest())
+# Even an equal object signature is unsafe when paragraph text is rebuilt.
+package('/before.docx', opaque)
+package('/after.docx', opaque.replace('Movable drawing paragraph', 'Revised drawing paragraph'))
+refused('changed text with unchanged opaque signature', manifest())
+# Only real comment source contexts may use the existing comment capability.
+package('/before.docx', para('Stable anchor'))
+package('/after.docx', para('Stable anchor'))
+with zipfile.ZipFile('/before.docx', 'a') as archive:
+    archive.writestr('word/header1.xml', '<w:hdr xmlns:w="' + WORD_NS + '">' + para('Before header unique') + '</w:hdr>')
+value = manifest()
+for item in value['decisions']:
+    if any(ref['part'] == 'word/header1.xml' for ref in item['before']):
+        item['trackedRepresentation'] = 'preserve-after'
+        item['trackedReason'] = 'existing-comment-contract'
+refused('forged header comment preservation', value)
+# The real comment capability still preserves after bytes, including opaque/table content.
+package('/before.docx', para('Stable anchor')); package('/after.docx', para('Stable anchor'))
+for path, text_value in (('/before.docx', 'Original comment'), ('/after.docx', 'Revised comment')):
+    with zipfile.ZipFile(path, 'a') as archive:
+        archive.writestr('word/comments.xml', '<w:comments xmlns:w="' + WORD_NS + '"><w:comment w:id="1"><w:tbl><w:tr><w:tc>' + para(text_value) + opaque + '</w:tc></w:tr></w:tbl></w:comment></w:comments>')
+export(manifest())
+with zipfile.ZipFile('/out.docx') as output, zipfile.ZipFile('/after.docx') as after_archive:
+    assert output.read('word/comments.xml') == after_archive.read('word/comments.xml')
+scenarios.append('real comment opaque/table bytes preserved')
 # Empty raw paragraphs remain explicitly covered instead of being labelled equal.
 package('/before.docx', '<w:p/>' + para('Stable anchor'))
 package('/after.docx', para('Stable anchor') + '<w:p/>')
@@ -104,6 +153,6 @@ package('/after.docx', para('Stable anchor'))
 refused('before-only footnote story', manifest())
 `);
 const scenarios = py.globals.get("scenarios").toJs();
-assert.equal(scenarios.length, 18);
+assert.equal(scenarios.length, 25);
 assert.equal(diffCalls, 0, "The emitter must not ask TypeScript to recompute a text diff");
 console.log(JSON.stringify({ scenarios: scenarios.length, checks: scenarios }));
