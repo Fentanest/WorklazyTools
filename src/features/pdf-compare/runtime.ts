@@ -17,8 +17,9 @@ export function errorCode(error: unknown, fallback: 'read-failed' | 'render-fail
 export async function openComparisonPdf(file: File, signal: AbortSignal, suppliedBytes?:ArrayBuffer): Promise<OwnedPdf> {
   checkAbort(signal);
   let bytes: ArrayBuffer;
-  try { bytes = suppliedBytes ?? await waitWithAbort(file.arrayBuffer(), signal); } catch (error) { checkAbort(signal); throw new PdfCompareError(errorCode(error)); }
-  checkAbort(signal);
+  // File reads cannot be aborted. Await settlement before releasing this owner to the next job.
+  try { bytes = suppliedBytes ?? await file.arrayBuffer(); } catch (error) { checkAbort(signal); throw new PdfCompareError(errorCode(error)); }
+  if (signal.aborted) { structuredClone(undefined, { transfer: [bytes] }); checkAbort(signal); }
   // PDF.js performs parsing; do not apply pdf-lib's editing admission policy.
   if (!new TextDecoder('latin1').decode(bytes.slice(0, 1024)).includes('%PDF-')) throw new PdfCompareError('invalid-pdf');
   let owner: Awaited<ReturnType<typeof openOwnedPdfDocument>>;
