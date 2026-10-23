@@ -242,6 +242,7 @@ function DocumentBlock({ item, side, table, first, last }: {
   const language = useAppLanguage();
   const location = side === "before" ? item.beforeLocation : item.afterLocation;
   const text = side === "before" ? item.before : item.after;
+  const formattingLabels = (item as WordDocumentViewItem & { formattingLabels?: string[] }).formattingLabels ?? [];
   if (table) {
     const tableMissing = side === "before" ? table.beforeIndex === null : table.afterIndex === null;
     return (
@@ -250,6 +251,7 @@ function DocumentBlock({ item, side, table, first, last }: {
           <small className="sr-only">{location || (side === "before" ? (language === "en" ? "Not in before" : "수정 전에는 없음") : (language === "en" ? "Not in after" : "수정 후에는 없음"))}</small>
           {(item.kind !== "unchanged" || item.moved) && <span className="rounded-md bg-[#f0f0f3]/90 px-1.5 py-1 text-xs font-extrabold text-[#57575e]">{changeKindLabel(item.kind, language)}{item.moved && item.kind !== "moved" ? ` · ${language === "en" ? "Moved" : "이동"}` : ""}</span>}
         </div>
+        {formattingLabels.length > 0 && <p className="my-1 text-xs text-violet-700" data-testid="document-formatting-labels">{formattingLabels.join(" · ")}</p>}
         <DocumentTable table={table} side={side} />
       </div>
     );
@@ -271,6 +273,7 @@ function DocumentBlock({ item, side, table, first, last }: {
             ? <SideDiffText segments={item.segments} side={side} fallback={text} />
             : text || "\u00a0"}
         </p>}
+      {formattingLabels.length > 0 && <p className="my-1 text-xs text-violet-700" data-testid="document-formatting-labels">{formattingLabels.join(" · ")}</p>}
       <InlineComments comments={item.comments ?? []} side={side} />
     </div>
   );

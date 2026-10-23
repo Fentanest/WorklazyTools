@@ -1,6 +1,8 @@
 import type { WordDiffSegment, WordTableAxisPair } from "../excel-merger/types";
 
 /** Paths address actual XML children (including property nodes), never filtered paragraph indexes. */
+export interface PropertyFact { supported: Record<string, string[]>; unsupported: Record<string, string[]>; history: boolean }
+export interface XmlPropertyTree { name: string; attributes: Record<string, string>; text: string; children: XmlPropertyTree[] }
 export interface DocumentSourceReference {
   part: string;
   path: number[];
@@ -8,6 +10,12 @@ export interface DocumentSourceReference {
   rawText?: string;
   opaqueSignature?: string;
   copySignature?: string;
+  propertySnapshots?: Record<string, XmlPropertyTree | null>;
+  normalizedProperties?: Record<string, PropertyFact>;
+  paragraphPath?: number[];
+  textRange?: [number, number];
+  attributes?: Record<string, string>;
+  label?: string;
 }
 export interface ManifestRecord {
   source?: DocumentSourceReference;
@@ -21,12 +29,13 @@ export interface ComparisonDecision {
   before: DocumentSourceReference[];
   after: DocumentSourceReference[];
   moved: boolean;
+  screenFormattingFamilies?: string[];
   trackedRepresentation: "revision" | "preserve-after";
   trackedReason?: "existing-comment-contract";
   segments: WordDiffSegment[];
   /** Raw XML text differs from display text for generated numbering labels. */
   textSegments: WordDiffSegment[];
-  comparisons: Array<{ before: string; after: string; segments: WordDiffSegment[] }>;
+  comparisons: TextComparison[];
   beforeText: string;
   afterText: string;
   rows?: WordTableAxisPair[];
@@ -34,6 +43,10 @@ export interface ComparisonDecision {
   children?: ComparisonDecision[];
   splitSlices?: Array<[number, number]>;
 }
+export interface FormattingScope { id: string; before: DocumentSourceReference; after: DocumentSourceReference; property: string; beforeFact: PropertyFact; afterFact: PropertyFact; families: string[]; excludedFamilies: string[]; comparisonId?: string; beforeStart?: number; afterStart?: number; length?: number }
+export interface FormattingSpan { beforeStart: number; afterStart: number; length: number; families: string[]; history: boolean; scopeId: string }
+export interface PropertyAction { id: string; before: DocumentSourceReference; after: DocumentSourceReference; property: string; families: string[]; representation: "revision" | "preserve-after-history"; decisionId?: string; scopeId: string }
+export interface TextComparison { before: string; after: string; segments: WordDiffSegment[]; formatting?: { paragraphFamilies: string[]; paragraphHistory: boolean; paragraphScopeId: string; beforeSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; afterSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; spans: FormattingSpan[]; history: boolean } }
 export interface DocumentComparisonManifest {
   version: 1;
   policyVersion: "worklazy-document-1";
@@ -41,6 +54,11 @@ export interface DocumentComparisonManifest {
   options: { formatting: boolean; tables: boolean; metadata: boolean };
   preservation: { comments: "preserve-after-existing-contract"; existingRevisions: "preserve-after-history" };
   decisions: ComparisonDecision[];
+  formattingPolicyVersion: "worklazy-formatting-1";
+  formattingScopes: FormattingScope[];
+  propertyExclusions: Array<{ side: "before" | "after"; source: DocumentSourceReference; property: string; reason: "unpaired-style" }>;
+  propertyActions: PropertyAction[];
+  formattingExcluded: string[];
   sources: { before: DocumentSourceReference[]; after: DocumentSourceReference[] };
   coverage: { before: SourceCoverage[]; after: SourceCoverage[] };
   exclusions: { formatting: "compare" | "preserve-after"; tables: DocumentSourceReference[]; metadata: DocumentSourceReference[] };

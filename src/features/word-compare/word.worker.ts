@@ -3,6 +3,7 @@
 import acceptRevisionsScript from "./accept_revisions.py?raw";
 import compareScript from "./compare.py?raw";
 import trackedDocxScript from "./tracked_docx.py?raw";
+import formattingPolicy from "./formatting-policy.json";
 import pyodidePackage from "pyodide/package.json";
 import type { WordCompareResult } from "../excel-merger/types";
 import { compareDocumentModels, diffText, type ComparisonModel } from "../document-compare/documentComparison";
@@ -75,6 +76,7 @@ worker.onmessage = async (event: MessageEvent) => {
       const loadedPyodide = await pyodideModule.loadPyodide({ indexURL: PYODIDE_BASE_URL });
       pyodide = loadedPyodide;
       progress(42, L("문서 비교 준비를 완료했습니다.", "Document comparison is ready."));
+      loadedPyodide.globals.set("WORKLAZY_FORMATTING_POLICY_JSON", JSON.stringify(formattingPolicy));
       loadedPyodide.runPython(compareScript);
       loadedPyodide.runPython(acceptRevisionsScript);
       loadedPyodide.runPython(trackedDocxScript);

@@ -12,6 +12,7 @@ import type {
 } from "../excel-merger/types";
 import { alignDocumentSequence, alignSequence, type SequenceGroup, type SequencePair } from "./documentAlignment.ts";
 
+import { buildWordFormatting, projectWordFormatting, type ManifestFormattingView } from "./wordFormatting.ts";
 import { completeManifestCoverage, freezeComparisonManifest } from "./comparisonManifest.ts";
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ManifestRecord } from "./comparisonManifest.ts";
 
@@ -81,6 +82,7 @@ export function compareDocumentModels(
     inputRevision: { before: before.sourceRevision, after: after.sourceRevision },
     options: { ...options },
     preservation: { comments: "preserve-after-existing-contract", existingRevisions: "preserve-after-history" },
+    formattingPolicyVersion: "worklazy-formatting-1", formattingScopes: [], propertyExclusions: [], propertyActions: [], formattingExcluded: [],
     coverage: { before: [], after: [] },
     sources: { before: before.sourceInventory ?? [], after: after.sourceInventory ?? [] },
     exclusions: {
@@ -91,7 +93,7 @@ export function compareDocumentModels(
   };
   const changes: WordDiffItem[] = [];
   const tables: WordTableComparison[] = [];
-  const documentViews: WordDocumentViewItem[] = [];
+  const documentViews: ManifestFormattingView[] = [];
   const blockGroups = alignDocumentSequence(before.blocks, after.blocks, {
     textOf: (item) => item.text,
     compatible: (left, right) => left.type === right.type,
@@ -119,6 +121,7 @@ export function compareDocumentModels(
       manifest.decisions.push(decision);
       const baseTableKind = tableViewKind(table);
       documentViews.push({
+        comparisonDecisionId: decision.id,
         kind: group.moved && baseTableKind === "unchanged" ? "moved" : baseTableKind,
         section: "table",
         blockType: "table",
@@ -151,6 +154,8 @@ export function compareDocumentModels(
   const commentChanges: WordDiffItem[] = [];
   const commentViews = compareRecordList(options.metadata ? before.comments ?? [] : [], options.metadata ? after.comments ?? [] : [], "comment", commentChanges, options.formatting, manifest);
   changes.push(...commentChanges);
+  buildWordFormatting(manifest, diffCharacters);
+  projectWordFormatting(manifest, documentViews, headerFooter, note, changes, tables, language);
   const summary: WordCompareResult["summary"] = { added: 0, deleted: 0, changed: 0, format: 0, unchanged: 0, moved: 0 };
   for (const change of changes) {
     if (change.kind === "moved") continue;
@@ -170,7 +175,7 @@ export function compareDocumentModels(
     changes,
     tables,
     views: { document: documentViews, headerFooter, note },
-    warnings: [...new Set([...before.warnings, ...after.warnings])],
+    warnings: [...new Set([...before.warnings, ...after.warnings, ...(manifest.formattingExcluded.length ? [language === "en" ? "Some advanced formatting is kept from the revised file and is not included in tracked formatting changes." : "일부 고급 서식은 수정본 기준으로 유지되며 변경 추적 서식 비교에 포함되지 않습니다."] : []), ...(manifest.formattingScopes.some((scope) => scope.families.length && scope.afterFact.history) ? [language === "en" ? "Some formatting keeps the revised file’s existing revision history." : "일부 서식은 수정본에 있는 기존 변경 기록을 유지합니다."] : [])])],
   };
 }
 
@@ -279,7 +284,7 @@ function compareRecord(
   formatting: boolean,
   group?: SequenceGroup,
   decision?: ComparisonDecision,
-): WordDocumentViewItem {
+): ManifestFormattingView {
   const beforeText = before?.text ?? "";
   const afterText = after?.text ?? "";
   const comments = compareComments(before?.comments ?? [], after?.comments ?? []);
@@ -314,6 +319,7 @@ function compareRecord(
     }
   }
   return {
+    comparisonDecisionId: decision?.id,
     kind,
     section,
     blockType: "paragraph",

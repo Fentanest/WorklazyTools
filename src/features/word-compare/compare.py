@@ -240,8 +240,12 @@ def _normalized_property_fact(tree, property_name, policy):
     supported, unsupported = {}, {}
     history = False
     toggles = set(policy.get("toggles", []))
+    noise_attributes = set(policy.get("noiseAttributes", []))
+    for name, value in (tree or {}).get("attributes", {}).items():
+        if name not in noise_attributes:
+            unsupported["@" + name] = [json.dumps(value, ensure_ascii=False)]
     def canonical(node):
-        attributes = sorted((name, value) for name, value in node["attributes"].items() if not (name.startswith(W) and name[len(W):].startswith("rsid")))
+        attributes = sorted((name, value) for name, value in node["attributes"].items() if name not in noise_attributes)
         local = node["name"][len(W):] if node["name"].startswith(W) else node["name"]
         if node["name"].startswith(W) and local in toggles:
             value = node["attributes"].get(W + "val", "true").lower()

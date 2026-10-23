@@ -19,6 +19,7 @@ globalThis.worklazyComparisonManifestJson = (before, after, formatting, tables, 
   return JSON.stringify(result.manifest);
 };
 const py = await loadPyodide();
+py.globals.set("WORKLAZY_FORMATTING_POLICY_JSON", fs.readFileSync("src/features/word-compare/formatting-policy.json", "utf8"));
 for (const name of ["compare", "accept_revisions", "tracked_docx"]) py.runPython(fs.readFileSync(`src/features/word-compare/${name}.py`, "utf8"));
 py.runPython(String.raw`
 def _fixture_paragraph(text, bold=False):

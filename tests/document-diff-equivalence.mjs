@@ -82,6 +82,7 @@ globalThis.worklazyDiffJson = (before, after) => {
 };
 
 const pyodide = await loadPyodide();
+pyodide.globals.set("WORKLAZY_FORMATTING_POLICY_JSON", fs.readFileSync("src/features/word-compare/formatting-policy.json", "utf8"));
 pyodide.FS.mkdirTree("/fixtures/oracle");
 for (const pair of pairSpecs) {
   for (const relativePath of [pair.before, pair.after]) {

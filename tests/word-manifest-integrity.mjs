@@ -6,6 +6,7 @@ let diffCalls = 0;
 globalThis.worklazyDiffJson = (before, after) => { diffCalls++; return JSON.stringify(diffText(before, after)); };
 globalThis.worklazyComparisonManifestJson = (before, after, formatting, tables, metadata) => JSON.stringify(compareDocumentModels("before", "after", JSON.parse(before), JSON.parse(after), { formatting, tables, metadata }, "en").manifest);
 const py = await loadPyodide();
+py.globals.set("WORKLAZY_FORMATTING_POLICY_JSON", fs.readFileSync("src/features/word-compare/formatting-policy.json", "utf8"));
 for (const name of ["compare", "accept_revisions", "tracked_docx"]) py.runPython(fs.readFileSync(`src/features/word-compare/${name}.py`, "utf8"));
 py.runPython(String.raw`
 import copy
