@@ -130,6 +130,42 @@ def add_numbering():
 checks.append(check('numbering merge resource relationship',p('<w:r>'+image()+'</w:r>')+p(text('Stable anchor')),p(text('Stable anchor')),setup=add_numbering))
 with zipfile.ZipFile('/out.docx') as output:
  assert 'word/numbering.xml' in output.namelist();assert any(node.get('Type')==REL+'numbering' for node in ET.fromstring(output.read('word/_rels/document.xml.rels')))
+# Interior before events must interrupt equal-text coalescing.
+witness=p('<w:r><w:t>Same</w:t>'+image()+'<w:t xml:space="preserve"> text</w:t></w:r>')
+plain=p(text('Same text'))
+checks.append(check('inline deleted start',p('<w:r>'+image()+'<w:t>Same text</w:t></w:r>'),plain))
+checks.append(check('inline deleted middle',witness,plain))
+checks.append(check('inline deleted end',p('<w:r><w:t>Same text</w:t>'+image()+'</w:r>'),plain))
+second=image().replace('id="1" name="Sample"','id="2" name="Second"')
+adjacent=p('<w:r><w:t>Same</w:t>'+image()+second+'<w:t xml:space="preserve"> text</w:t></w:r>')
+checks.append(check('adjacent deleted objects',adjacent,plain))
+checks.append(check('adjacent one retained',adjacent,witness,new=OLDPNG))
+checks.append(check('inline shifted middle',witness,p(text('Same text')+'<w:r>'+image()+'</w:r>'),new=OLDPNG))
+checks.append(check('matched full copy once',witness,witness,new=OLDPNG))
+checks.append(check('matched cell inline deletion','<w:tbl><w:tr><w:tc>'+witness+'</w:tc></w:tr></w:tbl>','<w:tbl><w:tr><w:tc>'+plain+'</w:tc></w:tr></w:tbl>'))
+checks.append(check('header inline deletion',p(text('Stable body')),p(text('Stable body')),headers=(witness,plain)))
+# Fault injection keeps declarations valid but removes or duplicates actual
+# emission. The codec must fail closed before writing any package.
+for variant in ['before','after']:__import__('shutil').copyfile('/p-packages/inline-shifted-middle-'+variant+'.docx','/'+variant+'.docx')
+original_tokens=_styled_tokens;original_drawing=_drawing_revision
+for fault in ['omitted-before-event','duplicate-before-event','omitted-after-event','duplicate-after-event']:
+ def tokens_with_missing_event(paragraph,collect_events=False):
+  result=original_tokens(paragraph,collect_events)
+  if collect_events and _MANIFEST_NODE_KEYS.get(paragraph,('unknown',))[0]==('before' if 'before' in fault else 'after'):return result[0],{offset:[node for node in nodes if not _is_drawing_event(node)] for offset,nodes in result[1].items()}
+  return result
+ def drawing_with_duplicate(source,kind,writer):
+  result=original_drawing(source,kind,writer)
+  if kind==('del' if 'before' in fault else 'ins'):_consume_object(source)
+  return result
+ _styled_tokens=tokens_with_missing_event if fault.startswith('omitted') else original_tokens
+ _drawing_revision=drawing_with_duplicate if fault.startswith('duplicate') else original_drawing
+ if os.path.exists('/fault.docx'):os.unlink('/fault.docx')
+ try:
+  generate_tracked_document('/before.docx','/after.docx','/fault.docx','events',False,True,True);raise AssertionError(fault+' accepted')
+ except ValueError as error:assert ('OBJECT_CONSUMPTION' if fault.startswith('omitted') else 'OBJECT_EMISSION') in str(error)
+ finally:_styled_tokens=original_tokens;_drawing_revision=original_drawing
+ assert not os.path.exists('/fault.docx')
+for variant in ['before','after']:__import__('shutil').copyfile('/p-packages/numbering-merge-resource-relationship-'+variant+'.docx','/'+variant+'.docx')
 # No image wrapper can escape revision schema, and every used resource resolves.
 for filename in os.listdir('/p-packages'):
  if not filename.endswith(('-out.docx','-accepted.docx','-rejected.docx')):continue
@@ -209,3 +245,6 @@ console.log(JSON.stringify(py.globals.get('checks').toJs()));
 assert.ok(all.some(result=>result.manifest.decisions.some(decision=>decision.beforeText==='Old clause' && decision.afterText==='New clause' && decision.objectEvents?.unchangedLinks.length===1)),'TS must declare the unchanged hyperlink envelope');
 
 assert.ok(all.some(result=>result.tables[0]?.kind==='changed' && result.tables[0].beforeKinds[0][0]==='changed' && result.summary.changed>0),'table object events must reach screen');
+
+assert.ok(all.some(result=>result.views.document.some(view=>view.before==='Same text'&&view.after==='Same text'&&view.kind==='changed'&&view.objectLabels?.length)),'object-only deletions must remain visible');
+assert.ok(all.some(result=>result.views.headerFooter.some(view=>view.before==='Same text'&&view.after==='Same text'&&view.kind==='changed'&&view.objectLabels?.length)),'header object-only deletions must remain visible');

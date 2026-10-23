@@ -476,7 +476,7 @@ def _styled_tokens(paragraph, collect_events=False):
             for child in node:
                 value = child.text or "" if child.tag == W + "t" else "\t" if child.tag == W + "tab" else "\n" if child.tag in (W + "br", W + "cr") else ""
                 if _is_drawing_event(child) and collect_events and not inside_preserved_wrapper: events.setdefault(len(tokens),[]).append(child)
-                for token in value:tokens.append({"text":token,"properties":copy.deepcopy(run_properties) if run_properties is not None else None,"wrapper":wrapper,"link":link})
+                for token in value:tokens.append({"text":token,"properties":copy.deepcopy(run_properties) if run_properties is not None else None,"wrapper":wrapper,"link":link,"sourceOffset":len(tokens)})
             return
         for child in node:
             if child.tag != W + "pPr":
@@ -524,6 +524,30 @@ def _token_run(token, run_properties, deleted=False):
     return run
 
 
+def _consume_object(source, positions=None):
+    if _MANIFEST is None:return
+    origin=_MANIFEST_NODE_KEYS.get(source)
+    if origin not in _MANIFEST_OBJECT_EXPECTED:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EMISSION")
+    expected=_MANIFEST_OBJECT_EXPECTED[origin];values=set(expected if positions is None else positions)
+    consumed=_MANIFEST_OBJECT_CONSUMED.setdefault(origin,set())
+    if not values<=expected or consumed & values:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EMISSION")
+    consumed.update(values)
+
+
+def _consume_link_tokens(tokens):
+    for token in tokens:
+        if token.get("link") is not None:_consume_object(token["link"],[token["sourceOffset"]])
+
+
+def _consume_copied_objects(source):
+    origin=_MANIFEST_NODE_KEYS.get(source)
+    if _MANIFEST is None or origin is None:return
+    side,(part,path)=origin
+    for key,positions in _MANIFEST_OBJECT_EXPECTED.items():
+        if key[0]==side and key[1][0]==part and key[1][1][:len(path)]==path:
+            _consume_object(_MANIFEST_SOURCE_NODES[key])
+
+
 def _revision_containers(kind, tokens, writer, strip_history=False):
     # Hyperlink is paragraph content, not a RunTrackChange child. Revisions
     # belong inside its envelope (CT_Hyperlink accepts inserted/deleted runs).
@@ -541,6 +565,7 @@ def _revision_containers(kind, tokens, writer, strip_history=False):
         if link is None:results.append(revision)
         else:
             hyperlink=_source_copy(link);hyperlink[:]=[];hyperlink.append(revision);results.append(hyperlink)
+            _consume_link_tokens(tokens[start:end])
         start=end
     return results
 
@@ -794,6 +819,7 @@ def _drawing_revision(source, kind, writer):
     properties=parent.find(W+"rPr") if parent is not None and parent.tag==W+"r" else None
     if properties is not None:run.append(_effective_properties(properties) if kind=="del" else copy.deepcopy(properties))
     run.append(_source_copy(source))
+    _consume_object(source)
     revision=ET.Element(W+kind,writer.attributes());revision.append(run)
     return revision
 
@@ -806,7 +832,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
     # that existing revision explain the visible change. This avoids producing
     # a mixed reject state such as "동의 없는금을" when revisions overlap.
     if before_text != after_text and _has_visible_text_revision(after):
-        return copy.deepcopy(after)
+        result=copy.deepcopy(after);_consume_copied_objects(before);_consume_copied_objects(after);return result
     before_tokens, before_events = _styled_tokens(before,collect_events=True)
     after_tokens, after_events = _styled_tokens(after, collect_events=True)
     before_values = [token["text"] for token in before_tokens]
@@ -819,7 +845,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
     format_changed = bool(paragraph_families or spans)
     object_changed=((_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents") or {}).get("changed",False)
     if before_text == after_text and not format_changed and not object_changed:
-        return copy.deepcopy(after)
+        result=copy.deepcopy(after);_consume_copied_objects(before);_consume_copied_objects(after);return result
 
     paragraph = ET.Element(W + "p", dict(after.attrib))
     revised_paragraph_properties = (
@@ -886,7 +912,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
             link_pair=(_link_source_key(before_tokens[before_position]),_link_source_key(token))
             pair = (scope_id, families, preserve_history, _properties_signature(after_properties),link_pair)
             end = position + 1
-            while end < j2 and end not in after_events and after_tokens[end].get("wrapper") is None:
+            while end < j2 and end not in after_events and i1+end-j1 not in before_events and after_tokens[end].get("wrapper") is None:
                 next_families, next_history, next_scope_id = declared(i1 + (end - j1), end)
                 if (next_scope_id, next_families, next_history, _properties_signature(after_tokens[end]["properties"]),(_link_source_key(before_tokens[i1+end-j1]),_link_source_key(after_tokens[end]))) != pair:
                     break
@@ -896,7 +922,9 @@ def _paragraph_revision(before, after, include_formatting, writer):
             if any(value is not None for value in link_pair) and link_pair not in {(_manifest_key(pair["before"]),_manifest_key(pair["after"])) for pair in (_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents",{}).get("unchangedLinks",[])}:
                 paragraph.extend(_revision_containers("del",_restore_projected_tokens(before_tokens[before_position:before_position+end-position],before_position,_MANIFEST_ACTIVE_COMPARISON["restoreStyles"]),writer,strip_history=True))
                 paragraph.extend(_revision_containers("ins",after_tokens[position:end],writer))
-            else:paragraph.append(_linked_run(_token_run(text,revised_properties),token))
+            else:
+                paragraph.append(_linked_run(_token_run(text,revised_properties),token))
+                _consume_link_tokens(before_tokens[before_position:before_position+end-position]);_consume_link_tokens(after_tokens[position:end])
             position = end
         emit_before_events(i1+j2-j1)
         emit_events(j2)
@@ -999,7 +1027,7 @@ def _table_revision(before, after, include_formatting, writer):
     for before_row_index, after_row_index in row_pairs:
         if before_row_index is None:
             _consume_manifest_subtree("after", after_rows[after_row_index])
-            row = copy.deepcopy(after_rows[after_row_index])
+            row = copy.deepcopy(after_rows[after_row_index]);_consume_copied_objects(after_rows[after_row_index])
             _mark_row(row, "ins", writer)
             revised_rows.append(row)
             continue
@@ -1022,11 +1050,11 @@ def _table_revision(before, after, include_formatting, writer):
             after_cell = after_cells[after_column_index] if after_column_index is not None and after_column_index < len(after_cells) else None
             if before_cell is None and after_cell is not None:
                 _consume_manifest_subtree("after", after_cell)
-                cell = copy.deepcopy(after_cell)
+                cell = copy.deepcopy(after_cell);_consume_copied_objects(after_cell)
                 _mark_cell(cell, "cellIns", writer)
             elif after_cell is None and before_cell is not None:
                 _consume_manifest_subtree("before", before_cell)
-                cell = _accepted_copy(before_cell)
+                cell = _accepted_copy(before_cell);_consume_copied_objects(before_cell)
                 _mark_cell(cell, "cellDel", writer)
             elif before_cell is not None and after_cell is not None:
                 cell = _cell_revision(before_cell, after_cell, include_formatting, writer)
@@ -1047,6 +1075,7 @@ def _table_revision(before, after, include_formatting, writer):
 def _whole_table_revision(source, kind, writer):
     _consume_manifest_subtree("after" if kind == "ins" else "before", source)
     table = copy.deepcopy(source) if kind == "ins" else _accepted_copy(source)
+    if kind=="ins":_consume_copied_objects(source)
     if kind == "del": _restore_whole_properties(table, source, "tblPr")
     for index, row in enumerate(table.findall(W + "tr")):
         original = source.findall(W + "tr")[index]
@@ -1125,6 +1154,8 @@ _MANIFEST_ACTIVE_COMPARISON = None
 _MANIFEST_PROPERTY_USED = set()
 _MANIFEST_SOURCE_NODES = {}
 _MANIFEST_ALLOWED_PROPERTIES = {}
+_MANIFEST_OBJECT_EXPECTED = {}
+_MANIFEST_OBJECT_CONSUMED = {}
 
 
 def _manifest_key(source):
@@ -1670,6 +1701,13 @@ def _install_manifest(manifest):
             _MANIFEST_DECISIONS.append(decision)
             visit(decision.get("children", []))
     visit(manifest["decisions"])
+    _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear()
+    for decision in _MANIFEST_DECISIONS:
+        for side in ("before","after"):
+            for ref in decision.get("objectEvents",{}).get(side,[]):
+                event=ref["objectEvent"];key=(side,_manifest_key(ref))
+                if key in _MANIFEST_OBJECT_EXPECTED:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EMISSION")
+                _MANIFEST_OBJECT_EXPECTED[key]=set(range(event["start"],event["end"])) if event["kind"]=="hyperlink" and event["end"]>event["start"] else {None}
 
 
 def _register_manifest_root(root, part, side):
@@ -2318,6 +2356,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
                     if _MANIFEST_CONSUMED.get((side, _manifest_key(ref))) != 1:
                         raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
 
+        if _MANIFEST_OBJECT_CONSUMED != _MANIFEST_OBJECT_EXPECTED:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_OBJECT_CONSUMPTION")
         if _MANIFEST_PROPERTY_USED != {action["id"] for action in _MANIFEST["propertyActions"]}:
             raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
 
@@ -2351,3 +2390,4 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _MANIFEST_PROPERTY_USED = set()
         _MANIFEST_SOURCE_NODES = {}
         _MANIFEST_ALLOWED_PROPERTIES = {}
+        _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear()
