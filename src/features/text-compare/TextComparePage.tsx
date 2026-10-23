@@ -1,3 +1,4 @@
+import { TextReportPanel } from "../comparison-report/ToolReportPanels.tsx";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -11,11 +12,11 @@ import { DEFAULT_TEXT_OPTIONS, type TextOptions, type TextResult } from "./resul
 import { TextHistory, mergeRow, type TextSnapshot } from "./session.ts";
 import { transformText, type TextTransform } from "./transforms.ts";
 import { TextDiffView } from "./TextDiffView";
-import { applyEditorChange, preferredLineEnding, rawEditorOffset, type EditorIntent } from "./editor.ts";
+import { editorText, applyEditorChange, preferredLineEnding, rawEditorOffset, type EditorIntent } from "./editor.ts";
 import type { TextDisplayStyle } from "./viewProjection.ts";
 
 export function TextComparePage() {
-  const {t}=useTranslation(["features","common"]);const tr=useCallback((key:string,values?:Record<string,unknown>)=>t(`features:textCompare.${key}` as never,values??{}),[t]);
+  const {t,i18n}=useTranslation(["features","common"]);const tr=useCallback((key:string,values?:Record<string,unknown>)=>t(`features:textCompare.${key}` as never,values??{}),[t]);
   const [state,setState]=useState<TextSnapshot>({left:"",right:"",options:structuredClone(DEFAULT_TEXT_OPTIONS),revision:0});
   const current=useRef(state);current.current=state;
   const sources=state.sources??{};
@@ -24,18 +25,21 @@ export function TextComparePage() {
   const [live,setLive]=useState(false),[composing,setComposing]=useState(false),[unified,setUnified]=useState(false),[wrap,setWrap]=useState(true),[fold,setFold]=useState(true),[search,setSearch]=useState(""),[rules,setRules]=useState("");
   const [action,setAction]=useState<TextTransform>("trim"),[target,setTarget]=useState<"left"|"right"|"both">("both");
   const history=useRef(new TextHistory()),abort=useRef<AbortController|undefined>(undefined),generation=useRef(0),reads=useRef({left:0,right:0});
+  const resultRef=useRef<TextResult|undefined>(undefined),resultRun=useRef(0),compareActive=useRef(false);
+  const displayedRef=useRef<{result:TextResult;ids:readonly string[]}|undefined>(undefined),[,setProjectionVersion]=useState(0);
+  const onDisplayedRows=useCallback((from:TextResult,ids:readonly string[])=>{if(resultRef.current!==from)return;const prior=displayedRef.current;if(prior?.result===from&&prior.ids.length===ids.length&&prior.ids.every((id,index)=>id===ids[index]))return;displayedRef.current={result:from,ids};setProjectionVersion(value=>value+1);},[]);
   const intents=useRef<Partial<Record<"left"|"right",EditorIntent&{revision:number}>>>({});
   const editors=useRef<Partial<Record<"left"|"right",HTMLTextAreaElement|null>>>({});
-  const cancel=useCallback(()=>{generation.current++;abort.current?.abort();setBusy(false);},[]);
+  const cancel=useCallback(()=>{generation.current++;compareActive.current=false;abort.current?.abort();setBusy(false);},[]);
   const change=(update:Partial<TextSnapshot>,record=true)=>{cancel();if("left" in update)reads.current.left++;if("right" in update)reads.current.right++;if(record)history.current.record(current.current);const next={...current.current,...update,revision:current.current.revision+1};current.current=next;setState(next);};
-  useEffect(()=>()=>{generation.current++;abort.current?.abort();reads.current.left++;reads.current.right++;},[]);
+  useEffect(()=>()=>{generation.current++;compareActive.current=false;resultRef.current=undefined;abort.current?.abort();reads.current.left++;reads.current.right++;},[]);
   const compare=useCallback(async()=>{
-    const snapshot=current.current;abort.current?.abort();const control=new AbortController();abort.current=control;const run=++generation.current;setBusy(true);setError("");
+    const snapshot=current.current;abort.current?.abort();const control=new AbortController();abort.current=control;const run=++generation.current;compareActive.current=true;setBusy(true);setError("");
     try {
       const compared=await runModuleWorker<typeof snapshot,TextResult>(()=>new Worker(new URL("./textCompare.worker.ts",import.meta.url),{type:"module"}),{left:snapshot.left,right:snapshot.right,options:snapshot.options,revision:snapshot.revision},{signal:control.signal,hardTimeoutMs:10000,canceledMessage:tr("canceled"),startErrorMessage:tr("error"),resultErrorMessage:tr("error"),timeoutMessage:tr("timeout"),validateResult:(value:unknown):value is TextResult=>!!value&&typeof value==="object"&&Array.isArray((value as TextResult).rows)&&(value as TextResult).revision===snapshot.revision});
-      if(run===generation.current&&snapshot.revision===current.current.revision)setResult(compared);
+      if(run===generation.current&&snapshot.revision===current.current.revision){resultRef.current=compared;resultRun.current=run;setResult(compared);}
     }catch(reason){if(run===generation.current&&!(reason instanceof DOMException&&reason.name==="AbortError")){const code=(reason as {code?:string}).code;setError(tr(code==="TEXT_TIMEOUT"||code==="WORKER_DEADLINE"?"timeout":code==="TEXT_LINE_LIMIT"?"lineLimit":code==="TEXT_TOO_LARGE"?"tooLarge":code==="GRAPHEME_UNAVAILABLE"?"graphemeUnavailable":code?.startsWith("IGNORE_")?"rulesError":"error"));}}
-    finally{if(run===generation.current)setBusy(false);}
+    finally{if(run===generation.current){compareActive.current=false;setBusy(false);}}
   },[tr]);
   useEffect(()=>{if(!live||composing)return;const timer=setTimeout(()=>void compare(),250);return()=>clearTimeout(timer);},[state.revision,live,composing,compare]);
   const load=async(side:"left"|"right",file?:File)=>{if(!file)return;const version=++reads.current[side];try{const source=await readText(file,inputEncoding==="auto"?undefined:inputEncoding);if(version!==reads.current[side])return;change({[side]:source.text,sources:{...current.current.sources,[side]:source}});setError("");}catch(reason){if(version===reads.current[side])setError(tr(reason instanceof Error&&reason.message==="TEXT_TOO_LARGE"?"tooLarge":"encodingError"));}};
@@ -51,7 +55,7 @@ export function TextComparePage() {
     <div className="grid grid-cols-2 gap-4 max-[620px]:grid-cols-1">
       {(["left","right"] as const).map(side=><UtilitySectionCard key={side} title={tr(side)} description={sources[side]?.name??tr("pasteHint")}>
         <Button variant="secondary" onClick={()=>document.getElementById(`text-file-${side}`)?.click()}>{tr("openFile")}</Button><input hidden id={`text-file-${side}`} type="file" accept="text/*,.txt,.csv,.json,.xml,.md,.js,.ts,.css,.html,.log" aria-label={tr(`${side}File`)} onChange={event=>void load(side,event.target.files?.[0])}/>
-        <UtilityTextarea className="mt-3 min-h-60" value={state[side]} aria-label={tr(side)} data-testid={`text-compare-${side}`} onFocus={event=>{const node=event.currentTarget;editors.current[side]=node;node.onbeforeinput=(inputEvent)=>{intents.current[side]={start:node.selectionStart,end:node.selectionEnd,inputType:(inputEvent as InputEvent).inputType??"",revision:current.current.revision};};}} onChange={event=>{reads.current[side]++;const prior=current.current,intent=intents.current[side];intents.current[side]=undefined;change({[side]:applyEditorChange(prior[side],event.target.value,preferredLineEnding(prior.sources?.[side]?.text??prior[side]),intent?.revision===prior.revision?intent:undefined)});}} onKeyDown={event=>{if((event.ctrlKey||event.metaKey)&&!composing&&["z","y"].includes(event.key.toLowerCase())){event.preventDefault();travel(event.key.toLowerCase()==="y"||event.shiftKey?"redo":"undo");}}} onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)}/>
+        <UtilityTextarea className="mt-3 min-h-60" value={editorText(state[side])} aria-label={tr(side)} data-testid={`text-compare-${side}`} onFocus={event=>{const node=event.currentTarget;editors.current[side]=node;node.onbeforeinput=(inputEvent)=>{intents.current[side]={start:node.selectionStart,end:node.selectionEnd,inputType:(inputEvent as InputEvent).inputType??"",revision:current.current.revision};};}} onChange={event=>{reads.current[side]++;const prior=current.current,intent=intents.current[side];intents.current[side]=undefined;const next=applyEditorChange(prior[side],event.target.value,preferredLineEnding(prior.sources?.[side]?.text??prior[side]),intent?.revision===prior.revision?intent:undefined);if(next!==prior[side])change({[side]:next});}} onKeyDown={event=>{if((event.ctrlKey||event.metaKey)&&!composing&&["z","y"].includes(event.key.toLowerCase())){event.preventDefault();travel(event.key.toLowerCase()==="y"||event.shiftKey?"redo":"undo");}}} onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)}/>
         <Button variant="ghost" disabled={!sources[side]} onClick={()=>{reads.current[side]++;change({[side]:sources[side]?.text??""});}}>{tr("restore")}</Button>
         <Button variant="secondary" onClick={()=>download(side)}>{tr("download")}</Button>
       </UtilitySectionCard>)}
@@ -70,10 +74,11 @@ export function TextComparePage() {
       <p aria-live="polite" data-testid="text-compare-summary">{tr("summary",result.counts)}</p>
       {result.revision!==state.revision&&<UtilityNotice kind="warning">{tr("stale")}</UtilityNotice>}
       {result.quality!=="full"&&<UtilityNotice kind="warning">{tr("coarse")}</UtilityNotice>}
-      <div className="mb-3 flex flex-wrap gap-3">{[["unified",unified,setUnified],["wrap",wrap,setWrap],["fold",fold,setFold]].map(([key,value,setter])=><label key={key as string} className="flex items-center gap-2"><input type="checkbox" checked={value as boolean} onChange={e=>(setter as (value:boolean)=>void)(e.target.checked)}/>{tr(key as string)}</label>)}<UtilityInput className="max-w-xs" value={search} onChange={e=>setSearch(e.target.value)} aria-label={tr("search")} placeholder={tr("search")}/></div>
+      <div className="mb-3 flex flex-wrap gap-3">{[["unified",unified,setUnified],["wrap",wrap,setWrap],["fold",fold,setFold]].map(([key,value,setter])=><label key={key as string} className="flex items-center gap-2"><input type="checkbox" checked={value as boolean} onChange={e=>(setter as (value:boolean)=>void)(e.target.checked)}/>{tr(key as string)}</label>)}<UtilityInput data-testid="text-compare-search" className="max-w-xs" value={search} onChange={e=>setSearch(e.target.value)} aria-label={tr("search")} placeholder={tr("search")}/></div>
       <div className="mb-3 flex flex-wrap items-center gap-2"><Button variant="outline" onClick={()=>navigate(-1)}>{tr("previousChange")}</Button><Button variant="outline" onClick={()=>navigate(1)}>{tr("nextChange")}</Button><UtilitySelect className="max-w-[220px]" aria-label={tr("palette")} value={display.palette} onChange={e=>setDisplay({...display,palette:e.target.value as TextDisplayStyle["palette"]})}><option value="standard">{tr("standardColors")}</option><option value="contrast">{tr("contrastColors")}</option></UtilitySelect><label className="flex gap-2"><input type="checkbox" checked={display.bold} onChange={e=>setDisplay({...display,bold:e.target.checked})}/>{tr("bold")}</label><label className="flex gap-2"><input type="checkbox" checked={display.underline} onChange={e=>setDisplay({...display,underline:e.target.checked})}/>{tr("underline")}</label><UtilitySelect className="max-w-[220px]" aria-label={tr("syntax")} value={display.syntax} onChange={e=>setDisplay({...display,syntax:e.target.value as TextDisplayStyle["syntax"]})}><option value="plain">{tr("plain")}</option><option value="json">JSON</option><option value="javascript">JavaScript</option></UtilitySelect></div>
-      <TextDiffView focusRequest={focusRequest} focusId={focusId} display={display} result={result} unified={unified} wrap={wrap} fold={fold} search={search} stale={result.revision!==state.revision} t={tr} onMerge={(id,side)=>{try{change(mergeRow(state,result,id,side));void compare();}catch{setError(tr("stale"));}}}/>
+      <TextDiffView onDisplayedRows={onDisplayedRows} focusRequest={focusRequest} focusId={focusId} display={display} result={result} unified={unified} wrap={wrap} fold={fold} search={search} stale={result.revision!==state.revision} t={tr} onMerge={(id,side)=>{try{change(mergeRow(state,result,id,side));void compare();}catch{setError(tr("stale"));}}}/>
     </UtilitySectionCard>}
+    {result&&<TextReportPanel result={result} source={state} language={i18n.resolvedLanguage?.startsWith("ko")?"ko":"en"} getDisplayedIds={()=>displayedRef.current?.result===result?displayedRef.current.ids:undefined} isCurrent={()=>resultRef.current===result&&resultRun.current===generation.current&&!compareActive.current&&current.current.revision===result.revision}/>}
     <ToolGuideWrapper slug="textCompare"/>
   </UtilityPage>;
 }

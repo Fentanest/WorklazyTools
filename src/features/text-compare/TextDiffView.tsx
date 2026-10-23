@@ -5,10 +5,11 @@ import { projectTextRows, textRenderPieces, type TextDisplayStyle } from "./view
 import type { TextLine, TextMark, TextResult } from "./resultTypes.ts";
 
 type Translate=(key:string,values?:Record<string,unknown>)=>string;
-export function TextDiffView({result,unified,wrap,fold,search,stale,onMerge,t,focusId,display,focusRequest}:{result:TextResult;unified:boolean;wrap:boolean;fold:boolean;search:string;stale:boolean;onMerge:(id:string,side:"left"|"right")=>void;t:Translate;focusId?:string;focusRequest:number;display:TextDisplayStyle}) {
+export function TextDiffView({result,unified,wrap,fold,search,stale,onMerge,t,focusId,display,focusRequest,onDisplayedRows}:{result:TextResult;unified:boolean;wrap:boolean;fold:boolean;search:string;stale:boolean;onMerge:(id:string,side:"left"|"right")=>void;t:Translate;focusId?:string;focusRequest:number;display:TextDisplayStyle;onDisplayedRows?:(result:TextResult,ids:readonly string[])=>void}) {
   const [expanded,setExpanded]=useState(new Set<string>()),[top,setTop]=useState(0),[measureVersion,setMeasureVersion]=useState(0);
   const container=useRef<HTMLDivElement>(null),heights=useRef(new Map<string,number>());
   const entries=useMemo(()=>projectTextRows(result.rows,fold,expanded,search),[result,fold,expanded,search]);
+  useLayoutEffect(()=>{onDisplayedRows?.(result,entries.filter(entry=>entry.kind==='row').map(entry=>entry.row.id));},[result,entries,onDisplayedRows]);
   const keyOf=(index:number)=>entries[index].kind==="row"?entries[index].row.id:`fold:${entries[index].id}`;
   const offsets=useMemo(()=>{const values=[0];entries.forEach((_,i)=>values.push(values.at(-1)!+(heights.current.get(keyOf(i))??48)));return values;},[entries,measureVersion,wrap,unified]);
   let low=0,high=entries.length;while(low<high){const mid=(low+high)>>>1;if(offsets[mid+1]<top)low=mid+1;else high=mid;}
