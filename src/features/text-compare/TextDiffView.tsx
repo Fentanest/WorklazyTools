@@ -1,3 +1,4 @@
+import type {RawSearchMatch} from "./search.ts";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/ui/button";
 import { projectTextRows, textRenderPieces, type TextDisplayStyle } from "./viewProjection.ts";
@@ -34,18 +35,18 @@ export function TextDiffView({result,unified,wrap,fold,search,stale,onMerge,t,fo
       return <div key={key} data-measure-key={key} data-row-id={row.id} data-kind={row.kind} className={`border-b border-border ${unified?"":"grid grid-cols-2"} ${focusId===row.id?"ring-2 ring-inset ring-primary":""}`}>
         {(["left","right"] as const).map(side=><div key={side} className="min-w-0 border-r border-border px-2 py-2" data-side={side}>
           <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground"><span>{t(side)} {row[side]?.number??"—"}{row[side]&&row[side]!.lastNumber>row[side]!.number?`–${row[side]!.lastNumber}`:""} · {t(`kind.${row.kind}`)}</span>{row.kind!=="equal"&&<button type="button" className="rounded border border-border px-2 disabled:opacity-40" disabled={stale} onClick={()=>onMerge(row.id,side)} aria-label={t(side==="left"?"copyRight":"copyLeft")}>{side==="left"?"←":"→"}</button>}</div>
-          <MarkedLine line={row[side]} marks={side==="left"?row.leftMarks:row.rightMarks} side={side} display={display} wrap={wrap} note={t("denseLine")}/>
+          <MarkedLine search={entry.search?.[side]} searchLimited={entry.search?.truncated} line={row[side]} marks={side==="left"?row.leftMarks:row.rightMarks} side={side} display={display} wrap={wrap} note={t("denseLine")} searchNote={t("searchLimit")}/>
         </div>)}
       </div>;
     })}
     <div style={{height:offsets.at(-1)!-offsets[end]}} aria-hidden="true" />
   </div>;
 }
-function MarkedLine({line,marks,side,display,wrap,note}:{line?:TextLine;marks:TextMark[];side:"left"|"right";display:TextDisplayStyle;wrap:boolean;note:string}) {
+function MarkedLine({line,marks,side,display,wrap,note,search,searchLimited,searchNote}:{line?:TextLine;marks:TextMark[];side:"left"|"right";display:TextDisplayStyle;wrap:boolean;note:string;search?:RawSearchMatch[];searchLimited?:boolean;searchNote:string}) {
   if(!line)return null;
-  const rendered=textRenderPieces(line,marks,display.syntax);
-  return <>{rendered.coarse&&<p className="text-xs text-muted-foreground" data-testid="text-render-coarse">{note}</p>}<pre className={`m-0 min-h-6 font-mono text-sm ${wrap?"whitespace-pre-wrap break-words":"whitespace-pre overflow-x-auto"}`}>{rendered.pieces.map(({start,text,mark:kind,syntax:syntaxKind})=>{
+  const rendered=textRenderPieces(line,marks,display.syntax,search);
+  return <>{rendered.coarse&&<p className="text-xs text-muted-foreground" data-testid="text-render-coarse">{note}</p>}{(searchLimited||rendered.searchLimited)&&<p className="text-xs text-muted-foreground">{searchNote}</p>}<pre className={`m-0 min-h-6 font-mono text-sm ${wrap?"whitespace-pre-wrap break-words":"whitespace-pre overflow-x-auto"}`}>{rendered.pieces.map(({start,text,mark:kind,syntax:syntaxKind,search:isSearch})=>{
     const color=kind==="changed"?(display.palette==="contrast"?(side==="left"?"bg-orange-100 text-orange-950 dark:bg-orange-950 dark:text-orange-100":"bg-blue-100 text-blue-950 dark:bg-blue-950 dark:text-blue-100"):(side==="left"?"bg-red-100 text-red-950 dark:bg-red-950 dark:text-red-100":"bg-green-100 text-green-950 dark:bg-green-950 dark:text-green-100")):kind==="ignored"?"bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-200":syntaxKind==="string"?"text-emerald-800 dark:text-emerald-300":syntaxKind==="number"?"text-orange-800 dark:text-orange-300":syntaxKind==="keyword"?"text-violet-800 dark:text-violet-300":syntaxKind==="comment"?"text-muted-foreground":"";
-    return <span key={start} className={`${color} ${kind==="changed"&&display.bold?"font-bold":""} ${kind==="changed"&&display.underline?"underline":""}`}>{text}</span>;
+    return <span key={start} data-search-start={isSearch?start:undefined} data-search-end={isSearch?start+text.length:undefined} className={`${isSearch?"outline outline-2 outline-amber-500":""} ${color} ${kind==="changed"&&display.bold?"font-bold":""} ${kind==="changed"&&display.underline?"underline":""}`}>{text}</span>;
   })}</pre></>;
 }

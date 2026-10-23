@@ -2860,7 +2860,8 @@
     "lineLimit": "한쪽 입력은 20만 줄 이하로 나누어 비교해 주세요.",
     "denseLine": "이 줄은 세부 색상 표시를 생략했습니다. 원문과 비교 결과는 그대로 유지됩니다.",
     "historyHelp": "최대 20단계까지 되돌릴 수 있습니다. 글이 크면 저장하는 기록 수가 줄어듭니다.",
-    "originalEncoding": "각 파일의 원래 인코딩·BOM 유지"
+    "originalEncoding": "각 파일의 원래 인코딩·BOM 유지",
+    "searchLimit": "일치 항목이 많아 일부만 강조했습니다. 검색된 줄과 원문은 그대로 표시합니다."
   },
   "imageCompare": {
     "eyebrow": "이미지 비교",

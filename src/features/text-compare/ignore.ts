@@ -1,3 +1,4 @@
+import {TEXT_NORMALIZATION_POLICY as policy} from "./normalizationPolicy.ts";
 import type { MappedText, RemovedSpan, TextOptions } from "./resultTypes.ts";
 
 // Literal matches are found against the ORIGINAL text, then unioned. Removing
@@ -34,10 +35,10 @@ export function mapText(raw: string, options: TextOptions): MappedText {
     let value = point;
     if (removed[span] && removed[span].start < end && removed[span].end > offset) value = "";
     else {
-      if (options.ignoreWhitespace && /^[\t \v\f]$/.test(value)) value = "";
+      if (options.ignoreWhitespace && policy.whitespace.includes(value)) value = "";
       if (options.normalizeLineEndings && value === "\r") value = raw[end] === "\n" ? "" : "\n";
-      if (options.ignoreQuotes) value = value.replace(/[‘’‚‛]/g, "'").replace(/[“”„‟]/g, '"');
-      if (options.ignoreDashes) value = value.replace(/[‐‑‒–—―−]/g, "-");
+      if (options.ignoreQuotes && value) value = policy.singleQuotes.includes(value) ? "'" : policy.doubleQuotes.includes(value) ? '"' : value;
+      if (options.ignoreDashes && value) value = policy.dashes.includes(value) ? "-" : value;
     }
     pieces.push(value);
     for (let i = 0; i < value.length; i++) { starts.push(offset); ends.push(end); }

@@ -2866,7 +2866,8 @@
     "lineLimit": "Split each input into at most 200,000 lines before comparing.",
     "denseLine": "Detailed colors are omitted for this line. The original text and comparison result are unchanged.",
     "historyHelp": "Undo keeps up to 20 steps. Large texts may retain fewer steps.",
-    "originalEncoding": "Keep each file’s original encoding and BOM"
+    "originalEncoding": "Keep each file’s original encoding and BOM",
+    "searchLimit": "Only some matches are highlighted because there are many. Matching rows and original text remain visible."
   },
   "imageCompare": {
     "eyebrow": "Image comparison",

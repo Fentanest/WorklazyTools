@@ -1,3 +1,4 @@
+import {TEXT_NORMALIZATION_POLICY} from "./normalizationPolicy.ts";
 import { diffText } from "../document-compare/documentComparison.ts";
 import { alignSequenceWithBudget } from "../../utils/sequenceAlignment.ts";
 import { mapText } from "./ignore.ts";
@@ -45,7 +46,7 @@ function marks(mapped: MappedText, line: TextLine | undefined, segments: Segment
     }
     position=end;
   }
-  for (const removed of mapped.removed) if(removed.start<line.end && removed.end>line.start) result.push({start:Math.max(removed.start,line.start),end:Math.min(removed.end,line.end),kind:"ignored"});
+  for (const removed of mapped.removed) if(removed.start<line.end && removed.end>line.start) result.push({start:Math.max(removed.start,line.start),end:Math.min(removed.end,line.end),kind:"ignored",ruleIds:[...removed.rules]});
   return result;
 }
 export function compareTexts(left: string, right: string, options: TextOptions, revision=0, deadlineMs=5000): TextResult {
@@ -87,5 +88,7 @@ export function compareTexts(left: string, right: string, options: TextOptions, 
     }
     return {id:`${revision}:${index}`,kind,left:l,right:r,leftMarks:marks(lm,l,segments,"left"),rightMarks:marks(rm,r,segments,"right")};
   });
-  return {revision,options:structuredClone(options),rows,counts,quality:coarse?"line-coarse":"full",reasons:coarse?["COMPARISON_BUDGET"]:[]};
+  const mapping=(value:MappedText)=>({rawLength:value.raw.length,normalizedLength:value.value.length,starts:Uint32Array.from(value.starts),ends:Uint32Array.from(value.ends),removedSpans:value.removed.map(span=>({...span,rules:[...span.rules]}))});
+  const provenance={policyVersion:TEXT_NORMALIZATION_POLICY.version,rules:options.ignoreRules.map((literal,id)=>({id,literal})),left:mapping(lm),right:mapping(rm)};
+  return {revision,provenance,options:structuredClone(options),rows,counts,quality:coarse?"line-coarse":"full",reasons:coarse?["COMPARISON_BUDGET"]:[]};
 }
