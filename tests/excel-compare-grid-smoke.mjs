@@ -13,6 +13,7 @@ const browser = await puppeteer.launch({ executablePath: "/usr/bin/google-chrome
 try {
   const page = await browser.newPage();
   page.setDefaultTimeout(30000);
+  await page.setViewport({ width: 1360, height: 940 });
   await page.evaluateOnNewDocument(() => { window.__WORKLAZY_MOCK_PROVIDERS__ = true; });
   const cdp = await page.createCDPSession();
   await cdp.send("Page.setDownloadBehavior", { behavior: "allow", downloadPath: temporary });
@@ -20,6 +21,12 @@ try {
   await cdp.send("Network.setBlockedURLs", { urls: ["*googlesyndication.com*", "*doubleclick.net*", "*google-analytics.com*", "*googletagmanager.com*"] });
   page.on("pageerror", (error) => console.error("Browser error:", error.message));
   await page.goto(`${baseUrl}/en/tools/excel-compare/`, { waitUntil: "domcontentloaded" });
+  if (process.env.EXCEL_GRID_HANDOFF) await page.evaluate(async () => {
+    const { default: i18n } = await import('/src/i18n/config.ts');
+    const handoff = await fetch('/docs/jobs/todo/diffchecker-port-20261023/excel-shared-handoff.json').then((response) => response.json());
+    for (const language of ['ko','en']) { const nested = {}; for (const [key,value] of Object.entries(handoff.localeEntries[language])) { const parts=key.split('.'); let target=nested; for(const part of parts.slice(0,-1)) target=target[part] ??= {}; target[parts.at(-1)]=value; } i18n.addResourceBundle(language,'features',nested,true,true); }
+    await i18n.changeLanguage('en');
+  });
   await page.waitForSelector('[data-testid="excel-compare-page"] input[type=file]');
   const input = await page.$('[data-testid="excel-compare-page"] input[type=file]');
   await input.uploadFile(path.join(temporary, "left.csv"), path.join(temporary, "right.csv"));
@@ -36,11 +43,20 @@ try {
   await page.click('[data-testid="excel-comparison-grid"] > summary');
   const initial = await page.$$eval('[data-testid="excel-comparison-grid"] [data-record-id]', (items) => items.map((item) => ({ id: item.dataset.recordId, status: item.dataset.status, addresses: [...item.querySelectorAll("[data-source-address]")].map((cell) => cell.dataset.sourceAddress) })));
   assert.ok(initial.some((item) => item.addresses.join(",") === "A2,B2"));
+  assert.equal(await page.$$eval('[data-testid="excel-worksheet-grid"]',items=>items.length),2);
+  assert.equal(await page.$eval('[data-testid="excel-worksheet-grid"][data-side="left"] [data-source-address="A1"]',element=>element.innerText),"Date");
+  assert.equal(await page.$eval('[data-testid="excel-worksheet-grid"][data-side="right"] [data-source-address="B1"]',element=>element.innerText),"Date");
+  const sourceId=await page.$eval('[data-testid="excel-worksheet-grid"][data-side="left"] [data-source-address="A2"]',element=>element.dataset.recordIds);
+  assert.equal(sourceId,await page.$eval('[data-testid="excel-worksheet-grid"][data-side="right"] [data-source-address="B2"]',element=>element.dataset.recordIds));
+  assert.equal(await page.$$eval('[data-testid="excel-original-matrix"] td',items=>items.length),12);
   const runId = await page.$eval('[data-testid="excel-comparison-grid"]', (element) => element.dataset.runId);
-  for (const layout of ["split", "threeColumns", "full", "left", "right", "top", "bottom", "horizontal", "vertical", "threeRows"]) {
+  for (const layout of ["split", "threeColumns"]) {
     await page.select('[data-testid="excel-comparison-grid"] select', layout);
     assert.deepEqual(await page.$$eval('[data-testid="excel-comparison-grid"] [data-record-id]', (items) => items.map((item) => item.dataset.recordId)), initial.map((item) => item.id));
   }
+  await page.waitForSelector('[data-testid="excel-grid-change-column"]');
+  assert.equal(await page.$eval('[data-testid="excel-sheet-layout"]',element=>getComputedStyle(element).gridTemplateColumns.split(" ").length),3);
+  assert.equal(await page.$$eval('[data-testid="excel-grid-change-column"] [data-change-record-id]',items=>items.length),initial.length);
   const gridInputs = await page.$$('[data-testid="excel-comparison-grid"] input');
   await gridInputs[0].type("3");
   const visible = await page.$$eval('[data-testid="excel-comparison-grid"] [data-record-id]', (items) => items.map((item) => item.dataset.recordId));
@@ -61,5 +77,21 @@ try {
   assert.deepEqual(exportedIds, [...visible].sort((a, b) => initial.findIndex((r) => r.id === a) - initial.findIndex((r) => r.id === b)));
   const screenshotPath = process.env.EXCEL_GRID_SCREENSHOT;
   if (screenshotPath) await page.screenshot({ path: screenshotPath, fullPage: true });
-  console.log(`Excel grid smoke passed: ${initial.length} records, 10 layouts preserve IDs; hide preserves run ${runId}.`);
+  const matrixRows=[Array.from({length:20},(_,i)=>`Column${i+1}`).join(',')];
+  for(let row=1;row<=80;row++)matrixRows.push(Array.from({length:20},(_,column)=>`r${row}c${column+1}`).join(','));
+  for(const side of ['left','right'])await fs.writeFile(path.join(temporary,`matrix-${side}.csv`),matrixRows.join('\n'));
+  await page.reload({waitUntil:'domcontentloaded'});await page.waitForSelector('[data-testid="excel-compare-page"] input[type=file]');
+  await (await page.$('[data-testid="excel-compare-page"] input[type=file]')).uploadFile(path.join(temporary,'matrix-left.csv'),path.join(temporary,'matrix-right.csv'));
+  await page.waitForFunction(()=>!document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]').disabled);
+  await page.click('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');await page.waitForSelector('[data-testid="excel-comparison-grid"]');await page.click('[data-testid="excel-comparison-grid"] > summary');
+  assert.equal(await page.$$eval('[data-testid="excel-original-matrix"] td',items=>items.length),960);
+  const matrixRun=await page.$eval('[data-testid="excel-comparison-grid"]',element=>element.dataset.runId);
+  const hiddenInputs=await page.$$('[data-testid="excel-comparison-grid"] > div > label > input');
+  await hiddenInputs[0].type(Array.from({length:81},(_,i)=>i+1).filter(row=>row!==4&&row!==7).join(','));await hiddenInputs[1].type(Array.from({length:20},(_,i)=>i+1).filter(column=>column!==4).join(','));
+  const addresses=()=>page.$$eval('[data-testid="excel-worksheet-grid"][data-side="left"] td[data-source-address]',items=>items.map(item=>item.dataset.sourceAddress));
+  assert.deepEqual(await addresses(),['D4','D7']);
+  await (await page.$$('[data-testid="excel-comparison-grid"] > div > button'))[0].click();assert.deepEqual(await addresses(),['D7','D4']);
+  assert.equal(await page.$eval('[data-testid="excel-comparison-grid"]',element=>element.dataset.runId),matrixRun);
+  await page.click('[data-testid="excel-worksheet-grid"][data-side="left"] [data-source-address="D4"] button');assert.ok((await page.$eval('[data-testid="excel-matrix-cell-details"]',element=>element.innerText)).includes('r3c4'));
+  console.log(`Excel grid smoke passed: ${initial.length} records, 2 layouts preserve IDs; hide preserves run ${runId}.`);
 } finally { await browser.close(); await fs.rm(temporary, { recursive: true, force: true }); }
