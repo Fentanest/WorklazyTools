@@ -49,6 +49,16 @@ export async function compareWordFilePairs(
   try { worker = new Worker(new URL("./word.worker.ts", import.meta.url), { type: "module" }); }
   catch { throw new Error(startError); }
 
+  const validEntry = (value: unknown, index: number) => {
+    if (!value || typeof value !== "object") return false;
+    const item = value as Partial<WordWorkerPairResult>, result = item.result;
+    return Boolean(result && result.beforeName === payloads[index].beforeName && result.afterName === payloads[index].afterName
+      && result.summary && ["added", "deleted", "changed", "format", "unchanged"].every((key) => Number.isFinite(result.summary[key as keyof typeof result.summary]) && result.summary[key as keyof typeof result.summary]! >= 0)
+      && Array.isArray(result.changes) && Array.isArray(result.tables) && Array.isArray(result.warnings) && result.warnings.every((message) => typeof message === "string")
+      && result.views && Array.isArray(result.views.document) && Array.isArray(result.views.headerFooter) && Array.isArray(result.views.note)
+      && (item.trackedBuffer === undefined || item.trackedBuffer instanceof ArrayBuffer && item.trackedBuffer.byteLength > 0));
+  };
+
   return new Promise<WordWorkerPairResult[]>((resolve, reject) => {
     let settled = false;
     const finish = () => { if (settled) return false; settled = true; signal?.removeEventListener("abort", abort); worker.onmessage = worker.onerror = worker.onmessageerror = null; worker.terminate(); return true; };
@@ -62,7 +72,7 @@ export async function compareWordFilePairs(
         return;
       }
       if (!finish()) return;
-      if (event.data?.type === "result" && Array.isArray(event.data.result) && event.data.result.length === payloads.length) resolve(event.data.result as WordWorkerPairResult[]);
+      if (event.data?.type === "result" && Array.isArray(event.data.result) && event.data.result.length === payloads.length && event.data.result.every(validEntry)) resolve(event.data.result as WordWorkerPairResult[]);
       else reject(new Error(event.data?.type === "error" && typeof event.data.error?.message === "string" ? event.data.error.message : language === "en" ? "An error occurred while comparing Word documents." : "Word 문서 비교 중 오류가 발생했습니다."));
     };
     worker.onerror = (event) => {

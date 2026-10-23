@@ -19,6 +19,7 @@ class FakeWorker {
 }
 const options = { formatting: true, tables: true, metadata: true, trackedDocument: true, rewriteRevisionAuthor: false, revisionAuthor: "Reviewer" };
 const file = (name: string, read = async () => new ArrayBuffer(1)) => ({ name, arrayBuffer: read }) as File;
+const emptyResult = { beforeName: "before.docx", afterName: "after.docx", summary: { added: 0, deleted: 0, changed: 0, format: 0, unchanged: 0 }, changes: [], tables: [], warnings: [], views: { document: [], headerFooter: [], note: [] } };
 const pairs = () => [{ beforeFile: file("before.docx"), afterFile: file("after.docx") }];
 beforeEach(() => { FakeWorker.instances = []; FakeWorker.failConstruction = FakeWorker.failPost = false; FakeWorker.onCreate = undefined; globalThis.Worker = FakeWorker as unknown as typeof Worker; });
 afterEach(() => { globalThis.Worker = previousWorker; });
@@ -65,7 +66,7 @@ test("safe localized worker errors are preserved", async () => {
   await assert.rejects(pending, /1번 문서 쌍: 암호로 보호된 Word 파일/);
 });
 test("malformed or incomplete result is rejected", async () => {
-  for (const result of [{}, []]) {
+  for (const result of [{}, [], [null], [{ result: {} }], [{ result: { ...emptyResult, beforeName: "wrong.docx" } }]]) {
     const pending = compareWordFilePairs(pairs(), options, undefined, "en"); await setImmediate();
     FakeWorker.instances.at(-1)!.onmessage?.({ data: { type: "result", result } } as MessageEvent);
     await assert.rejects(pending, /An error occurred/); assert.equal(FakeWorker.instances.at(-1)!.terminated, 1);
@@ -76,7 +77,7 @@ test("result settles once and late progress cannot reach consumer", async () => 
   const pending = compareWordFilePairs(pairs(), options, () => progress++, "en"); await setImmediate();
   const worker = FakeWorker.instances[0], message = worker.onmessage!;
   message({ data: { type: "progress", progress: 50, message: "Working" } } as MessageEvent);
-  message({ data: { type: "result", result: [{ result: {} }] } } as MessageEvent);
+  message({ data: { type: "result", result: [{ result: emptyResult }] } } as MessageEvent);
   await pending;
   message({ data: { type: "progress", progress: 99, message: "Late" } } as MessageEvent);
   assert.equal(progress, 1); assert.equal(worker.terminated, 1);
