@@ -586,6 +586,59 @@ def _iter_story_blocks(container):
                 yield from _iter_story_blocks(content)
 
 
+def _story_package_facts(archive):
+    import posixpath
+    relns='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
+    r='{'+relns[:-1]+'}';ct='{http://schemas.openxmlformats.org/package/2006/content-types}'
+    names=set(archive.namelist());errors=[];relationships={}
+    path='word/_rels/document.xml.rels'
+    if path in names:
+        for node in ET.fromstring(archive.read(path)):
+            rid=node.get('Id','')
+            if rid in relationships:errors.append('duplicate-main-relationship')
+            relationships[rid]=node
+    types=ET.fromstring(archive.read('[Content_Types].xml')) if '[Content_Types].xml' in names else []
+    def content_type(part):
+        return next((node.get('ContentType') for node in types if node.tag==ct+'Override' and node.get('PartName')=='/'+part),None)
+    parts={}
+    for rid,node in relationships.items():
+        kind=node.get('Type','').removeprefix(relns)
+        if node.get('Type')!=relns+kind or kind not in ('header','footer'):continue
+        target=node.get('Target','');resolved=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
+        if node.get('TargetMode')=='External' or resolved not in names:errors.append('unresolved-story-target');continue
+        root=ET.fromstring(archive.read(resolved))
+        if root.tag!=W+('hdr' if kind=='header' else 'ftr'):errors.append('invalid-story-root')
+        expected='application/vnd.openxmlformats-officedocument.wordprocessingml.'+kind+'+xml'
+        mime=content_type(resolved)
+        if mime!=expected:errors.append('invalid-story-content-type')
+        parts[resolved]={'part':resolved,'kind':kind,'sha256':hashlib.sha256(archive.read(resolved)).hexdigest(),'contentType':mime,'active':False}
+    # Keep conventional orphan parts as legacy comparison inputs; their source
+    # identity is never rewritten to an output/imported name.
+    for name in names:
+        match=re.fullmatch(r'word/(header|footer)\d+\.xml',name)
+        if match and name not in parts:parts[name]={'part':name,'kind':match.group(1),'sha256':hashlib.sha256(archive.read(name)).hexdigest(),'contentType':content_type(name),'active':False}
+    sections=[];bindings=[]
+    root=ET.fromstring(archive.read('word/document.xml'))
+    def visit(node,path,ancestors):
+        if node.tag==W+'sectPr' and not any(parent.tag in (W+'sectPrChange',W+'pPrChange') for parent in ancestors):
+            section={'part':'word/document.xml','path':path};sections.append({'source':section,'final':bool(ancestors and ancestors[-1].tag==W+'body'),'history':node.find(W+'sectPrChange') is not None})
+            slots=set()
+            for index,child in enumerate(node):
+                if child.tag not in (W+'headerReference',W+'footerReference'):continue
+                kind='header' if child.tag==W+'headerReference' else 'footer';variant=child.get(W+'type','default');
+                if variant not in ('default','first','even'):errors.append('invalid-story-variant')
+                rid=child.get(r+'id','');rel=relationships.get(rid)
+                if (kind,variant) in slots:errors.append('duplicate-story-binding')
+                slots.add((kind,variant))
+                if rel is None or rel.get('Type')!=relns+kind or rel.get('TargetMode')=='External':errors.append('invalid-story-binding');continue
+                target=rel.get('Target','');part=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
+                if part not in parts:errors.append('unresolved-story-binding');continue
+                parts[part]['active']=True
+                bindings.append({'section':section,'reference':{'part':'word/document.xml','path':path+[index]},'kind':kind,'variant':variant,'ownerPart':'word/document.xml','rId':rid,'type':rel.get('Type'),'rawTarget':target,'targetMode':rel.get('TargetMode',''),'targetPart':part})
+        for index,child in enumerate(node):visit(child,path+[index],ancestors+[node])
+    visit(root,[],[])
+    return {'policy':'worklazy-story-facts-1','parts':sorted(parts.values(),key=lambda item:item['part']),'sections':sections,'bindings':bindings,'errors':sorted(set(errors))}
+
 def _parse_document(data, include_tables, include_metadata):
     records = {
         "body": [],
@@ -599,8 +652,10 @@ def _parse_document(data, include_tables, include_metadata):
         "sourceInventory": [],
     }
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        records["storyFacts"]=_story_package_facts(archive)
+        story_kinds={item["part"]:item["kind"] for item in records["storyFacts"]["parts"]}
         for part in archive.namelist():
-            if re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments|styles)\.xml", part):
+            if part in story_kinds or re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments|styles)\.xml", part):
                 records["sourceInventory"].extend(_source_paths(ET.fromstring(archive.read(part)), part, archive).values())
         numbering = _NumberingResolver(archive)
         comments = _read_comments(archive, numbering.fresh()) if include_metadata else {}
@@ -680,16 +735,13 @@ def _parse_document(data, include_tables, include_metadata):
                         numbering.label(paragraph)
 
         if include_metadata:
-            header_footer_paths = sorted(
-                name for name in archive.namelist()
-                if re.match(r"word/(header|footer)\d+\.xml$", name)
-            )
+            header_footer_paths = sorted(story_kinds)
             for path in header_footer_paths:
                 story_numbering = numbering.fresh()
                 metadata_root = ET.fromstring(archive.read(path))
-                metadata_sources = _source_paths(metadata_root, path)
+                metadata_sources = _source_paths(metadata_root, path, archive)
                 file_name = path.split("/")[-1]
-                area = _l("머리말", "Header") if file_name.startswith("header") else _l("꼬리말", "Footer")
+                area = _l("머리말", "Header") if story_kinds[path]=="header" else _l("꼬리말", "Footer")
                 area_number = re.search(r"\d+", file_name)
                 label = f"{area} {area_number.group(0)}" if area_number else area
                 for index, paragraph in enumerate(metadata_root.iter(W + "p"), 1):
@@ -851,6 +903,7 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
         "fields": [source["field"] for source in records["sourceInventory"] if "field" in source],
         "sourceRevision": hashlib.sha256(bytes(document_bytes)).hexdigest(),
         "sourceInventory": records["sourceInventory"],
+        "storyFacts": records["storyFacts"],
         "blocks": blocks,
         "headerFooter": [record_of(record) for record in records["headerFooter"]],
         "notes": [record_of(record) for record in records["note"]],

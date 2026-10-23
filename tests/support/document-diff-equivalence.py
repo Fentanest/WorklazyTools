@@ -336,7 +336,7 @@ def _semantic_model(value):
     # property nodes legitimately change paths; semantic package comparison
     # still includes all text, formatting, paragraphs, comments and tables.
     if isinstance(value, dict):
-        return {key: _semantic_model(item) for key, item in value.items() if key not in {"source", "sourceInventory", "sourceRevision"}}
+        return {key: _semantic_model(item) for key, item in value.items() if key not in {"source", "sourceInventory", "sourceRevision", "storyFacts"}}
     if isinstance(value, list):
         return [_semantic_model(item) for item in value]
     return value

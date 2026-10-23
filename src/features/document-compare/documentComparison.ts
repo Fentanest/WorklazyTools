@@ -1,3 +1,4 @@
+import {buildStoryProjection,bindStoryDecisions,emptyStoryBindingChanges,type StoryFacts} from "./storyProjection.ts";
 import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
 import { normalizeFormattingMask, formattingGroup, maskPolicyVersion, maskedSourceFormatting, type FormattingMask } from "./formattingMask.ts";
 import type {
@@ -55,6 +56,7 @@ export interface ComparisonBlock {
 }
 
 export interface ComparisonModel {
+  storyFacts?:StoryFacts;
   capabilities?: DocumentCapabilities;
   provenance?: DocumentProvenance;
   fields?: Array<{kind:string; instruction:string; cachedText:string; sources:DocumentSourceReference[]}>;
@@ -98,6 +100,7 @@ export function compareDocumentModels(
     ? { emptyCell: (row, column) => `Empty cell ${row}:${column}`, table: (index) => `Table ${index}` }
     : { emptyCell: (row, column) => `빈 셀 ${row}:${column}`, table: (index) => `표 ${index}` };
   const manifest: DocumentComparisonManifest = {
+    storyFacts:{before:before.storyFacts,after:after.storyFacts},storyProjection:{policy:"worklazy-story-projection-1",supported:true,reasons:[],pairs:[],bindings:[]},
     nativeSources: {before:before.blocks.flatMap(block=>block.nativeSource?[block.nativeSource]:[]),after:after.blocks.flatMap(block=>block.nativeSource?[block.nativeSource]:[])},
     capabilities: {before:before.capabilities,after:after.capabilities}, provenance: {before:before.provenance,after:after.provenance}, fields:{before:before.fields ?? [],after:after.fields ?? []},
     version: 1, decisions: [], policyVersion: "worklazy-document-1",
@@ -172,7 +175,15 @@ export function compareDocumentModels(
     ));
   }
 
-  const headerFooter = compareRecordList(before.headerFooter, after.headerFooter, "headerFooter", changes, options.formatting, manifest);
+  manifest.storyProjection=buildStoryProjection(manifest);
+  const headerFooter:ManifestFormattingView[]=[];
+  if(before.storyFacts&&after.storyFacts){
+    for(const pair of manifest.storyProjection.pairs){const start=manifest.decisions.length;
+      headerFooter.push(...compareRecordList(before.headerFooter.filter(record=>record.source?.part===pair.beforePart),after.headerFooter.filter(record=>record.source?.part===pair.afterPart),"headerFooter",changes,options.formatting,manifest));
+      bindStoryDecisions(manifest,pair,manifest.decisions.slice(start));
+    }
+  }else headerFooter.push(...compareRecordList(before.headerFooter,after.headerFooter,"headerFooter",changes,options.formatting,manifest));
+  for(const view of emptyStoryBindingChanges(manifest,language)){headerFooter.push(view);changes.push({kind:view.kind,section:'headerFooter',location:view.afterLocation||view.beforeLocation,beforeLocation:view.beforeLocation,afterLocation:view.afterLocation,before:view.before,after:view.after,segments:view.segments});}
   const note = compareRecordList(before.notes, after.notes, "note", changes, options.formatting, manifest);
   const commentChanges: WordDiffItem[] = [];
   const commentViews = compareRecordList(before.comments ?? [], after.comments ?? [], "comment", commentChanges, options.formatting, manifest);

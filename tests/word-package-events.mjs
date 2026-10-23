@@ -30,9 +30,12 @@ def reject(node):
  # break joins its surviving content with the next paragraph. A wholly new
  # paragraph has no surviving content and disappears. Property changes restore
  # their explicit before snapshots, independently of the production codec.
- if node.tag in [W+'rPr',W+'pPr',W+'tblPr',W+'trPr',W+'tcPr']:
+ if node.tag in [W+'rPr',W+'pPr',W+'tblPr',W+'trPr',W+'tcPr',W+'sectPr']:
   change=node.find(node.tag+'Change')
-  if change is not None and change.get(W+'author')=='events':return reject(copy.deepcopy(change.find(node.tag)))
+  if change is not None and change.get(W+'author')=='events':
+   previous=copy.deepcopy(change.find(node.tag))
+   if node.tag==W+'sectPr':previous[:0]=[copy.deepcopy(child) for child in node if child.tag in (W+'headerReference',W+'footerReference')]
+   return reject(previous)
  if node.tag==W+'ins' and node.get(W+'author')=='events':return []
  children=[];pending=None
  for child in node:

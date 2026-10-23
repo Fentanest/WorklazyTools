@@ -1,3 +1,4 @@
+import type {StoryFacts,StoryProjection} from "./storyProjection.ts";
 import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
 import type { FormattingMask } from "./formattingMask.ts";
 import type { WordDiffSegment, WordTableAxisPair } from "../excel-merger/types";
@@ -63,6 +64,8 @@ export interface SourceSlices { before: Array<{ source: DocumentSourceReference;
 export interface RestoreStyleProjection { beforeStart: number; afterStart: number; length: number; kind: "equal" | "deleted"; policy: "copy-revised-run" | "inherit-after-default"; source?: DocumentSourceReference }
 export interface TextComparison { sourceSlices?: SourceSlices; restoreStyles?: RestoreStyleProjection[]; before: string; after: string; segments: WordDiffSegment[]; formatting?: { paragraphFamilies: string[]; paragraphHistory: boolean; paragraphScopeId: string; beforeSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; afterSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; spans: FormattingSpan[]; history: boolean } }
 export interface DocumentComparisonManifest {
+  storyFacts:{before?:StoryFacts;after?:StoryFacts};
+  storyProjection:StoryProjection;
   nativeSources: {before:Array<{format:"doc"|"hwp";story:string;paragraph:number;section?:number;control?:number}>;after:Array<{format:"doc"|"hwp";story:string;paragraph:number;section?:number;control?:number}>};
   capabilities: {before?:DocumentCapabilities;after?:DocumentCapabilities};
   provenance: {before?:DocumentProvenance;after?:DocumentProvenance};

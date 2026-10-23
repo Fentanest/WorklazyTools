@@ -48,13 +48,15 @@ class _PackageGraph:
     def __init__(self, before, after):
         self.before, self.after = before, after
         self.roots, self.additions, self.ids, self.media = {}, {}, {}, {}
+        self.output_owner=None
+        self.story_parts={item["part"] for item in _story_package_facts(after)["parts"]}|{"word/document.xml","word/footnotes.xml","word/endnotes.xml","word/comments.xml"}
         self.types = ET.fromstring(after.read('[Content_Types].xml')) if '[Content_Types].xml' in after.namelist() else ET.Element(CT+'Types')
         self.before_types = ET.fromstring(before.read('[Content_Types].xml')) if '[Content_Types].xml' in before.namelist() else ET.Element(CT+'Types')
         self.names = set(after.namelist()); self.next_drawing_id = 1
         for part in after.namelist():
             if part.startswith('word/media/'):
                 self.media[(hashlib.sha256(after.read(part)).hexdigest(),self.mime(part,self.types))] = part
-            if re.fullmatch(r'word/(document|header[0-9]+|footer[0-9]+|footnotes|endnotes|comments)\.xml',part):
+            if part in self.story_parts:
                 for node in ET.fromstring(after.read(part)).iter():
                     if node.tag=='{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr' and node.get('id','').isdigit(): self.next_drawing_id = max(self.next_drawing_id,int(node.get('id'))+1)
     def mime(self, part, types):
@@ -62,8 +64,9 @@ class _PackageGraph:
         return content or next((node.get('ContentType') for node in types if node.tag==CT+'Default' and node.get('Extension','').lower()==posixpath.splitext(part)[1].lstrip('.').lower()),None)
     def rel_path(self, part):
         return posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
-    def relationship(self, part, rid):
-        key=('before',part,rid)
+    def relationship(self, part, rid, output_owner=None):
+        output_owner=output_owner or part
+        key=('before',part,rid,output_owner)
         if key in self.ids: return self.ids[key]
         path=self.rel_path(part)
         if path not in self.before.namelist(): raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
@@ -71,6 +74,7 @@ class _PackageGraph:
         if len(candidates)!=1: raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
         old=candidates[0]; kind=old.get('Type',''); target=old.get('Target','')
         if kind not in {R[1:-1]+'/image',R[1:-1]+'/hyperlink'}: raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+        path=self.rel_path(output_owner)
         root=self.roots.get(path)
         if root is None:root=ET.fromstring(self.after.read(path)) if path in self.after.namelist() else ET.Element(PR+'Relationships')
         if old.get('TargetMode')!='External':
@@ -89,7 +93,7 @@ class _PackageGraph:
                     suffix+=1; destination='word/media/worklazy-'+digest+'-'+str(suffix)+extension
                 self.names.add(destination);self.media[(digest,content)]=destination;self.additions[destination]=data
                 ET.SubElement(self.types,CT+'Override',{'PartName':'/'+destination,'ContentType':content})
-            target=posixpath.relpath(destination,posixpath.dirname(part))
+            target=posixpath.relpath(destination,posixpath.dirname(output_owner))
         for existing in root:
             if existing.get('Type')==kind and existing.get('TargetMode','')==old.get('TargetMode','') and existing.get('Target')==target:
                 self.ids[key]=existing.get('Id');return existing.get('Id')
@@ -99,34 +103,40 @@ class _PackageGraph:
         rid='rIdWorklazy'+str(number);attrs=dict(old.attrib);attrs.update(Id=rid,Target=target)
         ET.SubElement(root,PR+'Relationship',attrs);self.ids[key]=rid
         return rid
-    def copy(self, source, part):
+    def copy(self, source, part, output_owner=None):
         result=copy.deepcopy(source)
         for node in result.iter():
             for name,value in list(node.attrib.items()):
-                if name.startswith(R):node.set(name,self.relationship(part,value))
+                if name.startswith(R):node.set(name,self.relationship(part,value,output_owner))
             if node.tag=='{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr':
                 node.set('id',str(self.next_drawing_id));self.next_drawing_id+=1
         return result
     def validate(self, replacements, additions):
         names=self.names | set(additions)
         types=ET.fromstring(replacements.get('[Content_Types].xml',self.after.read('[Content_Types].xml'))) if '[Content_Types].xml' in self.after.namelist() else self.types
-        for part,data in replacements.items():
-            if not re.fullmatch(r'word/(document|header[0-9]+|footer[0-9]+|footnotes|endnotes)\.xml',part):continue
+        for part in self.story_parts:
+            data=additions.get(part,replacements.get(part))
+            if data is None:
+                if part not in self.after.namelist():continue
+                data=self.after.read(part)
             root=_qname_safe_parse(data);path=self.rel_path(part)
             raw=additions.get(path,replacements.get(path))
             rels=ET.fromstring(raw) if raw is not None else ET.fromstring(self.after.read(path)) if path in self.after.namelist() else ET.Element(PR+'Relationships')
             for node in root.iter():
-                if node.tag not in {W+'hyperlink','{http://schemas.openxmlformats.org/drawingml/2006/main}blip','{urn:schemas-microsoft-com:vml}imagedata','{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick'}:continue
+                if node.tag not in {W+'headerReference',W+'footerReference',W+'hyperlink','{http://schemas.openxmlformats.org/drawingml/2006/main}blip','{urn:schemas-microsoft-com:vml}imagedata','{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick'}:continue
                 for name,rid in node.attrib.items():
                     if not name.startswith(R):continue
                     matches=[rel for rel in rels if rel.get('Id')==rid]
                     if len(matches)!=1:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
                     rel=matches[0]
-                    expected=R[1:-1]+('/hyperlink' if node.tag in {W+'hyperlink','{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick'} else '/image')
+                    expected=R[1:-1]+('/header' if node.tag==W+'headerReference' else '/footer' if node.tag==W+'footerReference' else '/hyperlink' if node.tag in {W+'hyperlink','{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick'} else '/image')
                     if rel.get('Type','')!=expected:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
                     if rel.get('TargetMode')=='External':continue
                     target=rel.get('Target','');target=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
                     if target not in names or self.mime(target,types) is None:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CONTENT_TYPE')
+                    if node.tag in {W+'headerReference',W+'footerReference'}:
+                        kind='header' if node.tag==W+'headerReference' else 'footer'
+                        if self.mime(target,types)!='application/vnd.openxmlformats-officedocument.wordprocessingml.'+kind+'+xml':raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CONTENT_TYPE')
     def finish(self, replacements, additions):
         for path,root in self.roots.items():
             current=replacements.get(path,additions.get(path))
@@ -166,7 +176,7 @@ def _inherit_mc_context(result, source):
 
 def _source_copy(source):
     origin = _MANIFEST_NODE_KEYS.get(source)
-    result=_PACKAGE_GRAPH.copy(source, origin[1][0]) if _PACKAGE_GRAPH is not None and origin and origin[0] == "before" else copy.deepcopy(source)
+    result=_PACKAGE_GRAPH.copy(source, origin[1][0],_PACKAGE_GRAPH.output_owner) if _PACKAGE_GRAPH is not None and origin and origin[0] == "before" else copy.deepcopy(source)
     return _inherit_mc_context(result,source)
 
 
@@ -278,6 +288,9 @@ def _property_revision(after_properties, before_properties, property_tag, change
     order = [child.tag for child in before_properties] if before_properties is not None else []
     order.extend(child.tag for child in previous if child.tag not in order)
     previous[:] = sorted(list(previous), key=lambda child: order.index(child.tag))
+    if property_tag==W+"sectPr":
+        for child in list(previous):
+            if child.tag in {W+"headerReference",W+"footerReference"}:previous.remove(child)
     change = ET.SubElement(result, change_tag, writer.attributes())
     change.append(previous)
     return result
@@ -336,8 +349,10 @@ def _accepted_copy(source, preserve_comments=False):
                 parent.remove(child)
                 continue
             if not preserve_comments and child.tag == W + "r" and child.find(W + "commentReference") is not None:
-                parent.remove(child)
-                continue
+                for reference in list(child.findall(W+"commentReference")):child.remove(reference)
+                if all(node.tag==W+"rPr" for node in child):
+                    parent.remove(child)
+                    continue
             clean(child)
             index += 1
 
@@ -1257,9 +1272,55 @@ def _source_envelope(nodes,side_name,value):
             result.append((ancestor.tag,tuple(sorted(ancestor.attrib.items())),ancestor.text if (ancestor.text or "").strip() else ""))
     return result
 
+def _validate_story_projection(facts,actual):
+    if _MANIFEST.get('storyFacts')!=facts:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_FACTS')
+    plan=_MANIFEST.get('storyProjection',{})
+    if plan.get('policy')!='worklazy-story-projection-1':raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
+    if not _MANIFEST['options']['metadata']:
+        if plan!={'policy':'worklazy-story-projection-1','supported':True,'reasons':[],'pairs':[],'bindings':[]}:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
+        return
+    a,b=facts['before'],facts['after']
+    if any(('before' in item)!=('after' in item) for item in plan.get('bindings',[])):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY_BINDING')
+    if plan.get('supported') is not True or plan.get('reasons') or a['errors'] or b['errors']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY')
+    if (a['bindings'] or b['bindings']) and (any(not section['final'] for section in a['sections']+b['sections']) or len(a['sections'])>1 or len(b['sections'])>1):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTIONS')
+    pairs=plan.get('pairs',[]);pair_ids={pair['id'] for pair in pairs}
+    if len(pair_ids)!=len(pairs):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
+    slots=sorted({ref['kind']+':'+ref['variant'] for ref in a['bindings']+b['bindings']})
+    if len(plan.get('bindings',[]))!=len(slots):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
+    used=set()
+    for slot,binding in zip(slots,plan['bindings']):
+        old=next((ref for ref in a['bindings'] if ref['kind']+':'+ref['variant']==slot),None);new=next((ref for ref in b['bindings'] if ref['kind']+':'+ref['variant']==slot),None)
+        expected={'id':'binding:'+slot,'kind':(old or new)['kind'],'variant':(old or new)['variant'],'storyId':binding.get('storyId')}
+        if old is not None:expected['before']=old
+        if new is not None:expected['after']=new
+        pair=next((pair for pair in pairs if pair['id']==binding.get('storyId')),None)
+        if binding!=expected or pair is None or pair.get('beforePart')!=(old or {}).get('targetPart') or pair.get('afterPart')!=(new or {}).get('targetPart'):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
+        used.add(pair['id'])
+    owned={'before':set(),'after':set()};covered_decisions=set()
+    for pair in pairs:
+        old,new=pair.get('beforePart'),pair.get('afterPart')
+        kind=pair['kind'];identity='story:'+json.dumps([kind,old,new],ensure_ascii=False,separators=(',',':'))
+        representation='inline' if old and new else 'unsupported-binding'
+        if pair['id']!=identity or pair['representation']!=representation:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
+        for side,part in [('before',old),('after',new)]:
+            if part is None:continue
+            if part in owned[side] or not any(item['part']==part and item['kind']==kind for item in facts[side]['parts']):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_OWNER')
+            owned[side].add(part)
+        if pair['id'] not in used and (old!=new or any(item['active'] for side,part in [('before',old),('after',new)] for item in facts[side]['parts'] if item['part']==part)):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
+        decisions=[decision for decision in _MANIFEST_DECISIONS if any(ref['part']==part for side,part in [('before',old),('after',new)] if part for ref in decision[side])]
+        if pair['decisionIds']!=[decision['id'] for decision in decisions] or any(decision['id'] in covered_decisions for decision in decisions):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
+        covered_decisions.update(pair['decisionIds'])
+        for decision in decisions:
+            if any(ref['part']!=part for side,part in [('before',old),('after',new)] for ref in decision[side]) or decision.get('trackedRepresentation')!='revision':raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
+        for side,part in [('before',old),('after',new)]:
+            expected=[ref for ref in actual[side].values() if ref['part']==part and ref['kind'] in ('p','tbl')]
+            if pair['coverage'][side]!=expected:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
+    if any(owned[side]!={item['part'] for item in facts[side]['parts']} for side in ('before','after')):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
+
 def _validate_manifest(before_path, after_path):
     """Validate ownership against raw input, without choosing correspondences."""
     actual = {}
+    story_facts={}
     nodes = {}
     for side, path in (("before", before_path), ("after", after_path)):
         with open(path, "rb") as source:
@@ -1269,6 +1330,7 @@ def _validate_manifest(before_path, after_path):
         provenance = _MANIFEST.get("provenance", {}).get(side)
         if provenance is not None and provenance.get("comparisonSha256") != model["sourceRevision"]:
             raise ValueError("STALE_COMPARISON_MANIFEST_PROVENANCE")
+        story_facts[side]=model["storyFacts"]
         inventory = model["sourceInventory"]
         entries = {_manifest_key(ref): ref for ref in inventory}
         supplied = _MANIFEST["sources"][side]
@@ -1286,6 +1348,7 @@ def _validate_manifest(before_path, after_path):
                 visit(root, [])
 
     ids = set()
+    _validate_story_projection(story_facts,actual)
     owners = {"before": {}, "after": {}}
     for decision in _MANIFEST_DECISIONS:
         decision_id = decision.get("id")
@@ -1354,7 +1417,7 @@ def _validate_manifest(before_path, after_path):
         for side in ("before", "after"):
             if decision.get("trackedRepresentation") != "preserve-after":
                 opposite_parts = {key[0] for key in actual["after" if side == "before" else "before"]}
-                if any(ref["part"] not in opposite_parts for ref in decision[side]):
+                if any(ref["part"] not in opposite_parts and not any(pair.get(side+"Part")==ref["part"] for pair in _MANIFEST["storyProjection"]["pairs"]) for ref in decision[side]):
                     raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
         _validate_segments(decision["textSegments"], decision["beforeText"], decision["afterText"])
         if shape == (1, 2):
@@ -2141,25 +2204,29 @@ def _replace_blocks(container, replacements):
         container.insert(insertion_index + offset, replacement)
 
 
-def _revisionize_xml_part(before_data, after_data, include_formatting, writer, container_tag=None, include_tables=True, part="word/document.xml"):
-    before_root = _parse_xml(before_data)
-    after_root = _parse_xml(after_data)
-    _register_manifest_root(before_root, part, "before")
-    _register_manifest_root(after_root, part, "after")
-    before_container = before_root.find(W + container_tag) if container_tag else before_root
-    after_container = after_root.find(W + container_tag) if container_tag else after_root
-    if before_container is None or after_container is None:
-        return after_data
-    before_blocks = [child for child in before_container if child.tag in BLOCK_TAGS]
-    after_blocks = [child for child in after_container if child.tag in BLOCK_TAGS]
-    _replace_blocks(
-        after_container,
-        _revision_blocks(before_blocks, after_blocks, include_formatting, writer, include_tables),
-    )
-    if include_formatting and container_tag == "body":
-        _apply_property_revision(after_container, before_container, W + "sectPr", W + "sectPrChange", writer)
-    return _serialize_xml(after_root)
-
+def _revisionize_xml_part(before_data, after_data, include_formatting, writer, container_tag=None, include_tables=True, part="word/document.xml",source_before_part=None):
+    previous_owner=_PACKAGE_GRAPH.output_owner if _PACKAGE_GRAPH is not None else None
+    if _PACKAGE_GRAPH is not None:_PACKAGE_GRAPH.output_owner=part
+    try:
+        before_root = _parse_xml(before_data)
+        after_root = _parse_xml(after_data)
+        _register_manifest_root(before_root, source_before_part or part, "before")
+        _register_manifest_root(after_root, part, "after")
+        before_container = before_root.find(W + container_tag) if container_tag else before_root
+        after_container = after_root.find(W + container_tag) if container_tag else after_root
+        if before_container is None or after_container is None:
+            return after_data
+        before_blocks = [child for child in before_container if child.tag in BLOCK_TAGS]
+        after_blocks = [child for child in after_container if child.tag in BLOCK_TAGS]
+        _replace_blocks(
+            after_container,
+            _revision_blocks(before_blocks, after_blocks, include_formatting, writer, include_tables),
+        )
+        if include_formatting and container_tag == "body":
+            _apply_property_revision(after_container, before_container, W + "sectPr", W + "sectPrChange", writer)
+        return _serialize_xml(after_root)
+    finally:
+        if _PACKAGE_GRAPH is not None:_PACKAGE_GRAPH.output_owner=previous_owner
 
 def _revisionize_notes(before_data, after_data, include_formatting, writer, note_tag, include_tables=True):
     before_root = _parse_xml(before_data)
@@ -2505,7 +2572,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
             if include_metadata:
                 reference_parts.extend(
                     name for name in before_names
-                    if re.fullmatch(r"word/(header|footer)\d+\.xml", name) and name in after_names
+                    if any(pair.get("beforePart")==name for pair in _MANIFEST["storyProjection"]["pairs"])
                 )
                 reference_parts.extend(
                     name for name in ("word/footnotes.xml", "word/endnotes.xml")
@@ -2555,16 +2622,10 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
             replacements["word/settings.xml"] = _enable_revision_display(after_archive.read("word/settings.xml"))
 
         if include_metadata:
-            for name in after_archive.namelist():
-                if re.fullmatch(r"word/(header|footer)\d+\.xml", name) and name in before_names:
-                    replacements[name] = _revisionize_xml_part(
-                        before_part(name),
-                        after_archive.read(name),
-                        bool(include_formatting),
-                        writer,
-                        include_tables=bool(include_tables),
-                        part=name,
-                    )
+            for pair in _MANIFEST['storyProjection']['pairs']:
+                old,new=pair.get('beforePart'),pair.get('afterPart')
+                if old and new:
+                    replacements[new]=_revisionize_xml_part(before_part(old),after_archive.read(new),bool(include_formatting),writer,include_tables=bool(include_tables),part=new,source_before_part=old)
             for name, note_tag in (("word/footnotes.xml", "footnote"), ("word/endnotes.xml", "endnote")):
                 if name in after_archive.namelist() and name in before_names:
                     replacements[name] = _revisionize_notes(
