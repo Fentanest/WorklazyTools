@@ -235,10 +235,60 @@ def _run_style(run):
     return "|".join(values)
 
 
+def _normalized_property_fact(tree, property_name, policy):
+    """Normalize one source snapshot; never compare documents or choose edits."""
+    supported, unsupported = {}, {}
+    history = False
+    toggles = set(policy.get("toggles", []))
+    def canonical(node):
+        attributes = sorted((name, value) for name, value in node["attributes"].items() if not (name.startswith(W) and name[len(W):].startswith("rsid")))
+        local = node["name"][len(W):] if node["name"].startswith(W) else node["name"]
+        if node["name"].startswith(W) and local in toggles:
+            value = node["attributes"].get(W + "val", "true").lower()
+            if value in {"false", "off", "0"}:
+                return None
+            return [node["name"], [(name, value) for name, value in attributes if name != W + "val"], "on", [canonical(child) for child in node["children"]]]
+        children = [canonical(child) for child in node["children"] if child["name"] not in {W + name + "Change" for name in policy.get("enabled", {})}]
+        return [node["name"], attributes, node["text"] if node["text"].strip() else "", children]
+    for child in (tree or {}).get("children", []):
+        if child["name"] == W + property_name + "Change":
+            history = True
+            continue
+        value = canonical(child)
+        if value is None:
+            continue
+        local = child["name"][len(W):] if child["name"].startswith(W) else child["name"]
+        target = supported if child["name"].startswith(W) and local in policy.get("enabled", {}).get(property_name, []) else unsupported
+        target.setdefault(child["name"], []).append(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+    return {"supported": supported, "unsupported": unsupported, "history": history}
+
+
 def _source_paths(root, part, archive=None):
     result = {}
-    def visit(node, path):
+    offsets = {}
+    policy = json.loads(globals().get("WORKLAZY_FORMATTING_POLICY_JSON", "{}"))
+    def property_tree(node):
+        if node is None:
+            return None
+        return {"name": node.tag, "attributes": dict(node.attrib), "text": node.text or "", "children": [property_tree(child) for child in node]}
+    def visit(node, path, paragraph=None):
         reference = {"part": part, "path": path, "kind": node.tag.rsplit("}", 1)[-1]}
+        property_names = {"p": ("pPr",), "r": ("rPr",), "tbl": ("tblPr",), "tr": ("trPr",), "tc": ("tcPr",), "body": ("sectPr",), "style": ("pPr", "rPr")}.get(reference["kind"], ())
+        if property_names:
+            reference["propertySnapshots"] = {name: property_tree(node.find(W + name)) for name in property_names}
+            reference["normalizedProperties"] = {name: _normalized_property_fact(tree, name, policy) for name, tree in reference["propertySnapshots"].items()}
+        if node.tag == W + "style":
+            reference["attributes"] = dict(node.attrib)
+            name = node.find(W + "name")
+            reference["label"] = name.get(W + "val", "") if name is not None else ""
+        if node.tag == W + "p":
+            paragraph = path
+            offsets[tuple(path)] = 0
+        if node.tag == W + "r" and paragraph is not None:
+            start = offsets[tuple(paragraph)]
+            offsets[tuple(paragraph)] += len(_text(node))
+            reference["paragraphPath"] = paragraph
+            reference["textRange"] = [start, offsets[tuple(paragraph)]]
         if node.tag == W + "p":
             reference["rawText"] = _text(node)
             opaque = [item for item in node.iter() if item.tag in {W + "drawing", W + "pict", W + "object", W + "hyperlink", W + "fldChar", W + "instrText", W + "footnoteReference", W + "endnoteReference"}]
@@ -272,7 +322,7 @@ def _source_paths(root, part, archive=None):
                 reference["copySignature"] = hashlib.sha256(json.dumps(copy_payload, ensure_ascii=False).encode("utf-8")).hexdigest()
         result[id(node)] = reference
         for index, child in enumerate(node):
-            visit(child, path + [index])
+            visit(child, path + [index], paragraph)
     visit(root, [])
     return result
 
@@ -447,7 +497,7 @@ def _parse_document(data, include_tables, include_metadata):
     }
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         for part in archive.namelist():
-            if re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments)\.xml", part):
+            if re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments|styles)\.xml", part):
                 records["sourceInventory"].extend(_source_paths(ET.fromstring(archive.read(part)), part, archive).values())
         numbering = _NumberingResolver(archive)
         comments = _read_comments(archive, numbering.fresh()) if include_metadata else {}
