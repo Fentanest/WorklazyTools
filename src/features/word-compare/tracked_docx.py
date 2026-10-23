@@ -1369,6 +1369,19 @@ def _validate_manifest(before_path, after_path):
                     old_parent=nodes["before"][(old_ref["part"],tuple(old_ref["path"][:-1]))]
                     new_parent=nodes["after"][(new_refs[0]["part"],tuple(new_refs[0]["path"][:-1]))]
                     if any(value["part"]!=new_refs[0]["part"] or value["path"][:-1]!=new_refs[0]["path"][:-1] for value in new_refs) or old_parent.tag!=new_parent.tag:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+                    def envelope(side_name,value):
+                        def canonical(node):
+                            return (node.tag,tuple(sorted(node.attrib.items())),node.text if (node.text or "").strip() else "",tuple(canonical(child) for child in node),node.tail if (node.tail or "").strip() else "")
+                        result=[]
+                        for depth in range(1,len(value["path"])):
+                            ancestor=nodes[side_name][(value["part"],tuple(value["path"][:depth]))]
+                            if ancestor.tag==CONTENT_CONTROL_TAG:
+                                result.append((ancestor.tag,tuple(sorted(ancestor.attrib.items())),ancestor.text if (ancestor.text or "").strip() else "",tuple(canonical(child) for child in ancestor if child.tag!=CONTENT_CONTROL_BODY_TAG)))
+                            elif ancestor.tag==CONTENT_CONTROL_BODY_TAG:
+                                result.append((ancestor.tag,tuple(sorted(ancestor.attrib.items())),ancestor.text if (ancestor.text or "").strip() else ""))
+                        return result
+                    old_envelope=envelope("before",old_ref)
+                    if any(envelope("after",value)!=old_envelope for value in new_refs):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
                     for split_side in ("before","after"):
                         for value in owner[split_side]:
                             paragraph=nodes[split_side][_manifest_key(value)]

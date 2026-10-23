@@ -508,6 +508,50 @@ for unsupported in ['bookmark','before-envelope','after-envelopes','hyperlink','
  except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE' in str(error),(unsupported,str(error))
  assert not os.path.exists('/bad.docx')
 `);
+py.runPython(String.raw`
+# The complete SDT ancestor envelope, not merely the immediate parent tag,
+# must remain representable. These are real source changes, not forged refs.
+def control(body,tag='stable',attrs='',content_attrs=''):
+ return '<w:sdt'+attrs+'><w:sdtPr><w:tag w:val="'+tag+'"/></w:sdtPr><w:sdtContent'+content_attrs+'>'+body+'</w:sdtContent></w:sdt>'
+for mutation in ['tag','alias','lock','outer-tag','sdt-attribute','content-attribute','end-properties']:
+ original=p(text('First sentence. ')+image_run('20','Arial','FF0000','en-US')+text('Second sentence.'))
+ revised=p(text('First sentence. '))+p(image_run('40','Calibri','0000FF','ko-KR')+text('Second sentence.'))
+ old=control(original);new=control(revised)
+ if mutation=='tag':old=control(original,'original-control');new=control(revised,'revised-control')
+ elif mutation=='alias':old=old.replace('<w:sdtPr>','<w:sdtPr><w:alias w:val="original-alias"/>');new=new.replace('<w:sdtPr>','<w:sdtPr><w:alias w:val="revised-alias"/>')
+ elif mutation=='lock':old=old.replace('<w:sdtPr>','<w:sdtPr><w:lock w:val="contentLocked"/>');new=new.replace('<w:sdtPr>','<w:sdtPr><w:lock w:val="sdtLocked"/>')
+ elif mutation=='outer-tag':old=control(old,'outer-original');new=control(new,'outer-revised')
+ elif mutation=='sdt-attribute':old=control(original,attrs=' xmlns:test="urn:source-envelope" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="test" test:state="original"');new=control(revised,attrs=' xmlns:test="urn:source-envelope" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="test" test:state="revised"')
+ elif mutation=='content-attribute':old=control(original,content_attrs=' xmlns:test="urn:source-envelope" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="test" test:state="original"');new=control(revised,content_attrs=' xmlns:test="urn:source-envelope" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="test" test:state="revised"')
+ else:old=old.replace('<w:sdtContent>','<w:sdtEndPr><w:rPr><w:b/></w:rPr></w:sdtEndPr><w:sdtContent>')
+ for side,body in [('before',old),('after',new)]:package('/envelope-'+side+'.docx',body,OLDPNG,'https://same.example')
+ for formatting in [False,True]:
+  if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+  try:generate_tracked_document('/envelope-before.docx','/envelope-after.docx','/bad.docx','events',formatting,True,True,None,requested_json);raise AssertionError((mutation,'accepted'))
+  except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE' in str(error),(mutation,str(error))
+  assert not os.path.exists('/bad.docx')
+ # Save actual reviewer/source regressions independently of the invalid result.
+ for side in ['before','after']:shutil.copyfile('/envelope-'+side+'.docx','/p-packages/envelope-'+mutation+'-'+side+'.docx')
+`);
+py.runPython(String.raw`
+# Prefix aliases and attribute order do not make an equal envelope unequal.
+old=control(p(text('First sentence. ')+image_run('20','Arial','FF0000','en-US')+text('Second sentence.')),attrs=' xmlns:left="urn:source-envelope" xmlns:mc="'+MC+'" mc:Ignorable="left" left:a="A" left:b="B"')
+new=control(p(text('First sentence. '))+p(image_run('40','Calibri','0000FF','ko-KR')+text('Second sentence.')),attrs=' xmlns:right="urn:source-envelope" xmlns:mc="'+MC+'" right:b="B" right:a="A" mc:Ignorable="right"')
+for side,body in [('before',old),('after',new)]:package('/equal-envelope-'+side+'.docx',body,OLDPNG,'https://same.example')
+generate_tracked_document('/equal-envelope-before.docx','/equal-envelope-after.docx','/equal-envelope-out.docx','events',False,True,True,None,requested_json)
+accept_tracked_document('/equal-envelope-out.docx','/equal-envelope-accepted.docx')
+assert view('/equal-envelope-accepted.docx')==view('/equal-envelope-after.docx')
+assert view('/equal-envelope-out.docx',True)==view('/equal-envelope-before.docx')
+for path in ['/equal-envelope-out.docx','/equal-envelope-accepted.docx']:
+ with zipfile.ZipFile(path) as z:
+  for root in [ET.fromstring(z.read('word/document.xml')),reject(ET.fromstring(z.read('word/document.xml')))[0]]:
+   controls=list(root.iter(W+'sdt'));assert len(controls)==1
+   assert controls[0].get('{urn:source-envelope}a')=='A' and controls[0].get('{urn:source-envelope}b')=='B'
+   assert controls[0].find(W+'sdtPr/'+W+'tag').get(W+'val')=='stable'
+for variant in ['before','after','out','accepted']:shutil.copyfile('/equal-envelope-'+variant+'.docx','/p-packages/equal-envelope-'+variant+'.docx')
+`);
+console.log('Equal SDT namespace-alias/attribute-order envelope exports and roundtrips');
+console.log('14 unequal SDT ancestor/property/attribute envelope gates passed');
 console.log('5 source-envelope/anchor/hyperlink/paragraph-history split capability gates passed');
 requested=undefined;
 console.log('49 paired image property package projections +252 source/family/fact negatives +2 metadata exclusions +4 absent-property targets +2 existing-history targets +2 malformed-history gates passed');
