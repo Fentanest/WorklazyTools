@@ -19,6 +19,7 @@ export function mappedLines(mapped: MappedText): TextLine[] {
   return lines;
 }
 function graphemeDiff(left: string, right: string, check: () => void): { segments: Segment[]; coarse: boolean } {
+  if(left.length+right.length>100_000)return {segments:[...(left?[{type:"deleted" as const,text:left}]:[]),...(right?[{type:"added" as const,text:right}]:[])],coarse:true};
   if (!Intl.Segmenter) throw new Error("GRAPHEME_UNAVAILABLE");
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   const a = Array.from(segmenter.segment(left), item => item.segment), b = Array.from(segmenter.segment(right), item => item.segment);
@@ -49,6 +50,7 @@ function marks(mapped: MappedText, line: TextLine | undefined, segments: Segment
 }
 export function compareTexts(left: string, right: string, options: TextOptions, revision=0, deadlineMs=5000): TextResult {
   if (left.length+right.length>4_000_000) throw new Error("TEXT_TOO_LARGE");
+  for(const text of [left,right]){let breaks=0;for(let i=0;i<text.length;i++)if(text.charCodeAt(i)===10&&++breaks>200_000)throw new Error("TEXT_LINE_LIMIT");if(breaks+(text.endsWith("\n")?0:1)>200_000)throw new Error("TEXT_LINE_LIMIT");}
   const deadline=performance.now()+deadlineMs, check=()=>{if(performance.now()>deadline) throw new Error("TEXT_TIMEOUT");};
   const lm=mapText(left,options), rm=mapText(right,options); check();
   const a=mappedLines(lm),b=mappedLines(rm);

@@ -88,3 +88,10 @@ test("undo and redo share a bounded history budget",()=>{
   assert.deepEqual(history.undo({...small,left:"x".repeat(100)}),small);
   assert.equal(history.canRedo,false);assert.equal(history.canUndo,false);
 });
+test("input line admission and long character spans remain bounded",()=>{
+  assert.throws(()=>compareTexts("x\n".repeat(200001),"",defaults),/TEXT_LINE_LIMIT/);
+  assert.throws(()=>compareTexts("x\n".repeat(200000)+"x","",defaults),/TEXT_LINE_LIMIT/);
+  const result=compareTexts("a".repeat(60000),"b".repeat(60000),{...defaults,mode:"character"});
+  assert.equal(result.quality,"line-coarse");assert.equal(result.counts.changed,1);
+  assert.equal(result.rows[0].left?.raw.length,60000);
+});

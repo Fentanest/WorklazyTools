@@ -1324,6 +1324,13 @@
         "paragraphs": [
           "Example data: Left has 10 P-01 / 20 P-02, Right has 25 P-02 / 10 P-01. By linking based on the product code, even with a different order, you can easily verify that P-01 has the same quantity and P-02 has changed."
         ]
+      },
+      {
+        "title": "Column mapping and cell views",
+        "paragraphs": [
+          "Enable manual column mapping to choose original column numbers. Date-string comparison defaults to off and applies only to plain string values in both selected columns. It supports US/EU or ISO dates with optional HH:mm:ss; date-only and timed values remain distinct. Keys, reconciliation and formulas are unchanged. Grid hiding and reversal preserve original addresses. Full-report and visible-record exports are separate.",
+          "The worksheet grids include headers and unchanged cells. Each pane shows up to 40 rows and 12 columns, with controls for the starting position. Choose original or changed to hide source rows or columns. Paging changes only the preview window; export includes all records selected by filters and hiding."
+        ]
       }
     ],
     "faq": {
@@ -2386,6 +2393,51 @@
         "7",
         "5"
       ]
+    }
+  },
+  "textCompare": {
+    "title": "Text comparison guide",
+    "description": "Find line, word and character changes between two texts, copy selected changes and save your result.",
+    "blocks": [
+      {
+        "title": "How to compare",
+        "items": [
+          "Paste text or open a file on each side.",
+          "Choose the comparison unit and optional ignore settings.",
+          "Select Compare and inspect the highlighted original and revised text.",
+          "Copy selected lines using the arrows, then save a TXT file."
+        ]
+      },
+      {
+        "title": "Spaces and line endings",
+        "paragraphs": [
+          "Ignoring spaces applies within lines. Normalizing line endings excludes CRLF versus LF differences from comparison while retaining the original text. For a notice with a changed deadline, inspect the date line before copying the revision."
+        ]
+      },
+      {
+        "title": "File size and downloads",
+        "paragraphs": [
+          "Choose files up to 4 MB each. UTF-8 and UTF-16 with a BOM are supported. Large or highly repetitive text can use less detailed highlighting or reach a processing limit. Select the download encoding and BOM option, and check important content in the saved file.Each input supports up to 200,000 lines."
+        ]
+      }
+    ],
+    "faq": {
+      "privacy": {
+        "q": "Are my files or text sent to a server?",
+        "a": "Comparison and download preparation run in your browser. Your input text and file contents are not sent to a server."
+      },
+      "ignore": {
+        "q": "Do ignore rules delete original text?",
+        "a": "No. They exclude text only from comparison. Original characters remain available in the result, downloads and copied changes."
+      },
+      "units": {
+        "q": "How do fine detail, word and character comparison differ?",
+        "a": "Word comparison highlights changed words. Fine detail also checks characters inside replacements, while character comparison keeps emoji and combining characters together. Large sections may use line-level comparison."
+      },
+      "save": {
+        "q": "Will the original file be overwritten?",
+        "a": "No. Copied changes and transformations affect the editors. Save TXT downloads a new file."
+      }
     }
   }
 }

@@ -372,6 +372,17 @@
         "One DOCX per row",
         "Sample and result reports"
       ]
+    },
+    "text-compare": {
+      "title": "Text Compare",
+      "shortTitle": "Text Compare",
+      "description": "Find line, word and character changes between two texts, copy selected changes and save your result.",
+      "eyebrow": "TEXT COMPARISON",
+      "highlights": [
+        "Line, word and character comparison",
+        "Literal ignore rules",
+        "Copy selected changes"
+      ]
     }
   }
 }

@@ -84,7 +84,9 @@ test("visual regression scenario manifest covers every available tool and state 
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  assert.equal(names.length, 294);
+  // Text Compare adds 4 initial, 2 bottom and 1 interaction captures.
+  assert.equal(names.length, 301);
+  assert.equal(visualRegressionScenarios.filter(({ toolId }) => toolId === "text-compare").flatMap(({ profiles }) => profiles).length, 7);
   assert.equal(visualRegressionScenarios.filter(({ toolId }) => toolId === "product-banner").flatMap(({ profiles }) => profiles).length, 7);
   // Pinned scope additions (not copied historical totals): 4 desktop-1920
   // captures and 4 mint-family captures; unpublished video captures are excluded.
@@ -101,8 +103,9 @@ test("visual regression scenario manifest covers every available tool and state 
     ].filter((name) => !names.includes(name)),
     [],
   );
-  assert.equal(qaCaptureScenarios.length, 96);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 756);
+  assert.equal(qaCaptureScenarios.length, 99);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 780);
+  assert.deepEqual(qaCaptureScenarios.filter(({ toolId }) => toolId === "text-compare").map(({ stateType }) => stateType), ["initial", "bottom", "interaction"]);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));

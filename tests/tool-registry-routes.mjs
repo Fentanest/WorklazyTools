@@ -54,7 +54,7 @@ export const expectedToolIds = Object.freeze([
   "foliotrace", "product-banner",
   "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "pdf-editor", "pdf-converter", "document-markdown", "document-compare", "pdf-compare",
   "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio", "image-studio",
-  "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator",
+  "text-compare", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator",
   "document-redactor", "payroll-calculator", "image-privacy", "security-tools", "qr-studio", "data-converter",
 ]);
 

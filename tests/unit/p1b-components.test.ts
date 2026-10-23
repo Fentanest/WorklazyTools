@@ -36,6 +36,7 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
     "product-banner/ProductBannerPage.tsx",
     "qr-studio/QrStudioPage.tsx",
     "security-tools/SecurityToolsPage.tsx",
+    "text-compare/TextComparePage.tsx",
     "text-formatter/TextFormatterPage.tsx",
     "text-merger/TextMergerPage.tsx",
     "text-tools/TextToolsPage.tsx",

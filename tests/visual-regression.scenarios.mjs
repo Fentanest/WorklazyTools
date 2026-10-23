@@ -52,6 +52,7 @@ const interactionProfiles = Object.freeze([enDarkDesktop]);
 const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, koLightMobile320, enLightMobile320]);
 const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
+  "text-compare",
   "product-banner",
   "document-redactor",
   "document-generator",
@@ -202,6 +203,16 @@ const bottomScenarioFor = (route) => {
 };
 
 const interactionDefinitions = Object.freeze({
+  "text-compare": Object.freeze({
+    stateId: "interaction-comparison-result",
+    actions: [
+      { type: "replace-text", selector: "[data-testid='text-compare-left']", value: "Deadline: Monday\nKeep this line." },
+      { type: "replace-text", selector: "[data-testid='text-compare-right']", value: "Deadline: Friday\nKeep this line." },
+      { type: "click", selector: "[data-testid='text-compare-run']" },
+      { type: "wait", selector: "[data-testid='text-compare-summary']" },
+    ],
+    assertSelector: "[data-testid='text-diff-view']",
+  }),
   "product-banner": Object.freeze({
     stateId: "interaction-iframe-preview",
     actions: [{ type: "select", selector: "[data-tool-page='product-banner'] select:is([aria-label='Preview'], [aria-label='미리보기'])", value: "iframe" }],
