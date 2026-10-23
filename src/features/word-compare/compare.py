@@ -235,10 +235,38 @@ def _run_style(run):
     return "|".join(values)
 
 
-def _source_paths(root, part):
+def _source_paths(root, part, archive=None):
     result = {}
     def visit(node, path):
-        result[id(node)] = {"part": part, "path": path}
+        reference = {"part": part, "path": path, "kind": node.tag.rsplit("}", 1)[-1]}
+        if node.tag == W + "p":
+            reference["rawText"] = _text(node)
+            opaque = [item for item in node.iter() if item.tag in {W + "drawing", W + "pict", W + "object", W + "hyperlink", W + "fldChar", W + "instrText", W + "footnoteReference", W + "endnoteReference"}]
+            if opaque:
+                def canonical(item):
+                    if item.tag == W + "hyperlink":
+                        return (item.tag, sorted(item.attrib.items()), _text(item))
+                    return (item.tag, sorted(item.attrib.items()), item.text or "", [canonical(child) for child in item])
+                payload = json.dumps([canonical(item) for item in opaque], ensure_ascii=False).encode("utf-8")
+                if archive is not None:
+                    import posixpath
+                    relationship_path = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
+                    if relationship_path in archive.namelist():
+                        relationship_root = ET.fromstring(archive.read(relationship_path))
+                        relationships = {item.get("Id"): item for item in relationship_root}
+                        for item in opaque:
+                            for descendant in item.iter():
+                                for attribute, value in descendant.attrib.items():
+                                    if attribute.startswith("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}") and value in relationships:
+                                        relationship = relationships[value]
+                                        payload += json.dumps(canonical(relationship), ensure_ascii=False).encode("utf-8")
+                                        if relationship.get("TargetMode") != "External":
+                                            target = relationship.get("Target", "")
+                                            target_path = target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), target))
+                                            if target_path in archive.namelist():
+                                                payload += archive.read(target_path)
+                reference["opaqueSignature"] = hashlib.sha256(payload).hexdigest()
+        result[id(node)] = reference
         for index, child in enumerate(node):
             visit(child, path + [index])
     visit(root, [])
@@ -416,7 +444,7 @@ def _parse_document(data, include_tables, include_metadata):
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         for part in archive.namelist():
             if re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments)\.xml", part):
-                records["sourceInventory"].extend(_source_paths(ET.fromstring(archive.read(part)), part).values())
+                records["sourceInventory"].extend(_source_paths(ET.fromstring(archive.read(part)), part, archive).values())
         numbering = _NumberingResolver(archive)
         comments = _read_comments(archive, numbering.fresh()) if include_metadata else {}
         comment_locations = {}

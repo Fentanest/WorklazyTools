@@ -12,7 +12,7 @@ import type {
 } from "../excel-merger/types";
 import { alignDocumentSequence, alignSequence, type SequenceGroup, type SequencePair } from "./documentAlignment.ts";
 
-import { freezeComparisonManifest } from "./comparisonManifest.ts";
+import { completeManifestCoverage, freezeComparisonManifest } from "./comparisonManifest.ts";
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ManifestRecord } from "./comparisonManifest.ts";
 
 export interface ComparisonRecord {
@@ -81,6 +81,7 @@ export function compareDocumentModels(
     inputRevision: { before: before.sourceRevision, after: after.sourceRevision },
     options: { ...options },
     preservation: { comments: "preserve-after-existing-contract", existingRevisions: "preserve-after-history" },
+    coverage: { before: [], after: [] },
     sources: { before: before.sourceInventory ?? [], after: after.sourceInventory ?? [] },
     exclusions: {
       formatting: options.formatting ? "compare" : "preserve-after",
@@ -160,6 +161,7 @@ export function compareDocumentModels(
     + commentViews.filter((view) => view.kind === "unchanged").length;
   summary.moved = visibleViews.filter((view) => view.moved || view.kind === "moved").length;
 
+  completeManifestCoverage(manifest);
   return {
     beforeName,
     afterName,
@@ -212,6 +214,7 @@ function compareRecordList(
 function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = false, type: ComparisonDecision["type"] = "paragraph", context = "paragraph"): ComparisonDecision {
   const beforeText = before.map((record) => record.rawText ?? record.text).join("\n");
   const afterText = after.map((record) => record.rawText ?? record.text).join("\n");
+  let splitSlices: Array<[number, number]> | undefined;
   const comparisons = [{ before: beforeText, after: afterText, segments: diffText(beforeText, afterText) }];
   // Paragraph-break revisions use synthetic text slices. Their text decisions
   // are fixed here too, so the XML emitter never chooses a second alignment.
@@ -221,6 +224,7 @@ function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = f
     let suffix = 0;
     while (suffix < a.length && suffix < tail.length && a[a.length - 1 - suffix] === tail[tail.length - 1 - suffix]) suffix++;
     const boundary = a.length - suffix;
+    splitSlices = [[0, boundary], [boundary, a.length]];
     for (const [old, next] of [[a.slice(0, boundary).join(""), after[0].rawText ?? after[0].text], [a.slice(boundary).join(""), tail.join("")]]) {
       comparisons.push({ before: old, after: next, segments: diffText(old, next) });
     }
@@ -230,6 +234,7 @@ function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = f
   }
   return {
     comparisons,
+    splitSlices,
     trackedRepresentation: "revision",
     id: [...before, ...after].some((record) => record.source)
       ? JSON.stringify([type, before.map((record) => record.source ?? null), after.map((record) => record.source ?? null)])

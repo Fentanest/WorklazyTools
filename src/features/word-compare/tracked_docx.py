@@ -289,12 +289,6 @@ def _block_kind(element):
 
 
 
-def _tracked_common_suffix_length(left, right):
-    limit = min(len(left), len(right))
-    index = 0
-    while index < limit and left[-index - 1] == right[-index - 1]:
-        index += 1
-    return index
 
 
 
@@ -451,12 +445,9 @@ def _plain_paragraph_from_tokens(source, tokens):
 
 def _paragraph_split_revision(before, first_after, second_after, include_formatting, writer):
     before_text = _comparison_text(before)
-    second_text = _comparison_text(second_after)
-    suffix = _tracked_common_suffix_length(before_text, second_text)
-    # Assign the unchanged tail to the second paragraph. Any source text between
-    # the common prefix and tail remains in the first comparison and is emitted
-    # as a real deletion instead of silently disappearing.
-    boundary = max(0, len(before_text) - suffix)
+    slices = _MANIFEST_ACTIVE_DECISION["splitSlices"]
+    boundary = slices[0][1]
+    # TypeScript owns the exact source slices; XML only renders those slices.
     before_tokens = _styled_tokens(before)
     first_before = _plain_paragraph_from_tokens(before, before_tokens[:boundary])
     second_before = _plain_paragraph_from_tokens(before, before_tokens[boundary:])
@@ -528,7 +519,15 @@ def _whole_paragraph_revision(source, kind, writer):
 def _shared_text_opcodes(before, after):
     """Adapt shared TypeScript diff segments to code-point token ranges."""
     try:
-        encoded = json.dumps(_MANIFEST_COMPARISONS[(before, after)]) if _MANIFEST is not None else worklazyDiffJson(before, after)
+        if _MANIFEST is not None:
+            if _MANIFEST_ACTIVE_DECISION is None:
+                raise ValueError("MISSING_COMPARISON_DECISION")
+            matches = [item for item in _MANIFEST_ACTIVE_DECISION["comparisons"] if item["before"] == before and item["after"] == after]
+            if not matches:
+                raise ValueError("MISSING_COMPARISON_DECISION_TEXT")
+            encoded = json.dumps(matches[0]["segments"])
+        else:
+            encoded = worklazyDiffJson(before, after)
     except Exception as error:
         raise ValueError("SHARED_DIFF_CALL_FAILED") from error
     if not isinstance(encoded, str):
@@ -761,11 +760,13 @@ def _table_revision(before, after, include_formatting, writer):
     revised_rows = []
     for before_row_index, after_row_index in row_pairs:
         if before_row_index is None:
+            _consume_manifest_subtree("after", after_rows[after_row_index])
             row = copy.deepcopy(after_rows[after_row_index])
             _mark_row(row, "ins", writer)
             revised_rows.append(row)
             continue
         if after_row_index is None:
+            _consume_manifest_subtree("before", before_rows[before_row_index])
             row = _accepted_copy(before_rows[before_row_index])
             _mark_row(row, "del", writer)
             _revisionize_deleted_row(row, writer)
@@ -782,9 +783,11 @@ def _table_revision(before, after, include_formatting, writer):
             before_cell = before_cells[before_column_index] if before_column_index is not None and before_column_index < len(before_cells) else None
             after_cell = after_cells[after_column_index] if after_column_index is not None and after_column_index < len(after_cells) else None
             if before_cell is None and after_cell is not None:
+                _consume_manifest_subtree("after", after_cell)
                 cell = copy.deepcopy(after_cell)
                 _mark_cell(cell, "cellIns", writer)
             elif after_cell is None and before_cell is not None:
+                _consume_manifest_subtree("before", before_cell)
                 cell = _accepted_copy(before_cell)
                 _mark_cell(cell, "cellDel", writer)
             elif before_cell is not None and after_cell is not None:
@@ -804,6 +807,7 @@ def _table_revision(before, after, include_formatting, writer):
 
 
 def _whole_table_revision(source, kind, writer):
+    _consume_manifest_subtree("after" if kind == "ins" else "before", source)
     table = copy.deepcopy(source) if kind == "ins" else _accepted_copy(source)
     for row in table.findall(W + "tr"):
         _mark_row(row, kind, writer)
@@ -866,63 +870,237 @@ def _content_control_revision(before, after, include_formatting, writer, include
 _MANIFEST = None
 _MANIFEST_NODE_KEYS = {}
 _MANIFEST_DECISIONS = []
-_MANIFEST_COMPARISONS = {}
 _MANIFEST_USED = set()
+_MANIFEST_CONSUMED = {}
+_MANIFEST_ACTIVE_DECISION = None
 
 
 def _manifest_key(source):
     return (source["part"], tuple(source["path"]))
 
 
+def _validate_manifest(before_path, after_path):
+    """Validate ownership against raw input, without choosing correspondences."""
+    actual = {}
+    nodes = {}
+    for side, path in (("before", before_path), ("after", after_path)):
+        with open(path, "rb") as source:
+            model = json.loads(extract_document_model(source.read(), True, True, "en"))
+        inventory = model["sourceInventory"]
+        entries = {_manifest_key(ref): ref for ref in inventory}
+        supplied = _MANIFEST["sources"][side]
+        if len(supplied) != len(entries) or {_manifest_key(ref): ref for ref in supplied} != entries:
+            raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_INVENTORY")
+        actual[side] = entries
+        nodes[side] = {}
+        with zipfile.ZipFile(path) as archive:
+            for part in {ref[0] for ref in entries}:
+                root = _parse_xml(archive.read(part))
+                def visit(node, path):
+                    nodes[side][(part, tuple(path))] = node
+                    for index, child in enumerate(node):
+                        visit(child, path + [index])
+                visit(root, [])
+
+    ids = set()
+    owners = {"before": {}, "after": {}}
+    for decision in _MANIFEST_DECISIONS:
+        decision_id = decision.get("id")
+        if not isinstance(decision_id, str) or decision_id in ids:
+            raise ValueError("INVALID_COMPARISON_MANIFEST_DUPLICATE_DECISION")
+        ids.add(decision_id)
+        before_refs, after_refs = decision["before"], decision["after"]
+        shape = (len(before_refs), len(after_refs))
+        if shape not in {(1, 0), (0, 1), (1, 1), (1, 2), (2, 1)}:
+            raise ValueError("INVALID_COMPARISON_MANIFEST_GROUP")
+        for side in ("before", "after"):
+            for ref in decision[side]:
+                key = _manifest_key(ref)
+                if key not in actual[side] or key in owners[side]:
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_OWNERSHIP")
+                kind = actual[side][key]["kind"]
+                expected_kind = "tbl" if decision["type"] == "table" else "p"
+                if kind != expected_kind and not (kind == "comment" and decision.get("trackedReason") == "existing-comment-contract"):
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_NODE_KIND")
+                owners[side][key] = decision
+            if decision["type"] == "paragraph" and not any(actual[side][_manifest_key(ref)]["kind"] == "comment" for ref in decision[side]):
+                raw = "\n".join(actual[side][_manifest_key(ref)].get("rawText", "") for ref in decision[side])
+                if raw != decision[side + "Text"]:
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_TEXT_BOUNDS")
+        allowed_pairs = {(decision["beforeText"], decision["afterText"])}
+        if shape == (1, 2):
+            slices = decision.get("splitSlices", [])
+            if len(slices) == 2 and all(isinstance(pair, list) and len(pair) == 2 and all(type(value) is int for value in pair) for pair in slices):
+                allowed_pairs.update((decision["beforeText"][start:end], actual["after"][_manifest_key(after_refs[index])].get("rawText", "")) for index, (start, end) in enumerate(slices))
+        if shape == (2, 1):
+            allowed_pairs.add(("".join(actual["before"][_manifest_key(ref)].get("rawText", "") for ref in before_refs), decision["afterText"]))
+        comparisons = decision.get("comparisons", [])
+        if {(item["before"], item["after"]) for item in comparisons} != allowed_pairs:
+            raise ValueError("INVALID_COMPARISON_MANIFEST_COMPARISON_CONTEXT")
+        for comparison in comparisons:
+            _validate_segments(comparison["segments"], comparison["before"], comparison["after"])
+        for side in ("before", "after"):
+            if decision.get("trackedRepresentation") != "preserve-after":
+                opposite_parts = {key[0] for key in actual["after" if side == "before" else "before"]}
+                if any(ref["part"] not in opposite_parts for ref in decision[side]):
+                    raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+        _validate_segments(decision["textSegments"], decision["beforeText"], decision["afterText"])
+        if shape == (1, 2):
+            slices = decision.get("splitSlices")
+            size = len(decision["beforeText"])
+            if not isinstance(slices, list) or len(slices) != 2 or slices[0][0] != 0 or slices[0][1] != slices[1][0] or slices[1][1] != size or not 0 <= slices[0][1] <= size:
+                raise ValueError("INVALID_COMPARISON_MANIFEST_SPLIT_SLICES")
+            for index, (start, end) in enumerate(slices):
+                old = decision["beforeText"][start:end]
+                new = _comparison_text(nodes["after"][_manifest_key(after_refs[index])])
+                if not any(item["before"] == old and item["after"] == new for item in decision["comparisons"]):
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_SPLIT_TEXT")
+        if decision["type"] == "table":
+            if shape not in {(1, 0), (0, 1), (1, 1)}:
+                raise ValueError("INVALID_COMPARISON_MANIFEST_TABLE_GROUP")
+            for axis, tag in (("rows", "tr"), ("columns", "tc")):
+                for side in ("before", "after"):
+                    table = nodes[side][_manifest_key(decision[side][0])] if decision[side] else None
+                    rows = table.findall(W + "tr") if table is not None else []
+                    size = len(rows) if axis == "rows" else max((len(row.findall(W + "tc")) for row in rows), default=0)
+                    indices = [pair[side + "Index"] for pair in decision[axis] if pair[side + "Index"] is not None]
+                    if any(type(index) is not int for index in indices) or indices != list(range(size)):
+                        raise ValueError("INVALID_COMPARISON_MANIFEST_TABLE_AXIS")
+                if any(pair["beforeIndex"] is None and pair["afterIndex"] is None for pair in decision[axis]):
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_TABLE_AXIS")
+
+    note_mappings = {}
+    note_contexts = {"before": set(), "after": set()}
+    for decision in _MANIFEST_DECISIONS:
+        contexts = {}
+        for side in ("before", "after"):
+            contexts[side] = {(ref["part"], tuple(ref["path"][:1])) for ref in decision[side] if ref["part"] in {"word/footnotes.xml", "word/endnotes.xml"}}
+            note_contexts[side].update(contexts[side])
+        if contexts["before"] and contexts["after"]:
+            if len(contexts["before"]) != 1 or len(contexts["after"]) != 1:
+                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+            before_context = next(iter(contexts["before"]))
+            after_context = next(iter(contexts["after"]))
+            if before_context != after_context or nodes["before"][before_context].get(W + "id") != nodes["after"][after_context].get(W + "id"):
+                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+            note_mappings[before_context] = after_context
+    if note_contexts["before"] != set(note_mappings) or note_contexts["after"] != set(note_mappings.values()):
+        raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+
+    for side in ("before", "after"):
+        structural = {key: ref for key, ref in actual[side].items() if ref["kind"] in {"p", "tbl"}}
+        coverage = _MANIFEST.get("coverage", {}).get(side, [])
+        if len(coverage) != len(structural) or len({_manifest_key(item["source"]) for item in coverage}) != len(coverage):
+            raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
+        tables = [key for key, ref in actual[side].items() if ref["kind"] == "tbl"]
+        for item in coverage:
+            key = _manifest_key(item["source"])
+            if key not in structural:
+                raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
+            ref = structural[key]
+            owner = owners[side].get(key)
+            excluded_metadata = not _MANIFEST["options"]["metadata"] and key[0] != "word/document.xml"
+            excluded_table = not _MANIFEST["options"]["tables"] and any(key[0] == part and key[1][:len(path)] == path for part, path in tables)
+            if excluded_metadata or excluded_table:
+                if item["disposition"] != "preserve-after":
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_EXCLUSION")
+                continue
+            if ref.get("opaqueSignature"):
+                if owner is None or len(owner["before"]) != 1 or len(owner["after"]) != 1:
+                    raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+                old = actual["before"][_manifest_key(owner["before"][0])].get("opaqueSignature")
+                new = actual["after"][_manifest_key(owner["after"][0])].get("opaqueSignature")
+                if old != new:
+                    raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+            if owner is not None:
+                if item["disposition"] != "decision" or item.get("decisionId") != owner["id"]:
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
+            elif ref["kind"] == "p" and not ref.get("rawText", "").strip() and not ref.get("opaqueSignature"):
+                if item["disposition"] != "preserve-after" or item.get("reason") != "blank-paragraph":
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_BLANK_POLICY")
+            else:
+                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+
+
+def _validate_segments(segments, before, after):
+    if not isinstance(segments, list) or any(not isinstance(segment, dict) or segment.get("type") not in {"equal", "added", "deleted"} or not isinstance(segment.get("text"), str) for segment in segments):
+        raise ValueError("INVALID_COMPARISON_MANIFEST_SEGMENTS")
+    if "".join(segment["text"] for segment in segments if segment["type"] != "added") != before or "".join(segment["text"] for segment in segments if segment["type"] != "deleted") != after:
+        raise ValueError("INVALID_COMPARISON_MANIFEST_TEXT_BOUNDS")
+
+
+def _consume_manifest_refs(side, refs):
+    for ref in refs:
+        key = (side, _manifest_key(ref))
+        _MANIFEST_CONSUMED[key] = _MANIFEST_CONSUMED.get(key, 0) + 1
+        if _MANIFEST_CONSUMED[key] != 1:
+            raise ValueError("INVALID_COMPARISON_MANIFEST_DUPLICATE_CONSUMPTION")
+
+
+def _consume_manifest_subtree(side, node):
+    origin = _MANIFEST_NODE_KEYS.get(node)
+    if origin is None:
+        raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE")
+    part, path = origin[1]
+    for decision in _MANIFEST_DECISIONS:
+        refs = [ref for ref in decision[side] if ref["part"] == part and tuple(ref["path"][:len(path)]) == path]
+        if refs:
+            refs = [ref for ref in refs if tuple(ref["path"]) != path]
+        if refs:
+            _consume_manifest_refs(side, refs)
+            _MANIFEST_USED.add(decision["id"])
+
+
 def _install_manifest(manifest):
-    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_COMPARISONS, _MANIFEST_USED
+    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION
     if not isinstance(manifest, dict) or manifest.get("version") != 1:
         raise ValueError("INVALID_COMPARISON_MANIFEST")
     _MANIFEST = manifest
     _MANIFEST_USED = set()
+    _MANIFEST_CONSUMED = {}
+    _MANIFEST_ACTIVE_DECISION = None
     _MANIFEST_NODE_KEYS = {}
     _MANIFEST_DECISIONS = []
-    _MANIFEST_COMPARISONS = {}
     def visit(decisions):
         for decision in decisions:
             _MANIFEST_DECISIONS.append(decision)
-            for comparison in decision.get("comparisons", []):
-                _MANIFEST_COMPARISONS[(comparison["before"], comparison["after"])] = comparison["segments"]
             visit(decision.get("children", []))
     visit(manifest["decisions"])
 
 
 def _register_manifest_root(root, part, side):
     def visit(node, path):
-        _MANIFEST_NODE_KEYS[id(node)] = (side, (part, tuple(path)))
+        _MANIFEST_NODE_KEYS[node] = (side, (part, tuple(path)))
         for index, child in enumerate(node):
             visit(child, path + [index])
     visit(root, [])
 
 
 def _manifest_decision(before, after):
-    left = _MANIFEST_NODE_KEYS.get(id(before)) if before is not None else None
-    right = _MANIFEST_NODE_KEYS.get(id(after)) if after is not None else None
+    left = _MANIFEST_NODE_KEYS.get(before) if before is not None else None
+    right = _MANIFEST_NODE_KEYS.get(after) if after is not None else None
     for decision in _MANIFEST_DECISIONS:
         if left and any(_manifest_key(ref) == left[1] for ref in decision["before"]):
             _MANIFEST_USED.add(decision["id"])
-            _MANIFEST_USED.update(child["id"] for child in decision.get("children", []))
             return decision
         if right and any(_manifest_key(ref) == right[1] for ref in decision["after"]):
             _MANIFEST_USED.add(decision["id"])
-            _MANIFEST_USED.update(child["id"] for child in decision.get("children", []))
             return decision
     raise ValueError("MISSING_COMPARISON_DECISION")
 
 
 def _manifest_block_groups(before, after, include_tables=True):
-    left = {_MANIFEST_NODE_KEYS.get(id(node), (None, None))[1]: index for index, node in enumerate(before)}
-    right = {_MANIFEST_NODE_KEYS.get(id(node), (None, None))[1]: index for index, node in enumerate(after)}
+    left = {_MANIFEST_NODE_KEYS.get(node, (None, None))[1]: index for index, node in enumerate(before)}
+    right = {_MANIFEST_NODE_KEYS.get(node, (None, None))[1]: index for index, node in enumerate(after)}
     result = []
     for decision in _MANIFEST_DECISIONS:
         a = [left[_manifest_key(ref)] for ref in decision["before"] if _manifest_key(ref) in left]
         b = [right[_manifest_key(ref)] for ref in decision["after"] if _manifest_key(ref) in right]
         if a or b:
+            if len(a) != len(decision["before"]) or len(b) != len(decision["after"]):
+                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+            _consume_manifest_refs("before", decision["before"])
+            _consume_manifest_refs("after", decision["after"])
             _MANIFEST_USED.add(decision["id"])
             if decision.get("moved") and a and b:
                 result.append((a, [], decision))
@@ -1000,13 +1178,15 @@ def _manifest_rewrap(after_blocks, emitted):
 
 
 
-def _revision_blocks(before_blocks, after_blocks, include_formatting, writer, include_tables=True):
+def _revision_blocks_impl(before_blocks, after_blocks, include_formatting, writer, include_tables=True):
+    global _MANIFEST_ACTIVE_DECISION
     original_after_blocks = after_blocks
     before_blocks = _manifest_flat_blocks(before_blocks)
     after_blocks = _manifest_flat_blocks(after_blocks)
     emitted = []
     alignment = _manifest_block_groups(before_blocks, after_blocks, include_tables)
     for before_indexes, after_indexes, decision in alignment:
+        _MANIFEST_ACTIVE_DECISION = decision
         revised = []
         target = after_blocks[after_indexes[0]] if after_indexes else None
         emitted.append((target, revised))
@@ -1064,6 +1244,15 @@ def _revision_blocks(before_blocks, after_blocks, include_formatting, writer, in
     return _manifest_rewrap(original_after_blocks, emitted)
 
 
+def _revision_blocks(before_blocks, after_blocks, include_formatting, writer, include_tables=True):
+    global _MANIFEST_ACTIVE_DECISION
+    previous = _MANIFEST_ACTIVE_DECISION
+    try:
+        return _revision_blocks_impl(before_blocks, after_blocks, include_formatting, writer, include_tables)
+    finally:
+        _MANIFEST_ACTIVE_DECISION = previous
+
+
 def _replace_blocks(container, replacements):
     children = list(container)
     positions = [index for index, child in enumerate(children) if child.tag in BLOCK_TAGS]
@@ -1104,11 +1293,32 @@ def _revisionize_notes(before_data, after_data, include_formatting, writer, note
     part = "word/footnotes.xml" if note_tag == "footnote" else "word/endnotes.xml"
     _register_manifest_root(before_root, part, "before")
     _register_manifest_root(after_root, part, "after")
-    before_notes = {note.get(W + "id", ""): note for note in before_root.findall(W + note_tag)}
-    for after_note in after_root.findall(W + note_tag):
-        before_note = before_notes.get(after_note.get(W + "id", ""))
-        if before_note is None:
+    before_children = list(before_root)
+    after_children = list(after_root)
+    for after_index, after_note in enumerate(after_children):
+        if after_note.tag != W + note_tag:
             continue
+        candidates = set()
+        for decision in _MANIFEST_DECISIONS:
+            relevant = [ref for ref in decision["after"] if ref["part"] == part and ref["path"] and ref["path"][0] == after_index]
+            if relevant:
+                if any(ref["part"] != part or not ref["path"] for ref in decision["before"]):
+                    raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+                candidates.update(ref["path"][0] for ref in decision["before"])
+        if not candidates:
+            # Empty separator records are explicitly preserved; added visible
+            # note containers need package-reference support in P.
+            if _comparison_text(after_note).strip():
+                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+            continue
+        if len(candidates) != 1:
+            raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+        before_index = next(iter(candidates))
+        before_note = before_children[before_index]
+        if before_index != after_index or before_note.get(W + "id") != after_note.get(W + "id"):
+            raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+        if before_note.tag != W + note_tag:
+            raise ValueError("INVALID_COMPARISON_MANIFEST_NOTE_CONTEXT")
         before_blocks = [child for child in before_note if child.tag in BLOCK_TAGS]
         after_blocks = [child for child in after_note if child.tag in BLOCK_TAGS]
         _replace_blocks(after_note, _revision_blocks(before_blocks, after_blocks, include_formatting, writer, include_tables))
@@ -1386,7 +1596,10 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
         with open(after_path, "rb") as source:
             after_model = extract_document_model(source.read(), True, True)
         manifest_json = worklazyComparisonManifestJson(before_model, after_model, bool(include_formatting), bool(include_tables), bool(include_metadata))
-    _install_manifest(json.loads(manifest_json))
+    try:
+        _install_manifest(json.loads(manifest_json))
+    except (KeyError, TypeError, IndexError, RecursionError) as error:
+        raise ValueError("INVALID_COMPARISON_MANIFEST") from error
     if _MANIFEST.get("policyVersion") != "worklazy-document-1":
         raise ValueError("STALE_COMPARISON_MANIFEST")
     if _MANIFEST.get("options") != {"formatting": bool(include_formatting), "tables": bool(include_tables), "metadata": bool(include_metadata)}:
@@ -1396,6 +1609,10 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
             revision = hashlib.sha256(source.read()).hexdigest()
         if revision != _MANIFEST.get("inputRevision", {}).get(side):
             raise ValueError("STALE_COMPARISON_MANIFEST")
+    try:
+        _validate_manifest(before_path, after_path)
+    except (KeyError, TypeError, IndexError) as error:
+        raise ValueError("INVALID_COMPARISON_MANIFEST") from error
     with zipfile.ZipFile(before_path, "r") as before_archive, zipfile.ZipFile(after_path, "r") as after_archive:
         writer = _RevisionWriter(author, _next_revision_id(before_archive, after_archive))
         before_names = set(before_archive.namelist())
@@ -1482,8 +1699,10 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
         for decision in _MANIFEST_DECISIONS:
             if decision.get("trackedRepresentation") == "preserve-after":
                 continue
-            if decision["id"] not in _MANIFEST_USED and (decision["beforeText"] or decision["afterText"]):
-                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+            for side in ("before", "after"):
+                for ref in decision[side]:
+                    if _MANIFEST_CONSUMED.get((side, _manifest_key(ref))) != 1:
+                        raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
 
         with zipfile.ZipFile(output_path, "w") as output_archive:
             for entry in after_archive.infolist():
@@ -1496,7 +1715,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
 
 
 def generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None):
-    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_COMPARISONS, _MANIFEST_USED
+    global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION
     try:
         return _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json)
     finally:
@@ -1504,5 +1723,6 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _MANIFEST = None
         _MANIFEST_NODE_KEYS = {}
         _MANIFEST_DECISIONS = []
-        _MANIFEST_COMPARISONS = {}
         _MANIFEST_USED = set()
+        _MANIFEST_CONSUMED = {}
+        _MANIFEST_ACTIVE_DECISION = None

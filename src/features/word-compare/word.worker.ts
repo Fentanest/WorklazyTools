@@ -130,6 +130,9 @@ worker.onmessage = async (event: MessageEvent) => {
           event.data.options,
           en ? "en" : "ko",
         );
+        if ([...result.manifest.coverage.before, ...result.manifest.coverage.after].some((item) => item.reason === "blank-paragraph")) {
+          result.warnings.push(L("화면에서 비교하지 않는 빈 문단의 배치는 수정본 기준으로 유지됩니다.", "The layout of empty paragraphs omitted from the comparison is kept from the revised file."));
+        }
         if (!event.data.options.formatting || !event.data.options.tables || !event.data.options.metadata) {
           result.warnings.push(L("비교에서 제외한 서식·표·문서 정보는 수정본 기준으로 유지됩니다.", "Excluded formatting, tables and document information are kept from the revised file."));
         }
