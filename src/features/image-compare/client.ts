@@ -12,8 +12,7 @@ export async function compareImages(left: File, right: File, options: PixelOptio
   if (signal.aborted) throw new DOMException("Canceled", "AbortError");
   validateImageFileSizes([left, right]);
   assertImageBudget(0, 0, left.size + right.size, previousViewBytes);
-  const [a, b] = await Promise.all([left.arrayBuffer(), right.arrayBuffer()]);
-  if (signal.aborted) { discardOwnedBuffer(a); discardOwnedBuffer(b); throw new DOMException("Canceled", "AbortError"); }
+  const [a, b] = await readImagePair(left, right, signal);
   return runModuleWorker<object, ImageCompareResult>(() => new Worker(new URL("./compare.worker.ts", import.meta.url), { type: "module" }), { leftName: left.name, rightName: right.name, left: a, right: b, options, transform, previousViewBytes, alignment, runId: crypto.randomUUID() }, { transfer: [a, b], signal, onProgress: ({ progress }) => onProgress(progress), canceledMessage: "Canceled", startErrorMessage: "IMAGE_PROCESSING_FAILED", resultErrorMessage: "IMAGE_PROCESSING_FAILED", inactivityTimeoutMs: 60_000, hardTimeoutMs: 30_000 }).finally(()=>{discardOwnedBuffer(a);discardOwnedBuffer(b);});
 }
 export function scanRegions(result: ImageCompareResult, options: RegionOptions, signal: AbortSignal, onProgress: (value: number) => void = () => undefined, retainedSessionBytes = 0) {
@@ -26,7 +25,7 @@ export function scanRegions(result: ImageCompareResult, options: RegionOptions, 
 
 export async function proposeAlignment(left:File,right:File,mode:AlignmentCandidate['mode'],sourceRevision:string,retainedBytes:number,signal:AbortSignal,onProgress:(value:number)=>void,featureRois?:AlignmentFeatureRois){
   if(signal.aborted)throw new DOMException('Canceled','AbortError');validateImageFileSizes([left,right]);const roiSnapshot=featureRois?structuredClone(featureRois):undefined;assertAlignmentBudget(0,left.size+right.size,retainedBytes);
-  const [a,b]=await Promise.all([left.arrayBuffer(),right.arrayBuffer()]);if(signal.aborted){discardOwnedBuffer(a);discardOwnedBuffer(b);throw new DOMException('Canceled','AbortError');}
+  const [a,b]=await readImagePair(left,right,signal);
   let lw:number,lh:number,rw:number,rh:number;
   try{const l=inspectImageHeader(left.name,a),r=inspectImageHeader(right.name,b);[lw,lh]=l.exifOrientation>=5?[l.height,l.width]:[l.width,l.height];[rw,rh]=r.exifOrientation>=5?[r.height,r.width]:[r.width,r.height];snapshotFeatureRois(roiSnapshot,lw,lh,rw,rh);assertAlignmentBudget(lw*lh+rw*rh,left.size+right.size,retainedBytes);}
   catch(error){discardOwnedBuffer(a);discardOwnedBuffer(b);throw error;}
@@ -37,4 +36,14 @@ export async function proposeAlignment(left:File,right:File,mode:AlignmentCandid
     if(expected&&![c.holdoutSourceCoverage,c.holdoutTargetCoverage].every(v=>typeof v==='number'&&Number.isFinite(v)&&v>=.12&&v<=1))return false;
     if(c.coverageReference!==(expected?'feature-roi':'full-frame')||JSON.stringify(c.featureRois)!==JSON.stringify(expected)||JSON.stringify(c.originalDimensions)!==JSON.stringify({left:{width:lw,height:lh},right:{width:rw,height:rh}}))return false;projectiveGeometry(lw,lh,rw,rh,c.matrix,left.size+right.size,retainedBytes);return overlapRatio(warpedCorners(c.matrix,rw,rh),lw,lh)>=.35;
   }}).finally(()=>{discardOwnedBuffer(a);discardOwnedBuffer(b);});
+}
+
+/** Native File reads cannot be canceled. Keep ownership until both actually settle. */
+async function readImagePair(left:File,right:File,signal:AbortSignal):Promise<[ArrayBuffer,ArrayBuffer]>{
+  let failed=false,firstError:unknown;
+  const buffers=await Promise.all([left,right].map(async file=>{
+    try{return await file.arrayBuffer();}catch(error){if(!failed){failed=true;firstError=error;}return undefined;}
+  }));
+  if(failed||signal.aborted){for(const buffer of buffers)if(buffer)discardOwnedBuffer(buffer);if(failed)throw firstError;throw new DOMException('Canceled','AbortError');}
+  return buffers as [ArrayBuffer,ArrayBuffer];
 }
