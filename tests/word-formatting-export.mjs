@@ -104,9 +104,47 @@ generate_tracked_document('/before.docx','/after.docx','/output.docx','format-te
 actual,_=selected('/output.docx','paragraph')
 assert actual.get('{urn:opaque-format}flag')=='after' and actual.find(W+'pPrChange') is None
 checks.append('unknown-root-attribute-preserved')
+
+def sized_runs(rows):
+    return ''.join('<w:r><w:rPr><w:sz w:val="' + str(size) + '"/></w:rPr><w:t xml:space="preserve">' + text + '</w:t></w:r>' for text,size in rows)
+def run_fixture(path, rows):
+    with zipfile.ZipFile(path, 'w') as archive:
+        archive.writestr('[Content_Types].xml','<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>')
+        archive.writestr('word/document.xml','<w:document xmlns:w="' + WORD_NS + '"><w:body><w:p>' + sized_runs(rows) + '</w:p></w:body></w:document>')
+def styled_characters(path, reject):
+    with zipfile.ZipFile(path) as archive: root=ET.fromstring(archive.read('word/document.xml'))
+    result=[]
+    def visit(node):
+        if reject and node.tag == W+'ins' and node.get(W+'author')=='format-test': return
+        if not reject and node.tag == W+'del': return
+        if node.tag == W+'r':
+            properties=node.find(W+'rPr')
+            change=properties.find(W+'rPrChange') if properties is not None else None
+            if reject and change is not None and change.get(W+'author')=='format-test': properties=change[0]
+            size=properties.find(W+'sz') if properties is not None else None
+            value=size.get(W+'val') if size is not None else None
+            for child in node:
+                if child.tag in (W+'t',W+'delText'): result.extend((char,value) for char in child.text or '')
+            return
+        if node.tag not in {W+'pPr',W+'rPr'}:
+            for child in node: visit(child)
+    visit(root)
+    return result
+for case,before_runs,after_runs in [
+    ('unequal-before-runs-merged-after',[('A',20),('B',30)],[('AB',40)]),
+    ('before-run-split-after',[('AB',40)],[('A',20),('B',30)]),
+    ('property-scopes-across-text-equals',[('A ',20),('old',30),(' B',50)],[('A new B',40)]),
+]:
+    run_fixture('/before.docx',before_runs);run_fixture('/after.docx',after_runs)
+    generate_tracked_document('/before.docx','/after.docx','/output.docx','format-test',True,True,True)
+    expected_before=[(character,str(size)) for text,size in before_runs for character in text]
+    expected_after=[(character,str(size)) for text,size in after_runs for character in text]
+    assert styled_characters('/output.docx',True)==expected_before,(case,'reject run boundaries',styled_characters('/output.docx',True))
+    assert styled_characters('/output.docx',False)==expected_after,(case,'accept run boundaries')
+    checks.append(case)
 `);
 const checks = py.globals.get("checks").toJs();
-assert.equal(checks.length, 29);
+assert.equal(checks.length, 32);
 for (const [index, fixture] of fixtures.entries()) {
   assert.equal(results[index].summary.format > 0, fixture.expectAction, `${fixture.id} screen formatting`);
   if (fixture.expectAction) assert([...results[index].views.document, ...results[index].views.headerFooter].some((view) => view.formattingLabels?.length), `${fixture.id} descriptive labels`);

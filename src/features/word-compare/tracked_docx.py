@@ -598,14 +598,14 @@ def _paragraph_revision(before, after, include_formatting, writer):
                 for span in spans:
                     offset = position_before - span["beforeStart"]
                     if 0 <= offset < span["length"] and position_after == span["afterStart"] + offset:
-                        return span["families"], span.get("history", False)
-                return [], False
-            families, preserve_history = declared(before_position, position)
-            pair = (families, preserve_history, _properties_signature(after_properties))
+                        return span["families"], span.get("history", False), span["scopeId"]
+                return [], False, None
+            families, preserve_history, scope_id = declared(before_position, position)
+            pair = (scope_id, families, preserve_history, _properties_signature(after_properties))
             end = position + 1
             while end < j2 and end not in after_events and after_tokens[end].get("wrapper") is None:
-                next_families, next_history = declared(i1 + (end - j1), end)
-                if (next_families, next_history, _properties_signature(after_tokens[end]["properties"])) != pair:
+                next_families, next_history, next_scope_id = declared(i1 + (end - j1), end)
+                if (next_scope_id, next_families, next_history, _properties_signature(after_tokens[end]["properties"])) != pair:
                     break
                 end += 1
             text = "".join(item["text"] for item in after_tokens[position:end])
