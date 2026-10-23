@@ -45,3 +45,10 @@ export function disposeImageResult(result: import("./types.ts").ImageCompareResu
   const buffers = new Set([result.left, result.right, result.leftValid, result.rightValid, result.changedMask, result.channelDelta, result.overlay, result.subtract].map((array) => array.buffer));
   for (const buffer of buffers) discardOwnedBuffer(buffer);
 }
+
+export function assertAlignmentBudget(sourcePixels:number,encodedBytes:number,retainedBytes:number){
+  if(![sourcePixels,encodedBytes,retainedBytes].every(v=>Number.isSafeInteger(v)&&v>=0))throw new Error("INVALID_RESOURCE_ESTIMATE");
+  const estimate=3*encodedBytes+24*sourcePixels+retainedBytes+CV_INITIAL_MEMORY_BYTES+CV_ASSET_TRANSIENT_BYTES+4*MiB;
+  if(estimate>IMAGE_LIMITS.memoryBytes)throw new Error("IMAGE_MEMORY_LIMIT");
+  return estimate;
+}

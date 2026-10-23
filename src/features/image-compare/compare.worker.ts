@@ -1,11 +1,13 @@
+import { projectiveGeometry, warpRgba } from "./projective.ts";
+import type { Matrix3 } from "./alignmentTypes.ts";
 /// <reference lib="webworker" />
-import { assertImageBudget } from "./memory.ts";
+import { assertImageBudget, discardOwnedBuffer } from "./memory.ts";
 import { inspectImageHeader } from "./input.ts";
 import { validateDimensions, workingGeometry } from "./geometry.ts";
 import { compareRgba } from "./kernel.ts";
 import type { ImageCompareResult, Matrix, PixelOptions, Transform } from "./types.ts";
 const scope = self as unknown as DedicatedWorkerGlobalScope;
-scope.onmessage = async ({ data }: MessageEvent<{ leftName: string; rightName: string; left: ArrayBuffer; right: ArrayBuffer; options: PixelOptions; transform: Transform; previousViewBytes: number; runId: string }>) => {
+scope.onmessage = async ({ data }: MessageEvent<{ leftName: string; rightName: string; left: ArrayBuffer; right: ArrayBuffer; options: PixelOptions; transform: Transform; previousViewBytes: number; alignment?: Matrix3; runId: string }>) => {
   let left: ImageBitmap | undefined, right: ImageBitmap | undefined;
   try {
     const leftMetadata = inspectImageHeader(data.leftName, data.left), rightMetadata = inspectImageHeader(data.rightName, data.right);
@@ -13,15 +15,19 @@ scope.onmessage = async ({ data }: MessageEvent<{ leftName: string; rightName: s
     const [lw, lh] = dimensions(leftMetadata), [rw, rh] = dimensions(rightMetadata);
     const encodedBytes = data.left.byteLength + data.right.byteLength;
     // Preflight source decode, transformed output, views and later CV scans before either bitmap allocation.
-    workingGeometry(lw, lh, rw, rh, data.transform, encodedBytes, data.previousViewBytes);
+    if(data.alignment)projectiveGeometry(lw,lh,rw,rh,data.alignment,encodedBytes,data.previousViewBytes);
+    else workingGeometry(lw, lh, rw, rh, data.transform, encodedBytes, data.previousViewBytes);
     scope.postMessage({ type: "progress", progress: 10 });
     left = await createImageBitmap(new Blob([data.left], { type: leftMetadata.mime }), { imageOrientation: "from-image", colorSpaceConversion: "default", premultiplyAlpha: "none" });
     right = await createImageBitmap(new Blob([data.right], { type: rightMetadata.mime }), { imageOrientation: "from-image", colorSpaceConversion: "default", premultiplyAlpha: "none" });
     leftMetadata.decodedWidth = left.width; leftMetadata.decodedHeight = left.height; rightMetadata.decodedWidth = right.width; rightMetadata.decodedHeight = right.height;
     validateDimensions(left.width, left.height); validateDimensions(right.width, right.height);
-    const geometry = workingGeometry(left.width, left.height, right.width, right.height, data.transform, encodedBytes, data.previousViewBytes);
+    const geometry: ReturnType<typeof workingGeometry> & {rightProjective?:Matrix3} = data.alignment ? projectiveGeometry(left.width,left.height,right.width,right.height,data.alignment,encodedBytes,data.previousViewBytes) : workingGeometry(left.width, left.height, right.width, right.height, data.transform, encodedBytes, data.previousViewBytes);
     const sourcePixels = left.width * left.height + right.width * right.height;
-    const a = render(left, geometry.width, geometry.height, geometry.leftMatrix), b = render(right, geometry.width, geometry.height, geometry.rightMatrix);
+    const a = render(left, geometry.width, geometry.height, geometry.leftMatrix);
+    let b:{rgba:Uint8ClampedArray;valid:Uint8Array};
+    if(geometry.rightProjective){const canvas=new OffscreenCanvas(right.width,right.height),context=canvas.getContext('2d',{willReadFrequently:true});if(!context)throw new Error('IMAGE_CANVAS_UNAVAILABLE');context.drawImage(right,0,0);const source=context.getImageData(0,0,right.width,right.height).data;try{b=warpRgba(source,right.width,right.height,geometry.width,geometry.height,geometry.rightProjective);}finally{discardOwnedBuffer(source.buffer);canvas.width=canvas.height=1;}}
+    else b=render(right,geometry.width,geometry.height,geometry.rightMatrix);
     left.close(); right.close(); left = undefined; right = undefined;
     scope.postMessage({ type: "progress", progress: 45 });
     const compared = compareRgba(a.rgba, b.rgba, geometry.width, geometry.height, a.valid, b.valid, data.options);

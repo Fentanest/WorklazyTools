@@ -19,8 +19,8 @@ export function viewPixels(result: ImageCompareResult, view: ImageView, amount: 
   }
   return output;
 }
-export function ImageViews({ result, t, regions, focus, boxes, darken }: { result: ImageCompareResult; t: ImageT; regions: Region[]; focus?: Region; boxes: boolean; darken: boolean }) {
-  const [view, setView] = useState<ImageView>("split"), [amount, setAmount] = useState(50), [playing, setPlaying] = useState(false), [frame, setFrame] = useState(false);
+export function ImageViews({ result, t, regions, focus, boxes, darken, initialView = "split" }: { result: ImageCompareResult; t: ImageT; regions: Region[]; focus?: Region; boxes: boolean; darken: boolean; initialView?: ImageView }) {
+  const [view, setView] = useState<ImageView>(initialView), [amount, setAmount] = useState(50), [playing, setPlaying] = useState(false), [frame, setFrame] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(() => matchMedia("(prefers-reduced-motion: reduce)").matches);
   useEffect(() => { const media = matchMedia("(prefers-reduced-motion: reduce)"); const change = () => { setReducedMotion(media.matches); if (media.matches) setPlaying(false); }; media.addEventListener("change", change); return () => media.removeEventListener("change", change); }, []);
   useEffect(() => { if (!playing || view !== "flicker" || reducedMotion) return; const timer = setInterval(() => setFrame((value) => !value), 500); return () => clearInterval(timer); }, [playing, view, reducedMotion]);

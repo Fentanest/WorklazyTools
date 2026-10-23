@@ -17,6 +17,6 @@ export interface ImageCompareResult {
   changedPixelCount: number; comparablePixelCount: number; differenceRatio: number;
   addedBoundaryPixelCount: number; removedBoundaryPixelCount: number;
   sources: { left: ImageMetadata; right: ImageMetadata }; options: PixelOptions;
-  geometry: { originX: number; originY: number; leftMatrix: Matrix; rightMatrix: Matrix; rightTransform: Transform };
+  geometry: { originX: number; originY: number; leftMatrix: Matrix; rightMatrix: Matrix; rightTransform: Transform; /** Authoritative when present; rightMatrix remains the legacy affine-only field. */ rightProjective?: import("./alignmentTypes.ts").Matrix3 };
 }
 export const IMAGE_LIMITS = { fileBytes: 32 * 1024 * 1024, sourcePixels: 12_000_000, outputPixels: 16_000_000, dimension: 8000, memoryBytes: 256 * 1024 * 1024 };
