@@ -14,7 +14,8 @@ import type {
 } from "../excel-merger/types";
 import { alignDocumentSequence, alignSequence, type SequenceGroup, type SequencePair } from "./documentAlignment.ts";
 
-import { buildDrawingRestoreProjections, sourceEventBoundary } from "./drawingRestoreProjection.ts";
+import { buildObjectEventContexts, eventPosition } from "./objectEventContext.ts";
+import { buildDrawingRestoreProjections } from "./drawingRestoreProjection.ts";
 import { buildRestoreStyleProjections } from "./restoreStyleProjection.ts";
 import { buildWordFormatting, projectWordFormatting, type ManifestFormattingView } from "./wordFormatting.ts";
 import { completeManifestCoverage, freezeComparisonManifest } from "./comparisonManifest.ts";
@@ -181,20 +182,22 @@ export function compareDocumentModels(
     const events=(side:"before"|"after")=>decision[side].flatMap(parent=>manifest.sources[side].filter(source=>source.objectEvent && source.part===parent.part && JSON.stringify(source.objectEvent.paragraphPath)===JSON.stringify(parent.path)));
     const before=events("before"),after=events("after");
     const runFact=(side:"before"|"after",event:DocumentSourceReference)=>manifest.sources[side].find(source=>source.part===event.part && JSON.stringify(source.path)===JSON.stringify(event.objectEvent!.runPath))?.normalizedProperties?.rPr??{supported:{},unsupported:{},history:false};
-    const boundary=(position:number)=>sourceEventBoundary(decision,position);
+    const contexts=buildObjectEventContexts(manifest,decision,before,after);
+    const positions={before:new Map(before.map(ref=>[ref,[eventPosition(decision,contexts,"before",ref),eventPosition(decision,contexts,"before",ref,true)]])),after:new Map(after.map(ref=>[ref,[eventPosition(decision,contexts,"after",ref),eventPosition(decision,contexts,"after",ref,true)]]))};
+    const position=(side:"before"|"after",ref:DocumentSourceReference,end=false)=>positions[side].get(ref)![end?1:0];
     // Pair drawing events only at the TS text mapping's same boundary, in source
     // order. Identity is the actual source reference, never a volatile rId.
     const available=after.filter(source=>source.objectEvent!.kind==="drawing");
     const drawingProperties=before.filter(source=>source.objectEvent!.kind==="drawing").flatMap(a=>{
-      const index=available.findIndex(b=>boundary(a.objectEvent!.start)===b.objectEvent!.start);
+      const index=available.findIndex(b=>position("before",a)===position("after",b));
       if(index<0)return [];
       const b=available.splice(index,1)[0],old=runFact("before",a),next=runFact("after",b);
       const names=[...new Set([...Object.keys(old.supported),...Object.keys(next.supported)])].filter(name=>JSON.stringify(old.supported[name]??[])!==JSON.stringify(next.supported[name]??[]));
       return [{representation:next.history?"preserve-after-history" as const:"revision" as const,before:a,after:b,beforeFact:old,afterFact:next,families:names.filter(name=>manifest.formattingMask.effective[formattingGroup("rPr",name)]),excludedFamilies:[...new Set([...Object.keys(old.unsupported),...Object.keys(next.unsupported)])].filter(name=>JSON.stringify(old.unsupported[name]??[])!==JSON.stringify(next.unsupported[name]??[])).concat(names.filter(name=>!manifest.formattingMask.effective[formattingGroup("rPr",name)]))}];
     });
     const propertiesSupported=true;
-    const unchangedLinks=before.filter(a=>a.objectEvent!.kind==="hyperlink").flatMap(a=>after.filter(b=>b.objectEvent!.kind==="hyperlink" && a.objectEvent!.signature===b.objectEvent!.signature && boundary(a.objectEvent!.start)===b.objectEvent!.start && boundary(a.objectEvent!.end)===b.objectEvent!.end).map(b=>({before:a,after:b})));
-    if(before.length || after.length)decision.objectEvents={deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-3",before,after,changed:JSON.stringify(before.map(source=>[source.objectEvent!.kind,boundary(source.objectEvent!.start),boundary(source.objectEvent!.end),source.objectEvent!.signature]))!==JSON.stringify(after.map(source=>[source.objectEvent!.kind,source.objectEvent!.start,source.objectEvent!.end,source.objectEvent!.signature]))};
+    const unchangedLinks=before.filter(a=>a.objectEvent!.kind==="hyperlink").flatMap(a=>after.filter(b=>b.objectEvent!.kind==="hyperlink" && a.objectEvent!.signature===b.objectEvent!.signature && position("before",a)===position("after",b) && position("before",a,true)===position("after",b,true)).map(b=>({before:a,after:b})));
+    if(before.length || after.length)decision.objectEvents={contexts,deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-4",before,after,changed:JSON.stringify(before.map(source=>[source.objectEvent!.kind,position("before",source),position("before",source,true),source.objectEvent!.signature]))!==JSON.stringify(after.map(source=>[source.objectEvent!.kind,position("after",source),position("after",source,true),source.objectEvent!.signature]))};
   }};
   objectDecisions(manifest.decisions);
   buildDrawingRestoreProjections(manifest);

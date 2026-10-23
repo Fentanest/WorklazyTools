@@ -429,6 +429,9 @@ def _is_drawing_event(node):
 
 
 def _styled_tokens(paragraph, collect_events=False):
+    if paragraph in _MANIFEST_SYNTHETIC_TOKENS:
+        tokens,events=_MANIFEST_SYNTHETIC_TOKENS[paragraph]
+        return (tokens,events) if collect_events else tokens
     tokens = []
     events = {}
     next_wrapper_id = 1
@@ -540,6 +543,12 @@ def _consume_link_tokens(tokens):
 
 
 def _consume_copied_objects(source):
+    if source in _MANIFEST_SYNTHETIC_TOKENS:
+        tokens,events=_MANIFEST_SYNTHETIC_TOKENS[source];_consume_link_tokens(tokens)
+        for values in events.values():
+            for event in values:
+                if _is_drawing_event(event):_consume_object(event)
+        return
     origin=_MANIFEST_NODE_KEYS.get(source)
     if _MANIFEST is None or origin is None:return
     side,(part,path)=origin
@@ -609,6 +618,14 @@ def _paragraph_split_revision(before, first_after, second_after, include_formatt
     before_tokens = _styled_tokens(before)
     first_before = _plain_paragraph_from_tokens(before, before_tokens[:boundary])
     second_before = _plain_paragraph_from_tokens(before, before_tokens[boundary:])
+    for index,(proxy,(start,end)) in enumerate(zip((first_before,second_before),slices),1):
+        selected={}
+        context=next(value for value in _MANIFEST_ACTIVE_DECISION["objectEvents"]["contexts"] if value["comparisonIndex"]==index) if "objectEvents" in _MANIFEST_ACTIVE_DECISION else None
+        if context is not None:
+            for event in context["before"]:
+                node=_MANIFEST_SOURCE_NODES[("before",_manifest_key(event["source"]))]
+                selected.setdefault(event["start"],[]).append(node)
+        _MANIFEST_SYNTHETIC_TOKENS[proxy]=(before_tokens[start:end],selected)
     _MANIFEST_ACTIVE_COMPARISON = _MANIFEST_ACTIVE_DECISION["comparisons"][1]
     revised_first = _paragraph_revision(first_before, first_after, include_formatting, writer)
     paragraph_properties = revised_first.find(W + "pPr")
@@ -1178,6 +1195,7 @@ _MANIFEST_ACTIVE_COMPARISON = None
 _MANIFEST_PROPERTY_USED = set()
 _MANIFEST_SOURCE_NODES = {}
 _MANIFEST_ALLOWED_PROPERTIES = {}
+_MANIFEST_SYNTHETIC_TOKENS = {}
 _MANIFEST_OBJECT_EXPECTED = {}
 _MANIFEST_OBJECT_CONSUMED = {}
 
@@ -1346,12 +1364,26 @@ def _validate_manifest(before_path, after_path):
             if ref.get("unsupportedObjectQName"):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
             event_owner = owner if owner and ref.get("objectEventsSupported") else None
             if event_owner is not None:
+                if len(owner["before"])==1 and len(owner["after"])==2:
+                    old_ref=owner["before"][0];new_refs=owner["after"]
+                    old_parent=nodes["before"][(old_ref["part"],tuple(old_ref["path"][:-1]))]
+                    new_parent=nodes["after"][(new_refs[0]["part"],tuple(new_refs[0]["path"][:-1]))]
+                    if any(value["part"]!=new_refs[0]["part"] or value["path"][:-1]!=new_refs[0]["path"][:-1] for value in new_refs) or old_parent.tag!=new_parent.tag:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+                    for split_side in ("before","after"):
+                        for value in owner[split_side]:
+                            paragraph=nodes[split_side][_manifest_key(value)]
+                            properties=paragraph.find(W+"pPr")
+                            if any(child.tag not in {W+"pPr",W+"r"} for child in paragraph) or paragraph.find(W+"pPr/"+W+"sectPr") is not None or (properties is not None and any(child.tag in TRACK_CHANGE_TAGS for child in properties.iter())):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+                            for run in paragraph.findall(W+"r"):
+                                if any(child.tag not in {W+"rPr",W+"t",W+"tab",W+"br",W+"cr",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"} for child in run):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+
                 if any(parent["type"]=="table" and (parent.get("moved") or len(parent["before"])!=1 or len(parent["after"])!=1) and any(ref["part"]==key[0] and key[1][:len(ref["path"])]==tuple(ref["path"]) for ref in parent[side]) for parent in _MANIFEST_DECISIONS):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_TABLE_OBJECT_AXIS")
                 declared = event_owner.get("objectEvents", {}).get(side)
+                if declared is not None:declared=[source for source in declared if source["part"]==key[0] and source["objectEvent"]["paragraphPath"]==list(key[1])]
                 expected = [source for source in actual[side].values() if source.get("objectEvent") and source["part"] == key[0] and source["objectEvent"]["paragraphPath"] == list(key[1])]
-                # Current event codec handles whole paragraphs and paired 1:1;
-                # split/merge object boundaries remain a distinct next stage.
-                if len(owner["before"]) > 1 or len(owner["after"]) > 1 or declared is None or len(declared) != len(expected) or {_manifest_key(source): source for source in declared} != {_manifest_key(source): source for source in expected}:
+                # Per-paragraph coverage is checked here; exact whole-decision
+                # membership and TS slice contexts are verified below.
+                if len(owner["before"]) > 1 or len(owner["after"]) > 2 or (len(owner["after"])==2 and any(source["objectEvent"]["kind"]!="drawing" for side in ("before","after") for source in owner.get("objectEvents",{}).get(side,[]))) or declared is None or len(declared) != len(expected) or {_manifest_key(source): source for source in declared} != {_manifest_key(source): source for source in expected}:
                     raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
             if ref.get("opaqueSignature") and event_owner is None:
                 if owner is None or len(owner["before"]) != 1 or len(owner["after"]) != 1:
@@ -1410,26 +1442,58 @@ def _validate_restore_styles(actual):
         if not any(expected.values()):
             if events is not None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
             continue
-        if events is None or events.get("policy") != "worklazy-source-events-3":raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+        if events is None or events.get("policy") != "worklazy-source-events-4":raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
         for side in ("before","after"):
             if events[side] != expected[side]:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+        if len(decision["after"])==2 and any(ref["objectEvent"]["kind"]!="drawing" for side in ("before","after") for ref in expected[side]):
+            if events.get("propertiesSupported") is not True:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
+            raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
         def run_fact(side,ref):return actual[side].get((ref["part"],tuple(ref["objectEvent"]["runPath"])),{}).get("normalizedProperties",{}).get("rPr",{"supported":{},"unsupported":{},"history":False})
-        def boundary(position):
-            if position==len(decision["beforeText"]):return len(decision["afterText"])
+        indexes=[1,2] if len(decision["before"])==1 and len(decision["after"])==2 else [0]
+        contexts=[];offset=0
+        for index in indexes:
+            comparison=decision["comparisons"][index]
+            slices={side:[(ref,[0,len(actual[side][_manifest_key(ref)].get("rawText",""))]) for ref in decision[side]] for side in ("before","after")}
+            if indexes==[1,2]:slices={"before":[(decision["before"][0],decision["splitSlices"][index-1])],"after":[slices["after"][index-1]]}
+            context={"comparisonIndex":index,"offset":offset}
+            if slices["after"]:context["afterParagraph"]=slices["after"][0][0]
+            for side in ("before","after"):
+                context[side]=[];displacement=0
+                for parent,(start,end) in slices[side]:
+                    length=len(actual[side][_manifest_key(parent)].get("rawText",""))
+                    for ref in expected[side]:
+                        event=ref["objectEvent"];position=event["start"]
+                        if ref["part"]==parent["part"] and event["paragraphPath"]==parent["path"] and start<=position and (position<end or position==end==length and (side=="after" or index==indexes[-1])):
+                            context[side].append({"source":ref,"start":position-start+displacement,"end":event["end"]-start+displacement})
+                    displacement+=end-start+1
+            contexts.append(context);offset+=len(comparison["after"])+1
+        if events.get("contexts")!=contexts:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_CONTEXTS")
+        locations={side:{_manifest_key(item["source"]):(context,item) for context in contexts for item in context[side]} for side in ("before","after")}
+        position_cache={}
+        def context_of(side,ref):return locations[side][_manifest_key(ref)][0]
+        def local_boundary(context,position):
+            comparison=decision["comparisons"][context["comparisonIndex"]]
+            if position==len(comparison["before"]):return len(comparison["after"])
             old=new=0
-            for segment in decision["comparisons"][0]["segments"]:
+            for segment in comparison["segments"]:
                 size=len(segment["text"])
                 if segment["type"]=="equal" and old<=position<=old+size:return new+position-old
                 if segment["type"]=="deleted" and old<=position<old+size:return new
                 if segment["type"]!="added":old+=size
                 if segment["type"]!="deleted":new+=size
             return new
+        def position_of(side,ref,end=False):
+            key=(side,_manifest_key(ref),end)
+            if key not in position_cache:
+                context,item=locations[side][_manifest_key(ref)];position=item["end" if end else "start"]
+                position_cache[key]=context["offset"]+(local_boundary(context,position) if side=="before" else position)
+            return position_cache[key]
         # Validate TS's correspondence, never recover/select a missing pair.
         drawings={side:[ref for ref in expected[side] if ref["objectEvent"]["kind"]=="drawing"] for side in ("before","after")}
         buckets={side:{} for side in ("before","after")}
         for side in ("before","after"):
             for ref in drawings[side]:
-                position=boundary(ref["objectEvent"]["start"]) if side=="before" else ref["objectEvent"]["start"]
+                position=position_of(side,ref)
                 buckets[side].setdefault(position,[]).append(ref)
         projections=events.get("drawingProperties")
         if not isinstance(projections,list) or len(projections)!=sum(min(len(refs),len(buckets["after"].get(position,[]))) for position,refs in buckets["before"].items()):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
@@ -1440,8 +1504,8 @@ def _validate_restore_styles(actual):
                 if ref not in drawings[side] or _manifest_key(ref) in seen[side]:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
                 seen[side].add(_manifest_key(ref))
             ref,match=pair["before"],pair["after"]
-            position=boundary(ref["objectEvent"]["start"])
-            if position!=match["objectEvent"]["start"] or buckets["before"][position].index(ref)!=buckets["after"][position].index(match):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
+            position=position_of("before",ref)
+            if position!=position_of("after",match) or buckets["before"][position].index(ref)!=buckets["after"][position].index(match):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
             old,new=run_fact("before",ref),run_fact("after",match)
             names=[name for name in dict.fromkeys(list(old["supported"])+list(new["supported"])) if old["supported"].get(name,[])!=new["supported"].get(name,[])]
             excluded=[name for name in dict.fromkeys(list(old["unsupported"])+list(new["unsupported"])) if old["unsupported"].get(name,[])!=new["unsupported"].get(name,[])]
@@ -1457,8 +1521,8 @@ def _validate_restore_styles(actual):
             owned.add(_manifest_key(ref));old=run_fact("before",ref)
             verified={"before":ref,"beforeFact":old,"policy":"restore-before-unpaired"}
             if decision["after"]:
-                if len(decision["after"])!=1:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_OBJECT_PROPERTIES")
-                paragraph=decision["after"][0];cursor=boundary(ref["objectEvent"]["start"])
+                context=context_of("before",ref);paragraph=context["afterParagraph"]
+                cursor=local_boundary(context,next(item["start"] for item in context["before"] if item["source"]==ref))
                 runs=[source for source in actual["after"].values() if source["kind"]=="r" and source["part"]==paragraph["part"] and source.get("paragraphPath")==paragraph["path"] and "textRange" in source]
                 length=len(actual["after"][_manifest_key(paragraph)].get("rawText",""))
                 def at(position):return next((source for source in runs if source["textRange"][0]<=position<source["textRange"][1]),None)
@@ -1469,9 +1533,9 @@ def _validate_restore_styles(actual):
                 if source is not None:verified["source"]=source
             if restore!=verified:raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE")
         if events.get("propertiesSupported") is not True:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
-        unchanged=[{"before":a,"after":b} for a in expected["before"] if a["objectEvent"]["kind"]=="hyperlink" for b in expected["after"] if b["objectEvent"]["kind"]=="hyperlink" and a["objectEvent"]["signature"]==b["objectEvent"]["signature"] and boundary(a["objectEvent"]["start"])==b["objectEvent"]["start"] and boundary(a["objectEvent"]["end"])==b["objectEvent"]["end"]]
+        unchanged=[{"before":a,"after":b} for a in expected["before"] if a["objectEvent"]["kind"]=="hyperlink" for b in expected["after"] if b["objectEvent"]["kind"]=="hyperlink" and a["objectEvent"]["signature"]==b["objectEvent"]["signature"] and position_of("before",a)==position_of("after",b) and position_of("before",a,True)==position_of("after",b,True)]
         if events.get("unchangedLinks")!=unchanged:raise ValueError("INVALID_COMPARISON_MANIFEST_LINK_ACTIONS")
-        facts=lambda side:[(source["objectEvent"]["kind"],boundary(source["objectEvent"]["start"]) if side=="before" else source["objectEvent"]["start"],boundary(source["objectEvent"]["end"]) if side=="before" else source["objectEvent"]["end"],source["objectEvent"]["signature"]) for source in expected[side]]
+        facts=lambda side:[(source["objectEvent"]["kind"],position_of(side,source),position_of(side,source,True),source["objectEvent"]["signature"]) for source in expected[side]]
         if type(events.get("changed")) is not bool or events["changed"] != (facts("before") != facts("after")):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
     for decision in _MANIFEST_DECISIONS:
         if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision": continue
@@ -1764,7 +1828,7 @@ def _install_manifest(manifest):
             _MANIFEST_DECISIONS.append(decision)
             visit(decision.get("children", []))
     visit(manifest["decisions"])
-    _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear()
+    _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear()
     for decision in _MANIFEST_DECISIONS:
         for side in ("before","after"):
             for ref in decision.get("objectEvents",{}).get(side,[]):
@@ -2453,4 +2517,4 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _MANIFEST_PROPERTY_USED = set()
         _MANIFEST_SOURCE_NODES = {}
         _MANIFEST_ALLOWED_PROPERTIES = {}
-        _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear()
+        _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear()

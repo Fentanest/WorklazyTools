@@ -26,10 +26,28 @@ def package(path,body,media,url,header=None,external=False):
   for part in parts:z.writestr('word/_rels/'+part+'.rels','<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rIdImage" Type="'+REL+'image" Target="'+(url if external else 'media/image1.png')+'"'+(' TargetMode="External"' if external else '')+'/><Relationship Id="rIdLink" Type="'+REL+'hyperlink" Target="'+url+'" TargetMode="External"/>'+('<Relationship Id="rIdHeader" Type="'+REL+'header" Target="header1.xml"/>' if part=='document.xml' and header is not None else '')+'</Relationships>')
   z.writestr('word/media/image1.png',media)
 def reject(node):
- if node.tag==W+'p' and node.find(W+'pPr/'+W+'rPr/'+W+'ins') is not None:return []
+ # Independent author-scoped paragraph-mark semantics: rejecting an inserted
+ # break joins its surviving content with the next paragraph. A wholly new
+ # paragraph has no surviving content and disappears. Property changes restore
+ # their explicit before snapshots, independently of the production codec.
+ if node.tag in [W+'rPr',W+'pPr',W+'tblPr',W+'trPr',W+'tcPr']:
+  change=node.find(node.tag+'Change')
+  if change is not None and change.get(W+'author')=='events':return reject(copy.deepcopy(change.find(node.tag)))
  if node.tag==W+'ins' and node.get(W+'author')=='events':return []
- children=[]
- for child in node:children.extend(reject(child))
+ children=[];pending=None
+ for child in node:
+  marker=child.find(W+'pPr/'+W+'rPr/'+W+'ins') if child.tag==W+'p' else None
+  inserted=marker is not None and marker.get(W+'author')=='events'
+  values=reject(child)
+  for value in values:
+   if pending is not None:
+    if value.tag==W+'p':
+     pending.extend(item for item in value if item.tag!=W+'pPr');value=pending;pending=None
+    else:children.append(pending);pending=None
+   if inserted:
+    if any(item.tag!=W+'pPr' for item in value):pending=value
+   else:children.append(value)
+ if pending is not None:children.append(pending)
  node[:]=children
  if node.tag==W+'del' and node.get(W+'author')=='events':return children
  if node.tag==W+'delText':node.tag=W+'t'
@@ -420,12 +438,83 @@ for context in ['start','middle','end','header','cell','whole','default','insert
 `);
 }
 console.log('24 unpaired drawing scope projections +192 source/policy negatives passed');
+// Split image source events stay bound to the declared TS paragraph slices.
+for(const [formatting,sizeEnabled,sameResource] of [[false,true,false],[true,true,false],[true,false,false],[false,true,true]]) {
+ requested={fontFamily:true,size:sizeEnabled,style:true,color:true,paragraph:true,numbering:true};
+ py.globals.set('requested_json',JSON.stringify(requested));py.globals.set('formatting',formatting);py.globals.set('same_resource',sameResource);
+ py.runPython(String.raw`
+for context in ['body','cell','header','nested SDT']:
+ for placement in ['first','boundary','second','end','deleted','adjacent','both']:
+  first='First sentence. ';second='Second sentence.'
+  obj=image_run('20','Arial','FF0000','en-US')
+  old_first=text(first[:6])+obj+text(first[6:]) if placement in ['first','both'] else text(first)
+  old_second=(obj if placement in ['boundary','deleted','adjacent'] else '')+(image_run('30','Arial2','FF0000','en-US').replace('docPr id="1"','docPr id="2"') if placement=='adjacent' else '')+text(second[:6])+(obj.replace('docPr id="1"','docPr id="2"') if placement=='both' else obj if placement=='second' else '')+text(second[6:])+(obj if placement=='end' else '')
+  before=p(old_first+old_second)
+  revised_obj=image_run('40','Calibri','0000FF','ko-KR')
+  new_first=text(first[:6])+revised_obj+text(first[6:]) if placement in ['first','both'] else text(first)
+  new_second=(revised_obj if placement in ['boundary','adjacent'] else '')+(image_run('50','Calibri2','0000FF','ko-KR').replace('docPr id="1"','docPr id="2"') if placement=='adjacent' else '')+text(second[:6])+(revised_obj.replace('docPr id="1"','docPr id="2"') if placement=='both' else revised_obj if placement=='second' else '')+text(second[6:])+(revised_obj if placement=='end' else '')
+  after=p(new_first)+p(new_second)
+  for side,body,media in [('before',before,OLDPNG),('after',after,OLDPNG if same_resource else NEWPNG)]:
+   if context=='nested SDT':body='<w:sdt><w:sdtPr><w:tag w:val="stable"/></w:sdtPr><w:sdtContent><w:sdt><w:sdtPr/><w:sdtContent>'+body+'</w:sdtContent></w:sdt></w:sdtContent></w:sdt>'
+   package('/split-'+side+'.docx',p(text('Stable body')) if context=='header' else '<w:tbl><w:tr><w:tc>'+body+'</w:tc></w:tr></w:tbl>' if context=='cell' else body,media,'https://same.example',body if context=='header' else None)
+  a=extract_document_model(open('/split-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/split-after.docx','rb').read(),True,True,'en');manifest=worklazyComparisonManifestJson(a,b,formatting,True,True)
+  def descendants(items):return [d for item in items for d in [item]+descendants(item.get('children',[]))]
+  value=json.loads(manifest);decision=next(d for d in descendants(value['decisions']) if len(d['before'])==1 and len(d['after'])==2)
+  assert len(decision['objectEvents']['contexts'])==2
+  try:generate_tracked_document('/split-before.docx','/split-after.docx','/split-out.docx','events',formatting,True,True,manifest,requested_json)
+  except ValueError as error:raise AssertionError((context,placement,formatting,same_resource,str(error),[(ref['part'],ref['path']) for ref in decision['before']],[(ref['part'],ref['path']) for ref in decision['after']]))
+  accept_tracked_document('/split-out.docx','/split-accepted.docx')
+  with zipfile.ZipFile('/split-out.docx') as source,zipfile.ZipFile('/split-rejected.docx','w') as output:
+   for entry in source.infolist():output.writestr(entry,_serialize_xml(reject(_qname_safe_parse(source.read(entry.filename)))[0]) if entry.filename in ['word/document.xml','word/header1.xml'] else source.read(entry.filename))
+  assert view('/split-accepted.docx')==view('/split-after.docx'),(context,placement,'accept',view('/split-accepted.docx'),view('/split-after.docx'))
+  assert view('/split-rejected.docx')==view('/split-before.docx'),(context,placement,'reject',view('/split-rejected.docx'),view('/split-before.docx'))
+  actual=drawing_styles('/split-rejected.docx')
+  if placement=='deleted':expected=[('Arial' if formatting else None,'FF0000' if formatting else None,'20' if formatting and json.loads(requested_json)['size'] else None,None)]
+  else:expected=[('Arial' if formatting else 'Calibri','FF0000' if formatting else '0000FF','20' if formatting and json.loads(requested_json)['size'] else '40','ko-KR')]+([('Arial2' if formatting else 'Calibri2','FF0000' if formatting else '0000FF','30' if formatting and json.loads(requested_json)['size'] else '50','ko-KR')] if placement=='adjacent' else [])
+  if placement=='both':expected*=2
+  assert actual==expected,(context,placement,'scope',actual,expected)
+  if same_resource:
+   with zipfile.ZipFile('/split-out.docx') as z:assert sum(len(list(ET.fromstring(z.read(part)).iter(W+'drawing'))) for part in ['word/document.xml','word/header1.xml'] if part in z.namelist())==len(drawing_styles('/split-before.docx'))
+  name='split-'+context+'-'+placement+'-'+str(formatting)+'-'+str(json.loads(requested_json)['size'])+'-'+str(same_resource)
+  for variant in ['before','after','out','accepted','rejected']:shutil.copyfile('/split-'+variant+'.docx','/p-packages/'+name+'-'+variant+'.docx')
+  for mutation in ['missing','duplicate','position','context','paragraph']:
+   bad=copy.deepcopy(value);d=next(d for d in descendants(bad['decisions']) if d['id']==decision['id']);contexts=d['objectEvents']['contexts']
+   if mutation=='missing':contexts.pop()
+   elif mutation=='duplicate':contexts.append(copy.deepcopy(contexts[0]))
+   elif mutation=='position':next(item for c in contexts for item in c['before'])['start']+=1
+   elif mutation=='context':contexts[1]['comparisonIndex']=0
+   else:contexts[1]['afterParagraph']=contexts[0]['afterParagraph']
+   if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+   try:generate_tracked_document('/split-before.docx','/split-after.docx','/bad.docx','events',formatting,True,True,json.dumps(bad),requested_json);raise AssertionError(mutation+' accepted')
+   except ValueError as error:assert 'INVALID_COMPARISON_MANIFEST_OBJECT_CONTEXTS' in str(error)
+   assert not os.path.exists('/bad.docx')
+`);
+}
+console.log('112 split drawing source/resource/style package targets +560 context negatives passed');
+py.runPython(String.raw`
+# Split support is source-bounded: do not silently discard other markers or
+# redistribute leaves between distinct content-control envelopes.
+for unsupported in ['bookmark','before-envelope','after-envelopes','hyperlink','paragraph-history']:
+ first='First sentence. ';second='Second sentence.'
+ before=p(text(first)+image_run('20','Arial','FF0000','en-US')+text(second));after=p(text(first))+p(image_run('40','Calibri','0000FF','ko-KR')+text(second))
+ if unsupported=='bookmark':before=before.replace('<w:p>','<w:p><w:bookmarkStart w:id="7" w:name="Kept"/>').replace('</w:p>','<w:bookmarkEnd w:id="7"/></w:p>')
+ if unsupported=='before-envelope':before='<w:sdt><w:sdtPr/><w:sdtContent>'+before+'</w:sdtContent></w:sdt>'
+ if unsupported=='after-envelopes':after='<w:sdt><w:sdtPr/><w:sdtContent>'+p(text(first))+'</w:sdtContent></w:sdt>'+p(image_run('40','Calibri','0000FF','ko-KR')+text(second))
+ if unsupported=='paragraph-history':after=after.replace('<w:p>','<w:p><w:pPr><w:rPr><w:ins w:id="17" w:author="Original author"/></w:rPr></w:pPr>',1)
+ if unsupported=='hyperlink':before=p(link(first)+image_run('20','Arial','FF0000','en-US')+text(second))
+ for side,body in [('before',before),('after',after)]:package('/unsafe-split-'+side+'.docx',body,OLDPNG,'https://same.example')
+ if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+ try:generate_tracked_document('/unsafe-split-before.docx','/unsafe-split-after.docx','/bad.docx','events',False,True,True,None,requested_json);raise AssertionError(unsupported+' accepted')
+ except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE' in str(error),(unsupported,str(error))
+ assert not os.path.exists('/bad.docx')
+`);
+console.log('5 source-envelope/anchor/hyperlink/paragraph-history split capability gates passed');
 requested=undefined;
 console.log('49 paired image property package projections +252 source/family/fact negatives +2 metadata exclusions +4 absent-property targets +2 existing-history targets +2 malformed-history gates passed');
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages',{recursive:true});
 for(const name of py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages/'+name,py.FS.readFile('/p-packages/'+name));
 const artifacts=py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')).sort().map(name=>{const data=py.FS.readFile('/p-packages/'+name);return {name,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')};});
-fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p2-unpaired-package-artifacts.json',JSON.stringify({count:artifacts.length,artifacts},null,2)+'\n');
+fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p-split-package-artifacts.json',JSON.stringify({count:artifacts.length,artifacts},null,2)+'\n');
 console.log(JSON.stringify(py.globals.get('checks').toJs()));
 assert.ok(all.some(result=>result.manifest.decisions.some(decision=>decision.beforeText==='Old clause' && decision.afterText==='New clause' && decision.objectEvents?.unchangedLinks.length===1)),'TS must declare the unchanged hyperlink envelope');
 
