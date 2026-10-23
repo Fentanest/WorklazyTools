@@ -409,6 +409,9 @@ async function captureAndCompare(capture, browser) {
     const { assertThemeFixture } = await import("./ui-theme-fixture.mjs");
     await assertThemeFixture(page, { theme: capture.theme, locale: capture.locale });
 
+    // A top/bottom scroll changes compositor tiles after the earlier layout settle.
+    // Capture only after the new viewport has had two paint opportunities.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const actualBuffer = await page.screenshot({ type: "png", captureBeyondViewport: false });
     if (captureDirectory) {
       await fs.writeFile(path.join(captureDirectory, capture.name), actualBuffer);
@@ -682,7 +685,7 @@ function escapeXml(value) {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;");
 }
 
-function createVisualPng({ width, height }) {
+function createVisualPng({ width, height, changed = false }) {
   const png = new PNG({ width, height });
   for (let offset = 0; offset < png.data.length; offset += 4) {
     png.data[offset] = 21;
@@ -690,6 +693,7 @@ function createVisualPng({ width, height }) {
     png.data[offset + 2] = 215;
     png.data[offset + 3] = 255;
   }
+  if(changed)for(let y=60;y<80;y++)for(let x=100;x<120;x++){const offset=(y*width+x)*4;png.data[offset]=255;png.data[offset+1]=0;png.data[offset+2]=0;}
   return PNG.sync.write(png);
 }
 
