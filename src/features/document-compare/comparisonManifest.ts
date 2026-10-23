@@ -95,7 +95,7 @@ export interface DocumentComparisonManifest {
 export interface SourceCoverage {
   source: DocumentSourceReference;
   noteId?:string;
-  disposition: "decision" | "preserve-after" | "unsupported" | "note-reference";
+  disposition: "decision" | "preserve-after" | "unsupported" | "note-reference" | "note-special";
   decisionId?: string;
   reason?: "blank-paragraph" | "excluded-table" | "excluded-metadata" | "opaque-content" | "unmapped-source" | "existing-comment-contract" | "note-separator";
 }
@@ -120,6 +120,7 @@ export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
       if (!manifest.options.tables && tables.some((table) => descendant(source, table))) return { source, disposition: "preserve-after", reason: "excluded-table" };
       const note=manifest.noteProjection.pairs.find(pair=>pair[side]&&pair[side]!.source.part===source.part&&pair[side]!.source.path.every((value,index)=>source.path[index]===value));
       if(note&&(!note.before||!note.after))return {source,disposition:'note-reference',noteId:note.id};
+      if(side==='before'&&manifest.noteProjection.partActions?.some(action=>action.create&&action.specials.some(note=>descendant(source,note.source))))return {source,disposition:'note-special',reason:'note-separator'};
       if(manifest.noteFacts[side]?.containers.some(note=>note.type!=='normal'&&note.source.part===source.part&&note.source.path.every((value,index)=>source.path[index]===value)))return {source,disposition:'preserve-after',reason:'note-separator'};
       if (decision?.trackedRepresentation === "preserve-after") return { source, disposition: "decision", decisionId: decision.id };
       const commentOwner = source.part === "word/comments.xml" ? decisions.find((item) => item.trackedReason === "existing-comment-contract" && item[side].some((ref) => descendant(source, ref))) : undefined;

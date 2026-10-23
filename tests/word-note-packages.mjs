@@ -170,6 +170,75 @@ for defect in ['wrong-type','duplicate-type','dangling-main-rel']:
  except ValueError:assert not os.path.exists('/bad-absent-out.docx')
 `);
 console.log('3 conflicting note-part declarations/relationship controls fail without output');
+py.runPython(`
+def special_graph(path,kind):
+ with zipfile.ZipFile(path) as z:
+  part='word/'+kind+'s.xml';relpath='word/_rels/'+kind+'s.xml.rels'
+  rels={r.get('Id'):r for r in ET.fromstring(z.read(relpath))} if relpath in z.namelist() else {}
+  def fact(n):
+   attrs=[]
+   for k,v in sorted(n.attrib.items()):
+    if n.tag.endswith('}docPr') and k=='id':continue # nonsemantic drawing allocation
+    if k.startswith(R):
+     rel=rels[v];target=rel.get('Target')
+     v=target if rel.get('TargetMode')=='External' else hashlib.sha256(z.read(posixpath.normpath(posixpath.join('word',target)))).hexdigest()
+    attrs.append([k,v])
+   return [n.tag,attrs,n.text or '',[fact(c) for c in n]]
+  return [fact(n) for n in ET.fromstring(z.read(part)) if n.get(W+'type','normal')!='normal']
+for kind in ['footnote','endnote']:
+ for special_type in ['separator','continuationSeparator','continuationNotice']:
+  for formatting in [False,True]:
+   case=next(c for c in validate_fixtures() if c['name']==kind+'-absent-part-before-resources')
+   with zipfile.ZipFile(case['before']) as z:entries={n:z.read(n) for n in z.namelist()}
+   root=ET.fromstring(entries['word/'+kind+'s.xml'])
+   payload='<w:'+kind+' xmlns:w="'+WNS+'" xmlns:r="'+RNS+'" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" w:id="1" w:type="'+special_type+'"><w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:sz w:val="26"/></w:rPr><w:t>CUSTOM SEPARATOR</w:t>'+('' if special_type=='continuationNotice' else '<w:'+special_type+'/>')+'</w:r><w:hyperlink r:id="rIdShared">'+run('Link')+'</w:hyperlink><w:r>'+drawing()+'</w:r></w:p></w:'+kind+'>'
+   root.append(ET.fromstring(payload));entries['word/'+kind+'s.xml']=_serialize_xml(root)
+   with zipfile.ZipFile('/special-before.docx','w') as z:
+    for n,data in entries.items():z.writestr(n,data)
+   generate_tracked_document('/special-before.docx',case['after'],'/special-out.docx','notes',formatting,True,True)
+   accept_tracked_document('/special-out.docx','/special-accepted.docx')
+   with zipfile.ZipFile('/special-out.docx') as source,zipfile.ZipFile('/special-rejected.docx','w') as output:
+    for entry in source.infolist():output.writestr(entry,_serialize_xml(reject_note(_qname_safe_parse(source.read(entry.filename)))[0]) if entry.filename in ['word/document.xml','word/'+kind+'s.xml'] else source.read(entry.filename))
+   assert reachable('/special-accepted.docx',kind)==[]
+   assert reachable('/special-rejected.docx',kind)==reachable('/special-before.docx',kind)
+   assert special_graph('/special-out.docx',kind)==special_graph('/special-before.docx',kind)
+   assert special_graph('/special-rejected.docx',kind)==special_graph('/special-before.docx',kind)
+   with zipfile.ZipFile('/special-out.docx') as z:
+    notes=ET.fromstring(z.read('word/'+kind+'s.xml'));assert len({n.get(W+'id') for n in notes})==len(notes),'special ID collides with allocated ordinary note'
+   a=extract_document_model(open('/special-before.docx','rb').read(),True,True,'en');b=extract_document_model(open(case['after'],'rb').read(),True,True,'en');manifest=json.loads(worklazyComparisonManifestJson(a,b,formatting,True,True))
+   for defect in ['omit','duplicate','source','coverage']:
+    bad=copy.deepcopy(manifest)
+    action=bad['noteProjection']['partActions'][0]
+    if defect=='omit':action['specials']=[]
+    elif defect=='duplicate':action['specials']*=2
+    elif defect=='source':action['specials'][0]['source']['path']=[999]
+    else:
+     for scope in bad['coverage']['before']:
+      if scope['disposition']=='note-special':scope['disposition']='preserve-after'
+    if os.path.exists('/bad-special.docx'):os.unlink('/bad-special.docx')
+    try:generate_tracked_document('/special-before.docx',case['after'],'/bad-special.docx','notes',formatting,True,True,json.dumps(bad));raise AssertionError(defect+' accepted')
+    except ValueError:assert not os.path.exists('/bad-special.docx')
+   for variant,path in [('before','/special-before.docx'),('out','/special-out.docx'),('accepted','/special-accepted.docx'),('rejected','/special-rejected.docx')]:shutil.copyfile(path,'/note-packages/'+kind+'-'+special_type+'-'+str(formatting)+'-'+variant+'.docx')
+`);
+console.log('12 custom separator/continuation separator/notice property and resource roundtrips +48 action/coverage negatives passed');
+py.runPython(`
+for defect in ['duplicate-id','duplicate-type','unknown-type','numbering','missing-style','internal-link']:
+ with zipfile.ZipFile('/special-before.docx') as z:entries={n:z.read(n) for n in z.namelist()}
+ part='word/endnotes.xml';root=ET.fromstring(entries[part]);special=next(n for n in root if n.get(W+'type','normal')!='normal')
+ if defect in ['duplicate-id','duplicate-type']:
+  extra=copy.deepcopy(special);extra.set(W+'id','1' if defect=='duplicate-id' else '99');extra.set(W+'type','separator' if defect=='duplicate-id' else special.get(W+'type'));root.append(extra)
+ elif defect=='unknown-type':special.set(W+'type','custom')
+ elif defect=='numbering':ET.SubElement(special.find(W+'p/'+W+'pPr'),W+'numPr')
+ elif defect=='missing-style':ET.SubElement(special.find(W+'p/'+W+'pPr'),W+'pStyle',{W+'val':'Missing'})
+ else:special.find(W+'p/'+W+'hyperlink').set(W+'anchor','MissingBookmark')
+ entries[part]=_serialize_xml(root)
+ with zipfile.ZipFile('/unsupported-special.docx','w') as z:
+  for n,data in entries.items():z.writestr(n,data)
+ if os.path.exists('/unsupported-special-out.docx'):os.unlink('/unsupported-special-out.docx')
+ try:generate_tracked_document('/unsupported-special.docx',case['after'],'/unsupported-special-out.docx','notes',True,True,True);raise AssertionError(defect+' accepted')
+ except ValueError:assert not os.path.exists('/unsupported-special-out.docx')
+`);
+console.log('6 unsupported/ambiguous special dependency gates fail without output');
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/note-packages',{recursive:true});
 for(const name of py.FS.readdir('/note-packages').filter(name=>name.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/note-packages/'+name,py.FS.readFile('/note-packages/'+name));
 console.log('11 forged note source/anchor/container/coverage controls passed');
