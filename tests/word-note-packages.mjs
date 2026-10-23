@@ -25,6 +25,15 @@ for case in validate_fixtures():
     root=ET.fromstring(out.read('word/document.xml'))
     assert not any(n.get(W+'id')=='4' for n in root.iter() if n.tag in [W+'commentReference',W+'commentRangeStart',W+'commentRangeEnd']), 'Old anchor aliases revised comment'
   if case['invalid']:raise AssertionError('Malformed ordinary IDs were accepted')
+  if '-absent-part-before' in case['name']:
+   with zipfile.ZipFile('/note-output.docx') as z:
+    part='word/'+case['kind']+'s.xml';root=ET.fromstring(z.read(part))
+    assert [(n.get(W+'id'),n.get(W+'type')) for n in root if n.get(W+'type')]==[('-1','separator'),('0','continuationSeparator')]
+    assert [n.get(W+'id') for n in root if n.get(W+'type','normal')=='normal']==['1']
+    rows=[r for r in ET.fromstring(z.read('word/_rels/document.xml.rels')) if r.get('Type')==RNS+'/'+case['kind']+'s']
+    assert len(rows)==1 and rows[0].get('Target')==case['kind']+'s.xml'
+    rows=[r for r in ET.fromstring(z.read('[Content_Types].xml')) if r.get('PartName')=='/'+part]
+    assert len(rows)==1 and rows[0].get('ContentType')=='application/vnd.openxmlformats-officedocument.wordprocessingml.'+case['kind']+'s+xml'
   accept_tracked_document('/note-output.docx','/note-accepted.docx')
   assert reachable('/note-accepted.docx',case['kind'])==expected(case,'after'),('accept',reachable('/note-accepted.docx',case['kind']),expected(case,'after'))
   # Independent author-scoped rejection. Paragraph boundary fixtures are separate;
@@ -51,9 +60,12 @@ json.dumps(results)
 py.runPython(`
 case=next(case for case in validate_fixtures() if case['name']=='footnote-different-id-same-note')
 a=extract_document_model(open(case['before'],'rb').read(),True,True,'en');b=extract_document_model(open(case['after'],'rb').read(),True,True,'en');value=json.loads(worklazyComparisonManifestJson(a,b,False,True,True))
-for mutation in ['facts','missing','duplicate','container','id','reference','coverage','decisions']:
+for mutation in ['facts','missing','duplicate','container','id','reference','coverage','decisions','part-create','part-missing','part-facts']:
  bad=copy.deepcopy(value)
- if mutation=='facts':bad['noteFacts']['before']['containers'][0]['id']='invalid'
+ if mutation=='part-create':bad['noteProjection']['partActions'][0]['create']=True
+ elif mutation=='part-missing':bad['noteProjection']['partActions']=[]
+ elif mutation=='part-facts':bad['noteFacts']['before']['parts']=[]
+ elif mutation=='facts':bad['noteFacts']['before']['containers'][0]['id']='invalid'
  elif mutation=='missing':bad['noteProjection']['pairs'].clear()
  elif mutation=='duplicate':bad['noteProjection']['pairs']*=2
  elif mutation=='container':bad['noteProjection']['pairs'][0]['before']['source']['path']=[99]
@@ -103,8 +115,63 @@ for kind in ['footnote','endnote']:
  for variant in ['before','after','out','accepted','rejected']:shutil.copyfile('/collision-'+variant+'.docx','/note-packages/'+kind+'-allocated-collision-'+variant+'.docx')
 `);
 console.log('2 before-only allocated-ID collision with paired surviving note targets passed');
+py.runPython(`
+# Shared named-style policy witness: raw pStyle is restored on a wholly
+# deleted paragraph, but excluded shared style definitions remain revised.
+for formatting in [False,True]:
+ for kind in ['footnote','endnote']:
+  paths=['/named-before.docx','/named-after.docx']
+  for side,path in zip(['before','after'],paths):
+   payload=note(1,'Deleted note',kind).replace('<w:p>','<w:p><w:pPr><w:pStyle w:val="NoteStyle"/></w:pPr>')
+   package(path,paragraph(run('Anchor')+(reference(kind,1) if side=='before' else '')),[payload] if side=='before' else [],kind)
+   with zipfile.ZipFile(path) as z:entries={n:z.read(n) for n in z.namelist()}
+   entries['word/styles.xml']=('<w:styles xmlns:w="'+WNS+'"><w:style w:type="paragraph" w:styleId="NoteStyle"><w:name w:val="NoteStyle"/><w:rPr><w:sz w:val="'+('20' if side=='before' else '40')+'"/></w:rPr></w:style></w:styles>').encode()
+   with zipfile.ZipFile(path,'w') as z:
+    for n,data in entries.items():z.writestr(n,data)
+  generate_tracked_document(paths[0],paths[1],'/named-out.docx','notes',formatting,True,True)
+  accept_tracked_document('/named-out.docx','/named-accepted.docx')
+  assert reachable('/named-accepted.docx',kind)==[]
+  with zipfile.ZipFile('/named-out.docx') as z:
+   root=ET.fromstring(z.read('word/'+kind+'s.xml'));p=root.find(W+kind+'/'+W+'p')
+   assert p.find(W+'pPr/'+W+'pStyle').get(W+'val')=='NoteStyle'
+   styles=ET.fromstring(z.read('word/styles.xml'));properties=styles.find(W+'style/'+W+'rPr');history=properties.find(W+'rPrChange')
+   assert properties.find(W+'sz').get(W+'val')=='40'
+   assert (history is not None)==formatting
+   if formatting:assert history.find(W+'rPr/'+W+'sz').get(W+'val')=='20'
+  for variant,path in [('before',paths[0]),('after',paths[1]),('out','/named-out.docx'),('accepted','/named-accepted.docx')]:shutil.copyfile(path,'/note-packages/'+kind+'-inherited-style-'+str(formatting)+'-'+variant+'.docx')
+`);
+console.log('4 named-style raw paragraph/shared-style policy witnesses passed');
+py.runPython(`
+for case in [case for case in validate_fixtures() if '-absent-part-' in case['name']]:
+ generate_tracked_document(case['before'],case['after'],'/absent-excluded.docx','notes',False,True,False)
+ accept_tracked_document('/absent-excluded.docx','/absent-excluded-accepted.docx')
+ assert reachable('/absent-excluded-accepted.docx',case['kind'])==expected(case,'after')
+ with zipfile.ZipFile('/absent-excluded.docx') as x,zipfile.ZipFile(case['after']) as y:
+  part='word/'+case['kind']+'s.xml'
+  assert (part in x.namelist())==(part in y.namelist())
+  if part in y.namelist():assert x.read(part)==y.read(part)
+  assert x.read('word/_rels/document.xml.rels')==y.read('word/_rels/document.xml.rels')
+`);
+console.log('8 metadata-excluded absent-part targets retain revised presence, bytes and relationships');
+py.runPython(`
+case=next(case for case in validate_fixtures() if case['name']=='footnote-absent-part-before')
+for defect in ['wrong-type','duplicate-type','dangling-main-rel']:
+ with zipfile.ZipFile(case['after']) as z:entries={n:z.read(n) for n in z.namelist()}
+ types=ET.fromstring(entries['[Content_Types].xml'])
+ if defect=='dangling-main-rel':
+  rels=ET.fromstring(entries['word/_rels/document.xml.rels']);ET.SubElement(rels,PR+'Relationship',{'Id':'dangling','Type':RNS+'/footnotes','Target':'missing.xml'});entries['word/_rels/document.xml.rels']=_serialize_xml(rels)
+ else:
+  for i in range(2 if defect=='duplicate-type' else 1):ET.SubElement(types,CT+'Override',{'PartName':'/word/footnotes.xml','ContentType':'application/wrong' if defect=='wrong-type' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml'})
+ entries['[Content_Types].xml']=_serialize_xml(types)
+ with zipfile.ZipFile('/bad-absent-after.docx','w') as z:
+  for n,data in entries.items():z.writestr(n,data)
+ if os.path.exists('/bad-absent-out.docx'):os.unlink('/bad-absent-out.docx')
+ try:generate_tracked_document(case['before'],'/bad-absent-after.docx','/bad-absent-out.docx','notes',False,True,True);raise AssertionError(defect+' accepted')
+ except ValueError:assert not os.path.exists('/bad-absent-out.docx')
+`);
+console.log('3 conflicting note-part declarations/relationship controls fail without output');
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/note-packages',{recursive:true});
 for(const name of py.FS.readdir('/note-packages').filter(name=>name.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/note-packages/'+name,py.FS.readFile('/note-packages/'+name));
-console.log('8 forged note source/anchor/container/coverage controls passed');
+console.log('11 forged note source/anchor/container/coverage controls passed');
 console.log(JSON.stringify(results,null,2));
 assert.equal(results.filter(r=>r.status==='fail').length,0,'Required note graph behavior is not implemented');

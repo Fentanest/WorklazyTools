@@ -59,6 +59,21 @@ class _PackageGraph:
             if part in self.story_parts:
                 for node in ET.fromstring(after.read(part)).iter():
                     if node.tag=='{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr' and node.get('id','').isdigit(): self.next_drawing_id = max(self.next_drawing_id,int(node.get('id'))+1)
+    def add_note_part(self, part, kind):
+        self.names.add(part)
+        content='application/vnd.openxmlformats-officedocument.wordprocessingml.'+kind+'s+xml'
+        existing=[node for node in self.types if node.tag==CT+'Override' and node.get('PartName')=='/'+part]
+        if len(existing)>1 or any(node.get('ContentType')!=content for node in existing):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_CONTENT_TYPE')
+        if not existing:ET.SubElement(self.types,CT+'Override',{'PartName':'/'+part,'ContentType':content})
+        path=self.rel_path('word/document.xml')
+        root=self.roots.get(path)
+        if root is None:root=ET.fromstring(self.after.read(path)) if path in self.after.namelist() else ET.Element(PR+'Relationships')
+        kind_uri=R[1:-1]+'/'+kind+'s'
+        if any(node.get('Type')==kind_uri for node in root):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_RELATIONSHIP')
+        used={node.get('Id') for node in root};number=1
+        while 'rIdWorklazyNote'+str(number) in used:number+=1
+        ET.SubElement(root,PR+'Relationship',{'Id':'rIdWorklazyNote'+str(number),'Type':kind_uri,'Target':posixpath.basename(part)})
+        self.roots[path]=root
     def mime(self, part, types):
         content=next((node.get('ContentType') for node in types if node.tag==CT+'Override' and node.get('PartName')=='/'+part),None)
         return content or next((node.get('ContentType') for node in types if node.tag==CT+'Default' and node.get('Extension','').lower()==posixpath.splitext(part)[1].lstrip('.').lower()),None)
@@ -149,11 +164,11 @@ class _PackageGraph:
                 root=merged
             (replacements if path in self.after.namelist() else additions)[path]=_serialize_xml(root)
         additions.update(self.additions)
-        if self.additions:
+        if self.additions or any(part not in self.after.namelist() for part in additions):
             merged=ET.fromstring(replacements.get('[Content_Types].xml',self.after.read('[Content_Types].xml')))
             present={node.get('PartName') for node in merged if node.tag==CT+'Override'}
             for node in self.types:
-                if node.tag==CT+'Override' and node.get('PartName','').lstrip('/') in self.additions and node.get('PartName') not in present:merged.append(copy.deepcopy(node))
+                if node.tag==CT+'Override' and node.get('PartName','').lstrip('/') in additions and node.get('PartName') not in present:merged.append(copy.deepcopy(node))
             replacements['[Content_Types].xml']=_serialize_xml(merged)
 
 _PACKAGE_GRAPH = None
@@ -1366,6 +1381,9 @@ def _validate_story_projection(facts,actual):
 def _validate_note_projection(facts,actual):
     if _MANIFEST.get('noteFacts')!=facts:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_FACTS')
     plan=_MANIFEST.get('noteProjection',{})
+    if _MANIFEST['options']['metadata']:
+        expected_parts=[{'part':'word/'+kind+'s.xml','kind':kind,'before':'word/'+kind+'s.xml' in facts['before']['parts'],'after':'word/'+kind+'s.xml' in facts['after']['parts'],'create':'word/'+kind+'s.xml' not in facts['after']['parts']} for kind in ('footnote','endnote') if any('word/'+kind+'s.xml' in facts[side]['parts'] for side in ('before','after'))]
+        if plan.get('partActions')!=expected_parts:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_PARTS')
     if plan.get('policy')!='worklazy-note-projection-1':raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE')
     if not _MANIFEST['options']['metadata']:
         if plan!={'policy':'worklazy-note-projection-1','supported':True,'reasons':[],'pairs':[],'references':[]}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE')
@@ -1525,7 +1543,7 @@ def _validate_manifest(before_path, after_path):
         for side in ("before", "after"):
             if decision.get("trackedRepresentation") != "preserve-after":
                 opposite_parts = {key[0] for key in actual["after" if side == "before" else "before"]}
-                if any(ref["part"] not in opposite_parts and not any(pair.get(side+"Part")==ref["part"] for pair in _MANIFEST["storyProjection"]["pairs"]) for ref in decision[side]):
+                if any(ref["part"] not in opposite_parts and not any(pair.get(side+"Part")==ref["part"] for pair in _MANIFEST["storyProjection"]["pairs"]) and not (decision.get('trackedRepresentation')=='note-reference' and any(pair['id']==decision.get('noteId') for pair in _MANIFEST['noteProjection']['pairs'])) for ref in decision[side]):
                     raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
         _validate_segments(decision["textSegments"], decision["beforeText"], decision["afterText"])
         if shape == (1, 2):
@@ -2328,7 +2346,10 @@ def _revisionize_xml_part(before_data, after_data, include_formatting, writer, c
         if _PACKAGE_GRAPH is not None:_PACKAGE_GRAPH.output_owner=previous_owner
 
 def _revisionize_notes(before_data,after_data,include_formatting,writer,note_tag,include_tables=True):
-    before_root=_parse_xml(before_data);after_root=_parse_xml(after_data);part='word/'+note_tag+'s.xml'
+    before_root=_parse_xml(before_data) if before_data else ET.Element(W+note_tag+'s');after_root=_parse_xml(after_data) if after_data else ET.Element(W+note_tag+'s');part='word/'+note_tag+'s.xml'
+    if after_data is None:
+        for identity,kind in [('-1','separator'),('0','continuationSeparator')]:
+            special=ET.SubElement(after_root,W+note_tag,{W+'id':identity,W+'type':kind});ET.SubElement(ET.SubElement(ET.SubElement(special,W+'p'),W+'r'),W+kind)
     _register_manifest_root(before_root,part,'before');_register_manifest_root(after_root,part,'after')
     for pair in _MANIFEST['noteProjection']['pairs']:
         old,new=pair.get('before'),pair.get('after')
@@ -2711,16 +2732,12 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
                 old,new=pair.get('beforePart'),pair.get('afterPart')
                 if old and new:
                     replacements[new]=_revisionize_xml_part(before_part(old),after_archive.read(new),bool(include_formatting),writer,include_tables=bool(include_tables),part=new,source_before_part=old)
-            for name, note_tag in (("word/footnotes.xml", "footnote"), ("word/endnotes.xml", "endnote")):
-                if name in after_archive.namelist() and name in before_names:
-                    replacements[name] = _revisionize_notes(
-                        before_part(name),
-                        after_archive.read(name),
-                        bool(include_formatting),
-                        writer,
-                        note_tag,
-                        bool(include_tables),
-                    )
+            for action in _MANIFEST['noteProjection']['partActions']:
+                name,note_tag=action['part'],action['kind']
+                data=_revisionize_notes(before_part(name) if action['before'] else None,after_archive.read(name) if action['after'] else None,bool(include_formatting),writer,note_tag,bool(include_tables))
+                (replacements if action['after'] else additions)[name]=data
+                if action['create']:
+                    _PACKAGE_GRAPH.add_note_part(name,note_tag)
 
         for decision in _MANIFEST_DECISIONS:
             if decision.get("trackedRepresentation") == "preserve-after":

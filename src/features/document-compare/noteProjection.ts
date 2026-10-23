@@ -1,13 +1,14 @@
 import {buildObjectEventContexts,eventPosition} from './objectEventContext.ts';
 import type {ComparisonDecision,DocumentComparisonManifest,DocumentSourceReference} from './comparisonManifest.ts';
 export interface NoteContainer {source:DocumentSourceReference;kind:string;id:string;type:string}
-export interface NoteFacts {policy:'worklazy-note-facts-1';containers:NoteContainer[];references:Array<{source:DocumentSourceReference;kind:string;id:string}>;errors:string[]}
+export interface NoteFacts {policy:'worklazy-note-facts-1';parts:string[];containers:NoteContainer[];references:Array<{source:DocumentSourceReference;kind:string;id:string}>;errors:string[]}
 export interface NotePair {id:string;kind:string;before?:NoteContainer;after?:NoteContainer;decisionIds:string[];coverage:{before:DocumentSourceReference[];after:DocumentSourceReference[]}}
-export interface NoteProjection {policy:'worklazy-note-projection-1';supported:boolean;reasons:string[];pairs:NotePair[];references:Array<{decisionId:string;before?:DocumentSourceReference;after?:DocumentSourceReference;noteId:string}>}
+export interface NoteProjection {policy:'worklazy-note-projection-1';supported:boolean;reasons:string[];pairs:NotePair[];partActions?:Array<{part:string;kind:string;before:boolean;after:boolean;create:boolean}>;references:Array<{decisionId:string;before?:DocumentSourceReference;after?:DocumentSourceReference;noteId:string}>}
 const key=(ref:DocumentSourceReference)=>JSON.stringify([ref.part,ref.path]);
 export function buildNoteProjection(manifest:DocumentComparisonManifest):NoteProjection {
  const a=manifest.noteFacts.before,b=manifest.noteFacts.after,plan:NoteProjection={policy:'worklazy-note-projection-1',supported:true,reasons:[],pairs:[],references:[]};
  if(!manifest.options.metadata||!a||!b)return plan;
+ plan.partActions=['footnote','endnote'].filter(kind=>a.parts.includes('word/'+kind+'s.xml')||b.parts.includes('word/'+kind+'s.xml')).map(kind=>{const part='word/'+kind+'s.xml';return {part,kind,before:a.parts.includes(part),after:b.parts.includes(part),create:!b.parts.includes(part)};});
  plan.reasons.push(...a.errors,...b.errors);
  const add=(old:NoteContainer|undefined,next:NoteContainer|undefined)=>{
   const id='note:'+JSON.stringify([old?.source??null,next?.source??null]);let pair=plan.pairs.find(pair=>pair.id===id);

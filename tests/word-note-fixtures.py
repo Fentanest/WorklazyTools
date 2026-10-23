@@ -38,7 +38,7 @@ def reachable(path,kind='footnote'):
  """Follow references, reject ambiguous/dangling IDs, resolve each owner independently."""
  with zipfile.ZipFile(path) as z:
   part='word/'+kind+'s.xml'; notes={}
-  for node in ET.fromstring(z.read(part)):
+  for node in ET.fromstring(z.read(part)) if part in z.namelist() else []:
    if node.get(W+'type','normal')!='normal':continue
    ident=node.get(W+'id')
    if ident is None or ident in notes:raise ValueError('ambiguous ordinary note ID')
@@ -86,6 +86,29 @@ def fixtures(root='/tmp/word-note-fixtures'):
    paths=[root+'/'+kind+'-'+name+'-'+side+'.docx' for side in ['before','after']]
    package(paths[0],b,bn,kind,resources=name=='owner-relationship-collisions');package(paths[1],a,an,kind,resources=name=='owner-relationship-collisions')
    cases.append({'name':kind+'-'+name,'kind':kind,'before':paths[0],'after':paths[1],'invalid':name in ['duplicate-id','missing-id']})
+ # A genuinely absent part has no main relationship or content-type declaration.
+ for kind in ['footnote','endnote']:
+  for direction in ['before','after']:
+   for resource in [False,True]:
+    name=kind+'-absent-part-'+direction+('-resources' if resource else '')
+    paths=[root+'/'+name+'-'+side+'.docx' for side in ['before','after']]
+    for side,path in zip(['before','after'],paths):
+     present=side==direction
+     payload=note(7,'Old' if side=='before' else 'New',kind)
+     if resource:payload=payload.replace('</w:p>','<w:hyperlink r:id="rIdShared">'+run('Link')+'</w:hyperlink><w:r>'+drawing()+'</w:r></w:p>')
+     package(path,paragraph(run('Anchor')+(reference(kind,7) if present else '')),[payload] if present else [],kind,resources=resource and present)
+     if not present:
+      with zipfile.ZipFile(path) as z:entries={n:z.read(n) for n in z.namelist() if n!='word/'+kind+'s.xml'}
+      rels=ET.fromstring(entries['word/_rels/document.xml.rels'])
+      for n in list(rels):
+       if n.get('Type')==RNS+'/'+kind+'s':rels.remove(n)
+      types=ET.fromstring(entries['[Content_Types].xml'])
+      for n in list(types):
+       if n.get('PartName')=='/word/'+kind+'s.xml':types.remove(n)
+      entries['word/_rels/document.xml.rels']=ET.tostring(rels);entries['[Content_Types].xml']=ET.tostring(types)
+      with zipfile.ZipFile(path,'w') as z:
+       for n,data in entries.items():z.writestr(n,data)
+    cases.append({'name':name,'kind':kind,'before':paths[0],'after':paths[1],'invalid':False})
  # E4: comments are after-owned byte artifacts, including absence. Old body
  # comment ID 4 must never acquire the unrelated revised comment with ID 4.
  for state in ['present','absent']:
@@ -102,6 +125,12 @@ def fixtures(root='/tmp/word-note-fixtures'):
 def expected(case,side):
  name=case['name'].removeprefix(case['kind']+'-')
  def event(text,pi=0):return {'anchor':[pi,6,0],'events':[['text',text]]}
+ if name.startswith('absent-part-'):
+  present=side==('before' if name.startswith('absent-part-before') else 'after')
+  if not present:return []
+  value=event('Old' if side=='before' else 'New')
+  if name.endswith('-resources'):value['events'] += [['link','https://note.example/','Link'],['image',{'before':'b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640','after':'fce481932ea5d07a91c7991c09fdadb4bf78f9b4cc8f927188384231f9d12679'}[side]]]
+  return [value]
  if name=='owner-relationship-collisions':
   value=event('Old' if side=='before' else 'New');value['events'] += [['link','https://note.example/','Link'],['image',{'before':'b1ff9c8ea3a780bad09b346c423d2d0e46815926879b18e841d928376a946640','after':'fce481932ea5d07a91c7991c09fdadb4bf78f9b4cc8f927188384231f9d12679'}[side]]];return [value]
  if name=='reordered-containers':return [event('One'),event('Two',1)]

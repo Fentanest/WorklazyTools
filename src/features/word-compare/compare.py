@@ -606,7 +606,7 @@ def _note_package_facts(archive,inventory):
     references=[{'source':source,'kind':source['objectEvent']['signature'],'id':source['objectEvent']['target']} for source in inventory if source.get('objectEvent',{}).get('kind')=='note']
     for ref in references:
         if not any(note['kind']==ref['kind'] and note['id']==ref['id'] and note['type']=='normal' for note in containers):errors.append('missing-note-target')
-    return {'policy':'worklazy-note-facts-1','containers':containers,'references':references,'errors':sorted(set(errors))}
+    return {'policy':'worklazy-note-facts-1','containers':containers,'references':references,'errors':sorted(set(errors)), 'parts':[part for part in ('word/footnotes.xml','word/endnotes.xml') if part in archive.namelist()]}
 
 def _story_package_facts(archive):
     import posixpath
