@@ -1331,6 +1331,13 @@
           "Enable manual column mapping to choose original column numbers. Date-string comparison defaults to off and applies only to plain string values in both selected columns. It supports US/EU or ISO dates with optional HH:mm:ss; date-only and timed values remain distinct. Keys, reconciliation and formulas are unchanged. Grid hiding and reversal preserve original addresses. Full-report and visible-record exports are separate.",
           "The worksheet grids include headers and unchanged cells. Each pane shows up to 40 rows and 12 columns, with controls for the starting position. Choose original or changed to hide source rows or columns. Paging changes only the preview window; export includes all records selected by filters and hiding."
         ]
+      },
+      {
+        "title": "Worksheet layouts and active date settings",
+        "paragraphs": [
+          "Choose a single pane, changes docked left/right/top/bottom, a split with a selected source, or three columns/rows. Narrow screens stack panes with scrolling inside each table. Adjust split size with arrow keys. Switching layout never reruns comparison.",
+          "Date-string normalization applies only to selected-column value comparison. It is inactive in reconciliation; the screen and Parameters sheet distinguish requested settings from applied policy."
+        ]
       }
     ],
     "faq": {

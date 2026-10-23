@@ -2448,11 +2448,18 @@
       "US": "US · month/day/year",
       "EU": "EU · day/month/year",
       "left": "Original date-string columns",
-      "right": "Changed date-string columns"
+      "right": "Changed date-string columns",
+      "policySummary": "Requested: {{requested}} · Applied to value checks: {{applied}}",
+      "policy": {
+        "off": "Date-string normalization is off.",
+        "reconcile": "Inactive in reconciliation. The requested setting is retained; existing reconciliation date rules and tolerances are used.",
+        "noColumns": "Inactive until target columns are selected in both sources.",
+        "none": "Applies only to eligible string values in selected columns. Keys, row matching and reconciliation rules stay unchanged."
+      }
     },
     "grid": {
       "title": "Cell comparison grid",
-      "description": "Inspect original and changed worksheet grids alongside comparison records. Choose split view or three columns with change records. Hiding and ordering only change the view and do not rerun comparison. Download the full report above, or export records selected by filters and hiding here.",
+      "description": "Inspect original worksheets and the same comparison records in single-pane, docked, split or three-pane layouts. Hiding, ordering and layout changes never rerun comparison. Download the full report above, or export records selected by filters and hiding here.",
       "layout": "Layout",
       "hideRows": "Hide source row numbers",
       "hideColumns": "Hide source column numbers",
@@ -2464,16 +2471,18 @@
       "changes": "Changes",
       "cellDetails": "Original cell details",
       "layouts": {
-        "split": "Split",
-        "threeColumns": "3 columns",
-        "full": "Full",
-        "left": "Left",
-        "right": "Right",
-        "top": "Top",
-        "bottom": "Bottom",
+        "split": "Original and changed side by side",
+        "threeColumns": "Original, changed and changes in three columns",
+        "full": "Single pane (choose content)",
+        "left": "Changes left · sources right",
+        "right": "Sources left · changes right",
+        "top": "Changes above sources",
+        "bottom": "Changes below sources",
         "horizontal": "Horizontal split",
         "vertical": "Vertical split",
-        "threeRows": "3 rows"
+        "threeRows": "Original, changed and changes in three rows",
+        "horizontalSplit": "Changes beside a selected source",
+        "verticalSplit": "Changes above a selected source"
       },
       "fields": {
         "address": "Source address",
@@ -2493,7 +2502,23 @@
       "nextRows": "Next rows",
       "hideSide": "Apply hiding to",
       "matrixDescription": "The original grids include headers and unchanged cells, with up to 40 rows and 12 columns at a time. Original row and column numbers are preserved. Colors come from the same comparison records and source coordinates. List filters apply to record details and export; paging through the grids does not narrow the exported record selection.",
-      "recordDetails": "Comparison record details"
+      "recordDetails": "Comparison record details",
+      "fullPane": "Content for single pane",
+      "secondaryPane": "Source to show with changes",
+      "splitSize": "Changes pane size {{percent}}%",
+      "narrowLayouts": "Narrow screens stack panes in the same order. Scroll within each table horizontally. Layout changes preserve source addresses, hidden rows/columns, table positions and selected cells.",
+      "layoutHelp": {
+        "split": "Shows only the original and changed worksheets side by side.",
+        "full": "Shows one selected original worksheet, changed worksheet or changes pane across the full width.",
+        "left": "Shows changes on the left, with original above changed on the right.",
+        "right": "Shows original above changed on the left, with changes on the right.",
+        "top": "Shows changes above the side-by-side original and changed worksheets.",
+        "bottom": "Shows side-by-side original and changed worksheets above changes.",
+        "horizontalSplit": "Shows changes beside a selected original or changed worksheet. Adjust the size slider with the arrow keys.",
+        "verticalSplit": "Shows changes above a selected original or changed worksheet. The size slider adjusts their viewing heights.",
+        "threeColumns": "Shows original, changed and changes from left to right in three columns.",
+        "threeRows": "Shows original, changed and changes from top to bottom in three rows."
+      }
     }
   },
   "excelCleaner": {
