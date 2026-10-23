@@ -26,43 +26,58 @@ export async function compareWordFilePairs(
   language: "ko" | "en" = "ko",
   signal?: AbortSignal,
 ) {
-  const worker = new Worker(new URL("./word.worker.ts", import.meta.url), { type: "module" });
+  const canceledMessage = language === "en" ? "Word comparison was cancelled." : "Word 문서 비교를 취소했습니다.";
+  const startError = language === "en" ? "Could not start Word comparison. Reload the page and try again." : "Word 문서 비교를 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.";
+  const checkAbort = () => { if (signal?.aborted) throw new DOMException(canceledMessage, "AbortError"); };
   const payloads: Array<{ beforeName: string; afterName: string; beforeBuffer: ArrayBuffer; afterBuffer: ArrayBuffer }> = [];
-  for (const { beforeFile, afterFile } of pairs) {
-    if (signal?.aborted) throw new DOMException(language === "en" ? "Word comparison was cancelled." : "Word 문서 비교를 취소했습니다.", "AbortError");
-    payloads.push({
-      beforeName: beforeFile.name,
-      afterName: afterFile.name,
-      beforeBuffer: await beforeFile.arrayBuffer(),
-      afterBuffer: await afterFile.arrayBuffer(),
-    });
+  try {
+    for (const { beforeFile, afterFile } of pairs) {
+      checkAbort();
+      const beforeBuffer = await beforeFile.arrayBuffer();
+      checkAbort();
+      const afterBuffer = await afterFile.arrayBuffer();
+      checkAbort();
+      payloads.push({ beforeName: beforeFile.name, afterName: afterFile.name, beforeBuffer, afterBuffer });
+    }
+  } catch (error) {
+    if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw new DOMException(canceledMessage, "AbortError");
+    throw new Error(language === "en" ? "Could not read the selected Word files. Choose the files again." : "선택한 파일을 읽지 못했습니다. 파일을 다시 선택해 주세요.");
   }
   const transfer = payloads.flatMap((pair) => [pair.beforeBuffer, pair.afterBuffer]);
+  checkAbort();
+  let worker: Worker;
+  try { worker = new Worker(new URL("./word.worker.ts", import.meta.url), { type: "module" }); }
+  catch { throw new Error(startError); }
 
   return new Promise<WordWorkerPairResult[]>((resolve, reject) => {
     let settled = false;
-    const finish = () => { if (settled) return false; settled = true; signal?.removeEventListener("abort", abort); worker.terminate(); return true; };
-    const abort = () => { if (finish()) reject(new DOMException(language === "en" ? "Word comparison was cancelled." : "Word 문서 비교를 취소했습니다.", "AbortError")); };
+    const finish = () => { if (settled) return false; settled = true; signal?.removeEventListener("abort", abort); worker.onmessage = worker.onerror = worker.onmessageerror = null; worker.terminate(); return true; };
+    const abort = () => { if (finish()) reject(new DOMException(canceledMessage, "AbortError")); };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) { abort(); return; }
     worker.onmessage = (event: MessageEvent) => {
-      if (event.data.type === "progress") {
+      if (settled) return;
+      if (event.data?.type === "progress") {
         onProgress?.(event.data.progress, event.data.message);
         return;
       }
       if (!finish()) return;
-      if (event.data.type === "result") resolve(event.data.result as WordWorkerPairResult[]);
-      else reject(new Error(event.data.error?.message || (language === "en" ? "An error occurred while comparing Word documents." : "Word 문서 비교 중 오류가 발생했습니다.")));
+      if (event.data?.type === "result" && Array.isArray(event.data.result) && event.data.result.length === payloads.length) resolve(event.data.result as WordWorkerPairResult[]);
+      else reject(new Error(event.data?.type === "error" && typeof event.data.error?.message === "string" ? event.data.error.message : language === "en" ? "An error occurred while comparing Word documents." : "Word 문서 비교 중 오류가 발생했습니다."));
     };
     worker.onerror = (event) => {
       if (!finish()) return;
       event.preventDefault();
-      reject(new Error(language === "en" ? "Could not start Word comparison. Reload the page and try again." : "Word 문서 비교를 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."));
+      reject(new Error(startError));
     };
-    worker.postMessage({
+    worker.onmessageerror = () => {
+      if (finish()) reject(new Error(language === "en" ? "Could not read the comparison result." : "비교 결과를 읽지 못했습니다."));
+    };
+    try { worker.postMessage({
       pairs: payloads,
       options,
       language,
-    }, transfer);
+    }, transfer); }
+    catch { if (finish()) reject(new Error(startError)); }
   });
 }
