@@ -70,12 +70,13 @@ class _PackageGraph:
         candidates=[node for node in ET.fromstring(self.before.read(path)) if node.get('Id')==rid]
         if len(candidates)!=1: raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
         old=candidates[0]; kind=old.get('Type',''); target=old.get('Target','')
-        if not kind.endswith(('/image','/hyperlink')): raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+        if kind not in {R[1:-1]+'/image',R[1:-1]+'/hyperlink'}: raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
         root=self.roots.get(path)
         if root is None:root=ET.fromstring(self.after.read(path)) if path in self.after.namelist() else ET.Element(PR+'Relationships')
         if old.get('TargetMode')!='External':
             source=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
-            if source not in self.before.namelist() or not kind.endswith('/image'): raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+            if source not in self.before.namelist() or kind!=R[1:-1]+'/image': raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+            if self.rel_path(source) in self.before.namelist():raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RESOURCE_GRAPH')
             data=self.before.read(source); digest=hashlib.sha256(data).hexdigest()
             content=self.mime(source,self.before_types)
             if content is None: raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CONTENT_TYPE')
@@ -121,8 +122,8 @@ class _PackageGraph:
                     matches=[rel for rel in rels if rel.get('Id')==rid]
                     if len(matches)!=1:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
                     rel=matches[0]
-                    expected='/hyperlink' if node.tag in {W+'hyperlink','{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick'} else '/image'
-                    if not rel.get('Type','').endswith(expected):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+                    expected=R[1:-1]+('/hyperlink' if node.tag in {W+'hyperlink','{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick'} else '/image')
+                    if rel.get('Type','')!=expected:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
                     if rel.get('TargetMode')=='External':continue
                     target=rel.get('Target','');target=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
                     if target not in names or self.mime(target,types) is None:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CONTENT_TYPE')
@@ -187,12 +188,12 @@ class _RevisionWriter:
         }
 
 
-def _qname_safe_parse(data):
+def _qname_safe_parse(data, register_namespaces=True):
     pending = {}; contexts = []; root = None
     for event, value in ET.iterparse(io.BytesIO(data), events=("start-ns", "start", "end")):
         if event == "start-ns":
             prefix, uri = value; pending[prefix or ""] = uri
-            if prefix and not prefix.startswith("wltq"):
+            if register_namespaces and prefix and not prefix.startswith("wltq"):
                 try: ET.register_namespace(prefix or "", uri)
                 except ValueError: pass
         elif event == "start":
@@ -214,7 +215,7 @@ def _qname_safe_parse(data):
                     value.set("xmlns:" + token, uri)
                     # Element names use another prefix; value-only declarations
                     # must survive even when their namespace has no elements.
-                    ET.register_namespace("wltn" + hashlib.sha256(uri.encode()).hexdigest(), uri)
+                    if register_namespaces:ET.register_namespace("wltn" + hashlib.sha256(uri.encode()).hexdigest(), uri)
                     words.append(token if prefixes else token + ":" + local)
                 value.set(name, " ".join(words))
         else: contexts.pop()
@@ -770,14 +771,12 @@ def _shared_text_opcodes(before, after):
         raise ValueError("SHARED_DIFF_OFFSET_MISMATCH")
 
 
-def _append_link_run(parent, run, token):
-    link=token.get("link")
-    if link is None:parent.append(run)
-    else:
-        hyperlink=_source_copy(link);hyperlink[:]=[];hyperlink.append(run);parent.append(hyperlink)
+def _linked_run(run, token):
+    if token.get("link") is None:return run
+    hyperlink=_source_copy(token["link"]);hyperlink[:]=[run];return hyperlink
 
 
-def _link_identity(token):
+def _link_source_key(token):
     link=token.get("link")
     if link is None:return None
     origin=_MANIFEST_NODE_KEYS.get(link)
@@ -785,7 +784,7 @@ def _link_identity(token):
     side,key=origin
     entry=next((source for source in _MANIFEST_ACTIVE_DECISION.get("objectEvents",{}).get(side,[]) if _manifest_key(source)==key),None)
     if entry is None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_SOURCE")
-    return entry["objectEvent"]["signature"]
+    return origin[1]
 
 
 def _drawing_revision(source, kind, writer):
@@ -884,20 +883,20 @@ def _paragraph_revision(before, after, include_formatting, writer):
                         return span["families"], span.get("history", False), span["scopeId"]
                 return [], False, None
             families, preserve_history, scope_id = declared(before_position, position)
-            link_pair=(_link_identity(before_tokens[before_position]),_link_identity(token))
+            link_pair=(_link_source_key(before_tokens[before_position]),_link_source_key(token))
             pair = (scope_id, families, preserve_history, _properties_signature(after_properties),link_pair)
             end = position + 1
             while end < j2 and end not in after_events and after_tokens[end].get("wrapper") is None:
                 next_families, next_history, next_scope_id = declared(i1 + (end - j1), end)
-                if (next_scope_id, next_families, next_history, _properties_signature(after_tokens[end]["properties"]),(_link_identity(before_tokens[i1+end-j1]),_link_identity(after_tokens[end]))) != pair:
+                if (next_scope_id, next_families, next_history, _properties_signature(after_tokens[end]["properties"]),(_link_source_key(before_tokens[i1+end-j1]),_link_source_key(after_tokens[end]))) != pair:
                     break
                 end += 1
             text = "".join(item["text"] for item in after_tokens[position:end])
             revised_properties = _property_revision(after_properties, before_properties, W + "rPr", W + "rPrChange", writer, families, preserve_history) if families else after_properties
-            if link_pair[0]!=link_pair[1]:
+            if any(value is not None for value in link_pair) and link_pair not in {(_manifest_key(pair["before"]),_manifest_key(pair["after"])) for pair in (_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents",{}).get("unchangedLinks",[])}:
                 paragraph.extend(_revision_containers("del",_restore_projected_tokens(before_tokens[before_position:before_position+end-position],before_position,_MANIFEST_ACTIVE_COMPARISON["restoreStyles"]),writer,strip_history=True))
                 paragraph.extend(_revision_containers("ins",after_tokens[position:end],writer))
-            else:_append_link_run(paragraph,_token_run(text,revised_properties),token)
+            else:paragraph.append(_linked_run(_token_run(text,revised_properties),token))
             position = end
         emit_before_events(i1+j2-j1)
         emit_events(j2)
@@ -913,7 +912,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
             signature = _properties_signature(token["properties"])
             end = position + 1
             while end < j2 and end not in after_events and after_tokens[end].get("wrapper") is None:
-                if _properties_signature(after_tokens[end]["properties"]) != signature or _link_identity(after_tokens[end])!=_link_identity(token):
+                if _properties_signature(after_tokens[end]["properties"]) != signature or _link_source_key(after_tokens[end])!=_link_source_key(token):
                     break
                 end += 1
             paragraph.extend(_revision_containers("ins", after_tokens[position:end], writer))
@@ -1362,7 +1361,7 @@ def _validate_restore_styles(actual):
         def run_fact(side,ref):return actual[side].get((ref["part"],tuple(ref["objectEvent"]["runPath"])),{}).get("normalizedProperties",{}).get("rPr",{"supported":{},"unsupported":{},"history":False})
         def compatible(a,b):
             old,next=run_fact("before",a),run_fact("after",b)
-            return not old["history"] and not next["history"] and all(old["unsupported"].get(name,[])==next["unsupported"].get(name,[]) for name in set(old["unsupported"])|set(next["unsupported"])) and all(old["supported"].get(name,[])==next["supported"].get(name,[]) or _mask_enabled("rPr",name) for name in set(old["supported"])|set(next["supported"]))
+            return not old["history"] and not next["history"] and all(old["unsupported"].get(name,[])==next["unsupported"].get(name,[]) for name in set(old["unsupported"])|set(next["unsupported"])) and all(old["supported"].get(name,[])==next["supported"].get(name,[]) for name in set(old["supported"])|set(next["supported"]))
         supported=all(compatible(a,b) for a in expected["before"] if a["objectEvent"]["kind"]=="drawing" for b in expected["after"] if b["objectEvent"]["kind"]=="drawing")
         if type(events.get("propertiesSupported")) is not bool or events["propertiesSupported"]!=supported:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
         if not supported:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_OBJECT_PROPERTIES")
@@ -1376,6 +1375,8 @@ def _validate_restore_styles(actual):
                 if segment["type"]!="added":old+=size
                 if segment["type"]!="deleted":new+=size
             return new
+        unchanged=[{"before":a,"after":b} for a in expected["before"] if a["objectEvent"]["kind"]=="hyperlink" for b in expected["after"] if b["objectEvent"]["kind"]=="hyperlink" and a["objectEvent"]["signature"]==b["objectEvent"]["signature"] and boundary(a["objectEvent"]["start"])==b["objectEvent"]["start"] and boundary(a["objectEvent"]["end"])==b["objectEvent"]["end"]]
+        if events.get("unchangedLinks")!=unchanged:raise ValueError("INVALID_COMPARISON_MANIFEST_LINK_ACTIONS")
         facts=lambda side:[(source["objectEvent"]["kind"],boundary(source["objectEvent"]["start"]) if side=="before" else source["objectEvent"]["start"],boundary(source["objectEvent"]["end"]) if side=="before" else source["objectEvent"]["end"],source["objectEvent"]["signature"]) for source in expected[side]]
         if type(events.get("changed")) is not bool or events["changed"] != (facts("before") != facts("after")):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
     for decision in _MANIFEST_DECISIONS:

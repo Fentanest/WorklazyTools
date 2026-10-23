@@ -271,7 +271,7 @@ def _source_paths(root, part, archive=None):
     result = {}
     offsets = {}
     invalid_qname = False
-    try: normalized_root = globals().get("_qname_safe_parse", ET.fromstring)(archive.read(part)) if archive is not None else root
+    try: normalized_root = _qname_safe_parse(archive.read(part),False) if archive is not None and "_qname_safe_parse" in globals() else root
     except ValueError: normalized_root = root; invalid_qname = True
     policy = json.loads(globals().get("WORKLAZY_FORMATTING_POLICY_JSON", "{}"))
     def property_tree(node):
@@ -334,6 +334,7 @@ def _source_paths(root, part, archive=None):
     # XML positions and relationship identities are extraction facts, not pairs.
     def event_identity(node):
         import posixpath
+        relationship_base="http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
         rels = {}
         if archive is not None:
             rel_path = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
@@ -352,14 +353,14 @@ def _source_paths(root, part, archive=None):
                     if relationship is None: supported = False
                     else:
                         kind, mode, destination = relationship.get("Type", ""), relationship.get("TargetMode", ""), relationship.get("Target", "")
-                        if item.tag==W+"hyperlink" and not kind.endswith("/hyperlink"):supported=False
-                        if item.tag=="{http://schemas.openxmlformats.org/drawingml/2006/main}blip" and not kind.endswith("/image"):supported=False
-                        if kind.endswith("/image"):has_image=True
-                        if not kind.endswith(("/image", "/hyperlink")): supported = False
+                        if item.tag==W+"hyperlink" and kind!=relationship_base+"hyperlink":supported=False
+                        if item.tag=="{http://schemas.openxmlformats.org/drawingml/2006/main}blip" and kind!=relationship_base+"image":supported=False
+                        if kind==relationship_base+"image":has_image=True
+                        if kind not in {relationship_base+"image",relationship_base+"hyperlink"}: supported = False
                         if mode == "External": value = json.dumps([kind, mode, destination]); target = destination
                         else:
                             path = destination.lstrip("/") if destination.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), destination))
-                            if archive is None or path not in archive.namelist() or not kind.endswith("/image"): supported = False
+                            if archive is None or path not in archive.namelist() or kind!=relationship_base+"image": supported = False
                             else: value = json.dumps([kind, hashlib.sha256(archive.read(path)).hexdigest()])
                 attrs.append((name, value))
             return (item.tag, attrs) if item.tag == W + "hyperlink" else (item.tag, attrs, item.text or "", [canonical_event(child) for child in item])
@@ -368,6 +369,7 @@ def _source_paths(root, part, archive=None):
         value = canonical_event(normalized)
         if node.tag == W + "hyperlink" and (node.get(W + "anchor") or node.find('.//' + W + 'drawing') is not None or any(child.tag!=W+"r" for child in node)): supported = False
         if node.tag != W + "hyperlink" and not has_image:supported=False
+        if node.find('.//'+W+'pict') is not None:supported=False
         return hashlib.sha256(json.dumps(value, ensure_ascii=False).encode()).hexdigest(), supported, target
     for paragraph in root.iter(W + "p"):
         cursor = [0]; events = []
@@ -387,7 +389,7 @@ def _source_paths(root, part, archive=None):
                 for child in node: event_walk(child)
         event_walk(paragraph)
         event_paths=[result[id(node)]["path"] for node in paragraph.iter() if "objectEvent" in result[id(node)]]
-        unsupported = any(node.tag in {W + "object", W + "fldChar", W + "fldSimple", W + "instrText", W + "footnoteReference", W + "endnoteReference", W + "ins", W + "del", W + "moveFrom", W + "moveTo"} or (node.tag==W+"pict" and not any(result[id(node)]["path"][:len(path)]==path for path in event_paths)) for node in paragraph.iter())
+        unsupported = any(node.tag in {W + "object", W + "fldChar", W + "fldSimple", W + "instrText", W + "footnoteReference", W + "endnoteReference", W + "ins", W + "del", W + "moveFrom", W + "moveTo", W + "rPrChange", W + "pPrChange", W + "sectPrChange"} or (node.tag==W+"pict" and not any(result[id(node)]["path"][:len(path)]==path for path in event_paths)) for node in paragraph.iter())
         if invalid_qname: result[id(paragraph)]["unsupportedObjectQName"] = True
         if events: result[id(paragraph)]["objectEventsSupported"] = not unsupported and not invalid_qname and all(event["supported"] for event in events)
     def classify(instruction):

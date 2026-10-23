@@ -4,6 +4,7 @@ const all=[];let last;globalThis.worklazyDiffJson=(a,b)=>JSON.stringify(diffText
 const py=await loadPyodide();py.globals.set('WORKLAZY_FORMATTING_POLICY_JSON',fs.readFileSync('src/features/word-compare/formatting-policy.json','utf8'));
 for(const name of ['compare','accept_revisions','tracked_docx'])py.runPython(fs.readFileSync(`src/features/word-compare/${name}.py`,'utf8'));
 py.runPython(String.raw`
+registry=dict(ET._namespace_map);_qname_safe_parse(('<x:p xmlns:x="'+WORD_NS+'" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:hint="urn:test" mc:Ignorable="hint"/>').encode(),False);assert ET._namespace_map==registry
 REL='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
 NS=' xmlns:w="'+WORD_NS+'" xmlns:r="'+REL[:-1]+'" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"'
 def text(value):return '<w:r><w:t xml:space="preserve">'+value+'</w:t></w:r>'
@@ -48,7 +49,7 @@ def view(path,rejected=False):
      blip=node.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}blip');relationship=relations[blip.get(R+'embed') or blip.get(R+'link')]
      if relationship.get('TargetMode')=='External':return [('external-image',relationship.get('Target'))]
      target=posixpath.normpath(posixpath.join(posixpath.dirname(part),relationship.get('Target')))
-     return [('image',hashlib.sha256(z.read(target)).hexdigest())]
+     click=node.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick');return [('image',hashlib.sha256(z.read(target)).hexdigest(),relations[click.get(R+'id')].get('Target') if click is not None else None)]
     if node.tag==W+'t':return [('text',node.text or '')]
     return [value for child in node for value in events(child)]
    def coalesce(values):
@@ -81,7 +82,7 @@ def check(name,before,after,old=OLDPNG,new=NEWPNG,oldurl='https://before.example
 checks=[]
 checks.append(check('mixed run image collision',p('<w:r><w:t>Old </w:t>'+image()+'<w:t> clause</w:t></w:r>'),p('<w:r><w:t>New </w:t>'+image()+'<w:t> clause</w:t></w:r>')))
 checks.append(check('same words changed URL',p(link('Same label')),p(link('Same label'))))
-checks.append(check('linked changed words',p(link('Old clause')),p(link('New clause'))))
+checks.append(check('linked changed words',p(link('Old clause')),p(link('New clause')),oldurl='https://same.example/link',newurl='https://same.example/link'))
 checks.append(check('linked to plain',p(link('Same label')),p(text('Same label'))))
 checks.append(check('before image paragraph',p('<w:r>'+image()+'</w:r>')+p(text('Stable anchor')),p(text('Stable anchor'))))
 checks.append(check('final image paragraph',p(text('Stable anchor'))+p('<w:r>'+image()+'</w:r>'),p(text('Stable anchor'))))
@@ -112,6 +113,8 @@ for path in ['/out.docx','/rejected.docx']:
   assert seen==1
 # Same cached image under aliased namespace prefixes has the same semantic event.
 checks.append(check('namespace aliases',p('<w:r>'+image().replace('a:','old:').replace('<w:drawing>','<w:drawing xmlns:old="http://schemas.openxmlformats.org/drawingml/2006/main">')+'</w:r>'),p('<w:r>'+image()+'</w:r>'),new=OLDPNG))
+clickable=image().replace('<wp:docPr id="1" name="Sample"/>','<wp:docPr id="1" name="Sample"><a:hlinkClick r:id="rIdLink"/></wp:docPr>')
+checks.append(check('drawing click relationships',p('<w:r>'+clickable+'</w:r>'),p('<w:r>'+clickable+'</w:r>')))
 checks.append(check('table cell URL collision','<w:tbl><w:tr><w:tc>'+p(link('Same label'))+'</w:tc></w:tr></w:tbl>','<w:tbl><w:tr><w:tc>'+p(link('Same label'))+'</w:tc></w:tr></w:tbl>'))
 checks.append(check('external image declarations',p('<w:r>'+image().replace('r:embed=','r:link=')+'</w:r>'),p('<w:r>'+image().replace('r:embed=','r:link=')+'</w:r>'),external=True))
 checks.append(check('flowed image boundary',p(text('😀 old ' )+'<w:r>'+image()+'</w:r>'),p(text('😀 longer prefix ' )+'<w:r>'+image()+'</w:r>'),new=OLDPNG))
@@ -157,7 +160,7 @@ for mutation in ['missing','duplicate','changed-flag','wrong-position']:
   generate_tracked_document('/before.docx','/after.docx','/bad.docx','events',False,True,True,json.dumps(bad));raise AssertionError(mutation+' accepted')
  except ValueError as error:assert 'COMPARISON_MANIFEST' in str(error)
  assert not os.path.exists('/bad.docx')
-for mutation in ['missing-image','missing-mime','duplicate-relationship','undefined-qname']:
+for mutation in ['missing-image','missing-mime','duplicate-relationship','undefined-qname','wrong-type']:
  for side in ['before','after']:
   with zipfile.ZipFile('/'+side+'.docx') as source,zipfile.ZipFile('/tampered-'+side+'.docx','w') as out:
    for entry in source.infolist():
@@ -170,6 +173,7 @@ for mutation in ['missing-image','missing-mime','duplicate-relationship','undefi
      data=ET.tostring(root)
     if mutation=='duplicate-relationship' and entry.filename=='word/_rels/document.xml.rels':
      root=ET.fromstring(data);root.append(copy.deepcopy(root[0]));data=ET.tostring(root)
+    if mutation=='wrong-type' and entry.filename=='word/_rels/document.xml.rels':data=data.replace((REL+'image').encode(),b'urn:other:image')
     if mutation=='undefined-qname' and entry.filename=='word/document.xml':data=data.replace(b'<wp:inline>',b'<wp:inline xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="undefined:Shape">')
     out.writestr(entry,data)
  if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
@@ -188,6 +192,7 @@ for side,size in [('before','20'),('after','40')]:
     root=ET.fromstring(data);run=next(node for node in root.iter(W+'r') if node.find(W+'drawing') is not None);properties=ET.Element(W+'rPr');ET.SubElement(properties,W+'sz',{W+'val':size});run.insert(0,properties);data=ET.tostring(root)
    output.writestr(entry,data)
 a=extract_document_model(open('/styled-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/styled-after.docx','rb').read(),True,True,'en');value=json.loads(worklazyComparisonManifestJson(a,b,False,True,True));assert any(not d['objectEvents']['propertiesSupported'] for d in value['decisions'] if d.get('objectEvents'))
+enabled=json.loads(worklazyComparisonManifestJson(a,b,True,True,True));assert any(not d['objectEvents']['propertiesSupported'] for d in enabled['decisions'] if d.get('objectEvents'))
 for forged in [False,True]:
  bad=copy.deepcopy(value)
  if forged:
@@ -201,6 +206,6 @@ for forged in [False,True]:
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages',{recursive:true});
 for(const name of py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages/'+name,py.FS.readFile('/p-packages/'+name));
 console.log(JSON.stringify(py.globals.get('checks').toJs()));
-assert.ok(last.manifest.decisions.some(decision=>decision.objectEvents));
+assert.ok(all.some(result=>result.manifest.decisions.some(decision=>decision.beforeText==='Old clause' && decision.afterText==='New clause' && decision.objectEvents?.unchangedLinks.length===1)),'TS must declare the unchanged hyperlink envelope');
 
 assert.ok(all.some(result=>result.tables[0]?.kind==='changed' && result.tables[0].beforeKinds[0][0]==='changed' && result.summary.changed>0),'table object events must reach screen');

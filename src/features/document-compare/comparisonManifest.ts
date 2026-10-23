@@ -35,7 +35,7 @@ export interface ComparisonDecision {
   before: DocumentSourceReference[];
   after: DocumentSourceReference[];
   moved: boolean;
-  objectEvents?: {propertiesSupported:boolean;policy:"worklazy-source-events-1";before:DocumentSourceReference[];after:DocumentSourceReference[];changed:boolean};
+  objectEvents?: {unchangedLinks:Array<{before:DocumentSourceReference;after:DocumentSourceReference}>;propertiesSupported:boolean;policy:"worklazy-source-events-1";before:DocumentSourceReference[];after:DocumentSourceReference[];changed:boolean};
   screenFormattingFamilies?: string[];
   deletedFormattingPolicy?: "restore-before-unpaired" | "paired-revised";
   wholeRestoreStyles?: Array<{ before: DocumentSourceReference; afterParagraph: DocumentSourceReference; projections: RestoreStyleProjection[] }>;
