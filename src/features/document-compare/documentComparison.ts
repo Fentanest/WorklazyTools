@@ -98,7 +98,7 @@ export function compareDocumentModels(
     include: (item) => item.type === "table" ? options.tables : Boolean(item.text.trim()) || Boolean(item.comments?.length),
   });
 
-  for (const group of blockGroups) {
+  for (const [groupIndex, group] of blockGroups.entries()) {
     const leftBlocks = group.beforeIndexes.map((index) => before.blocks[index]);
     const rightBlocks = group.afterIndexes.map((index) => after.blocks[index]);
     const left = leftBlocks[0];
@@ -106,14 +106,14 @@ export function compareDocumentModels(
     if (left?.type === "table" || right?.type === "table") {
       const table = compareTable(left?.table, right?.table, tables.length, changes, options.formatting, labels);
       tables.push(table);
-      const decision = decisionOf(leftBlocks, rightBlocks, group.moved, "table");
+      const decision = decisionOf(leftBlocks, rightBlocks, group.moved, "table", `body:${groupIndex}`);
       decision.rows = table.rowPairs;
       decision.columns = table.columnPairs;
       decision.children = [];
       for (const row of table.rowPairs) for (const column of table.columnPairs) {
         const a = row.beforeIndex === null || column.beforeIndex === null ? undefined : left?.table?.grid[row.beforeIndex]?.[column.beforeIndex] as (WordTableCell & ManifestRecord) | undefined;
         const b = row.afterIndex === null || column.afterIndex === null ? undefined : right?.table?.grid[row.afterIndex]?.[column.afterIndex] as (WordTableCell & ManifestRecord) | undefined;
-        decision.children.push(...paragraphDecisions(a?.paragraphs ?? [], b?.paragraphs ?? []));
+        decision.children.push(...paragraphDecisions(a?.paragraphs ?? [], b?.paragraphs ?? [], `${decision.id}:cell:${row.beforeIndex}:${row.afterIndex}:${column.beforeIndex}:${column.afterIndex}`));
       }
       manifest.decisions.push(decision);
       const baseTableKind = tableViewKind(table);
@@ -132,7 +132,7 @@ export function compareDocumentModels(
       });
       continue;
     }
-    const decision = decisionOf(leftBlocks, rightBlocks, group.moved);
+    const decision = decisionOf(leftBlocks, rightBlocks, group.moved, "paragraph", `body:${groupIndex}`);
     manifest.decisions.push(decision);
     documentViews.push(compareRecord(
       combineRecords(leftBlocks),
@@ -181,34 +181,35 @@ function compareRecordList(
   manifest: DocumentComparisonManifest,
 ) {
   const groups = alignDocumentSequence(before, after, { textOf: (item) => item.text });
-  for (const group of groups) {
+  const decisions = groups.map((group, groupIndex) => {
     const left = group.beforeIndexes.map((index) => before[index]);
     const right = group.afterIndexes.map((index) => after[index]);
-    const decision = decisionOf(left, right, group.moved);
+    const decision = decisionOf(left, right, group.moved, "paragraph", `${section}:${groupIndex}`);
     if (section === "comment") {
       decision.trackedRepresentation = "preserve-after";
       decision.trackedReason = "existing-comment-contract";
-      decision.children = paragraphDecisions(left.flatMap((record) => record.paragraphs ?? []), right.flatMap((record) => record.paragraphs ?? []));
+      decision.children = paragraphDecisions(left.flatMap((record) => record.paragraphs ?? []), right.flatMap((record) => record.paragraphs ?? []), `${decision.id}:comment`);
       for (const child of decision.children) {
         child.trackedRepresentation = "preserve-after";
         child.trackedReason = "existing-comment-contract";
       }
     }
     manifest.decisions.push(decision);
-  }
-  return groups.map((group) => compareRecord(
+    return decision;
+  });
+  return groups.map((group, groupIndex) => compareRecord(
     combineRecords(group.beforeIndexes.map((index) => before[index])),
     combineRecords(group.afterIndexes.map((index) => after[index])),
     section,
     changes,
     formatting,
     group,
-    manifest.decisions.find((decision) => decision.id === decisionOf(group.beforeIndexes.map((index) => before[index]), group.afterIndexes.map((index) => after[index]), group.moved).id),
+    decisions[groupIndex],
   ));
 }
 
 
-function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = false, type: ComparisonDecision["type"] = "paragraph"): ComparisonDecision {
+function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = false, type: ComparisonDecision["type"] = "paragraph", context = "paragraph"): ComparisonDecision {
   const beforeText = before.map((record) => record.rawText ?? record.text).join("\n");
   const afterText = after.map((record) => record.rawText ?? record.text).join("\n");
   const comparisons = [{ before: beforeText, after: afterText, segments: diffText(beforeText, afterText) }];
@@ -230,7 +231,9 @@ function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = f
   return {
     comparisons,
     trackedRepresentation: "revision",
-    id: JSON.stringify([type, before.map((record) => record.source ?? null), after.map((record) => record.source ?? null)]),
+    id: [...before, ...after].some((record) => record.source)
+      ? JSON.stringify([type, before.map((record) => record.source ?? null), after.map((record) => record.source ?? null)])
+      : `source-less:${type}:${context}`,
     type, before: before.flatMap((record) => record.source ? [record.source] : []),
     after: after.flatMap((record) => record.source ? [record.source] : []), moved,
     segments: diffText(before.map((record) => record.text).join("\n"), after.map((record) => record.text).join("\n")),
@@ -238,9 +241,9 @@ function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = f
   };
 }
 
-function paragraphDecisions(before: ManifestRecord[], after: ManifestRecord[]): ComparisonDecision[] {
-  return alignDocumentSequence(before, after, { textOf: (record) => record.text }).map((group) => decisionOf(
-    group.beforeIndexes.map((index) => before[index]), group.afterIndexes.map((index) => after[index]), group.moved,
+function paragraphDecisions(before: ManifestRecord[], after: ManifestRecord[], context: string): ComparisonDecision[] {
+  return alignDocumentSequence(before, after, { textOf: (record) => record.text }).map((group, index) => decisionOf(
+    group.beforeIndexes.map((index) => before[index]), group.afterIndexes.map((index) => after[index]), group.moved, "paragraph", `${context}:${index}`,
   ));
 }
 
