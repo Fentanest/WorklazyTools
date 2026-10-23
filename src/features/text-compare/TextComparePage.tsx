@@ -11,7 +11,7 @@ import { DEFAULT_TEXT_OPTIONS, type TextOptions, type TextResult } from "./resul
 import { TextHistory, mergeRow, type TextSnapshot } from "./session.ts";
 import { transformText, type TextTransform } from "./transforms.ts";
 import { TextDiffView } from "./TextDiffView";
-import { applyEditorChange, preferredLineEnding, rawEditorOffset } from "./editor.ts";
+import { applyEditorChange, preferredLineEnding, rawEditorOffset, type EditorIntent } from "./editor.ts";
 import type { TextDisplayStyle } from "./viewProjection.ts";
 
 export function TextComparePage() {
@@ -24,6 +24,7 @@ export function TextComparePage() {
   const [live,setLive]=useState(false),[composing,setComposing]=useState(false),[unified,setUnified]=useState(false),[wrap,setWrap]=useState(true),[fold,setFold]=useState(true),[search,setSearch]=useState(""),[rules,setRules]=useState("");
   const [action,setAction]=useState<TextTransform>("trim"),[target,setTarget]=useState<"left"|"right"|"both">("both");
   const history=useRef(new TextHistory()),abort=useRef<AbortController|undefined>(undefined),generation=useRef(0),reads=useRef({left:0,right:0});
+  const intents=useRef<Partial<Record<"left"|"right",EditorIntent&{revision:number}>>>({});
   const editors=useRef<Partial<Record<"left"|"right",HTMLTextAreaElement|null>>>({});
   const cancel=useCallback(()=>{generation.current++;abort.current?.abort();setBusy(false);},[]);
   const change=(update:Partial<TextSnapshot>,record=true)=>{cancel();if("left" in update)reads.current.left++;if("right" in update)reads.current.right++;if(record)history.current.record(current.current);const next={...current.current,...update,revision:current.current.revision+1};current.current=next;setState(next);};
@@ -50,7 +51,7 @@ export function TextComparePage() {
     <div className="grid grid-cols-2 gap-4 max-[620px]:grid-cols-1">
       {(["left","right"] as const).map(side=><UtilitySectionCard key={side} title={tr(side)} description={sources[side]?.name??tr("pasteHint")}>
         <Button variant="secondary" onClick={()=>document.getElementById(`text-file-${side}`)?.click()}>{tr("openFile")}</Button><input hidden id={`text-file-${side}`} type="file" accept="text/*,.txt,.csv,.json,.xml,.md,.js,.ts,.css,.html,.log" aria-label={tr(`${side}File`)} onChange={event=>void load(side,event.target.files?.[0])}/>
-        <UtilityTextarea className="mt-3 min-h-60" value={state[side]} aria-label={tr(side)} data-testid={`text-compare-${side}`} onFocus={event=>{editors.current[side]=event.currentTarget;}} onChange={event=>{reads.current[side]++;change({[side]:applyEditorChange(state[side],event.target.value,preferredLineEnding(sources[side]?.text??state[side]))});}} onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)}/>
+        <UtilityTextarea className="mt-3 min-h-60" value={state[side]} aria-label={tr(side)} data-testid={`text-compare-${side}`} onFocus={event=>{const node=event.currentTarget;editors.current[side]=node;node.onbeforeinput=(inputEvent)=>{intents.current[side]={start:node.selectionStart,end:node.selectionEnd,inputType:(inputEvent as InputEvent).inputType??"",revision:current.current.revision};};}} onChange={event=>{reads.current[side]++;const prior=current.current,intent=intents.current[side];intents.current[side]=undefined;change({[side]:applyEditorChange(prior[side],event.target.value,preferredLineEnding(prior.sources?.[side]?.text??prior[side]),intent?.revision===prior.revision?intent:undefined)});}} onKeyDown={event=>{if((event.ctrlKey||event.metaKey)&&!composing&&["z","y"].includes(event.key.toLowerCase())){event.preventDefault();travel(event.key.toLowerCase()==="y"||event.shiftKey?"redo":"undo");}}} onCompositionStart={()=>setComposing(true)} onCompositionEnd={()=>setComposing(false)}/>
         <Button variant="ghost" disabled={!sources[side]} onClick={()=>{reads.current[side]++;change({[side]:sources[side]?.text??""});}}>{tr("restore")}</Button>
         <Button variant="secondary" onClick={()=>download(side)}>{tr("download")}</Button>
       </UtilitySectionCard>)}

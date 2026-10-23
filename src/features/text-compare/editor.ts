@@ -10,8 +10,21 @@ export function preferredLineEnding(raw:string):"\r\n"|"\r"|"\n" {
   const crlf=(raw.match(/\r\n/g)??[]).length,cr=(raw.match(/\r(?!\n)/g)??[]).length,lf=(raw.match(/(?<!\r)\n/g)??[]).length;
   return crlf&&crlf>=cr&&crlf>=lf?"\r\n":cr>lf?"\r":"\n";
 }
-export function applyEditorChange(raw:string,next:string,lineEnding=preferredLineEnding(raw)){
+export interface EditorIntent { start:number; end:number; inputType:string }
+export function applyEditorChange(raw:string,next:string,lineEnding=preferredLineEnding(raw),intent?:EditorIntent){
   const previous=editorText(raw);if(previous===next)return raw;
+  if(intent){
+    let start=intent.start,end=intent.end;
+    if(start===end&&intent.inputType.startsWith("delete")){
+      const removed=previous.length-next.length;
+      if(intent.inputType.endsWith("Backward"))start-=removed;
+      else if(intent.inputType.endsWith("Forward"))end+=removed;
+    }
+    const inserted=next.length-previous.length+end-start;
+    if(start>=0&&end>=start&&end<=previous.length&&inserted>=0&&previous.slice(0,start)===next.slice(0,start)&&previous.slice(end)===next.slice(start+inserted)){
+      return raw.slice(0,rawEditorOffset(raw,start))+next.slice(start,start+inserted).replace(/\n/g,lineEnding)+raw.slice(rawEditorOffset(raw,end));
+    }
+  }
   let prefix=0,suffix=0;
   while(prefix<previous.length&&prefix<next.length&&previous[prefix]===next[prefix])prefix++;
   while(suffix<previous.length-prefix&&suffix<next.length-prefix&&previous[previous.length-1-suffix]===next[next.length-1-suffix])suffix++;

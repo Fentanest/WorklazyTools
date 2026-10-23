@@ -4,10 +4,25 @@ export interface TextDisplayStyle { palette:"standard"|"contrast"; bold:boolean;
 export const MAX_TEXT_RENDER_PIECES=512;
 export function syntaxSpans(text:string,syntax:TextDisplayStyle['syntax'],limit=MAX_TEXT_RENDER_PIECES) {
   if(syntax==="plain")return [];
-  const pattern=syntax==="json"?/"(?:\\.|[^"\\])*"|\b(?:true|false|null)\b|-?\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g
-    :/\/\/[^\n]*|\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b(?:const|let|var|function|return|if|else|class|new|async|await|true|false|null|undefined|import|export|from)\b|\b\d+(?:\.\d+)?\b/g;
-  const spans=[];
-  for(const match of text.matchAll(pattern)){spans.push({start:match.index!,end:match.index!+match[0].length,kind:match[0].startsWith('/')?'comment':/^["']/.test(match[0])?'string':/^-?\d/.test(match[0])?'number':'keyword'});if(spans.length>limit)break;}
+  const spans:Array<{start:number;end:number;kind:string}>=[];
+  const words=new Set(syntax==="json"?["true","false","null"]:["const","let","var","function","return","if","else","class","new","async","await","true","false","null","undefined","import","export","from"]);
+  const digit=(c:string|undefined)=>c!==undefined&&c>="0"&&c<="9";
+  const identifier=(c:string|undefined)=>c!==undefined&&/^[A-Za-z0-9_$]$/.test(c);
+  let i=0;
+  while(i<text.length){
+    const start=i,c=text[i];let kind:string|undefined;
+    if(syntax==="javascript"&&c==="/"&&text[i+1]==="/"){const end=text.indexOf("\n",i+2);i=end<0?text.length:end;kind="comment";}
+    else if(syntax==="javascript"&&c==="/"&&text[i+1]==="*"){const end=text.indexOf("*/",i+2);i=end<0?text.length:end+2;kind="comment";}
+    else if(c==='"'||syntax==="javascript"&&(c==="'"||c==="`")){i++;while(i<text.length){if(text[i]==="\\"){i=Math.min(text.length,i+2);continue;}if(text[i++]===c)break;}kind="string";}
+    else if(digit(c)||c==="-"&&digit(text[i+1])){
+      if(c==="-")i++;while(digit(text[i]))i++;
+      if(text[i]==="."&&digit(text[i+1])){i++;while(digit(text[i]))i++;}
+      if(text[i]==="e"||text[i]==="E"){let j=i+1;if(text[j]==="+"||text[j]==="-")j++;if(digit(text[j])){i=j+1;while(digit(text[i]))i++;}}
+      kind="number";
+    }else if(identifier(c)){i++;while(identifier(text[i]))i++;if(words.has(text.slice(start,i)))kind="keyword";}
+    else i++;
+    if(kind){spans.push({start,end:i,kind});if(spans.length>limit)break;}
+  }
   return spans;
 }
 export function textRenderPieces(line:TextLine,marks:TextMark[],mode:TextDisplayStyle['syntax']) {

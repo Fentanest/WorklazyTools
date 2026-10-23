@@ -6,7 +6,7 @@ import { DEFAULT_TEXT_OPTIONS as defaults } from "../../src/features/text-compar
 import { decodeText, encodeText } from "../../src/features/text-compare/input.ts";
 import { mergeRow, TextHistory } from "../../src/features/text-compare/session.ts";
 import { transformText } from "../../src/features/text-compare/transforms.ts";
-import { textRenderPieces, MAX_TEXT_RENDER_PIECES } from "../../src/features/text-compare/viewProjection.ts";
+import { textRenderPieces, syntaxSpans, MAX_TEXT_RENDER_PIECES } from "../../src/features/text-compare/viewProjection.ts";
 import { applyEditorChange, rawEditorOffset, editorText } from "../../src/features/text-compare/editor.ts";
 
 test("text input preserves encoding, BOM, CRLF and final newline",()=>{
@@ -120,4 +120,16 @@ test("textarea edits and selection offsets preserve unrelated CRLF/mixed endings
   assert.equal(rawEditorOffset("a\r\n👩‍💻old",3),4);
   const raw="a\r\n old \r\nz";const start=rawEditorOffset(raw,2),end=rawEditorOffset(raw,7);
   assert.equal(transformText(raw,"trim",start,end),"a\r\nold\r\nz");
+});
+test("real edit range disambiguates repeated mixed-EOL lines",()=>{
+  const raw="x\r\nx\n";
+  assert.equal(applyEditorChange(raw,"x\n","\r\n",{start:0,end:2,inputType:"deleteContentBackward"}),"x\n");
+  assert.equal(applyEditorChange(raw,"x\n","\r\n",{start:2,end:4,inputType:"deleteByCut"}),"x\r\n");
+  assert.equal(applyEditorChange(raw,"xx\n","\r\n",{start:2,end:2,inputType:"deleteContentBackward"}),"xx\n");
+});
+test("unterminated code tokens are scanned once without repeated suffix searches",()=>{
+  const text="/*aaaa".repeat(30000);
+  assert.deepEqual(syntaxSpans(text,"javascript"),[{start:0,end:text.length,kind:"comment"}]);
+  const quoted='"'+"\\x".repeat(30000);
+  assert.deepEqual(syntaxSpans(quoted,"json"),[{start:0,end:quoted.length,kind:"string"}]);
 });
