@@ -1,0 +1,21 @@
+import {runModuleWorker} from '../../utils/workerLifecycle.ts';
+import {discardOwnedBuffer} from '../image-compare/memory.ts';
+import {invertProjective} from '../image-compare/projective.ts';
+import {ocrMemoryEstimate,MAX_OCR_WORDS,MAX_OCR_CHARACTERS} from './model.ts';
+import type {ImageCompareResult,Matrix} from '../image-compare/types.ts';
+import type {Matrix3} from '../image-compare/alignmentTypes.ts';
+import type {OcrLanguage,OcrPair} from './types.ts';
+const matrix3=([a,b,c,d,x,y]:Matrix):Matrix3=>[a,c,x,b,d,y,0,0,1];
+export async function recognizeOcrPair(result:ImageCompareResult,language:OcrLanguage,layout:'paragraphs'|'sparse',signal:AbortSignal,onProgress:(value:number)=>void){
+ if(signal.aborted)throw new DOMException('Canceled','AbortError');ocrMemoryEstimate(result.width*result.height,result.sources.left.bytes+result.sources.right.bytes);
+ const left=result.left.slice(),right=result.right.slice(),leftTransform=invertProjective(matrix3(result.geometry.leftMatrix)),rightTransform=invertProjective(result.geometry.rightProjective??matrix3(result.geometry.rightMatrix));
+ let disposal=Promise.resolve();
+ const factory=()=>{const worker=new Worker(new URL('./provider.worker.ts',import.meta.url),{type:'module'}),terminate=worker.terminate.bind(worker);let closing=false;
+  worker.terminate=()=>{if(closing)return;closing=true;disposal=new Promise<void>(resolve=>{let ended=false;const finish=()=>{if(ended)return;ended=true;clearTimeout(timer);worker.removeEventListener('message',ack);terminate();resolve();};const ack=(event:MessageEvent)=>{if(event.data?.type==='disposed')finish();};const timer=setTimeout(finish,2000);worker.addEventListener('message',ack);try{worker.postMessage({type:'dispose'});}catch{finish();}});};return worker;};
+ try{
+  const pair=await runModuleWorker<object,OcrPair>(factory,{type:'recognize',left,right,encodedBytes:result.sources.left.bytes+result.sources.right.bytes,width:result.width,height:result.height,leftTransform,rightTransform,sourceRunId:result.runId,language,layout,base:new URL(import.meta.env.BASE_URL,location.origin).href},{transfer:[left.buffer,right.buffer],signal,hardTimeoutMs:120000,inactivityTimeoutMs:30000,canceledMessage:'Canceled',startErrorMessage:'OCR_PROVIDER_UNAVAILABLE',resultErrorMessage:'OCR_RECOGNITION_FAILED',onProgress:({progress})=>onProgress(progress),validateResult:(value):value is OcrPair=>{
+   const pair=value as OcrPair;if(!pair||pair.sourceRunId!==result.runId||!Number.isFinite(pair.elapsedMs))return false;
+   return [pair.left,pair.right].every((page,index)=>!!page&&page.sourceRunId===result.runId&&page.language===language&&page.width===result.width&&page.height===result.height&&page.providerVersion==='7.0.0'&&page.modelVersion==='4.0.0_best_int'&&page.background==='white'&&page.coordinateSpace==='comparison-working'&&page.provider==='tesseract.js'&&Array.isArray(page.warnings)&&page.warnings.length<=5&&page.warnings.every(w=>typeof w==='string')&&['complete','empty'].includes(page.status)&&typeof page.rawText==='string'&&page.rawText.length<=MAX_OCR_CHARACTERS&&Array.isArray(page.words)&&page.words.length<=MAX_OCR_WORDS&&page.nativeHeapPeakBytes>0&&page.nativeHeapPeakBytes<=128*1024*1024&&Array.isArray(page.sourceTransform)&&page.sourceTransform.length===9&&page.sourceTransform.every((v,i)=>v===(index?rightTransform:leftTransform)[i])&&page.comparisonText===page.rawText&&page.words.every((word,i)=>word.id===`${result.runId}:${index?'right':'left'}:${i}`&&typeof word.rawText==='string'&&word.rawText.length<=MAX_OCR_CHARACTERS*2&&(word.confidence===null||Number.isFinite(word.confidence)&&word.confidence>=0&&word.confidence<=100)&&word.reviewRequired===(word.confidence===null||word.confidence<70)&&!!word.bbox&&[word.bbox.x,word.bbox.y,word.bbox.width,word.bbox.height].every(Number.isFinite)&&word.bbox.x>=0&&word.bbox.y>=0&&word.bbox.width>0&&word.bbox.height>0&&word.bbox.x+word.bbox.width<=result.width&&word.bbox.y+word.bbox.height<=result.height&&Array.isArray(word.sourcePolygon)&&word.sourcePolygon.length===4&&word.sourcePolygon.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y))));
+  }});await disposal;if(signal.aborted)throw new DOMException('Canceled','AbortError');return pair;
+ }finally{await disposal;discardOwnedBuffer(left.buffer);discardOwnedBuffer(right.buffer);}
+}

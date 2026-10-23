@@ -4,9 +4,9 @@ import { loadCvRuntime } from "./cvRuntime.ts";
 import { detectRegions, type RegionCv } from "./regions.ts";
 import type { RegionOptions, RegionPass } from "./types.ts";
 const scope = self as unknown as DedicatedWorkerGlobalScope;
-scope.onmessage = async ({ data }: MessageEvent<{ delta: Uint8Array; width: number; height: number; options: RegionOptions; id: string; runId: string; resources: { sourcePixels: number; encodedBytes: number } }>) => {
+scope.onmessage = async ({ data }: MessageEvent<{ delta: Uint8Array; width: number; height: number; options: RegionOptions; id: string; runId: string; resources: { sourcePixels: number; encodedBytes: number; retainedSessionBytes?:number } }>) => {
   try {
-    assertImageBudget(data.resources.sourcePixels, data.width * data.height, data.resources.encodedBytes);
+    assertImageBudget(data.resources.sourcePixels, data.width * data.height, data.resources.encodedBytes,0,data.resources.retainedSessionBytes??0);
     scope.postMessage({ type: "progress", progress: 5 });
     const {cv,memory}=await loadCvRuntime<RegionCv>(()=>scope.postMessage({type:"progress",progress:40,phase:"READY"}));
     const detected = detectRegions(cv, data.delta, data.width, data.height, data.options, data.id);

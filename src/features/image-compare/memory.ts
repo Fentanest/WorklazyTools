@@ -14,21 +14,21 @@ const REGION_RESULTS_BYTES = MAX_REGION_PASSES * 8 * MiB; // Up to 5000 boxed/so
  * Masks, native contour vectors, hierarchy and ROI scratch live inside that arena. Its JS
  * allocator is capped before initialization; excessive complexity fails rather than growing.
  */
-export function imageMemoryEstimate(sourcePixels: number, outputPixels: number, encodedBytes: number, previousViewBytes = 0) {
-  if (![sourcePixels, outputPixels, encodedBytes, previousViewBytes].every((value) => Number.isSafeInteger(value) && value >= 0)) throw new Error("INVALID_RESOURCE_ESTIMATE");
+export function imageMemoryEstimate(sourcePixels: number, outputPixels: number, encodedBytes: number, previousViewBytes = 0, retainedSessionBytes = 0) {
+  if (![sourcePixels, outputPixels, encodedBytes, previousViewBytes, retainedSessionBytes].every((value) => Number.isSafeInteger(value) && value >= 0)) throw new Error("INVALID_RESOURCE_ESTIMATE");
   const encoded = encodedBytes * 3; // Original File backing + transferred buffers + decoder Blob copies.
   const decoded = sourcePixels * 24;
   const cvHeapBytes = CV_INITIAL_MEMORY_BYTES;
   const stages = {
-    decode: encoded + decoded + previousViewBytes,
-    comparison: encoded + decoded + outputPixels * 48 + previousViewBytes,
-    views: encoded + outputPixels * 44 + previousViewBytes,
-    regions: encoded + outputPixels * 46 + cvHeapBytes + CV_ASSET_TRANSIENT_BYTES + REGION_RESULTS_BYTES,
+    decode: encoded + decoded + previousViewBytes + retainedSessionBytes,
+    comparison: encoded + decoded + outputPixels * 48 + previousViewBytes + retainedSessionBytes,
+    views: encoded + outputPixels * 44 + previousViewBytes + retainedSessionBytes,
+    regions: encoded + outputPixels * 46 + cvHeapBytes + CV_ASSET_TRANSIENT_BYTES + REGION_RESULTS_BYTES + retainedSessionBytes,
   };
-  return { sourcePixels, outputPixels, encodedBytes, previousViewBytes, cvHeapBytes, stages, estimatedPeakBytes: Math.max(...Object.values(stages)), budgetBytes: IMAGE_LIMITS.memoryBytes };
+  return { sourcePixels, outputPixels, encodedBytes, previousViewBytes, retainedSessionBytes, cvHeapBytes, stages, estimatedPeakBytes: Math.max(...Object.values(stages)), budgetBytes: IMAGE_LIMITS.memoryBytes };
 }
-export function assertImageBudget(sourcePixels: number, outputPixels: number, encodedBytes: number, previousViewBytes = 0) {
-  const estimate = imageMemoryEstimate(sourcePixels, outputPixels, encodedBytes, previousViewBytes);
+export function assertImageBudget(sourcePixels: number, outputPixels: number, encodedBytes: number, previousViewBytes = 0, retainedSessionBytes = 0) {
+  const estimate = imageMemoryEstimate(sourcePixels, outputPixels, encodedBytes, previousViewBytes, retainedSessionBytes);
   if (estimate.estimatedPeakBytes > estimate.budgetBytes) throw new Error("IMAGE_MEMORY_LIMIT");
   return estimate;
 }
