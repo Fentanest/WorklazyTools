@@ -88,7 +88,9 @@ function positionsBySignature<T>(items: T[], signatureOf: (item: T) => string) {
   items.forEach((item, index) => {
     const signature = signatureOf(item);
     if (!signature) return;
-    positions.set(signature, [...(positions.get(signature) ?? []), index]);
+    const existing = positions.get(signature);
+    if (existing) existing.push(index);
+    else positions.set(signature, [index]);
   });
   return positions;
 }
