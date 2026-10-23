@@ -39,15 +39,34 @@ export function fileSource(files: readonly File[], revision: string, admission: 
   return { entries: Object.freeze(entries), warnings: ['snapshot-only', 'empty-directories-and-metadata-unavailable'], close: async () => {} };
 }
 export function blobBytes(blob: Blob, signal: AbortSignal): OpenedBytes {
-  let position = 0;
-  const stream = new ReadableStream<Uint8Array>({ async pull(controller) {
-    try { checkAbort(signal); if (position === blob.size) { controller.close(); return; }
-      const bytes = new Uint8Array(await blob.slice(position, position + LIMITS.chunk).arrayBuffer());
-      checkAbort(signal); position += bytes.length; controller.enqueue(bytes);
-    } catch (error) { controller.error(error); }
+  let position = 0, closed = false;
+  let pendingRead: Promise<void> = Promise.resolve(), closing: Promise<void> | undefined;
+  const stream = new ReadableStream<Uint8Array>({ pull(controller) {
+    pendingRead = (async () => {
+      try {
+        checkAbort(signal); if (position === blob.size) { controller.close(); return; }
+        const length = Math.min(LIMITS.chunk, blob.size - position);
+        const bytes = new Uint8Array(await blob.slice(position, position + length).arrayBuffer());
+        checkAbort(signal);
+        if (bytes.length !== length) throw new Error('blob-short-read');
+        if (closed) return;
+        position += bytes.length; controller.enqueue(bytes);
+      } catch (error) { if (!closed) controller.error(error); }
+    })();
+    return pendingRead;
   } }, { highWaterMark: 0 });
   const reader = stream.getReader();
-  return { reader, done: Promise.resolve(), close: async () => { await reader.cancel().catch(() => {}); reader.releaseLock(); } };
+  return { reader, done: Promise.resolve(), close: () => {
+    if (!closing) {
+      closed = true;
+      closing = (async () => {
+        await reader.cancel().catch(() => {});
+        // Blob reads cannot be interrupted by AbortSignal or stream cancellation.
+        await pendingRead; reader.releaseLock();
+      })();
+    }
+    return closing;
+  } };
 }
 export function pairEntries(left: readonly FolderEntry[], right: readonly FolderEntry[], options: MatchOptions = {}): FolderRow[] {
   const rows = new Map<string, FolderRow>();
@@ -103,19 +122,28 @@ export async function compareBytes(left: FolderEntry, right: FolderEntry, signal
 export class FolderRun {
   private generation = 0;
   private controller?: AbortController;
+  private tail: Promise<void> = Promise.resolve();
   cancel() { this.controller?.abort(); }
   invalidate() { this.generation++; this.cancel(); }
   async compare(rows: FolderRow[], update: (rows: FolderRow[]) => void) {
     this.invalidate(); const generation = this.generation; const controller = new AbortController(); this.controller = controller;
-    for (const row of rows) {
-      if (row.pairing !== 'matched' || row.content !== 'pending') continue;
-      if (controller.signal.aborted) { row.content = 'canceled'; row.integrity = 'unchecked'; continue; }
-      try { const result = await compareBytes(row.left[0], row.right[0], controller.signal);
+    const previous = this.tail;
+    const work = previous.catch(() => {}).then(async () => {
+      // Queued replacements can be superseded without ever opening a source.
+      if (generation !== this.generation) return;
+      for (const row of rows) {
         if (generation !== this.generation) return;
-        row.content = result.equal ? 'equal' : 'different'; row.integrity = result.integrity;
-      } catch { if (generation !== this.generation) return; row.content = controller.signal.aborted ? 'canceled' : 'unreadable'; row.integrity = controller.signal.aborted ? 'unchecked' : 'failed'; }
-      if (generation === this.generation) update([...rows]);
-    }
-    if (generation === this.generation) { this.controller = undefined; update([...rows]); }
+        if (row.pairing !== 'matched' || row.content !== 'pending') continue;
+        if (controller.signal.aborted) { row.content = 'canceled'; row.integrity = 'unchecked'; continue; }
+        try { const result = await compareBytes(row.left[0], row.right[0], controller.signal);
+          if (generation !== this.generation) return;
+          row.content = result.equal ? 'equal' : 'different'; row.integrity = result.integrity;
+        } catch { if (generation !== this.generation) return; row.content = controller.signal.aborted ? 'canceled' : 'unreadable'; row.integrity = controller.signal.aborted ? 'unchecked' : 'failed'; }
+        if (generation === this.generation) update([...rows]);
+      }
+      if (generation === this.generation) { this.controller = undefined; update([...rows]); }
+    });
+    this.tail = work;
+    return work;
   }
 }

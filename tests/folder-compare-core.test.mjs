@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BlobReader, BlobWriter, ZipWriter } from '@zip.js/zip.js';
+import { BlobReader, BlobWriter, ZipWriter, ZipReader } from '@zip.js/zip.js';
 import { Admission, LIMITS, blobBytes, compareBytes, fileSource, pairEntries, pathIssue, FolderRun } from '../src/features/folder-compare/core.ts';
 import { BoundedZipReader, zipSource } from '../src/features/folder-compare/zip.ts';
 const signal = () => new AbortController().signal;
@@ -89,4 +89,107 @@ test('obsolete generation cannot publish completion', async () => {
   const work = run.compare(rows, () => updates++);
   await new Promise(resolve => setTimeout(resolve, 0)); run.invalidate(); release(); await work;
   assert.equal(updates, 0); assert.equal(rows[0].content, 'pending');
+});
+function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
+const turn = () => new Promise(resolve => setImmediate(resolve));
+test('zero and partial fake Blob slices reject before EOF; true empty file stays equal', async () => {
+  for (const actual of [0, 2, 4]) {
+    let calls = 0;
+    const blob = { size: 3, slice() { calls++; return { arrayBuffer: async () => new ArrayBuffer(actual) }; } };
+    const source = { ...entry('short', new Uint8Array(3)), open: s => blobBytes(blob, s) };
+    await assert.rejects(compareBytes(source, entry('ok', new Uint8Array(3)), signal()), /blob-short-read/);
+    assert.equal(calls, 1);
+  }
+  const empty = { ...entry('empty', new Uint8Array()), open: s => blobBytes(new Blob(), s) };
+  assert.equal((await compareBytes(empty, empty, signal())).equal, true);
+});
+test('replacement waits pending Blob read cleanup; superseded and canceled queues never open', async () => {
+  const reading = deferred(), release = deferred(); let active = 0, peak = 0;
+  const opens = [];
+  const wrap = (path, blob) => ({ ...entry(path, new Uint8Array([1])), open(s) {
+    opens.push(path); active++; peak = Math.max(peak, active); const bytes = blobBytes(blob, s);
+    return { ...bytes, close: async () => { await bytes.close(); active--; } };
+  } });
+  const delayed = { size: 1, slice() { reading.resolve(); return { arrayBuffer: async () => { await release.promise; return new Uint8Array([1]).buffer; } }; } };
+  const normal = new Blob([new Uint8Array([1])]);
+  const run = new FolderRun(); let staleUpdates = 0;
+  const rowsFor = (name, left = normal) => pairEntries([wrap(name, left)], [wrap(name, normal)]);
+  const oldRows = rowsFor('old', delayed);
+  const old = run.compare(oldRows, () => staleUpdates++); await reading.promise;
+  const skipped = run.compare(rowsFor('superseded'), () => assert.fail('superseded publication'));
+  const canceledRows = rowsFor('canceled'); const canceled = run.compare(canceledRows, () => {}); run.cancel();
+  await turn(); assert.deepEqual(opens, ['old', 'old']); assert.equal(active, 2);
+  release.resolve(); await Promise.all([old, skipped, canceled]);
+  assert.equal(active, 0); assert.equal(staleUpdates, 0); assert.equal(canceledRows[0].content, 'canceled');
+  const newestRows = rowsFor('newest'); await run.compare(newestRows, () => {});
+  assert.equal(newestRows[0].content, 'equal'); assert.equal(active, 0); assert.equal(peak, 2);
+  assert.deepEqual(opens, ['old', 'old', 'newest', 'newest']);
+});
+test('ZIP entry/source repeated close await delayed real extraction finalization', async () => {
+  const original = ZipReader.prototype.getEntriesGenerator;
+  const finishing = deferred(), release = deferred(); let finalized = false;
+  ZipReader.prototype.getEntriesGenerator = async function* (...args) {
+    for await (const item of original.apply(this, args)) {
+      if (!item.directory) {
+        const getData = item.getData.bind(item);
+        item.getData = async (...dataArgs) => {
+          try { return await getData(...dataArgs); }
+          finally { finishing.resolve(); await release.promise; finalized = true; }
+        };
+      }
+      yield item;
+    }
+  };
+  let zip, opened;
+  try {
+    zip = await zipSource(await archive([['a', new Uint8Array([1, 2, 3])]]), 'finalize', new Admission(), signal());
+    opened = zip.entries[0].open(signal());
+    while (!(await opened.reader.read()).done) { /* Drain real ZIP to EOF. */ }
+    await finishing.promise;
+    let entryClosed = false, sourceClosed = false, doneSettled = false;
+    opened.done.finally(() => { doneSettled = true; }).catch(() => {});
+    const entryClose = opened.close().then(() => { entryClosed = true; });
+    const repeatedEntryClose = opened.close();
+    const sourceClose = zip.close().then(() => { sourceClosed = true; });
+    const repeatedSourceClose = zip.close();
+    await turn(); assert.equal(entryClosed, false); assert.equal(sourceClosed, false); assert.equal(finalized, false);
+    release.resolve(); await Promise.all([entryClose, repeatedEntryClose, sourceClose, repeatedSourceClose]);
+    assert.equal(finalized, true); assert.equal(doneSettled, true); await opened.done;
+    assert.throws(() => zip.entries[0].open(signal()), /source-closed/);
+  } finally {
+    release.resolve(); if (opened) await opened.close(); if (zip) await zip.close();
+    ZipReader.prototype.getEntriesGenerator = original;
+  }
+});
+test('genuine ZIP versus ZIP reaches verified EOF and truncated archive rejects', async () => {
+  const bytes = Uint8Array.from({ length: 180003 }, (_, i) => i % 239);
+  const archiveA = await archive([['a', bytes]]); const archiveB = await archive([['a', bytes]]);
+  const admission = new Admission();
+  const a = await zipSource(archiveA, 'A', admission, signal());
+  const b = await zipSource(archiveB, 'B', admission, signal());
+  try { assert.deepEqual(await compareBytes(a.entries[0], b.entries[0], signal()), { equal: true, integrity: 'verified' }); }
+  finally { await Promise.all([a.close(), b.close()]); }
+  await assert.rejects(zipSource(archiveA.slice(0, archiveA.size - 10), 'truncated', new Admission(), signal()));
+});
+test('latest queued replacement opens only after obsolete Blob read releases ownership', async () => {
+  const reading = deferred(), release = deferred(); const events = []; let active = 0, peak = 0;
+  const make = (name, delayed = false) => ({ ...entry(name, new Uint8Array([1])), open(s) {
+    events.push(`open:${name}`); active++; peak = Math.max(peak, active);
+    const blob = delayed ? { size: 1, slice() { reading.resolve(); return { arrayBuffer: async () => {
+      await release.promise; return new Uint8Array([1]).buffer;
+    } }; } } : new Blob([new Uint8Array([1])]);
+    const opened = blobBytes(blob, s);
+    return { ...opened, close: async () => { await opened.close(); events.push(`close:${name}`); active--; } };
+  } });
+  const run = new FolderRun();
+  const old = run.compare(pairEntries([make('old', true)], [make('old')]), () => assert.fail('old publication'));
+  await reading.promise;
+  const skipped = run.compare(pairEntries([make('skipped')], [make('skipped')]), () => assert.fail('skipped publication'));
+  const rows = pairEntries([make('latest')], [make('latest')]);
+  const latest = run.compare(rows, () => {});
+  await turn(); assert.deepEqual(events, ['open:old', 'open:old']);
+  release.resolve(); await Promise.all([old, skipped, latest]);
+  assert.equal(rows[0].content, 'equal'); assert.equal(peak, 2); assert.equal(active, 0);
+  assert.deepEqual(events.slice(0, 4), ['open:old', 'open:old', 'close:old', 'close:old']);
+  assert.equal(events.includes('open:skipped'), false);
 });

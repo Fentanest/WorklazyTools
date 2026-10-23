@@ -17,6 +17,7 @@ export async function zipSource(blob: Blob, revision: string, admission: Admissi
     checkCrc32: true, checkAuthenticationCode: true, checkLocalDirectory: true, checkOverlappingEntry: true, useWebWorkers: false });
   const pending = new Set<Promise<void>>();
   const entries: FolderEntry[] = []; const active = new Set<AbortController>();
+  let closing: Promise<void> | undefined;
   try {
     for await (const entry of reader.getEntriesGenerator()) {
       checkAbort(signal); admission.add(entry.uncompressedSize);
@@ -24,6 +25,7 @@ export async function zipSource(blob: Blob, revision: string, admission: Admissi
       const source: FolderEntry = Object.freeze({ id: `${revision}:zip:${entries.length}`, rawPath: entry.filename,
         rawFilename: entry.rawFilename.slice(), size: entry.uncompressedSize, directory: entry.directory, issue,
         open(jobSignal: AbortSignal): OpenedBytes {
+          if (closing) throw new Error('source-closed');
           if (issue || entry.directory) throw new Error(issue ?? 'directory');
           const controller = new AbortController(); active.add(controller);
           const abort = () => controller.abort();
@@ -45,15 +47,24 @@ export async function zipSource(blob: Blob, revision: string, admission: Admissi
           done.finally(() => pending.delete(done)).catch(() => {});
           done.catch(() => {});
           const output = stream.readable.getReader();
-          return { reader: output, done, close: async () => { controller.abort(); await output.cancel().catch(() => {});
-            await pending.add(done);
-          done.finally(() => pending.delete(done)).catch(() => {});
-          done.catch(() => {}); output.releaseLock(); cleanup(); } };
+          let entryClosing: Promise<void> | undefined;
+          return { reader: output, done, close: () => {
+            if (!entryClosing) entryClosing = (async () => {
+              controller.abort(); await output.cancel().catch(() => {});
+              await done.catch(() => {});
+              output.releaseLock(); cleanup();
+            })();
+            return entryClosing;
+          } };
         } });
       entries.push(source);
     }
-    return { entries: Object.freeze(entries), warnings: ['empty-directory-metadata-unavailable'], close: async () => {
-      for (const controller of active) controller.abort(); await Promise.allSettled([...pending]); await reader.close();
+    return { entries: Object.freeze(entries), warnings: ['empty-directory-metadata-unavailable'], close: () => {
+      if (!closing) closing = (async () => {
+        for (const controller of active) controller.abort();
+        await Promise.allSettled([...pending]); await reader.close();
+      })();
+      return closing;
     } };
   } catch (error) { await reader.close(); throw error; }
 }
