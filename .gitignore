@@ -33,3 +33,6 @@ public/vendor/libreoffice-converter/
 
 public/vendor/markitdown/
 .cache/markitdown/
+
+# Rebuilt from pinned vendor/comparison sources.
+/public/vendor/opencv/
