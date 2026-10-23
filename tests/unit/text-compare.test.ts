@@ -133,3 +133,12 @@ test("unterminated code tokens are scanned once without repeated suffix searches
   const quoted='"'+"\\x".repeat(30000);
   assert.deepEqual(syntaxSpans(quoted,"json"),[{start:0,end:quoted.length,kind:"string"}]);
 });
+
+test("whole-document transforms preserve CRLF and mixed terminator positions",()=>{
+  assert.equal(transformText(" b \r\n a \r\n","trim"),"b\r\na\r\n");
+  assert.equal(transformText("b\r\na","sort"),"a\r\nb");
+  assert.equal(transformText("c\r\nb\ra\n","sort"),"b\ra\r\nc\n");
+  assert.equal(transformText("a\r\n  \r\nb\r\n","removeEmpty"),"a\r\nb\r\n");
+  assert.equal(transformText("a\r\n  \rb\n","trim"),"a\r\nb\n");
+  assert.equal(transformText("PRE| b \r\n a |POST","trim",4,12),"PRE|b\r\na|POST");
+});
