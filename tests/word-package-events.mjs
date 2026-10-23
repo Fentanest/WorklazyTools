@@ -355,12 +355,77 @@ for formatting in [False,True]:
  assert not os.path.exists('/bad.docx')
 
 `);
+// W1 unmatched drawing restoration: use revised text styles, never vacuous
+// "all revised drawings match" when the revised paragraph has no drawing.
+for(const [formatting,sizeEnabled,colorEnabled] of [[false,true,true],[true,true,true],[true,false,false]]) {
+ requested={fontFamily:true,size:sizeEnabled,style:true,color:colorEnabled,paragraph:true,numbering:true};
+ py.globals.set('requested_json',JSON.stringify(requested));py.globals.set('formatting',formatting);
+ py.runPython(String.raw`
+mask=json.loads(requested_json)
+def image_run(size,font,color,language):return '<w:r><w:rPr><w:rFonts w:ascii="'+font+'"/><w:color w:val="'+color+'"/><w:sz w:val="'+size+'"/><w:lang w:val="'+language+'"/></w:rPr>'+image()+'</w:r>'
+def revised_text(value,size,font):return '<w:r><w:rPr><w:rFonts w:ascii="'+font+'"/><w:color w:val="0000FF"/><w:sz w:val="'+size+'"/><w:lang w:val="ko-KR"/></w:rPr><w:t xml:space="preserve">'+value+'</w:t></w:r>'
+def drawing_styles(path):
+ with zipfile.ZipFile(path) as z:
+  result=[]
+  for part in ['word/document.xml','word/header1.xml']:
+   if part not in z.namelist():continue
+   for run in ET.fromstring(z.read(part)).iter(W+'r'):
+    if run.find(W+'drawing') is None:continue
+    props=run.find(W+'rPr')
+    result.append(tuple(props.find(W+name).get(W+attribute) if props is not None and props.find(W+name) is not None else None for name,attribute in [('rFonts','ascii'),('color','val'),('sz','val'),('lang','val')]))
+  return result
+for context in ['start','middle','end','header','cell','whole','default','inserted']:
+ location={'start':0,'middle':1,'end':2}.get(context,1)
+ original=p((text('AB'[:location]) if location else '')+image_run('20','Arial','FF0000','en-US')+(text('AB'[location:]) if location<2 else ''))
+ revised=p(revised_text('A','40','CalibriA')+(revised_text('X','60','CalibriX') if context=='inserted' else '')+revised_text('B','50','CalibriB'))
+ if context=='inserted':original=p(text('A')+image_run('20','Arial','FF0000','en-US')+text(' B'));revised=p(revised_text('A','40','CalibriA')+revised_text(' X','60','CalibriX')+revised_text(' B','50','CalibriB'))
+ if context=='whole':original=p(image_run('20','Arial','FF0000','en-US'))+p(text('Stable body'));revised=p(text('Stable body'))
+ if context=='default':original=p(image_run('20','Arial','FF0000','en-US')+image_run('30','Arial2','FF0000','en-US'));revised=p(image_run('40','Calibri','0000FF','ko-KR'))
+ for side,body in [('before',original),('after',revised)]:
+  if context=='cell':body='<w:tbl><w:tr><w:tc>'+body+'</w:tc></w:tr></w:tbl>'
+  package('/deleted-'+side+'.docx',p(text('Stable body')) if context=='header' else body,OLDPNG,'https://same.example',body if context=='header' else None)
+ a=extract_document_model(open('/deleted-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/deleted-after.docx','rb').read(),True,True,'en');manifest=worklazyComparisonManifestJson(a,b,formatting,True,True)
+ generate_tracked_document('/deleted-before.docx','/deleted-after.docx','/deleted-out.docx','events',formatting,True,True,manifest,requested_json)
+ accept_tracked_document('/deleted-out.docx','/deleted-accepted.docx')
+ with zipfile.ZipFile('/deleted-out.docx') as source,zipfile.ZipFile('/deleted-rejected.docx','w') as output:
+  for entry in source.infolist():output.writestr(entry,_serialize_xml(reject(_qname_safe_parse(source.read(entry.filename)))[0]) if entry.filename in ['word/document.xml','word/header1.xml'] else source.read(entry.filename))
+ if context=='whole':target=[('Arial','FF0000','20','en-US')]
+ elif context=='default':target=[('Arial' if formatting else 'Calibri','FF0000' if formatting and mask['color'] else '0000FF','20' if formatting and mask['size'] else '40','ko-KR'),('Arial2' if formatting else None,'FF0000' if formatting and mask['color'] else None,'30' if formatting and mask['size'] else None,None)]
+ else:target=[('Arial' if formatting else 'CalibriA' if location==0 else 'CalibriX' if context=='inserted' else 'CalibriB','FF0000' if formatting and mask['color'] else '0000FF','20' if formatting and mask['size'] else '40' if location==0 else '60' if context=='inserted' else '50','ko-KR')]
+ assert drawing_styles('/deleted-rejected.docx')==target,(context,formatting,mask,drawing_styles('/deleted-rejected.docx'),target)
+ assert view('/deleted-accepted.docx')==view('/deleted-after.docx'),(context,'accept',view('/deleted-accepted.docx'),view('/deleted-after.docx'))
+ assert view('/deleted-rejected.docx')==view('/deleted-before.docx'),(context,'reject',view('/deleted-rejected.docx'),view('/deleted-before.docx'))
+ name='unpaired-'+context+'-'+str(formatting)+'-'+str(mask['size'])
+ for variant in ['before','after','out','accepted','rejected']:shutil.copyfile('/deleted-'+variant+'.docx','/p-packages/'+name+'-'+variant+'.docx')
+ value=json.loads(manifest)
+ for mutation in ['missing','duplicate','source','scope','policy','family','fact','extra']:
+  bad=copy.deepcopy(value)
+  def descendants(items):return [d for item in items for d in [item]+descendants(item.get('children',[]))]
+  decision=next(d for d in descendants(bad['decisions']) if d.get('objectEvents',{}).get('deletedDrawingStyles'));entries=decision['objectEvents']['deletedDrawingStyles'];entry=entries[0]
+  if mutation=='missing':entries.clear()
+  elif mutation=='duplicate':entries.append(copy.deepcopy(entry))
+  elif mutation=='source':entry['source']=next(ref for ref in bad['sources']['after'] if ref['kind']=='r')
+  elif mutation=='scope':entry['afterParagraph']=bad['sources']['after'][0]
+  elif mutation=='policy':entry['policy']='copy-revised-run' if entry['policy']=='restore-before-unpaired' else 'restore-before-unpaired'
+  elif mutation=='family':entry['families']=[W+'lang']
+  elif mutation=='fact':entry['beforeFact']['history']=not entry['beforeFact']['history']
+  else:entry['ignored']=1
+  # Source forgery must change a valid field even if the first run happened to
+  # be the real start-cursor source in this particular fixture.
+  if mutation=='source' and entry==value['decisions'][0].get('objectEvents',{}).get('deletedDrawingStyles',[None])[0]:entry['source']=bad['sources']['after'][0]
+  if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
+  try:generate_tracked_document('/deleted-before.docx','/deleted-after.docx','/bad.docx','events',formatting,True,True,json.dumps(bad),requested_json);raise AssertionError((context,mutation,'accepted'))
+  except ValueError as error:assert 'INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE' in str(error),(context,mutation,str(error))
+  assert not os.path.exists('/bad.docx')
+`);
+}
+console.log('24 unpaired drawing scope projections +192 source/policy negatives passed');
 requested=undefined;
 console.log('49 paired image property package projections +252 source/family/fact negatives +2 metadata exclusions +4 absent-property targets +2 existing-history targets +2 malformed-history gates passed');
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages',{recursive:true});
 for(const name of py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p-packages/'+name,py.FS.readFile('/p-packages/'+name));
 const artifacts=py.FS.readdir('/p-packages').filter(name=>name.endsWith('.docx')).sort().map(name=>{const data=py.FS.readFile('/p-packages/'+name);return {name,bytes:data.length,sha256:createHash('sha256').update(data).digest('hex')};});
-fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p2-package-artifacts.json',JSON.stringify({count:artifacts.length,artifacts},null,2)+'\n');
+fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/word-p2-unpaired-package-artifacts.json',JSON.stringify({count:artifacts.length,artifacts},null,2)+'\n');
 console.log(JSON.stringify(py.globals.get('checks').toJs()));
 assert.ok(all.some(result=>result.manifest.decisions.some(decision=>decision.beforeText==='Old clause' && decision.afterText==='New clause' && decision.objectEvents?.unchangedLinks.length===1)),'TS must declare the unchanged hyperlink envelope');
 

@@ -5,6 +5,7 @@ import type { WordDiffSegment, WordTableAxisPair } from "../excel-merger/types";
 /** Paths address actual XML children (including property nodes), never filtered paragraph indexes. */
 export interface PropertyFact { supported: Record<string, string[]>; unsupported: Record<string, string[]>; history: boolean }
 export interface XmlPropertyTree { name: string; attributes: Record<string, string>; text: string; children: XmlPropertyTree[] }
+export interface DeletedDrawingStyleProjection { before:DocumentSourceReference; beforeFact:PropertyFact; policy:"restore-before-unpaired"|"copy-revised-run"|"inherit-after-default"; afterParagraph?:DocumentSourceReference; afterFact?:PropertyFact; cursor?:number; families?:string[]; source?:DocumentSourceReference }
 export interface DrawingPropertyProjection { representation:"revision"|"preserve-after-history"; before: DocumentSourceReference; after: DocumentSourceReference; beforeFact: PropertyFact; afterFact: PropertyFact; families: string[]; excludedFamilies: string[] }
 export interface ObjectSourceEvent {kind:"drawing"|"hyperlink";start:number;end:number;signature:string;supported:boolean;target:string;paragraphPath:number[];runPath:number[]}
 export interface DocumentSourceReference {
@@ -36,7 +37,7 @@ export interface ComparisonDecision {
   before: DocumentSourceReference[];
   after: DocumentSourceReference[];
   moved: boolean;
-  objectEvents?: {drawingProperties:DrawingPropertyProjection[];unchangedLinks:Array<{before:DocumentSourceReference;after:DocumentSourceReference}>;propertiesSupported:boolean;policy:"worklazy-source-events-2";before:DocumentSourceReference[];after:DocumentSourceReference[];changed:boolean};
+  objectEvents?: {deletedDrawingStyles:DeletedDrawingStyleProjection[];drawingProperties:DrawingPropertyProjection[];unchangedLinks:Array<{before:DocumentSourceReference;after:DocumentSourceReference}>;propertiesSupported:boolean;policy:"worklazy-source-events-3";before:DocumentSourceReference[];after:DocumentSourceReference[];changed:boolean};
   screenFormattingFamilies?: string[];
   deletedFormattingPolicy?: "restore-before-unpaired" | "paired-revised";
   wholeRestoreStyles?: Array<{ before: DocumentSourceReference; afterParagraph: DocumentSourceReference; projections: RestoreStyleProjection[] }>;

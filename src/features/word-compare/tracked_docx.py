@@ -830,6 +830,17 @@ def _drawing_revision(source, kind, writer):
             value=_property_revision(revised,properties,W+"rPr",W+"rPrChange",writer,families)
             previous=value.find(W+"rPrChange/"+W+"rPr") if families and value is not None else None
             properties=previous if previous is not None else value
+        else:
+            restore=next((entry for entry in (_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents",{}).get("deletedDrawingStyles",[]) if _manifest_key(entry["before"])==origin[1]),None)
+            if restore is None:raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE")
+            if restore["policy"]!="restore-before-unpaired":
+                after_run=_MANIFEST_SOURCE_NODES.get(("after",_manifest_key(restore["source"]))) if "source" in restore else None
+                revised=after_run.find(W+"rPr") if after_run is not None else None
+                revised=_effective_properties(revised) if revised is not None else None
+                families=restore["families"]
+                value=_property_revision(revised,properties,W+"rPr",W+"rPrChange",writer,families)
+                previous=value.find(W+"rPrChange/"+W+"rPr") if families and value is not None else None
+                properties=previous if previous is not None else value
     if properties is not None:run.append(_effective_properties(properties) if kind=="del" else copy.deepcopy(properties))
     run.append(_source_copy(source))
     _consume_object(source)
@@ -1399,7 +1410,7 @@ def _validate_restore_styles(actual):
         if not any(expected.values()):
             if events is not None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
             continue
-        if events is None or events.get("policy") != "worklazy-source-events-2":raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+        if events is None or events.get("policy") != "worklazy-source-events-3":raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
         for side in ("before","after"):
             if events[side] != expected[side]:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
         def run_fact(side,ref):return actual[side].get((ref["part"],tuple(ref["objectEvent"]["runPath"])),{}).get("normalizedProperties",{}).get("rPr",{"supported":{},"unsupported":{},"history":False})
@@ -1436,9 +1447,28 @@ def _validate_restore_styles(actual):
             excluded=[name for name in dict.fromkeys(list(old["unsupported"])+list(new["unsupported"])) if old["unsupported"].get(name,[])!=new["unsupported"].get(name,[])]
             verified={"representation":"preserve-after-history" if new["history"] else "revision","before":ref,"after":match,"beforeFact":old,"afterFact":new,"families":[name for name in names if _mask_enabled("rPr",name)],"excludedFamilies":excluded+[name for name in names if not _mask_enabled("rPr",name)]}
             if pair!=verified:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
-        supported=all(any(pair["before"]==ref for pair in projections) or all(run_fact("before",ref)==run_fact("after",other) for other in expected["after"] if other["objectEvent"]["kind"]=="drawing") for ref in expected["before"] if ref["objectEvent"]["kind"]=="drawing")
-        if type(events.get("propertiesSupported")) is not bool or events["propertiesSupported"]!=supported:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
-        if not supported:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_OBJECT_PROPERTIES")
+        unpaired=[ref for ref in drawings["before"] if not any(pair["before"]==ref for pair in projections)]
+        restores=events.get("deletedDrawingStyles")
+        if not isinstance(restores,list) or len(restores)!=len(unpaired):raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE")
+        owned=set()
+        for restore in restores:
+            ref=restore.get("before")
+            if ref not in unpaired or _manifest_key(ref) in owned:raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE")
+            owned.add(_manifest_key(ref));old=run_fact("before",ref)
+            verified={"before":ref,"beforeFact":old,"policy":"restore-before-unpaired"}
+            if decision["after"]:
+                if len(decision["after"])!=1:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_OBJECT_PROPERTIES")
+                paragraph=decision["after"][0];cursor=boundary(ref["objectEvent"]["start"])
+                runs=[source for source in actual["after"].values() if source["kind"]=="r" and source["part"]==paragraph["part"] and source.get("paragraphPath")==paragraph["path"] and "textRange" in source]
+                length=len(actual["after"][_manifest_key(paragraph)].get("rawText",""))
+                def at(position):return next((source for source in runs if source["textRange"][0]<=position<source["textRange"][1]),None)
+                source=at(cursor) or at(min(cursor,length)-1)
+                new=source.get("normalizedProperties",{}).get("rPr",{"supported":{},"unsupported":{},"history":False}) if source is not None else {"supported":{},"unsupported":{},"history":False}
+                families=[name for name in dict.fromkeys(list(old["supported"])+list(new["supported"])) if _mask_enabled("rPr",name)]
+                verified.update({"policy":"copy-revised-run" if source is not None else "inherit-after-default","afterParagraph":paragraph,"afterFact":new,"cursor":cursor,"families":families})
+                if source is not None:verified["source"]=source
+            if restore!=verified:raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE")
+        if events.get("propertiesSupported") is not True:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
         unchanged=[{"before":a,"after":b} for a in expected["before"] if a["objectEvent"]["kind"]=="hyperlink" for b in expected["after"] if b["objectEvent"]["kind"]=="hyperlink" and a["objectEvent"]["signature"]==b["objectEvent"]["signature"] and boundary(a["objectEvent"]["start"])==b["objectEvent"]["start"] and boundary(a["objectEvent"]["end"])==b["objectEvent"]["end"]]
         if events.get("unchangedLinks")!=unchanged:raise ValueError("INVALID_COMPARISON_MANIFEST_LINK_ACTIONS")
         facts=lambda side:[(source["objectEvent"]["kind"],boundary(source["objectEvent"]["start"]) if side=="before" else source["objectEvent"]["start"],boundary(source["objectEvent"]["end"]) if side=="before" else source["objectEvent"]["end"],source["objectEvent"]["signature"]) for source in expected[side]]
