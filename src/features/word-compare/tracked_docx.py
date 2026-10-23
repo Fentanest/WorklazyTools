@@ -38,6 +38,137 @@ INSERTED_CONTENT_TAGS = {W + "ins", W + "moveTo"}
 COMMENT_MARKER_TAGS = {W + "commentRangeStart", W + "commentRangeEnd"}
 
 
+# Package copying is keyed by (source side, owner part, relationship id).
+# External targets are copied as declarations and are never fetched.
+import posixpath
+R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+PR = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+CT = "{http://schemas.openxmlformats.org/package/2006/content-types}"
+class _PackageGraph:
+    def __init__(self, before, after):
+        self.before, self.after = before, after
+        self.roots, self.additions, self.ids, self.media = {}, {}, {}, {}
+        self.types = ET.fromstring(after.read('[Content_Types].xml')) if '[Content_Types].xml' in after.namelist() else ET.Element(CT+'Types')
+        self.before_types = ET.fromstring(before.read('[Content_Types].xml')) if '[Content_Types].xml' in before.namelist() else ET.Element(CT+'Types')
+        self.names = set(after.namelist()); self.next_drawing_id = 1
+        for part in after.namelist():
+            if part.startswith('word/media/'):
+                self.media[(hashlib.sha256(after.read(part)).hexdigest(),self.mime(part,self.types))] = part
+            if re.fullmatch(r'word/(document|header[0-9]+|footer[0-9]+|footnotes|endnotes|comments)\.xml',part):
+                for node in ET.fromstring(after.read(part)).iter():
+                    if node.tag=='{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr' and node.get('id','').isdigit(): self.next_drawing_id = max(self.next_drawing_id,int(node.get('id'))+1)
+    def mime(self, part, types):
+        content=next((node.get('ContentType') for node in types if node.tag==CT+'Override' and node.get('PartName')=='/'+part),None)
+        return content or next((node.get('ContentType') for node in types if node.tag==CT+'Default' and node.get('Extension','').lower()==posixpath.splitext(part)[1].lstrip('.').lower()),None)
+    def rel_path(self, part):
+        return posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
+    def relationship(self, part, rid):
+        key=('before',part,rid)
+        if key in self.ids: return self.ids[key]
+        path=self.rel_path(part)
+        if path not in self.before.namelist(): raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+        candidates=[node for node in ET.fromstring(self.before.read(path)) if node.get('Id')==rid]
+        if len(candidates)!=1: raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+        old=candidates[0]; kind=old.get('Type',''); target=old.get('Target','')
+        if not kind.endswith(('/image','/hyperlink')): raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+        root=self.roots.get(path)
+        if root is None:root=ET.fromstring(self.after.read(path)) if path in self.after.namelist() else ET.Element(PR+'Relationships')
+        if old.get('TargetMode')!='External':
+            source=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
+            if source not in self.before.namelist() or not kind.endswith('/image'): raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+            data=self.before.read(source); digest=hashlib.sha256(data).hexdigest()
+            content=self.mime(source,self.before_types)
+            if content is None: raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CONTENT_TYPE')
+            destination=self.media.get((digest,content))
+            if destination is None:
+                extension=posixpath.splitext(source)[1]
+                destination='word/media/worklazy-'+digest+extension
+                suffix=0
+                while destination in self.names:
+                    suffix+=1; destination='word/media/worklazy-'+digest+'-'+str(suffix)+extension
+                self.names.add(destination);self.media[(digest,content)]=destination;self.additions[destination]=data
+                ET.SubElement(self.types,CT+'Override',{'PartName':'/'+destination,'ContentType':content})
+            target=posixpath.relpath(destination,posixpath.dirname(part))
+        for existing in root:
+            if existing.get('Type')==kind and existing.get('TargetMode','')==old.get('TargetMode','') and existing.get('Target')==target:
+                self.ids[key]=existing.get('Id');return existing.get('Id')
+        self.roots[path]=root
+        number=1;used={node.get('Id') for node in root}
+        while 'rIdWorklazy'+str(number) in used:number+=1
+        rid='rIdWorklazy'+str(number);attrs=dict(old.attrib);attrs.update(Id=rid,Target=target)
+        ET.SubElement(root,PR+'Relationship',attrs);self.ids[key]=rid
+        return rid
+    def copy(self, source, part):
+        result=copy.deepcopy(source)
+        for node in result.iter():
+            for name,value in list(node.attrib.items()):
+                if name.startswith(R):node.set(name,self.relationship(part,value))
+            if node.tag=='{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr':
+                node.set('id',str(self.next_drawing_id));self.next_drawing_id+=1
+        return result
+    def validate(self, replacements, additions):
+        names=self.names | set(additions)
+        types=ET.fromstring(replacements.get('[Content_Types].xml',self.after.read('[Content_Types].xml'))) if '[Content_Types].xml' in self.after.namelist() else self.types
+        for part,data in replacements.items():
+            if not re.fullmatch(r'word/(document|header[0-9]+|footer[0-9]+|footnotes|endnotes)\.xml',part):continue
+            root=_qname_safe_parse(data);path=self.rel_path(part)
+            raw=additions.get(path,replacements.get(path))
+            rels=ET.fromstring(raw) if raw is not None else ET.fromstring(self.after.read(path)) if path in self.after.namelist() else ET.Element(PR+'Relationships')
+            for node in root.iter():
+                if node.tag not in {W+'hyperlink','{http://schemas.openxmlformats.org/drawingml/2006/main}blip','{urn:schemas-microsoft-com:vml}imagedata','{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick'}:continue
+                for name,rid in node.attrib.items():
+                    if not name.startswith(R):continue
+                    matches=[rel for rel in rels if rel.get('Id')==rid]
+                    if len(matches)!=1:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+                    rel=matches[0]
+                    expected='/hyperlink' if node.tag in {W+'hyperlink','{http://schemas.openxmlformats.org/drawingml/2006/main}hlinkClick'} else '/image'
+                    if not rel.get('Type','').endswith(expected):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+                    if rel.get('TargetMode')=='External':continue
+                    target=rel.get('Target','');target=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
+                    if target not in names or self.mime(target,types) is None:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CONTENT_TYPE')
+    def finish(self, replacements, additions):
+        for path,root in self.roots.items():
+            current=replacements.get(path,additions.get(path))
+            if current is not None:
+                merged=ET.fromstring(current);by_id={node.get('Id'):node for node in merged}
+                for node in root:
+                    existing=by_id.get(node.get('Id'))
+                    if existing is not None and existing.attrib!=node.attrib:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP_COLLISION')
+                    if existing is None:merged.append(copy.deepcopy(node))
+                root=merged
+            (replacements if path in self.after.namelist() else additions)[path]=_serialize_xml(root)
+        additions.update(self.additions)
+        if self.additions:
+            merged=ET.fromstring(replacements.get('[Content_Types].xml',self.after.read('[Content_Types].xml')))
+            present={node.get('PartName') for node in merged if node.tag==CT+'Override'}
+            for node in self.types:
+                if node.tag==CT+'Override' and node.get('PartName','').lstrip('/') in self.additions and node.get('PartName') not in present:merged.append(copy.deepcopy(node))
+            replacements['[Content_Types].xml']=_serialize_xml(merged)
+
+_PACKAGE_GRAPH = None
+
+def _inherit_mc_context(result, source):
+    origin=_MANIFEST_NODE_KEYS.get(source)
+    if origin is None or origin[0]!="before":return result
+    side,(part,path)=origin;directives={};declarations={}
+    for depth in range(len(path)+1):
+        ancestor=_MANIFEST_SOURCE_NODES.get((side,(part,path[:depth])))
+        if ancestor is None:continue
+        for name,value in ancestor.attrib.items():
+            if name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}"+local for local in ("Ignorable","MustUnderstand","ProcessContent","PreserveElements","PreserveAttributes")}:
+                directives[name]=list(dict.fromkeys(directives.get(name,[])+value.split()))
+            elif name.startswith("xmlns:wltq"):declarations[name]=value
+    for name,words in directives.items():result.set(name," ".join(words))
+    for name,value in declarations.items():result.set(name,value)
+    return result
+
+
+def _source_copy(source):
+    origin = _MANIFEST_NODE_KEYS.get(source)
+    result=_PACKAGE_GRAPH.copy(source, origin[1][0]) if _PACKAGE_GRAPH is not None and origin and origin[0] == "before" else copy.deepcopy(source)
+    return _inherit_mc_context(result,source)
+
+
 class _RevisionWriter:
     def __init__(self, author, start_id=1):
         self.author = (author or "Worklazy Tools").strip() or "Worklazy Tools"
@@ -56,24 +187,46 @@ class _RevisionWriter:
         }
 
 
-def _parse_xml(data):
-    for _, namespace in ET.iterparse(io.BytesIO(data), events=("start-ns",)):
-        prefix, uri = namespace
-        try:
-            ET.register_namespace(prefix or "", uri)
-        except ValueError:
-            pass
-    root = ET.fromstring(data)
-    # ElementTree cannot retain declarations referenced only by mc:Ignorable values.
-    # Removing the hint is safe: the extension elements themselves remain in place.
-    for element in root.iter():
-        for attribute_name in list(element.attrib):
-            if attribute_name.endswith("}Ignorable"):
-                element.attrib.pop(attribute_name, None)
+def _qname_safe_parse(data):
+    pending = {}; contexts = []; root = None
+    for event, value in ET.iterparse(io.BytesIO(data), events=("start-ns", "start", "end")):
+        if event == "start-ns":
+            prefix, uri = value; pending[prefix or ""] = uri
+            if prefix and not prefix.startswith("wltq"):
+                try: ET.register_namespace(prefix or "", uri)
+                except ValueError: pass
+        elif event == "start":
+            context = dict(contexts[-1]) if contexts else {}; context.update(pending); pending.clear(); contexts.append(context)
+            if root is None: root = value
+            if value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice" and not value.get("Requires", "").split():raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
+            for name, raw in list(value.attrib.items()):
+                prefixes = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable", "{http://schemas.openxmlformats.org/markup-compatibility/2006}MustUnderstand"} or (name == "Requires" and value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice")
+                typed = name == "{http://www.w3.org/2001/XMLSchema-instance}type"
+                qnames = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}ProcessContent", "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveElements", "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveAttributes"}
+                if not prefixes and not typed and not qnames: continue
+                if typed and len(raw.split())!=1:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
+                words = []
+                for word in raw.split():
+                    prefix, local = (word, "") if prefixes else word.split(":", 1) if ":" in word else ("", word)
+                    uri = context.get(prefix)
+                    if uri is None: raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
+                    token = "wltq" + hashlib.sha256(uri.encode()).hexdigest()
+                    value.set("xmlns:" + token, uri)
+                    # Element names use another prefix; value-only declarations
+                    # must survive even when their namespace has no elements.
+                    ET.register_namespace("wltn" + hashlib.sha256(uri.encode()).hexdigest(), uri)
+                    words.append(token if prefixes else token + ":" + local)
+                value.set(name, " ".join(words))
+        else: contexts.pop()
     return root
 
 
+def _parse_xml(data):
+    return _qname_safe_parse(data)
+
+
 def _serialize_xml(root):
+    if root.tag in {PR+"Relationships",CT+"Types"}:ET.register_namespace("",root.tag[1:].split("}",1)[0])
     return ET.tostring(root, encoding="utf-8", xml_declaration=True)
 
 
@@ -160,7 +313,7 @@ def _apply_property_revision(result, before, property_tag, change_tag, writer, a
 
 
 def _accepted_copy(source, preserve_comments=False):
-    result = copy.deepcopy(source)
+    result = _source_copy(source)
 
     def clean(parent):
         index = 0
@@ -265,6 +418,15 @@ def _block_kind(element):
 
 
 
+def _is_drawing_event(node):
+    if node.tag == W + "drawing":return True
+    if node.tag!="{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent":return False
+    origin=_MANIFEST_NODE_KEYS.get(node)
+    if origin is None:return False
+    source=next((ref for ref in _MANIFEST["sources"][origin[0]] if _manifest_key(ref)==origin[1]),None)
+    return source is not None and (source.get("objectEvent") or {}).get("kind")=="drawing"
+
+
 def _styled_tokens(paragraph, collect_events=False):
     tokens = []
     events = {}
@@ -273,7 +435,7 @@ def _styled_tokens(paragraph, collect_events=False):
     def add_event(element):
         events.setdefault(len(tokens), []).append(copy.deepcopy(element))
 
-    def visit(node, wrapper=None, inside_preserved_wrapper=False):
+    def visit(node, wrapper=None, inside_preserved_wrapper=False, link=None):
         nonlocal next_wrapper_id
         if node.tag in DELETED_CONTENT_TAGS:
             if collect_events and not inside_preserved_wrapper:
@@ -292,11 +454,17 @@ def _styled_tokens(paragraph, collect_events=False):
             if collect_events and not inside_preserved_wrapper:
                 add_event(node)
             return
+        if node.tag == W + "hyperlink":
+            for child in node:visit(child,wrapper,inside_preserved_wrapper,node)
+            return
         if node.tag == W + "r":
             text = _element_text(node)
             if not text:
                 if collect_events and not inside_preserved_wrapper:
-                    add_event(node)
+                    drawings=[child for child in node if _is_drawing_event(child)]
+                    if drawings:
+                        for drawing in drawings:events.setdefault(len(tokens),[]).append(drawing)
+                    else:add_event(node)
                 return
             run_properties = node.find(W + "rPr")
             # Word may split one visible word across several runs for reasons
@@ -304,16 +472,14 @@ def _styled_tokens(paragraph, collect_events=False):
             # prior revisions). Character tokens keep the text alignment
             # independent from those arbitrary run boundaries. Output runs are
             # coalesced again by _revision_container and emit_equal.
-            for token in text:
-                tokens.append({
-                    "text": token,
-                    "properties": copy.deepcopy(run_properties) if run_properties is not None else None,
-                    "wrapper": wrapper,
-                })
+            for child in node:
+                value = child.text or "" if child.tag == W + "t" else "\t" if child.tag == W + "tab" else "\n" if child.tag in (W + "br", W + "cr") else ""
+                if _is_drawing_event(child) and collect_events and not inside_preserved_wrapper: events.setdefault(len(tokens),[]).append(child)
+                for token in value:tokens.append({"text":token,"properties":copy.deepcopy(run_properties) if run_properties is not None else None,"wrapper":wrapper,"link":link})
             return
         for child in node:
             if child.tag != W + "pPr":
-                visit(child, wrapper, inside_preserved_wrapper)
+                visit(child, wrapper, inside_preserved_wrapper, link)
 
     visit(paragraph)
     return (tokens, events) if collect_events else tokens
@@ -357,20 +523,25 @@ def _token_run(token, run_properties, deleted=False):
     return run
 
 
-def _revision_container(kind, tokens, writer, strip_history=False):
-    container = ET.Element(W + kind, writer.attributes())
-    deleted = kind == "del"
-    groups = []
-    for token in tokens:
-        properties = _effective_properties(token["properties"]) if strip_history else token["properties"]
-        signature = _properties_signature(properties)
-        if groups and groups[-1][0] == signature:
-            groups[-1][1] += token["text"]
+def _revision_containers(kind, tokens, writer, strip_history=False):
+    # Hyperlink is paragraph content, not a RunTrackChange child. Revisions
+    # belong inside its envelope (CT_Hyperlink accepts inserted/deleted runs).
+    results=[];start=0
+    while start<len(tokens):
+        link=tokens[start].get("link");end=start+1
+        while end<len(tokens) and tokens[end].get("link") is link:end+=1
+        revision=ET.Element(W+kind,writer.attributes());groups=[]
+        for token in tokens[start:end]:
+            properties=_effective_properties(token["properties"]) if strip_history else token["properties"]
+            signature=_properties_signature(properties)
+            if groups and groups[-1][0]==signature:groups[-1][1]+=token["text"]
+            else:groups.append([signature,token["text"],properties])
+        for _,text,properties in groups:revision.append(_token_run(text,properties,kind=="del"))
+        if link is None:results.append(revision)
         else:
-            groups.append([signature, token["text"], properties])
-    for _, text, run_properties in groups:
-        container.append(_token_run(text, run_properties, deleted))
-    return container
+            hyperlink=_source_copy(link);hyperlink[:]=[];hyperlink.append(revision);results.append(hyperlink)
+        start=end
+    return results
 
 
 def _mark_paragraph_end(paragraph, kind, writer):
@@ -387,7 +558,7 @@ def _mark_paragraph_end(paragraph, kind, writer):
 
 def _plain_paragraph_from_tokens(source, tokens):
     """Create a comparison-only paragraph while retaining character formatting."""
-    paragraph = ET.Element(W + "p", dict(source.attrib))
+    paragraph = _inherit_mc_context(ET.Element(W + "p", dict(source.attrib)),source)
     paragraph_properties = source.find(W + "pPr")
     if paragraph_properties is not None:
         paragraph.append(copy.deepcopy(paragraph_properties))
@@ -491,7 +662,7 @@ def _restore_whole_properties(result, source, property_name):
 
 
 def _whole_paragraph_revision(source, kind, writer):
-    paragraph = ET.Element(W + "p", dict(source.attrib))
+    paragraph = _inherit_mc_context(ET.Element(W + "p", dict(source.attrib)),source)
     paragraph_properties = source.find(W + "pPr")
     restoration = None
     if kind == "del" and source in _MANIFEST_NODE_KEYS:
@@ -509,19 +680,23 @@ def _whole_paragraph_revision(source, kind, writer):
     if kind == "ins":
         tokens, events = _styled_tokens(source, collect_events=True)
     else:
-        tokens = _styled_tokens(source)
+        tokens, events = _styled_tokens(source, collect_events=True)
         if restoration is not None: tokens = _restore_projected_tokens(tokens, 0, restoration["projections"])
-        events = {}
     if kind == "del":
-        if tokens:
-            paragraph.append(_revision_container(kind, tokens, writer, strip_history=True))
+        cursor=0
+        for position in sorted(set(events)|{len(tokens)}):
+            if position>cursor:paragraph.extend(_revision_containers(kind,tokens[cursor:position],writer,strip_history=True))
+            for event in events.get(position,[]):
+                if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"del",writer))
+            cursor=position
         return paragraph
 
     emitted_wrappers = set()
     position = 0
     while position <= len(tokens):
         for event in events.get(position, []):
-            paragraph.append(copy.deepcopy(event))
+            if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"ins",writer))
+            else:paragraph.append(copy.deepcopy(event))
         if position == len(tokens):
             break
         wrapper = tokens[position].get("wrapper")
@@ -538,7 +713,7 @@ def _whole_paragraph_revision(source, kind, writer):
             if _properties_signature(tokens[end]["properties"]) != signature:
                 break
             end += 1
-        paragraph.append(_revision_container(kind, tokens[position:end], writer))
+        paragraph.extend(_revision_containers(kind, tokens[position:end], writer))
         position = end
     return paragraph
 
@@ -595,6 +770,35 @@ def _shared_text_opcodes(before, after):
         raise ValueError("SHARED_DIFF_OFFSET_MISMATCH")
 
 
+def _append_link_run(parent, run, token):
+    link=token.get("link")
+    if link is None:parent.append(run)
+    else:
+        hyperlink=_source_copy(link);hyperlink[:]=[];hyperlink.append(run);parent.append(hyperlink)
+
+
+def _link_identity(token):
+    link=token.get("link")
+    if link is None:return None
+    origin=_MANIFEST_NODE_KEYS.get(link)
+    if origin is None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_SOURCE")
+    side,key=origin
+    entry=next((source for source in _MANIFEST_ACTIVE_DECISION.get("objectEvents",{}).get(side,[]) if _manifest_key(source)==key),None)
+    if entry is None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_SOURCE")
+    return entry["objectEvent"]["signature"]
+
+
+def _drawing_revision(source, kind, writer):
+    run=ET.Element(W+"r")
+    origin=_MANIFEST_NODE_KEYS.get(source)
+    parent=_MANIFEST_SOURCE_NODES.get((origin[0],(origin[1][0],origin[1][1][:-1]))) if origin else None
+    properties=parent.find(W+"rPr") if parent is not None and parent.tag==W+"r" else None
+    if properties is not None:run.append(_effective_properties(properties) if kind=="del" else copy.deepcopy(properties))
+    run.append(_source_copy(source))
+    revision=ET.Element(W+kind,writer.attributes());revision.append(run)
+    return revision
+
+
 def _paragraph_revision(before, after, include_formatting, writer):
     before_text = _comparison_text(before)
     after_text = _comparison_text(after)
@@ -604,7 +808,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
     # a mixed reject state such as "동의 없는금을" when revisions overlap.
     if before_text != after_text and _has_visible_text_revision(after):
         return copy.deepcopy(after)
-    before_tokens = _styled_tokens(before)
+    before_tokens, before_events = _styled_tokens(before,collect_events=True)
     after_tokens, after_events = _styled_tokens(after, collect_events=True)
     before_values = [token["text"] for token in before_tokens]
     after_values = [token["text"] for token in after_tokens]
@@ -614,7 +818,8 @@ def _paragraph_revision(before, after, include_formatting, writer):
     paragraph_families = formatting.get("paragraphFamilies", []) if include_formatting else []
     spans = formatting.get("spans", []) if include_formatting else []
     format_changed = bool(paragraph_families or spans)
-    if before_text == after_text and not format_changed:
+    object_changed=((_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents") or {}).get("changed",False)
+    if before_text == after_text and not format_changed and not object_changed:
         return copy.deepcopy(after)
 
     paragraph = ET.Element(W + "p", dict(after.attrib))
@@ -634,7 +839,21 @@ def _paragraph_revision(before, after, include_formatting, writer):
             return
         emitted_event_positions.add(position)
         for event in after_events.get(position, []):
-            paragraph.append(copy.deepcopy(event))
+            if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"ins",writer))
+            else:paragraph.append(copy.deepcopy(event))
+
+    emitted_before_events=set()
+    def emit_before_events(position):
+        if position in emitted_before_events:return
+        emitted_before_events.add(position)
+        for event in before_events.get(position,[]):
+            if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"del",writer))
+
+    def emit_deleted(start,end):
+        cursor=start
+        for position in sorted({value for value in before_events if start<=value<=end}|{end}):
+            if cursor<position:paragraph.extend(_revision_containers("del",(_restore_projected_tokens(before_tokens[cursor:position],cursor,_MANIFEST_ACTIVE_COMPARISON["restoreStyles"]) if _MANIFEST is not None else before_tokens[cursor:position]),writer,strip_history=True))
+            emit_before_events(position);cursor=position
 
     def emit_existing_wrapper(token):
         wrapper = token.get("wrapper")
@@ -649,6 +868,7 @@ def _paragraph_revision(before, after, include_formatting, writer):
     def emit_equal(i1, j1, j2):
         position = j1
         while position < j2:
+            emit_before_events(i1 + position-j1)
             emit_events(position)
             token = after_tokens[position]
             if emit_existing_wrapper(token):
@@ -664,17 +884,22 @@ def _paragraph_revision(before, after, include_formatting, writer):
                         return span["families"], span.get("history", False), span["scopeId"]
                 return [], False, None
             families, preserve_history, scope_id = declared(before_position, position)
-            pair = (scope_id, families, preserve_history, _properties_signature(after_properties))
+            link_pair=(_link_identity(before_tokens[before_position]),_link_identity(token))
+            pair = (scope_id, families, preserve_history, _properties_signature(after_properties),link_pair)
             end = position + 1
             while end < j2 and end not in after_events and after_tokens[end].get("wrapper") is None:
                 next_families, next_history, next_scope_id = declared(i1 + (end - j1), end)
-                if (next_scope_id, next_families, next_history, _properties_signature(after_tokens[end]["properties"])) != pair:
+                if (next_scope_id, next_families, next_history, _properties_signature(after_tokens[end]["properties"]),(_link_identity(before_tokens[i1+end-j1]),_link_identity(after_tokens[end]))) != pair:
                     break
                 end += 1
             text = "".join(item["text"] for item in after_tokens[position:end])
             revised_properties = _property_revision(after_properties, before_properties, W + "rPr", W + "rPrChange", writer, families, preserve_history) if families else after_properties
-            paragraph.append(_token_run(text, revised_properties))
+            if link_pair[0]!=link_pair[1]:
+                paragraph.extend(_revision_containers("del",_restore_projected_tokens(before_tokens[before_position:before_position+end-position],before_position,_MANIFEST_ACTIVE_COMPARISON["restoreStyles"]),writer,strip_history=True))
+                paragraph.extend(_revision_containers("ins",after_tokens[position:end],writer))
+            else:_append_link_run(paragraph,_token_run(text,revised_properties),token)
             position = end
+        emit_before_events(i1+j2-j1)
         emit_events(j2)
 
     def emit_inserted(j1, j2):
@@ -688,10 +913,10 @@ def _paragraph_revision(before, after, include_formatting, writer):
             signature = _properties_signature(token["properties"])
             end = position + 1
             while end < j2 and end not in after_events and after_tokens[end].get("wrapper") is None:
-                if _properties_signature(after_tokens[end]["properties"]) != signature:
+                if _properties_signature(after_tokens[end]["properties"]) != signature or _link_identity(after_tokens[end])!=_link_identity(token):
                     break
                 end += 1
-            paragraph.append(_revision_container("ins", after_tokens[position:end], writer))
+            paragraph.extend(_revision_containers("ins", after_tokens[position:end], writer))
             position = end
         emit_events(j2)
 
@@ -701,9 +926,10 @@ def _paragraph_revision(before, after, include_formatting, writer):
         else:
             emit_events(j1)
             if i1 < i2:
-                paragraph.append(_revision_container("del", _restore_projected_tokens(before_tokens[i1:i2], i1, _MANIFEST_ACTIVE_COMPARISON["restoreStyles"]) if _MANIFEST is not None else before_tokens[i1:i2], writer, strip_history=True))
+                emit_deleted(i1,i2)
             if j1 < j2:
                 emit_inserted(j1, j2)
+    emit_before_events(len(before_tokens))
     emit_events(len(after_tokens))
     return paragraph
 
@@ -1063,7 +1289,17 @@ def _validate_manifest(before_path, after_path):
                 elif item["disposition"] != "preserve-after" or item.get("decisionId") != comment_owner["id"] or item.get("reason") != "existing-comment-contract":
                     raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
                 continue
-            if ref.get("opaqueSignature"):
+            if ref.get("unsupportedObjectQName"):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
+            event_owner = owner if owner and ref.get("objectEventsSupported") else None
+            if event_owner is not None:
+                if any(parent["type"]=="table" and (parent.get("moved") or len(parent["before"])!=1 or len(parent["after"])!=1) and any(ref["part"]==key[0] and key[1][:len(ref["path"])]==tuple(ref["path"]) for ref in parent[side]) for parent in _MANIFEST_DECISIONS):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_TABLE_OBJECT_AXIS")
+                declared = event_owner.get("objectEvents", {}).get(side)
+                expected = [source for source in actual[side].values() if source.get("objectEvent") and source["part"] == key[0] and source["objectEvent"]["paragraphPath"] == list(key[1])]
+                # Current event codec handles whole paragraphs and paired 1:1;
+                # split/merge object boundaries remain a distinct next stage.
+                if len(owner["before"]) > 1 or len(owner["after"]) > 1 or declared is None or len(declared) != len(expected) or {_manifest_key(source): source for source in declared} != {_manifest_key(source): source for source in expected}:
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+            if ref.get("opaqueSignature") and event_owner is None:
                 if owner is None or len(owner["before"]) != 1 or len(owner["after"]) != 1:
                     raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
                 unsafe_parent = any(parent["type"] == "table" and (parent.get("moved") or len(parent["before"]) != 1 or len(parent["after"]) != 1) and any(ref["part"] == key[0] and key[1][:len(ref["path"])] == tuple(ref["path"]) for ref in parent[side]) for parent in _MANIFEST_DECISIONS)
@@ -1114,6 +1350,34 @@ def _validate_restore_styles(actual):
     pairs = _MANIFEST.get("restorePropertyPairs", [])
     if len(pairs) != len(expected_pairs) or {(_manifest_key(pair["before"]), _manifest_key(pair["after"]), pair["property"]) for pair in pairs} != expected_pairs:
         raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROPERTY_PAIRS")
+    for decision in _MANIFEST_DECISIONS:
+        expected = {side:[source for ref in decision[side] for source in actual[side].values() if source.get("objectEvent") and source["part"] == ref["part"] and source["objectEvent"]["paragraphPath"] == ref["path"]] for side in ("before","after")} if decision["type"] == "paragraph" and decision.get("trackedRepresentation") == "revision" else {"before":[],"after":[]}
+        events=decision.get("objectEvents")
+        if not any(expected.values()):
+            if events is not None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+            continue
+        if events is None or events.get("policy") != "worklazy-source-events-1":raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+        for side in ("before","after"):
+            if events[side] != expected[side]:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
+        def run_fact(side,ref):return actual[side].get((ref["part"],tuple(ref["objectEvent"]["runPath"])),{}).get("normalizedProperties",{}).get("rPr",{"supported":{},"unsupported":{},"history":False})
+        def compatible(a,b):
+            old,next=run_fact("before",a),run_fact("after",b)
+            return not old["history"] and not next["history"] and all(old["unsupported"].get(name,[])==next["unsupported"].get(name,[]) for name in set(old["unsupported"])|set(next["unsupported"])) and all(old["supported"].get(name,[])==next["supported"].get(name,[]) or _mask_enabled("rPr",name) for name in set(old["supported"])|set(next["supported"]))
+        supported=all(compatible(a,b) for a in expected["before"] if a["objectEvent"]["kind"]=="drawing" for b in expected["after"] if b["objectEvent"]["kind"]=="drawing")
+        if type(events.get("propertiesSupported")) is not bool or events["propertiesSupported"]!=supported:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
+        if not supported:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_OBJECT_PROPERTIES")
+        def boundary(position):
+            if position==len(decision["beforeText"]):return len(decision["afterText"])
+            old=new=0
+            for segment in decision["comparisons"][0]["segments"]:
+                size=len(segment["text"])
+                if segment["type"]=="equal" and old<=position<=old+size:return new+position-old
+                if segment["type"]=="deleted" and old<=position<old+size:return new
+                if segment["type"]!="added":old+=size
+                if segment["type"]!="deleted":new+=size
+            return new
+        facts=lambda side:[(source["objectEvent"]["kind"],boundary(source["objectEvent"]["start"]) if side=="before" else source["objectEvent"]["start"],boundary(source["objectEvent"]["end"]) if side=="before" else source["objectEvent"]["end"],source["objectEvent"]["signature"]) for source in expected[side]]
+        if type(events.get("changed")) is not bool or events["changed"] != (facts("before") != facts("after")):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
     for decision in _MANIFEST_DECISIONS:
         if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision": continue
         has_comparison_projection = any("sourceSlices" in comparison or "restoreStyles" in comparison for comparison in decision.get("comparisons", []))
@@ -1932,7 +2196,7 @@ def _ensure_numbering_content_type(content_types_data):
 
 
 def _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None, formatting_mask_json=None):
-    global _MANIFEST
+    global _MANIFEST, _PACKAGE_GRAPH
     if manifest_json is None:
         # Read-only test/tool bridge; the browser always passes its already
         # computed screen manifest. Pairing remains TypeScript-owned here too.
@@ -1963,6 +2227,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
         raise ValueError("INVALID_COMPARISON_MANIFEST") from error
     with zipfile.ZipFile(before_path, "r") as before_archive, zipfile.ZipFile(after_path, "r") as after_archive:
         writer = _RevisionWriter(author, _next_revision_id(before_archive, after_archive))
+        _PACKAGE_GRAPH = _PackageGraph(before_archive,after_archive)
         before_names = set(before_archive.namelist())
         after_names = set(after_archive.namelist())
         replacements = {}
@@ -2055,6 +2320,8 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
         if _MANIFEST_PROPERTY_USED != {action["id"] for action in _MANIFEST["propertyActions"]}:
             raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
 
+        _PACKAGE_GRAPH.finish(replacements, additions)
+        _PACKAGE_GRAPH.validate(replacements, additions)
         with zipfile.ZipFile(output_path, "w") as output_archive:
             for entry in after_archive.infolist():
                 output_archive.writestr(entry, replacements.get(entry.filename, after_archive.read(entry.filename)))
@@ -2067,11 +2334,13 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
 
 def generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None, formatting_mask_json=None):
     global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION, _MANIFEST_ACTIVE_COMPARISON, _MANIFEST_PROPERTY_USED, _MANIFEST_SOURCE_NODES, _MANIFEST_ALLOWED_PROPERTIES
+    global _PACKAGE_GRAPH
     try:
         return _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json, formatting_mask_json)
     finally:
         # Do not retain source nodes or text decisions after failure/cancellation.
         _MANIFEST = None
+        _PACKAGE_GRAPH = None
         _MANIFEST_NODE_KEYS = {}
         _MANIFEST_DECISIONS = []
         _MANIFEST_USED = set()

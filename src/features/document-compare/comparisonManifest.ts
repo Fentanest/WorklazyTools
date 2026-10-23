@@ -5,7 +5,11 @@ import type { WordDiffSegment, WordTableAxisPair } from "../excel-merger/types";
 /** Paths address actual XML children (including property nodes), never filtered paragraph indexes. */
 export interface PropertyFact { supported: Record<string, string[]>; unsupported: Record<string, string[]>; history: boolean }
 export interface XmlPropertyTree { name: string; attributes: Record<string, string>; text: string; children: XmlPropertyTree[] }
+export interface ObjectSourceEvent {kind:"drawing"|"hyperlink";start:number;end:number;signature:string;supported:boolean;target:string;paragraphPath:number[];runPath:number[]}
 export interface DocumentSourceReference {
+  objectEvent?: ObjectSourceEvent;
+  objectEventsSupported?: boolean;
+  unsupportedObjectQName?: boolean;
   part: string;
   path: number[];
   kind?: string;
@@ -31,6 +35,7 @@ export interface ComparisonDecision {
   before: DocumentSourceReference[];
   after: DocumentSourceReference[];
   moved: boolean;
+  objectEvents?: {propertiesSupported:boolean;policy:"worklazy-source-events-1";before:DocumentSourceReference[];after:DocumentSourceReference[];changed:boolean};
   screenFormattingFamilies?: string[];
   deletedFormattingPolicy?: "restore-before-unpaired" | "paired-revised";
   wholeRestoreStyles?: Array<{ before: DocumentSourceReference; afterParagraph: DocumentSourceReference; projections: RestoreStyleProjection[] }>;
@@ -105,7 +110,7 @@ export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
       if (decision?.trackedRepresentation === "preserve-after") return { source, disposition: "decision", decisionId: decision.id };
       const commentOwner = source.part === "word/comments.xml" ? decisions.find((item) => item.trackedReason === "existing-comment-contract" && item[side].some((ref) => descendant(source, ref))) : undefined;
       if (commentOwner) return { source, disposition: "preserve-after", decisionId: commentOwner.id, reason: "existing-comment-contract" };
-      if (source.opaqueSignature) {
+      if (source.opaqueSignature && !source.objectEventsSupported) {
         const before = decision?.before.length === 1 ? manifest.sources.before.find((ref) => key(ref) === key(decision.before[0])) : undefined;
         const after = decision?.after.length === 1 ? manifest.sources.after.find((ref) => key(ref) === key(decision.after[0])) : undefined;
         if (!before || !after || (decision && unsafeAncestors.has(decision.id)) || decision?.moved || before.rawText !== after.rawText || before.copySignature !== after.copySignature || before.opaqueSignature !== after.opaqueSignature) return { source, disposition: "unsupported", reason: "opaque-content" };

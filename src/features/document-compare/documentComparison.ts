@@ -1,5 +1,5 @@
 import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
-import { normalizeFormattingMask, maskPolicyVersion, maskedSourceFormatting, type FormattingMask } from "./formattingMask.ts";
+import { normalizeFormattingMask, formattingGroup, maskPolicyVersion, maskedSourceFormatting, type FormattingMask } from "./formattingMask.ts";
 import type {
   WordCellComment,
   WordCompareResult,
@@ -118,7 +118,7 @@ export function compareDocumentModels(
     textOf: (item) => item.text,
     compatible: (left, right) => left.type === right.type,
     canGroup: (item) => item.type === "paragraph",
-    include: (item) => item.type === "table" ? options.tables : Boolean(item.text.trim()) || Boolean(item.comments?.length),
+    include: (item) => item.type === "table" ? options.tables : Boolean(item.text.trim()) || Boolean(item.comments?.length) || Boolean(item.source?.opaqueSignature),
   });
 
   for (const [groupIndex, group] of blockGroups.entries()) {
@@ -174,9 +174,49 @@ export function compareDocumentModels(
   const commentChanges: WordDiffItem[] = [];
   const commentViews = compareRecordList(before.comments ?? [], after.comments ?? [], "comment", commentChanges, options.formatting, manifest);
   changes.push(...commentChanges);
+  const objectDecisions = (items:ComparisonDecision[]) => { for(const decision of items) {
+    objectDecisions(decision.children ?? []);
+    if(decision.type!=="paragraph" || decision.trackedRepresentation!=="revision")continue;
+    const events=(side:"before"|"after")=>decision[side].flatMap(parent=>manifest.sources[side].filter(source=>source.objectEvent && source.part===parent.part && JSON.stringify(source.objectEvent.paragraphPath)===JSON.stringify(parent.path)));
+    const before=events("before"),after=events("after");
+    const runFact=(side:"before"|"after",event:DocumentSourceReference)=>manifest.sources[side].find(source=>source.part===event.part && JSON.stringify(source.path)===JSON.stringify(event.objectEvent!.runPath))?.normalizedProperties?.rPr??{supported:{},unsupported:{},history:false};
+    const propertiesSupported=before.filter(source=>source.objectEvent!.kind==="drawing").every(a=>after.filter(source=>source.objectEvent!.kind==="drawing").every(b=>{
+      const old=runFact("before",a),next=runFact("after",b);
+      const differs=(family:"supported"|"unsupported",name:string)=>JSON.stringify(old[family][name]??[])!==JSON.stringify(next[family][name]??[]);
+      return !old.history&&!next.history && ![...Object.keys(old.unsupported),...Object.keys(next.unsupported)].some(name=>differs("unsupported",name)) && ![...Object.keys(old.supported),...Object.keys(next.supported)].some(name=>differs("supported",name)&&!effective[formattingGroup("rPr",name)]);
+    }));
+    const boundary=(position:number)=>{
+      if(position===Array.from(decision.beforeText).length)return Array.from(decision.afterText).length;
+      let old=0,next=0;
+      for(const segment of decision.comparisons[0].segments){const length=Array.from(segment.text).length;
+        if(segment.type==="equal" && old<=position && position<=old+length)return next+position-old;
+        if(segment.type==="deleted" && old<=position && position<old+length)return next;
+        if(segment.type!=="added")old+=length;if(segment.type!=="deleted")next+=length;
+      }
+      return next;
+    };
+    if(before.length || after.length)decision.objectEvents={propertiesSupported,policy:"worklazy-source-events-1",before,after,changed:JSON.stringify(before.map(source=>[source.objectEvent!.kind,boundary(source.objectEvent!.start),boundary(source.objectEvent!.end),source.objectEvent!.signature]))!==JSON.stringify(after.map(source=>[source.objectEvent!.kind,source.objectEvent!.start,source.objectEvent!.end,source.objectEvent!.signature]))};
+  }};
+  objectDecisions(manifest.decisions);
   buildRestoreStyleProjections(manifest);
   buildWordFormatting(manifest, diffCharacters);
   projectWordFormatting(manifest, documentViews, headerFooter, note, changes, tables, language);
+  const objectViews=(items:ComparisonDecision[],parentView?:ManifestFormattingView)=>{for(const decision of items){
+    const view=[...documentViews,...headerFooter,...note].find(view=>view.comparisonDecisionId===decision.id)??parentView;
+    objectViews(decision.children??[],view);
+    if(!decision.objectEvents?.changed || !view)continue;
+    if(view.kind==="unchanged")view.kind="changed";
+    (view as ManifestFormattingView & {objectLabels?:string[]}).objectLabels=[language==="en"?"Image or hyperlink change":"이미지·하이퍼링크 변경"];
+    if(view.tableIndex!==undefined){
+      const table=tables[view.tableIndex];table.kind="changed";
+      for(const side of ["before","after"] as const)for(const [r,row] of table[side].entries())for(const [c,cell]of row.entries()){
+        const source=(cell as unknown as {source?:DocumentSourceReference}).source;
+        if(source && decision[side].some(ref=>ref.part===source.part && source.path.every((value,index)=>ref.path[index]===value)))table[side+"Kinds" as "beforeKinds"|"afterKinds"][r][c]="changed";
+      }
+    }
+    if(!changes.some(change=>change.beforeLocation===view.beforeLocation && change.afterLocation===view.afterLocation && change.kind!=="format"))changes.push({kind:"changed",section:view.section,location:view.afterLocation||view.beforeLocation,beforeLocation:view.beforeLocation,afterLocation:view.afterLocation,before:view.before,after:view.after,segments:view.segments});
+  }};
+  objectViews(manifest.decisions);
   const summary: WordCompareResult["summary"] = { added: 0, deleted: 0, changed: 0, format: 0, unchanged: 0, moved: 0 };
   for (const change of changes) {
     if (change.kind === "moved") continue;
@@ -248,7 +288,7 @@ function compareRecordList(
   formatting: boolean,
   manifest: DocumentComparisonManifest,
 ) {
-  const groups = alignDocumentSequence(before, after, { textOf: (item) => item.text });
+  const groups = alignDocumentSequence(before, after, { textOf: (item) => item.text, include:item=>Boolean(item.text.trim()) || Boolean(item.source?.opaqueSignature) || Boolean(item.paragraphs?.some(paragraph=>paragraph.source?.opaqueSignature)) });
   const decisions = groups.map((group, groupIndex) => {
     const left = group.beforeIndexes.map((index) => before[index]);
     const right = group.afterIndexes.map((index) => after[index]);
@@ -303,7 +343,7 @@ function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = f
     splitSlices,
     trackedRepresentation: "revision",
     id: [...before, ...after].some((record) => record.source)
-      ? JSON.stringify([type, before.map((record) => record.source ?? null), after.map((record) => record.source ?? null)])
+      ? JSON.stringify([type, before.map((record) => record.source ? Object.fromEntries(Object.entries(record.source).filter(([name])=>!["objectEvent","objectEventsSupported","unsupportedObjectQName"].includes(name))) : null), after.map((record) => record.source ? Object.fromEntries(Object.entries(record.source).filter(([name])=>!["objectEvent","objectEventsSupported","unsupportedObjectQName"].includes(name))) : null)])
       : `source-less:${type}:${context}`,
     type, before: before.flatMap((record) => record.source ? [record.source] : []),
     after: after.flatMap((record) => record.source ? [record.source] : []), moved,
@@ -313,7 +353,7 @@ function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = f
 }
 
 function paragraphDecisions(before: ManifestRecord[], after: ManifestRecord[], context: string): ComparisonDecision[] {
-  return alignDocumentSequence(before, after, { textOf: (record) => record.text }).map((group, index) => decisionOf(
+  return alignDocumentSequence(before, after, { textOf: (record) => record.text, include:record=>Boolean(record.text.trim()) || Boolean(record.source?.opaqueSignature) }).map((group, index) => decisionOf(
     group.beforeIndexes.map((index) => before[index]), group.afterIndexes.map((index) => after[index]), group.moved, "paragraph", `${context}:${index}`,
   ));
 }

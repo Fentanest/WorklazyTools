@@ -270,6 +270,9 @@ def _normalized_property_fact(tree, property_name, policy):
 def _source_paths(root, part, archive=None):
     result = {}
     offsets = {}
+    invalid_qname = False
+    try: normalized_root = globals().get("_qname_safe_parse", ET.fromstring)(archive.read(part)) if archive is not None else root
+    except ValueError: normalized_root = root; invalid_qname = True
     policy = json.loads(globals().get("WORKLAZY_FORMATTING_POLICY_JSON", "{}"))
     def property_tree(node):
         if node is None:
@@ -328,6 +331,65 @@ def _source_paths(root, part, archive=None):
         for index, child in enumerate(node):
             visit(child, path + [index], paragraph)
     visit(root, [])
+    # XML positions and relationship identities are extraction facts, not pairs.
+    def event_identity(node):
+        import posixpath
+        rels = {}
+        if archive is not None:
+            rel_path = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
+            if rel_path in archive.namelist(): rels = {item.get("Id"): item for item in ET.fromstring(archive.read(rel_path))}
+        supported = True
+        has_image = False
+        target = ""
+        def canonical_event(item):
+            nonlocal supported, target, has_image
+            attrs = []
+            for name, value in sorted(item.attrib.items()):
+                if item.tag == "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr" and name == "id": continue
+                if name.startswith("xmlns:"):continue
+                if name.startswith("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"):
+                    relationship = rels.get(value)
+                    if relationship is None: supported = False
+                    else:
+                        kind, mode, destination = relationship.get("Type", ""), relationship.get("TargetMode", ""), relationship.get("Target", "")
+                        if item.tag==W+"hyperlink" and not kind.endswith("/hyperlink"):supported=False
+                        if item.tag=="{http://schemas.openxmlformats.org/drawingml/2006/main}blip" and not kind.endswith("/image"):supported=False
+                        if kind.endswith("/image"):has_image=True
+                        if not kind.endswith(("/image", "/hyperlink")): supported = False
+                        if mode == "External": value = json.dumps([kind, mode, destination]); target = destination
+                        else:
+                            path = destination.lstrip("/") if destination.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), destination))
+                            if archive is None or path not in archive.namelist() or not kind.endswith("/image"): supported = False
+                            else: value = json.dumps([kind, hashlib.sha256(archive.read(path)).hexdigest()])
+                attrs.append((name, value))
+            return (item.tag, attrs) if item.tag == W + "hyperlink" else (item.tag, attrs, item.text or "", [canonical_event(child) for child in item])
+        normalized = normalized_root
+        for index in result[id(node)]["path"]: normalized = list(normalized)[index]
+        value = canonical_event(normalized)
+        if node.tag == W + "hyperlink" and (node.get(W + "anchor") or node.find('.//' + W + 'drawing') is not None or any(child.tag!=W+"r" for child in node)): supported = False
+        if node.tag != W + "hyperlink" and not has_image:supported=False
+        return hashlib.sha256(json.dumps(value, ensure_ascii=False).encode()).hexdigest(), supported, target
+    for paragraph in root.iter(W + "p"):
+        cursor = [0]; events = []
+        def event_walk(node):
+            if node is not paragraph and node.tag == W + "p": return
+            if node.tag in {W + "drawing", W + "hyperlink", "{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:
+                start = cursor[0]
+                if node.tag == W + "hyperlink":
+                    for child in node: event_walk(child)
+                signature, supported, target = event_identity(node)
+                event = {"kind": "hyperlink" if node.tag == W + "hyperlink" else "drawing", "start": start, "end": cursor[0], "signature": signature, "supported": supported, "target": target, "paragraphPath": result[id(paragraph)]["path"], "runPath": result[id(node)]["path"][:-1]}
+                result[id(node)]["objectEvent"] = event; events.append(event)
+                return
+            if node.tag == W + "t": cursor[0] += len(node.text or "")
+            elif node.tag in {W + "tab", W + "br", W + "cr"}: cursor[0] += 1
+            else:
+                for child in node: event_walk(child)
+        event_walk(paragraph)
+        event_paths=[result[id(node)]["path"] for node in paragraph.iter() if "objectEvent" in result[id(node)]]
+        unsupported = any(node.tag in {W + "object", W + "fldChar", W + "fldSimple", W + "instrText", W + "footnoteReference", W + "endnoteReference", W + "ins", W + "del", W + "moveFrom", W + "moveTo"} or (node.tag==W+"pict" and not any(result[id(node)]["path"][:len(path)]==path for path in event_paths)) for node in paragraph.iter())
+        if invalid_qname: result[id(paragraph)]["unsupportedObjectQName"] = True
+        if events: result[id(paragraph)]["objectEventsSupported"] = not unsupported and not invalid_qname and all(event["supported"] for event in events)
     def classify(instruction):
         command = instruction.strip().split(None, 1)[0].upper() if instruction.strip() else ""
         if command in {"PAGE", "NUMPAGES", "SECTIONPAGES"}: return "pagination"
@@ -554,7 +616,7 @@ def _parse_document(data, include_tables, include_metadata):
                     record["comments"] = [comments[item] for item in comment_ids if item in comments]
                     for comment_id in comment_ids:
                         comment_locations.setdefault(comment_id, record["location"])
-                    if record["text"] or record["format"] or record["comments"]:
+                    if record["text"] or record["format"] or record["comments"] or record.get("source", {}).get("opaqueSignature"):
                         records["body"].append(record)
                         records["document"].append(record)
                     records["documentBlocks"].append({"type": "paragraph", "record": record})
@@ -597,7 +659,7 @@ def _parse_document(data, include_tables, include_metadata):
                             }
                             for comment_id in comment_ids:
                                 comment_locations.setdefault(comment_id, record["location"])
-                            if record["text"] or record["format"] or record["comments"]:
+                            if record["text"] or record["format"] or record["comments"] or record.get("source", {}).get("opaqueSignature"):
                                 records["table"].append(record)
                             row_records.append(record)
                         table_grid.append(row_records)

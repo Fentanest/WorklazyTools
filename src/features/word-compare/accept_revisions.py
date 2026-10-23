@@ -102,29 +102,28 @@ def _remove_paragraph_mark(paragraph, kind):
             run_properties.remove(marker)
 
 
-def _fully_deleted_plain_paragraph(paragraph):
-    # The terminal deleted-mark rule applies only to entirely deleted text.
-    # Keep anchors, objects, section boundaries and prior property history.
-    saw_text = False
+def _fully_deleted_supported_paragraph(paragraph):
+    # Terminal deleted-mark rule: every payload is explicitly inside deletion.
+    # Anchors, surviving objects, section boundaries and history stay protected.
+    protected = PROPERTY_CHANGE_TAGS | COMMENT_MARKERS | {W+"commentReference",W+"bookmarkStart",W+"bookmarkEnd",W+"permStart",W+"permEnd"}
+    saw_payload = False
+    def run_payload(run):
+        nonlocal saw_payload
+        if run.tag==W+"hyperlink":return bool(len(run)) and all(run_payload(child) for child in run)
+        if run.tag!=W+"r":return False
+        for item in run:
+            if any(node.tag in protected for node in item.iter()):return False
+            if item.tag==W+"rPr":continue
+            if item.tag in {W+"delText",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:saw_payload=True
+            else:return False
+        return True
     for child in paragraph:
-        if child.tag == W + "pPr":
-            if any(node.tag in PROPERTY_CHANGE_TAGS or node.tag == W + "sectPr" for node in child.iter()):
-                return False
-            continue
-        if child.tag != W + "del" or not len(child):
-            return False
-        for run in child:
-            if run.tag != W + "r":
-                return False
-            for item in run:
-                if item.tag == W + "rPr":
-                    if any(node.tag in PROPERTY_CHANGE_TAGS for node in item.iter()):
-                        return False
-                elif item.tag == W + "delText":
-                    saw_text = True
-                else:
-                    return False
-    return saw_text
+        if child.tag==W+"pPr":
+            if any(node.tag in PROPERTY_CHANGE_TAGS or node.tag==W+"sectPr" for node in child.iter()):return False
+        elif child.tag==W+"hyperlink":
+            if not len(child) or any(part.tag!=W+"del" or not len(part) or not all(run_payload(run) for run in part) for part in child):return False
+        elif child.tag!=W+"del" or not len(child) or not all(run_payload(run) for run in child):return False
+    return saw_payload
 
 
 def _merge_deleted_paragraph_marks(parent):
@@ -143,7 +142,7 @@ def _merge_deleted_paragraph_marks(parent):
             # OfficeDev RevisionProcessor terminal paragraph rule: no following
             # block (body sectPr is not a block), or the following block is a table.
             terminal = next_paragraph is None or next_paragraph.tag in {W + "tbl", W + "sectPr"}
-            if parent.tag == W + "body" and terminal and _fully_deleted_plain_paragraph(paragraph):
+            if parent.tag == W + "body" and terminal and _fully_deleted_supported_paragraph(paragraph):
                 parent.remove(paragraph)
                 continue
             _remove_paragraph_mark(paragraph, "del")
