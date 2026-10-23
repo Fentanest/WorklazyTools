@@ -230,9 +230,9 @@ export function ExcelComparePage() {
     });
     const fileName = createUniqueSafeFileName(`${fileStem(pair.left!.name)}-vs-${fileStem(pair.right!.name)}.xlsx`, names, `comparison-${index + 1}.xlsx`);
     const blob = new Blob([result.reportBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    assertReportBlobSize(blob, result.reportByteLength);
+    if(!result.reportError)assertReportBlobSize(blob,result.reportByteLength);
     result.reportBuffer = new ArrayBuffer(0);
-    const url = keepObjectUrl(URL.createObjectURL(blob), objectUrls);
+    const url=result.reportError?"":keepObjectUrl(URL.createObjectURL(blob),objectUrls);
     const item = { pairId: pair.id, result, blob, url, fileName };
     successes.push(item);
     setCompleted([...successes]);
@@ -248,7 +248,7 @@ export function ExcelComparePage() {
    controllerRef.current = undefined;
    return;
   }
-  if (successes.length>= 2) {
+  if (successes.length>= 2&&successes.every(item=>!item.result.reportError)) {
    operation.update(94, t("features:excelCompare.progress.ZIPPING"));
    try {
     const writer = new BlobWriter("application/zip");
@@ -317,7 +317,8 @@ export function ExcelComparePage() {
    {(completed.length> 0 || failed.length> 0) && <Card as="section" className="mt-4 gap-0 overflow-visible rounded-3xl border border-border p-4 shadow-sm" data-testid="excel-compare-results" aria-labelledby="excel-compare-results-title" onFocusCapture={(event) => scheduleResultFocusVisibility(event.target)}>
     <div><p className="text-xs font-extrabold tracking-[.08em] text-primary uppercase dark:text-primary">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">{t("features:excelCompare.results.guideLink" as never)} &darr;</a></p></div>
     <div className="mt-3 grid grid-cols-2 gap-2 max-[620px]:grid-cols-1" data-testid="excel-report-downloads">
-     {completed.map((item, index) => <Button render={<a href={item.url} download={item.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left" key={item.pairId}><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.pairReport", { number: index + 1 })}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{item.fileName} · {formatBytes(item.blob.size)}</small></span></Button>)}
+     {completed.map((item, index) => item.result.reportError?<p key={item.pairId} role="status" data-testid="excel-report-unavailable" className="rounded-xl border border-border p-3">{t("features:excelCompare.results.reportUnavailable" as never,{number:index+1})} {t(`features:excelCompare.results.reportError.${item.result.reportError}` as never)}</p>:<Button render={<a href={item.url} download={item.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left" key={item.pairId}><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.pairReport", { number: index + 1 })}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{item.fileName} · {formatBytes(item.blob.size)}</small></span></Button>)}
+     {completed.length>=2&&completed.some(item=>item.result.reportError)&&<p data-testid="excel-report-bundle-unavailable" className="text-sm">{t("features:excelCompare.results.bundleUnavailable" as never)}</p>}
      {zipResult && <Button render={<a href={zipResult.url} download={zipResult.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left"><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.zip")}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{zipResult.fileName} · {formatBytes(zipResult.size)}</small></span></Button>}
     </div>
     {completed.length> 0 && <p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.results.downloadCheck")}</p>}

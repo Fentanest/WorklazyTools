@@ -1,4 +1,5 @@
-import { writeXlsxReport, type XlsxReportSheet } from "../../utils/xlsxReport.ts";
+import {writeSourceFaithfulXlsxReport} from "../comparison-report/sourceXlsxText.ts";
+import { type XlsxReportSheet } from "../../utils/xlsxReport.ts";
 import type { ExcelCompareEngineResult } from "./compareEngine.ts";
 import { duplicateReportParameters, formatDuplicateReportRows } from "./duplicateReport.ts";
 import type { ExcelCompareRecord, ExcelCompareStandardRecord } from "./types.ts";
@@ -65,7 +66,7 @@ export async function buildExcelCompareReport(
     recordSheet("Errors", standardRecords(result.records, "error", "unmatched"), context),
   ];
   if (sheets.map((sheet) => sheet.name).join("|") !== REPORT_SHEETS.join("|")) throw new Error("REPORT_TOPOLOGY_INVALID");
-  return writeXlsxReport({ creator: "Worklazy Tools", sheets });
+  return writeSourceFaithfulXlsxReport({ creator: "Worklazy Tools", sheets });
 }
 
 function standardRecords(

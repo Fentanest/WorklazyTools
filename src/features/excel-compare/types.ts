@@ -124,6 +124,7 @@ export interface ExcelComparePairResult {
   summary: ExcelCompareSummary;
   records: ExcelCompareRecord[];
   warnings: string[];
+  reportError?:"COMPARISON_XLSX_TEXT_UNSUPPORTED"|"REPORT_GENERATION_FAILED";
   reportBuffer: ArrayBuffer;
   reportByteLength: number;
   reportName: string;

@@ -74,6 +74,12 @@ export async function runExcelComparePair(
     startErrorMessage: messages[language].start,
     resultErrorMessage: messages[language].result,
   });
-  assertReceivedXlsxReport(result.reportBuffer, result.reportByteLength);
+  assertExcelPairReportContract(result);
   return result;
+}
+
+/** Only an explicit, fixed report failure may accompany an empty report after successful comparison. */
+export function assertExcelPairReportContract(result:Pick<ExcelComparePairResult,'reportError'|'reportBuffer'|'reportByteLength'>){
+ if(result.reportError!==undefined){if(!['COMPARISON_XLSX_TEXT_UNSUPPORTED','REPORT_GENERATION_FAILED'].includes(result.reportError)||!(result.reportBuffer instanceof ArrayBuffer)||result.reportBuffer.byteLength!==0||result.reportByteLength!==0)throw new Error('REPORT_BUFFER_INVALID');return;}
+ assertReceivedXlsxReport(result.reportBuffer,result.reportByteLength);
 }

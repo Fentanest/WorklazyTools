@@ -25,7 +25,7 @@ export function ComparisonGrid({ result, statuses, search, t }: { result: ExcelC
   const updateHidden = (axis: "rows" | "columns", value: string) => { setHidden((current) => ({ ...current, [hideSide]: { ...current[hideSide], [axis]: value } })); setLimit(100); };
   const [descending, setDescending] = useState(false);
   const [limit, setLimit] = useState(100);
-  const [exportError, setExportError] = useState(false);
+  const [exportError, setExportError] = useState<"COMPARISON_XLSX_TEXT_UNSUPPORTED"|"REPORT_GENERATION_FAILED">();
   const original = result.originalSheets;
   const indexes = useMemo(() => ({ left: indexCells(original?.left), right: indexCells(original?.right) }), [original]);
   const visible = useMemo(() => projectCompareRecords(result.records, {
@@ -33,7 +33,7 @@ export function ComparisonGrid({ result, statuses, search, t }: { result: ExcelC
   }), [result.records, statuses, search, descending, hiddenIds]);
   if (!original) return null;
   const exportVisible = async () => {
-    setExportError(false);
+    setExportError(undefined);
     try {
       const selected = selectCompareResult({ runId: result.runId, records: result.records, summary: result.summary, warnings: result.warnings, parameters: result.parameters ?? [] }, new Set(visible.flatMap((item) => item.recordId ? [item.recordId] : [])));
       const bytes = await buildExcelCompareReport(selected, { leftName: result.leftName, rightName: result.rightName, leftSheet: original.left.name, rightSheet: original.right.name });
@@ -42,7 +42,7 @@ export function ComparisonGrid({ result, statuses, search, t }: { result: ExcelC
       const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
       const anchor = document.createElement("a"); anchor.href = url; anchor.download = "visible-report.xlsx"; anchor.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch { setExportError(true); }
+    } catch(error) {setExportError(error instanceof Error&&error.message==="COMPARISON_XLSX_TEXT_UNSUPPORTED"?"COMPARISON_XLSX_TEXT_UNSUPPORTED":"REPORT_GENERATION_FAILED");}
   };
   return <details className="mt-4 rounded-xl border border-border p-3" data-testid="excel-comparison-grid" data-run-id={result.runId} aria-label={t("features:excelCompare.grid.title")}>
     <summary className="cursor-pointer font-medium">{t("features:excelCompare.grid.title")}</summary>
@@ -57,7 +57,7 @@ export function ComparisonGrid({ result, statuses, search, t }: { result: ExcelC
       <Button variant="secondary" type="button" aria-pressed={descending} onClick={() => setDescending((value) => !value)}>{t("features:excelCompare.grid.reverse")}</Button>
       <Button variant="secondary" type="button" disabled={!visible.length} onClick={() => void exportVisible()}>{t("features:excelCompare.grid.exportVisible", { count: visible.length })}</Button>
     </div>
-    {exportError && <p role="alert">{t("features:excelCompare.error.PROCESSING_FAILED")}</p>}
+    {exportError && <p role="alert">{t(`features:excelCompare.results.reportError.${exportError}`)}</p>}
     <p className="text-xs text-muted-foreground">{t("features:excelCompare.grid.visibleCount", { count: visible.length, total: result.records.length })}</p>
     <p className="my-2 text-xs text-muted-foreground">{t("features:excelCompare.grid.matrixDescription")}</p>
     <p className="my-2 text-xs" data-testid="excel-layout-help">{t(`features:excelCompare.grid.layoutHelp.${layout}`)}</p><p className="text-xs text-muted-foreground">{t("features:excelCompare.grid.narrowLayouts")}</p>

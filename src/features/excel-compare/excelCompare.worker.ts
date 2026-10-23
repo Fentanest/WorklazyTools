@@ -51,14 +51,9 @@ async function handle(request: Request) {
     progress(46, "COMPARING");
     const compared = compareSpreadsheetPair(leftBook, rightBook, request.options);
     progress(80, "WRITING_REPORT");
-    const reportBytes = await buildExcelCompareReport(compared, {
-      leftName: request.leftName,
-      rightName: request.rightName,
-      leftSheet: request.options.left.sheetName,
-      rightSheet: request.options.right.sheetName,
-    });
-    const reportBuffer = transferableArrayBuffer(reportBytes);
-    await assertGeneratedXlsxReport(reportBuffer);
+    let reportBuffer=new ArrayBuffer(0),reportError:ExcelComparePairResult['reportError'];
+    try{const reportBytes=await buildExcelCompareReport(compared,{leftName:request.leftName,rightName:request.rightName,leftSheet:request.options.left.sheetName,rightSheet:request.options.right.sheetName});reportBuffer=transferableArrayBuffer(reportBytes);await assertGeneratedXlsxReport(reportBuffer);}
+    catch(error){reportBuffer=new ArrayBuffer(0);reportError=error instanceof Error&&error.message==='COMPARISON_XLSX_TEXT_UNSUPPORTED'?'COMPARISON_XLSX_TEXT_UNSUPPORTED':'REPORT_GENERATION_FAILED';}
     const reportByteLength = reportBuffer.byteLength;
     const result: ExcelComparePairResult = {
       leftName: request.leftName,
@@ -71,6 +66,7 @@ async function handle(request: Request) {
       summary: compared.summary,
       records: compared.records,
       warnings: compared.warnings,
+      reportError,
       reportBuffer,
       reportByteLength,
       reportName: "report.xlsx",

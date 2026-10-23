@@ -506,7 +506,10 @@ test("reconciliation records the pair-wide combination budget as RECON_SEARCH_LI
 test("pair report always has nine sheets and stores external values as primitive text", async () => {
   const compared = compareSpreadsheetPair(book([["ID"], ["=1+1"]]), book([["ID"], ["+2"]]), baseOptions());
   compared.records[0].key = "\tkey";
-  compared.records[0].leftValue = " leading\uFFFE\uD800";
+  compared.records[0].leftValue=" leading\uFFFE\uD800";
+  await assert.rejects(buildExcelCompareReport(compared,{leftName:"=left.xlsx",rightName:"@right.xlsx",leftSheet:"Data",rightSheet:"Data"}),/COMPARISON_XLSX_TEXT_UNSUPPORTED/);
+  assert.equal(compared.records[0].leftValue," leading\uFFFE\uD800");
+  compared.records[0].leftValue=" leading\u0000\r_x0041_";
   const buffer = await buildExcelCompareReport(compared, { leftName: "=left.xlsx", rightName: "@right.xlsx", leftSheet: "Data", rightSheet: "Data" });
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
@@ -519,7 +522,7 @@ test("pair report always has nine sheets and stores external values as primitive
   assert.equal(parameters.keyLeftColumns, "UNUSED");
   assert.equal(parameters.reconcileLeftAmountColumn, "UNUSED");
   assert.equal(parameters.reconciliationCandidatesPerTarget, "UNUSED");
-  assert.ok(workbook.worksheets.some((sheet) => sheet.getColumn(10).values.includes(" leading��")));
+  assert.ok(workbook.worksheets.some((sheet) => sheet.getColumn(10).values.includes(" leading\u0000\r_x0041_")));
 });
 
 function reconciliationOptions(): ExcelComparePairOptions {

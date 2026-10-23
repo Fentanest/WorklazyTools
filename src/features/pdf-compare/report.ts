@@ -27,9 +27,9 @@ export function pairReportDefinition(pair: PairComparison, language: AppLanguage
 }
 export async function writePairReport(pair: PairComparison, language: AppLanguage, signal?: AbortSignal) {
   checkAbort(signal);
-  const [{ writeXlsxReport }, { createSafeFileName }] = await Promise.all([import('../../utils/xlsxReport.ts'), import('../../utils/fileNameSafety.ts')]);
+  const [{writeSourceFaithfulXlsxReport},{createSafeFileName}]=await Promise.all([import('../comparison-report/sourceXlsxText.ts'),import('../../utils/fileNameSafety.ts')]);
   checkAbort(signal);
-  const buffer = await writeXlsxReport(pairReportDefinition(pair, language)); checkAbort(signal);
+  const buffer = await writeSourceFaithfulXlsxReport(pairReportDefinition(pair, language)); checkAbort(signal);
   return { blob: new Blob([new Uint8Array(buffer)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName: createSafeFileName(`${pair.beforeName.replace(/\.pdf$/i, '')}-${pair.afterName.replace(/\.pdf$/i, '')}-comparison.xlsx`) };
 }
 export async function writeComparisonReports(pairs: readonly PairComparison[], language: AppLanguage, signal?: AbortSignal) {
