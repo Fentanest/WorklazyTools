@@ -193,3 +193,60 @@ test('latest queued replacement opens only after obsolete Blob read releases own
   assert.deepEqual(events.slice(0, 4), ['open:old', 'open:old', 'close:old', 'close:old']);
   assert.equal(events.includes('open:skipped'), false);
 });
+async function within(promise, milliseconds = 1000) {
+  let timer;
+  try { return await Promise.race([promise, new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error('ownership cleanup timed out')), milliseconds);
+  })]); } finally { clearTimeout(timer); }
+}
+test('source-only ZIP close cancels undrained owned reader and settles extraction', async () => {
+  const zip = await zipSource(await archive([['a', new Uint8Array([1, 2, 3, 4, 5, 6, 7])]]), 'nodrain', new Admission(), signal());
+  const opened = zip.entries[0].open(signal()); let doneSettled = false;
+  await new Promise(resolve => setTimeout(resolve, 30));
+  opened.done.finally(() => { doneSettled = true; }).catch(() => {});
+  try {
+    // No read() or entry close: source must own and unblock its backpressured entry.
+    await within(zip.close());
+    assert.equal(doneSettled, true);
+    await assert.rejects(opened.reader.read(), /released|attached|reader/i);
+    assert.throws(() => zip.entries[0].open(signal()), /source-closed/);
+    await zip.close(); await opened.close();
+  } finally { await opened.close(); await zip.close(); }
+});
+test('undrained ZIP source close and overlapping entry close await delayed extraction together', async () => {
+  const original = ZipReader.prototype.getEntriesGenerator;
+  const finishing = deferred(), release = deferred(); let finalized = false;
+  ZipReader.prototype.getEntriesGenerator = async function* (...args) {
+    for await (const item of original.apply(this, args)) {
+      if (!item.directory) {
+        const getData = item.getData.bind(item);
+        item.getData = async (...dataArgs) => {
+          try { return await getData(...dataArgs); }
+          finally { finishing.resolve(); await release.promise; finalized = true; }
+        };
+      }
+      yield item;
+    }
+  };
+  let zip, opened;
+  try {
+    zip = await zipSource(await archive([['a', new Uint8Array([1, 2, 3])]]), 'nodrain-delay', new Admission(), signal());
+    opened = zip.entries[0].open(signal());
+    await new Promise(resolve => setTimeout(resolve, 30));
+    let sourceClosed = false, entryClosed = false, doneSettled = false;
+    opened.done.finally(() => { doneSettled = true; }).catch(() => {});
+    const sourceClose = zip.close().then(() => { sourceClosed = true; });
+    const repeatedSourceClose = zip.close();
+    assert.throws(() => zip.entries[0].open(signal()), /source-closed/);
+    // Source close must reach the extraction's finally without consumer demand.
+    await within(finishing.promise);
+    const entryClose = opened.close().then(() => { entryClosed = true; });
+    await turn(); assert.equal(sourceClosed, false); assert.equal(entryClosed, false); assert.equal(doneSettled, false);
+    release.resolve(); await within(Promise.all([sourceClose, repeatedSourceClose, entryClose, opened.close()]));
+    assert.equal(finalized, true); assert.equal(doneSettled, true);
+    assert.equal(sourceClosed, true); assert.equal(entryClosed, true);
+  } finally {
+    release.resolve(); if (opened) await opened.close(); if (zip) await zip.close();
+    ZipReader.prototype.getEntriesGenerator = original;
+  }
+});

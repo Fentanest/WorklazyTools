@@ -16,8 +16,8 @@ export async function zipSource(blob: Blob, revision: string, admission: Admissi
   const reader = new ZipReader(new BoundedZipReader(blob, signal), { strictness: 'balanced', filenameValidation: 'strict',
     checkCrc32: true, checkAuthenticationCode: true, checkLocalDirectory: true, checkOverlappingEntry: true, useWebWorkers: false });
   const pending = new Set<Promise<void>>();
-  const entries: FolderEntry[] = []; const active = new Set<AbortController>();
-  let closing: Promise<void> | undefined;
+  const entries: FolderEntry[] = []; const openedEntries = new Set<OpenedBytes>();
+  let sourceClosing = false, closing: Promise<void> | undefined;
   try {
     for await (const entry of reader.getEntriesGenerator()) {
       checkAbort(signal); admission.add(entry.uncompressedSize);
@@ -25,9 +25,9 @@ export async function zipSource(blob: Blob, revision: string, admission: Admissi
       const source: FolderEntry = Object.freeze({ id: `${revision}:zip:${entries.length}`, rawPath: entry.filename,
         rawFilename: entry.rawFilename.slice(), size: entry.uncompressedSize, directory: entry.directory, issue,
         open(jobSignal: AbortSignal): OpenedBytes {
-          if (closing) throw new Error('source-closed');
+          if (sourceClosing) throw new Error('source-closed');
           if (issue || entry.directory) throw new Error(issue ?? 'directory');
-          const controller = new AbortController(); active.add(controller);
+          const controller = new AbortController();
           const abort = () => controller.abort();
           signal.addEventListener('abort', abort, { once: true }); jobSignal.addEventListener('abort', abort, { once: true });
           if (signal.aborted || jobSignal.aborted) abort();
@@ -38,7 +38,7 @@ export async function zipSource(blob: Blob, revision: string, admission: Admissi
             if (chunk.byteLength > LIMITS.chunk || count > entry.uncompressedSize || count > LIMITS.entry) throw new Error('expanded-size-limit');
             sink.enqueue(chunk);
           } }, { highWaterMark: 1 }, { highWaterMark: 0 });
-          const cleanup = () => { active.delete(controller); signal.removeEventListener('abort', abort); jobSignal.removeEventListener('abort', abort); };
+          const cleanup = () => { signal.removeEventListener('abort', abort); jobSignal.removeEventListener('abort', abort); };
           const done = (entry as FileEntry).getData(stream.writable, { signal: controller.signal, checkCrc32: true, checkAuthenticationCode: true,
             checkLocalDirectory: true, checkOverlappingEntry: true, useWebWorkers: false }).then(() => {
               if (count !== entry.uncompressedSize) throw new Error('expanded-size-mismatch');
@@ -48,22 +48,29 @@ export async function zipSource(blob: Blob, revision: string, admission: Admissi
           done.catch(() => {});
           const output = stream.readable.getReader();
           let entryClosing: Promise<void> | undefined;
-          return { reader: output, done, close: () => {
+          const opened: OpenedBytes = { reader: output, done, close: () => {
             if (!entryClosing) entryClosing = (async () => {
               controller.abort(); await output.cancel().catch(() => {});
               await done.catch(() => {});
-              output.releaseLock(); cleanup();
+              try { output.releaseLock(); } finally { cleanup(); openedEntries.delete(opened); }
             })();
             return entryClosing;
           } };
+          openedEntries.add(opened);
+          return opened;
         } });
       entries.push(source);
     }
     return { entries: Object.freeze(entries), warnings: ['empty-directory-metadata-unavailable'], close: () => {
-      if (!closing) closing = (async () => {
-        for (const controller of active) controller.abort();
-        await Promise.allSettled([...pending]); await reader.close();
-      })();
+      if (!closing) {
+        sourceClosing = true;
+        closing = (async () => {
+          // Aborting getData alone cannot unblock a write waiting for readable demand.
+          // Each owned close cancels its reader before awaiting extraction settlement.
+          await Promise.allSettled([...openedEntries].map(opened => opened.close()));
+          await Promise.allSettled([...pending]); await reader.close();
+        })();
+      }
       return closing;
     } };
   } catch (error) { await reader.close(); throw error; }
