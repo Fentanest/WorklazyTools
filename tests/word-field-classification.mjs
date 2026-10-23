@@ -24,6 +24,13 @@ for side,value in [('before','Old'),('after','New')]:
 try:
     generate_tracked_document('/simple-before.docx','/simple-after.docx','/unsafe.docx','field',False,True,True);raise AssertionError('simple field lost its wrapper')
 except ValueError as e:assert 'UNSUPPORTED_TRACKED_SOURCE' in str(e)
+# Unchanged fields may partition equivalent per-character formatting into
+# different runs. Preserve the revised wrapper without rejecting that copy.
+for side,runs in [('before','<w:r><w:t>Field</w:t></w:r><w:r><w:t xml:space="preserve"> result</w:t></w:r>'),('after','<w:r><w:t>Field result</w:t></w:r>')]:
+    with zipfile.ZipFile('/copy-'+side+'.docx','w') as z:z.writestr('word/document.xml','<w:document xmlns:w="'+WORD_NS+'"><w:body><w:p><w:fldSimple w:instr=" DATE ">'+runs+'</w:fldSimple></w:p></w:body></w:document>')
+generate_tracked_document('/copy-before.docx','/copy-after.docx','/copy.docx','field',False,True,True)
+with zipfile.ZipFile('/copy.docx') as out,zipfile.ZipFile('/copy-after.docx') as revised:
+    assert ET.tostring(ET.fromstring(out.read('word/document.xml')))==ET.tostring(ET.fromstring(revised.read('word/document.xml')))
 worklazyComparisonManifestJson(a,b,False,True,True)
 bad=json.loads(m);bad['fields']['before']=[]
 try:

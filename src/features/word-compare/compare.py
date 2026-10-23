@@ -298,7 +298,7 @@ def _source_paths(root, part, archive=None):
             opaque = [item for item in node.iter() if item.tag in {W + "drawing", W + "pict", W + "object", W + "hyperlink", W + "fldChar", W + "fldSimple", W + "instrText", W + "footnoteReference", W + "endnoteReference"}]
             if opaque:
                 def canonical(item):
-                    if item.tag == W + "hyperlink":
+                    if item.tag in {W + "hyperlink", W + "fldSimple"}:
                         return (item.tag, sorted(item.attrib.items()), _text(item))
                     return (item.tag, sorted(item.attrib.items()), item.text or "", [canonical(child) for child in item])
                 payload = json.dumps([canonical(item) for item in opaque], ensure_ascii=False).encode("utf-8")
