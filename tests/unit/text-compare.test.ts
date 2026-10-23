@@ -73,3 +73,18 @@ test("explicit transforms affect selection only and keep standalone CR",()=>{
   assert.equal(transformText("z\na\na","sort"),"a\na\nz");
   assert.equal(transformText("a\rb\r\nc\n","lineSpaces"),"a\rb c ");
 });
+test("contextual Unicode lowercase keeps original spans",()=>{
+  const result=compareTexts("ΟΣ\nİ","ος\ni̇",{...defaults,ignoreCase:true});
+  assert.equal(result.counts.changed,0);assert.equal(result.counts.ignored,2);
+  assert.equal(result.rows.map(r=>r.left?.raw??"").join(""),"ΟΣ\nİ");
+});
+test("very large repeated-line fallback has no argument-count limit",()=>{
+  const result=compareTexts("a\n".repeat(150000),"b\n".repeat(150000),{...defaults,mode:"word"},0,15000);
+  assert.equal(result.rows.length,150000);assert.equal(result.quality,"line-coarse");assert.equal(result.counts.changed,150000);
+});
+test("undo and redo share a bounded history budget",()=>{
+  const history=new TextHistory(3,100),small={left:"a",right:"b",options:defaults,revision:1};
+  history.record(small);history.record(small);
+  assert.deepEqual(history.undo({...small,left:"x".repeat(100)}),small);
+  assert.equal(history.canRedo,false);assert.equal(history.canUndo,false);
+});

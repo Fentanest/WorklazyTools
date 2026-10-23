@@ -36,11 +36,21 @@ export function mapText(raw: string, options: TextOptions): MappedText {
       if (options.normalizeLineEndings && value === "\r") value = raw[end] === "\n" ? "" : "\n";
       if (options.ignoreQuotes) value = value.replace(/[‘’‚‛]/g, "'").replace(/[“”„‟]/g, '"');
       if (options.ignoreDashes) value = value.replace(/[‐‑‒–—―−]/g, "-");
-      if (options.ignoreCase) value = value.toLowerCase();
     }
     pieces.push(value);
     for (let i = 0; i < value.length; i++) { starts.push(offset); ends.push(end); }
     offset = end;
   }
-  return { raw, value: pieces.join(""), starts, ends, removed };
+  const value=pieces.join("");
+  if(!options.ignoreCase)return { raw, value, starts, ends, removed };
+  // Lowercase the complete string: final Greek sigma depends on surrounding
+  // letters. Map expansions (e.g. İ -> i + dot) back to their original span.
+  const lower=value.toLowerCase(),lowerStarts:number[]=[],lowerEnds:number[]=[];
+  let position=0;
+  for(const point of value){
+    for(let i=0;i<point.toLowerCase().length;i++){lowerStarts.push(starts[position]);lowerEnds.push(ends[position+point.length-1]);}
+    position+=point.length;
+  }
+  if(lowerStarts.length!==lower.length)throw new Error("CASE_MAPPING_UNAVAILABLE");
+  return {raw,value:lower,starts:lowerStarts,ends:lowerEnds,removed};
 }

@@ -1,15 +1,22 @@
 import type { TextOptions, TextResult } from "./resultTypes.ts";
-export interface TextSnapshot { left: string; right: string; options: TextOptions; revision: number }
+import type { TextSource } from "./input.ts";
+export interface TextSnapshot { left: string; right: string; options: TextOptions; revision: number; sources?:Partial<Record<"left"|"right",TextSource>> }
 export class TextHistory {
   private past:TextSnapshot[]=[]; private future:TextSnapshot[]=[];
+  private maxEntries:number;private maxBytes:number;
+  constructor(maxEntries=20,maxBytes=64*1024*1024){this.maxEntries=maxEntries;this.maxBytes=maxBytes;}
   get canUndo(){return this.past.length>0;} get canRedo(){return this.future.length>0;}
   record(snapshot:TextSnapshot) {
     this.past.push(structuredClone(snapshot));this.future=[];
-    let bytes=this.past.reduce((n,s)=>n+2*(s.left.length+s.right.length),0);
-    while(this.past.length>20||bytes>64*1024*1024) {const removed=this.past.shift()!;bytes-=2*(removed.left.length+removed.right.length);}
+    this.trim();
   }
-  undo(current:TextSnapshot){const next=this.past.pop();if(next)this.future.push(structuredClone(current));return next;}
-  redo(current:TextSnapshot){const next=this.future.pop();if(next)this.past.push(structuredClone(current));return next;}
+  private trim(){
+    const size=(s:TextSnapshot)=>2*(s.left.length+s.right.length+(s.sources?.left?.text.length??0)+(s.sources?.right?.text.length??0));
+    let bytes=[...this.past,...this.future].reduce((n,s)=>n+size(s),0);
+    while(this.past.length+this.future.length>this.maxEntries||bytes>this.maxBytes){const removed=(this.past.length?this.past:this.future).shift()!;bytes-=size(removed);}
+  }
+  undo(current:TextSnapshot){const next=this.past.pop();if(next)this.future.push(structuredClone(current));this.trim();return next;}
+  redo(current:TextSnapshot){const next=this.future.pop();if(next)this.past.push(structuredClone(current));this.trim();return next;}
 }
 export function mergeRow(snapshot:TextSnapshot,result:TextResult,rowId:string,target:"left"|"right"):TextSnapshot {
   if(snapshot.revision!==result.revision)throw new Error("STALE_COMPARISON");
