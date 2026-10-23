@@ -375,6 +375,11 @@ def _source_paths(root, part, archive=None):
         cursor = [0]; events = []
         def event_walk(node):
             if node is not paragraph and node.tag == W + "p": return
+            if node.tag in {W+"footnoteReference",W+"endnoteReference"}:
+                kind="footnote" if node.tag==W+"footnoteReference" else "endnote"
+                if archive is None or "word/"+kind+"s.xml" not in archive.namelist():return
+                event={"kind":"note","start":cursor[0],"end":cursor[0],"signature":kind,"supported":True,"target":node.get(W+"id",""),"paragraphPath":result[id(paragraph)]["path"],"runPath":result[id(node)]["path"][:-1]}
+                result[id(node)]["objectEvent"]=event;events.append(event);return
             if node.tag in {W + "drawing", W + "hyperlink", "{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:
                 start = cursor[0]
                 if node.tag == W + "hyperlink":
@@ -393,7 +398,7 @@ def _source_paths(root, part, archive=None):
         # that revised run. Content/revision wrappers remain unsupported.
         history_tags={W+name for name in policy.get("enabled",{}).get("rPr",[])+["rPr","lang","rStyle","szCs"]}
         run_histories={id(change) for run in paragraph.iter(W+"r") for change in run.findall(W+"rPr/"+W+"rPrChange") if len(change)==1 and change[0].tag==W+"rPr" and all(child.tag in history_tags and not (child.text or "").strip() and not (child.tail or "").strip() for child in change[0].iter())}
-        unsupported = any(node.tag in {W + "object", W + "fldChar", W + "fldSimple", W + "instrText", W + "footnoteReference", W + "endnoteReference", W + "ins", W + "del", W + "moveFrom", W + "moveTo", W + "pPrChange", W + "sectPrChange"} or (node.tag==W+"rPrChange" and id(node) not in run_histories) or (node.tag==W+"pict" and not any(result[id(node)]["path"][:len(path)]==path for path in event_paths)) for node in paragraph.iter())
+        unsupported = any(node.tag in {W + "object", W + "fldChar", W + "fldSimple", W + "instrText", W + "ins", W + "del", W + "moveFrom", W + "moveTo", W + "pPrChange", W + "sectPrChange"} or (node.tag in {W+"footnoteReference",W+"endnoteReference"} and "objectEvent" not in result[id(node)]) or (node.tag==W+"rPrChange" and id(node) not in run_histories) or (node.tag==W+"pict" and not any(result[id(node)]["path"][:len(path)]==path for path in event_paths)) for node in paragraph.iter())
         if invalid_qname: result[id(paragraph)]["unsupportedObjectQName"] = True
         if events: result[id(paragraph)]["objectEventsSupported"] = not unsupported and not invalid_qname and all(event["supported"] for event in events)
     def classify(instruction):
@@ -585,6 +590,23 @@ def _iter_story_blocks(container):
             if content is not None:
                 yield from _iter_story_blocks(content)
 
+
+def _note_package_facts(archive,inventory):
+    containers=[];errors=[]
+    for kind in ('footnote','endnote'):
+        part='word/'+kind+'s.xml'
+        if part not in archive.namelist():continue
+        ids=set()
+        for index,node in enumerate(ET.fromstring(archive.read(part))):
+            if node.tag!=W+kind:continue
+            identity=node.get(W+'id','');type_name=node.get(W+'type','normal')
+            if type_name=='normal' and (identity in ids or not identity.lstrip('-').isdigit()):errors.append('invalid-note-id')
+            if type_name=='normal':ids.add(identity)
+            containers.append({'source':{'part':part,'path':[index]},'kind':kind,'id':identity,'type':type_name})
+    references=[{'source':source,'kind':source['objectEvent']['signature'],'id':source['objectEvent']['target']} for source in inventory if source.get('objectEvent',{}).get('kind')=='note']
+    for ref in references:
+        if not any(note['kind']==ref['kind'] and note['id']==ref['id'] and note['type']=='normal' for note in containers):errors.append('missing-note-target')
+    return {'policy':'worklazy-note-facts-1','containers':containers,'references':references,'errors':sorted(set(errors))}
 
 def _story_package_facts(archive):
     import posixpath
@@ -778,6 +800,7 @@ def _parse_document(data, include_tables, include_metadata):
                 story_numbering = numbering.fresh()
                 for note_index, note in enumerate(notes_root.findall(W + element_name), 1):
                     note_id = note.attrib.get(W + "id", str(note_index))
+                    if note.get(W+"type","normal")!="normal":continue
                     try:
                         if int(note_id) < 0:
                             continue
@@ -792,6 +815,7 @@ def _parse_document(data, include_tables, include_metadata):
                         )
                         record["source"] = note_sources[id(paragraph)]
                         records["note"].append(record)
+        records["noteFacts"]=_note_package_facts(archive,records["sourceInventory"])
         records["warnings"] = numbering.unresolved
     return records
 
@@ -904,6 +928,7 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
         "sourceRevision": hashlib.sha256(bytes(document_bytes)).hexdigest(),
         "sourceInventory": records["sourceInventory"],
         "storyFacts": records["storyFacts"],
+        "noteFacts": records["noteFacts"],
         "blocks": blocks,
         "headerFooter": [record_of(record) for record in records["headerFooter"]],
         "notes": [record_of(record) for record in records["note"]],

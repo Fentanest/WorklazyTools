@@ -56,7 +56,10 @@ def reachable(path,kind='footnote'):
     if ident not in notes:raise ValueError('missing ordinary note ID')
     events=[]
     def walk(n):
-     if n.tag==W+'hyperlink':events.append(['link',relations[n.get(R+'id')].get('Target'),''.join(n.itertext())]);return
+     if n.tag==W+'hyperlink':
+      value=''.join(n.itertext())
+      if value:events.append(['link',relations[n.get(R+'id')].get('Target'),value])
+      return
      if n.tag=='{http://schemas.openxmlformats.org/drawingml/2006/main}blip':
       rel=relations[n.get(R+'embed')];target=posixpath.normpath(posixpath.join('word',rel.get('Target')));events.append(['image',hashlib.sha256(z.read(target)).hexdigest()]);return
      if n.tag==W+'t':events.append(['text',n.text or ''])

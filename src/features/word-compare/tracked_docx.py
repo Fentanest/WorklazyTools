@@ -480,7 +480,7 @@ def _styled_tokens(paragraph, collect_events=False):
             text = _element_text(node)
             if not text:
                 if collect_events and not inside_preserved_wrapper:
-                    drawings=[child for child in node if _is_drawing_event(child)]
+                    drawings=[child for child in node if _is_drawing_event(child) or _is_note_event(child)]
                     if drawings:
                         for drawing in drawings:events.setdefault(len(tokens),[]).append(drawing)
                     else:add_event(node)
@@ -493,7 +493,7 @@ def _styled_tokens(paragraph, collect_events=False):
             # coalesced again by _revision_container and emit_equal.
             for child in node:
                 value = child.text or "" if child.tag == W + "t" else "\t" if child.tag == W + "tab" else "\n" if child.tag in (W + "br", W + "cr") else ""
-                if _is_drawing_event(child) and collect_events and not inside_preserved_wrapper: events.setdefault(len(tokens),[]).append(child)
+                if (_is_drawing_event(child) or _is_note_event(child)) and collect_events and not inside_preserved_wrapper: events.setdefault(len(tokens),[]).append(child)
                 for token in value:tokens.append({"text":token,"properties":copy.deepcopy(run_properties) if run_properties is not None else None,"wrapper":wrapper,"link":link,"sourceOffset":len(tokens)})
             return
         for child in node:
@@ -758,6 +758,7 @@ def _whole_paragraph_revision(source, kind, writer):
             if position>cursor:paragraph.extend(_revision_containers(kind,tokens[cursor:position],writer,strip_history=True))
             for event in events.get(position,[]):
                 if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"del",writer))
+                elif _is_note_event(event):paragraph.append(_note_event(event,"del",writer))
             cursor=position
         return paragraph
 
@@ -766,6 +767,7 @@ def _whole_paragraph_revision(source, kind, writer):
     while position <= len(tokens):
         for event in events.get(position, []):
             if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"ins",writer))
+            elif _is_note_event(event):paragraph.append(_note_event(event,"ins",writer))
             else:paragraph.append(copy.deepcopy(event))
         if position == len(tokens):
             break
@@ -855,6 +857,32 @@ def _link_source_key(token):
     if entry is None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_SOURCE")
     return origin[1]
 
+
+_NOTE_IDS={}
+def _is_note_event(node):return node.tag in (W+'footnoteReference',W+'endnoteReference')
+def _note_action(source):
+    origin=_MANIFEST_NODE_KEYS.get(source)
+    if origin is None:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+    return next(item for item in _MANIFEST['noteProjection']['references'] if item.get(origin[0]) and _manifest_key(item[origin[0]])==origin[1])
+def _note_event(source,kind,writer):
+    action=_note_action(source);result=_drawing_revision(source,kind,writer)
+    for node in result.iter():
+        if _is_note_event(node):node.set(W+'id',_NOTE_IDS[action['noteId']])
+    return result
+
+def _prepare_note_ids(after_archive):
+    result={};used={}
+    for pair in _MANIFEST['noteProjection']['pairs']:
+        note=pair.get('after') or pair['before'];part=note['source']['part']
+        if part not in used:
+            root=ET.fromstring(after_archive.read(part)) if part in after_archive.namelist() else []
+            used[part]={node.get(W+'id') for node in root}
+        if pair.get('after'):result[pair['id']]=pair['after']['id']
+        else:
+            identity=1
+            while str(identity) in used[part]:identity+=1
+            used[part].add(str(identity));result[pair['id']]=str(identity)
+    return result
 
 def _drawing_revision(source, kind, writer):
     run=ET.Element(W+"r")
@@ -946,6 +974,19 @@ def _paragraph_revision(before, after, include_formatting, writer):
             return
         emitted_event_positions.add(position)
         for event in after_events.get(position, []):
+            if _is_note_event(event):
+                if not _MANIFEST["options"]["metadata"]:
+                    origin=_MANIFEST_NODE_KEYS[event][1];parent=_MANIFEST_SOURCE_NODES[("after",(origin[0],origin[1][:-1]))];run=ET.Element(W+"r");props=parent.find(W+"rPr")
+                    if props is not None:run.append(copy.deepcopy(props))
+                    run.append(copy.deepcopy(event));_consume_object(event);append_nodes([run],after_position=position);continue
+                action=_note_action(event);matched=action.get('before') and action.get('after')
+                pair=next((pair for pair in (_MANIFEST_ACTIVE_DECISION.get('objectEvents') or {}).get('unchangedDrawings',[]) if _manifest_key(pair['after'])==_MANIFEST_NODE_KEYS[event][1]),None)
+                if matched and pair:
+                    origin=_MANIFEST_NODE_KEYS[event][1];parent=_MANIFEST_SOURCE_NODES[('after',(origin[0],origin[1][:-1]))];run=ET.Element(W+'r');props=parent.find(W+'rPr')
+                    if props is not None:run.append(copy.deepcopy(props))
+                    ref=copy.deepcopy(event);ref.set(W+'id',_NOTE_IDS[action['noteId']]);run.append(ref);_consume_object(event);_consume_object(_MANIFEST_SOURCE_NODES[('before',_manifest_key(action['before']))]);append_nodes([run],after_position=position)
+                else:append_nodes([_note_event(event,'ins',writer)],after_position=position)
+                continue
             if _is_drawing_event(event):
                 origin=_MANIFEST_NODE_KEYS[event][1]
                 pair=next((pair for pair in unchanged_drawings if _manifest_key(pair["after"])==origin),None)
@@ -963,6 +1004,11 @@ def _paragraph_revision(before, after, include_formatting, writer):
         if position in emitted_before_events:return
         emitted_before_events.add(position)
         for event in before_events.get(position,[]):
+            if _is_note_event(event):
+                if not _MANIFEST["options"]["metadata"]:_consume_object(event);continue
+                action=_note_action(event)
+                if action.get('after') and any(_manifest_key(pair['before'])==_MANIFEST_NODE_KEYS[event][1] for pair in (_MANIFEST_ACTIVE_DECISION.get('objectEvents') or {}).get('unchangedDrawings',[])):continue
+                append_nodes([_note_event(event,'del',writer)],before_position=position);continue
             if _is_drawing_event(event):
                 if any(_manifest_key(pair["before"])==_MANIFEST_NODE_KEYS[event][1] for pair in unchanged_drawings):continue
                 append_nodes([_drawing_revision(event,"del",writer)],event=event)
@@ -1317,10 +1363,69 @@ def _validate_story_projection(facts,actual):
             if pair['coverage'][side]!=expected:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
     if any(owned[side]!={item['part'] for item in facts[side]['parts']} for side in ('before','after')):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
 
+def _validate_note_projection(facts,actual):
+    if _MANIFEST.get('noteFacts')!=facts:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_FACTS')
+    plan=_MANIFEST.get('noteProjection',{})
+    if plan.get('policy')!='worklazy-note-projection-1':raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE')
+    if not _MANIFEST['options']['metadata']:
+        if plan!={'policy':'worklazy-note-projection-1','supported':True,'reasons':[],'pairs':[],'references':[]}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE')
+        return
+    if plan.get('supported') is not True or plan.get('reasons') or any(value['errors'] for value in facts.values()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE')
+    pairs=plan['pairs'];owned={side:set() for side in ('before','after')};used_refs={side:set() for side in ('before','after')};ids=set()
+    for pair in pairs:
+        old,new=pair.get('before'),pair.get('after');identity='note:'+json.dumps([(old or {}).get('source'),(new or {}).get('source')],ensure_ascii=False,separators=(',',':'))
+        if pair['id']!=identity or identity in ids or pair['kind']!=(old or new)['kind']:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE')
+        ids.add(identity)
+        for side,note in [('before',old),('after',new)]:
+            if note is None:continue
+            key=_manifest_key(note['source'])
+            if note not in facts[side]['containers'] or note['type']!='normal' or key in owned[side]:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_OWNER')
+            owned[side].add(key)
+        decisions=[decision for decision in _MANIFEST_DECISIONS if any(ref['part']==note['source']['part'] and ref['path'][:1]==note['source']['path'] for side,note in [('before',old),('after',new)] if note for ref in decision[side])]
+        if pair['decisionIds']!=[decision['id'] for decision in decisions]:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
+        for decision in decisions:
+            if decision.get('trackedRepresentation')!=('revision' if old and new else 'note-reference') or (not(old and new) and decision.get('noteId')!=identity):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
+            for side,note in [('before',old),('after',new)]:
+                if any(note is None or ref['part']!=note['source']['part'] or ref['path'][:1]!=note['source']['path'] for ref in decision[side]):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
+        for side,note in [('before',old),('after',new)]:
+            coverage=[ref for ref in actual[side].values() if note and ref['part']==note['source']['part'] and ref['path'][:1]==note['source']['path'] and ref['kind'] in ('p','tbl')]
+            if pair['coverage'][side]!=coverage:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
+    for ref in plan['references']:
+        decision=next((decision for decision in _MANIFEST_DECISIONS if decision['id']==ref['decisionId']),None);pair=next((pair for pair in pairs if pair['id']==ref['noteId']),None)
+        if decision is None or pair is None:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+        for side in ('before','after'):
+            source=ref.get(side);note=pair.get(side)
+            if source is None:continue
+            key=_manifest_key(source)
+            if key in used_refs[side] or not any(item['source']==source and item['id']==note['id'] and item['kind']==note['kind'] for item in facts[side]['references']) or not any(parent['part']==source['part'] and parent['path']==source['objectEvent']['paragraphPath'] for parent in decision[side]):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+            used_refs[side].add(key)
+        property_pairs=decision.get('objectEvents',{}).get('drawingProperties',[])
+        matching=next((item for item in property_pairs if (ref.get('before') and item['before']==ref['before']) or (ref.get('after') and item['after']==ref['after'])),None)
+        if (matching is not None)!=(bool(ref.get('before')) and bool(ref.get('after'))) or matching is not None and (matching['before']!=ref['before'] or matching['after']!=ref['after']):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+        if set(ref)!={key for key in ('decisionId','noteId','before','after') if key in ('decisionId','noteId') or ref.get(key) is not None}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+        if ref.get('before') and ref.get('after'):
+            a,b=ref['before']['objectEvent'],ref['after']['objectEvent'];comparison=decision['comparisons'][0];old=new=0;position=a['start'];target=len(comparison['after']) if position==len(comparison['before']) else None
+            if target is None:
+                for segment in comparison['segments']:
+                    size=len(segment['text'])
+                    if segment['type']=='equal' and old<=position<=old+size:target=new+position-old;break
+                    if segment['type']=='deleted' and old<=position<old+size:target=new;break
+                    if segment['type']!='added':old+=size
+                    if segment['type']!='deleted':new+=size
+            if target!=b['start'] or a['signature']!=b['signature']:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+    referenced_pairs={ref['noteId'] for ref in plan['references']}
+    for pair in pairs:
+        if pair['id'] not in referenced_pairs:
+            old,new=pair.get('before'),pair.get('after')
+            if not old or not new or old['id']!=new['id'] or old['source']!=new['source'] or any(item['kind']==note['kind'] and item['id']==note['id'] for side,note in [('before',old),('after',new)] for item in facts[side]['references']):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+    for side in ('before','after'):
+        if used_refs[side]!={_manifest_key(ref['source']) for ref in facts[side]['references']} or owned[side]!={_manifest_key(note['source']) for note in facts[side]['containers'] if note['type']=='normal'}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
+
 def _validate_manifest(before_path, after_path):
     """Validate ownership against raw input, without choosing correspondences."""
     actual = {}
     story_facts={}
+    note_facts={}
     nodes = {}
     for side, path in (("before", before_path), ("after", after_path)):
         with open(path, "rb") as source:
@@ -1331,6 +1436,7 @@ def _validate_manifest(before_path, after_path):
         if provenance is not None and provenance.get("comparisonSha256") != model["sourceRevision"]:
             raise ValueError("STALE_COMPARISON_MANIFEST_PROVENANCE")
         story_facts[side]=model["storyFacts"]
+        note_facts[side]=model["noteFacts"]
         inventory = model["sourceInventory"]
         entries = {_manifest_key(ref): ref for ref in inventory}
         supplied = _MANIFEST["sources"][side]
@@ -1349,6 +1455,7 @@ def _validate_manifest(before_path, after_path):
 
     ids = set()
     _validate_story_projection(story_facts,actual)
+    _validate_note_projection(note_facts,actual)
     owners = {"before": {}, "after": {}}
     for decision in _MANIFEST_DECISIONS:
         decision_id = decision.get("id")
@@ -1357,8 +1464,9 @@ def _validate_manifest(before_path, after_path):
         ids.add(decision_id)
         representation = decision.get("trackedRepresentation")
         reason = decision.get("trackedReason")
-        if representation not in {"revision", "preserve-after"}:
+        if representation not in {"revision", "preserve-after","note-reference"}:
             raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
+        if representation=="note-reference" and not any(pair["id"]==decision.get("noteId") and decision["id"] in pair["decisionIds"] and not(pair.get("before") and pair.get("after")) for pair in _MANIFEST["noteProjection"]["pairs"]):raise ValueError("INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE")
         if representation == "preserve-after":
             refs = decision["before"] + decision["after"]
             if reason != "existing-comment-contract" or not refs or any(ref["part"] != "word/comments.xml" for ref in refs):
@@ -1447,24 +1555,6 @@ def _validate_manifest(before_path, after_path):
     _validate_restore_styles(actual)
     _validate_formatting_manifest(actual, json.loads(WORKLAZY_FORMATTING_POLICY_JSON))
 
-    note_mappings = {}
-    note_contexts = {"before": set(), "after": set()}
-    for decision in _MANIFEST_DECISIONS:
-        contexts = {}
-        for side in ("before", "after"):
-            contexts[side] = {(ref["part"], tuple(ref["path"][:1])) for ref in decision[side] if ref["part"] in {"word/footnotes.xml", "word/endnotes.xml"}}
-            note_contexts[side].update(contexts[side])
-        if contexts["before"] and contexts["after"]:
-            if len(contexts["before"]) != 1 or len(contexts["after"]) != 1:
-                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
-            before_context = next(iter(contexts["before"]))
-            after_context = next(iter(contexts["after"]))
-            if before_context != after_context or nodes["before"][before_context].get(W + "id") != nodes["after"][after_context].get(W + "id"):
-                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
-            note_mappings[before_context] = after_context
-    if note_contexts["before"] != set(note_mappings) or note_contexts["after"] != set(note_mappings.values()):
-        raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
-
     for side in ("before", "after"):
         structural = {key: ref for key, ref in actual[side].items() if ref["kind"] in {"p", "tbl"}}
         coverage = _MANIFEST.get("coverage", {}).get(side, [])
@@ -1482,6 +1572,14 @@ def _validate_manifest(before_path, after_path):
             if excluded_metadata or excluded_table:
                 if item["disposition"] != "preserve-after":
                     raise ValueError("INVALID_COMPARISON_MANIFEST_EXCLUSION")
+                continue
+            special=next((note for note in note_facts[side]['containers'] if note['type']!='normal' and note['source']['part']==key[0] and tuple(note['source']['path'])==key[1][:1]),None)
+            if special:
+                if item['disposition']!='preserve-after' or item.get('reason')!='note-separator':raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
+                continue
+            note=next((pair for pair in _MANIFEST['noteProjection']['pairs'] if pair.get(side) and pair[side]['source']['part']==key[0] and tuple(pair[side]['source']['path'])==key[1][:1]),None)
+            if note and not(note.get('before') and note.get('after')):
+                if item['disposition']!='note-reference' or item.get('noteId')!=note['id']:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
                 continue
             comment_owner = next((candidate for candidate in _MANIFEST_DECISIONS if candidate.get("trackedReason") == "existing-comment-contract" and any(parent["part"] == key[0] and key[1][:len(parent["path"])] == tuple(parent["path"]) for parent in candidate[side])), None)
             if comment_owner is not None:
@@ -1621,12 +1719,12 @@ def _validate_restore_styles(actual):
                 position_cache[key]=context["offset"]+(local_boundary(context,position) if side=="before" else position)
             return position_cache[key]
         # Validate TS's correspondence, never recover/select a missing pair.
-        drawings={side:[ref for ref in expected[side] if ref["objectEvent"]["kind"]=="drawing"] for side in ("before","after")}
+        drawings={side:[ref for ref in expected[side] if ref["objectEvent"]["kind"]=="drawing" or _MANIFEST["options"]["metadata"] and ref["objectEvent"]["kind"]=="note"] for side in ("before","after")}
         buckets={side:{} for side in ("before","after")}
         for side in ("before","after"):
             for ref in drawings[side]:
                 position=position_of(side,ref)
-                buckets[side].setdefault(position,[]).append(ref)
+                buckets[side].setdefault((position,ref["objectEvent"]["kind"],ref["objectEvent"]["signature"] if ref["objectEvent"]["kind"]=="note" else ""),[]).append(ref)
         projections=events.get("drawingProperties")
         if not isinstance(projections,list) or len(projections)!=sum(min(len(refs),len(buckets["after"].get(position,[]))) for position,refs in buckets["before"].items()):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
         seen={side:set() for side in ("before","after")}
@@ -1637,7 +1735,8 @@ def _validate_restore_styles(actual):
                 seen[side].add(_manifest_key(ref))
             ref,match=pair["before"],pair["after"]
             position=position_of("before",ref)
-            if position!=position_of("after",match) or buckets["before"][position].index(ref)!=buckets["after"][position].index(match):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
+            bucket=(position,ref["objectEvent"]["kind"],ref["objectEvent"]["signature"] if ref["objectEvent"]["kind"]=="note" else "")
+            if ref["objectEvent"]["kind"]!=match["objectEvent"]["kind"] or ref["objectEvent"]["kind"]=="note" and ref["objectEvent"]["signature"]!=match["objectEvent"]["signature"] or position!=position_of("after",match) or buckets["before"][bucket].index(ref)!=buckets["after"][bucket].index(match):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
             old,new=run_fact("before",ref),run_fact("after",match)
             names=[name for name in dict.fromkeys(list(old["supported"])+list(new["supported"])) if old["supported"].get(name,[])!=new["supported"].get(name,[])]
             excluded=[name for name in dict.fromkeys(list(old["unsupported"])+list(new["unsupported"])) if old["unsupported"].get(name,[])!=new["unsupported"].get(name,[])]
@@ -1669,7 +1768,7 @@ def _validate_restore_styles(actual):
         if events.get("unchangedDrawings")!=unchanged_drawings:raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_ACTIONS")
         unchanged=[{"before":a,"after":b} for a in expected["before"] if a["objectEvent"]["kind"]=="hyperlink" for b in expected["after"] if b["objectEvent"]["kind"]=="hyperlink" and a["objectEvent"]["signature"]==b["objectEvent"]["signature"] and position_of("before",a)==position_of("after",b) and position_of("before",a,True)==position_of("after",b,True)]
         if events.get("unchangedLinks")!=unchanged:raise ValueError("INVALID_COMPARISON_MANIFEST_LINK_ACTIONS")
-        facts=lambda side:[(source["objectEvent"]["kind"],position_of(side,source),position_of(side,source,True),source["objectEvent"]["signature"]) for source in expected[side]]
+        facts=lambda side:[(source["objectEvent"]["kind"],position_of(side,source),position_of(side,source,True),source["objectEvent"]["signature"]) for source in expected[side] if _MANIFEST["options"]["metadata"] or source["objectEvent"]["kind"]!="note"]
         if type(events.get("changed")) is not bool or events["changed"] != (facts("before") != facts("after")):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
     for decision in _MANIFEST_DECISIONS:
         value=decision.get("mergeProjection")
@@ -2228,41 +2327,26 @@ def _revisionize_xml_part(before_data, after_data, include_formatting, writer, c
     finally:
         if _PACKAGE_GRAPH is not None:_PACKAGE_GRAPH.output_owner=previous_owner
 
-def _revisionize_notes(before_data, after_data, include_formatting, writer, note_tag, include_tables=True):
-    before_root = _parse_xml(before_data)
-    after_root = _parse_xml(after_data)
-    part = "word/footnotes.xml" if note_tag == "footnote" else "word/endnotes.xml"
-    _register_manifest_root(before_root, part, "before")
-    _register_manifest_root(after_root, part, "after")
-    before_children = list(before_root)
-    after_children = list(after_root)
-    for after_index, after_note in enumerate(after_children):
-        if after_note.tag != W + note_tag:
-            continue
-        candidates = set()
-        for decision in _MANIFEST_DECISIONS:
-            relevant = [ref for ref in decision["after"] if ref["part"] == part and ref["path"] and ref["path"][0] == after_index]
-            if relevant:
-                if any(ref["part"] != part or not ref["path"] for ref in decision["before"]):
-                    raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
-                candidates.update(ref["path"][0] for ref in decision["before"])
-        if not candidates:
-            # Empty separator records are explicitly preserved; added visible
-            # note containers need package-reference support in P.
-            if _comparison_text(after_note).strip():
-                raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
-            continue
-        if len(candidates) != 1:
-            raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
-        before_index = next(iter(candidates))
-        before_note = before_children[before_index]
-        if before_index != after_index or before_note.get(W + "id") != after_note.get(W + "id"):
-            raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
-        if before_note.tag != W + note_tag:
-            raise ValueError("INVALID_COMPARISON_MANIFEST_NOTE_CONTEXT")
-        before_blocks = [child for child in before_note if child.tag in BLOCK_TAGS]
-        after_blocks = [child for child in after_note if child.tag in BLOCK_TAGS]
-        _replace_blocks(after_note, _revision_blocks(before_blocks, after_blocks, include_formatting, writer, include_tables))
+def _revisionize_notes(before_data,after_data,include_formatting,writer,note_tag,include_tables=True):
+    before_root=_parse_xml(before_data);after_root=_parse_xml(after_data);part='word/'+note_tag+'s.xml'
+    _register_manifest_root(before_root,part,'before');_register_manifest_root(after_root,part,'after')
+    for pair in _MANIFEST['noteProjection']['pairs']:
+        old,new=pair.get('before'),pair.get('after')
+        if (old or new)['source']['part']!=part:continue
+        if old and new:
+            before_note=before_root[old['source']['path'][0]];after_note=after_root[new['source']['path'][0]]
+            _replace_blocks(after_note,_revision_blocks([child for child in before_note if child.tag in BLOCK_TAGS],[child for child in after_note if child.tag in BLOCK_TAGS],include_formatting,writer,include_tables))
+        else:
+            if old:
+                original=before_root[old['source']['path'][0]]
+                if any(node.tag in {W+'numPr',W+'pict',W+'object',W+'sdt',W+'bookmarkStart',W+'bookmarkEnd'} or (node.tag==W+'tbl' and not include_tables) or (node.tag==W+'hyperlink' and node.get(W+'anchor')) for node in original.iter()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_DEPENDENCY')
+                styles=ET.fromstring(_PACKAGE_GRAPH.after.read('word/styles.xml')) if 'word/styles.xml' in _PACKAGE_GRAPH.after.namelist() else ET.Element(W+'styles');style_ids={node.get(W+'styleId') for node in styles.findall(W+'style')}
+                if any(node.get(W+'val') not in style_ids for node in original.iter() if node.tag in {W+'pStyle',W+'rStyle'}):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_STYLE')
+                copied=_accepted_copy(original);copied.set(W+'id',_NOTE_IDS[pair['id']]);after_root.append(copied)
+            for identity in pair['decisionIds']:
+                decision=next(item for item in _MANIFEST_DECISIONS if item['id']==identity)
+                for side in ('before','after'):_consume_manifest_refs(side,decision[side])
+                _MANIFEST_USED.add(identity)
     return _serialize_xml(after_root)
 
 
@@ -2530,7 +2614,7 @@ def _ensure_numbering_content_type(content_types_data):
 
 
 def _generate_tracked_document(before_path, after_path, output_path, author, include_formatting, include_tables, include_metadata, manifest_json=None, formatting_mask_json=None):
-    global _MANIFEST, _PACKAGE_GRAPH
+    global _MANIFEST, _PACKAGE_GRAPH, _NOTE_IDS
     if manifest_json is None:
         # Read-only test/tool bridge; the browser always passes its already
         # computed screen manifest. Pairing remains TypeScript-owned here too.
@@ -2562,6 +2646,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
     with zipfile.ZipFile(before_path, "r") as before_archive, zipfile.ZipFile(after_path, "r") as after_archive:
         writer = _RevisionWriter(author, _next_revision_id(before_archive, after_archive))
         _PACKAGE_GRAPH = _PackageGraph(before_archive,after_archive)
+        _NOTE_IDS=_prepare_note_ids(after_archive) if include_metadata else {}
         before_names = set(before_archive.namelist())
         after_names = set(after_archive.namelist())
         replacements = {}
@@ -2670,6 +2755,7 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         # Do not retain source nodes or text decisions after failure/cancellation.
         _MANIFEST = None
         _PACKAGE_GRAPH = None
+        _NOTE_IDS.clear()
         _MANIFEST_NODE_KEYS = {}
         _MANIFEST_DECISIONS = []
         _MANIFEST_USED = set()

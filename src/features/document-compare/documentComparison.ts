@@ -1,3 +1,4 @@
+import {buildNoteProjection,bindNoteDecisions,type NoteFacts} from "./noteProjection.ts";
 import {buildStoryProjection,bindStoryDecisions,emptyStoryBindingChanges,type StoryFacts} from "./storyProjection.ts";
 import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
 import { normalizeFormattingMask, formattingGroup, maskPolicyVersion, maskedSourceFormatting, type FormattingMask } from "./formattingMask.ts";
@@ -57,6 +58,7 @@ export interface ComparisonBlock {
 
 export interface ComparisonModel {
   storyFacts?:StoryFacts;
+  noteFacts?:NoteFacts;
   capabilities?: DocumentCapabilities;
   provenance?: DocumentProvenance;
   fields?: Array<{kind:string; instruction:string; cachedText:string; sources:DocumentSourceReference[]}>;
@@ -100,6 +102,7 @@ export function compareDocumentModels(
     ? { emptyCell: (row, column) => `Empty cell ${row}:${column}`, table: (index) => `Table ${index}` }
     : { emptyCell: (row, column) => `빈 셀 ${row}:${column}`, table: (index) => `표 ${index}` };
   const manifest: DocumentComparisonManifest = {
+    noteFacts:{before:before.noteFacts,after:after.noteFacts},noteProjection:{policy:"worklazy-note-projection-1",supported:true,reasons:[],pairs:[],references:[]},
     storyFacts:{before:before.storyFacts,after:after.storyFacts},storyProjection:{policy:"worklazy-story-projection-1",supported:true,reasons:[],pairs:[],bindings:[]},
     nativeSources: {before:before.blocks.flatMap(block=>block.nativeSource?[block.nativeSource]:[]),after:after.blocks.flatMap(block=>block.nativeSource?[block.nativeSource]:[])},
     capabilities: {before:before.capabilities,after:after.capabilities}, provenance: {before:before.provenance,after:after.provenance}, fields:{before:before.fields ?? [],after:after.fields ?? []},
@@ -184,7 +187,12 @@ export function compareDocumentModels(
     }
   }else headerFooter.push(...compareRecordList(before.headerFooter,after.headerFooter,"headerFooter",changes,options.formatting,manifest));
   for(const view of emptyStoryBindingChanges(manifest,language)){headerFooter.push(view);changes.push({kind:view.kind,section:'headerFooter',location:view.afterLocation||view.beforeLocation,beforeLocation:view.beforeLocation,afterLocation:view.afterLocation,before:view.before,after:view.after,segments:view.segments});}
-  const note = compareRecordList(before.notes, after.notes, "note", changes, options.formatting, manifest);
+  manifest.noteProjection=buildNoteProjection(manifest);
+  const note:ManifestFormattingView[]=[];
+  if(before.noteFacts&&after.noteFacts){for(const pair of manifest.noteProjection.pairs){const start=manifest.decisions.length;
+    const records=(side:'before'|'after')=>(side==='before'?before:after).notes.filter(record=>pair[side]&&record.source?.part===pair[side]!.source.part&&pair[side]!.source.path.every((value,index)=>record.source!.path[index]===value));
+    note.push(...compareRecordList(records('before'),records('after'),'note',changes,options.formatting,manifest));bindNoteDecisions(manifest,pair,manifest.decisions.slice(start));
+  }}else note.push(...compareRecordList(before.notes,after.notes,'note',changes,options.formatting,manifest));
   const commentChanges: WordDiffItem[] = [];
   const commentViews = compareRecordList(before.comments ?? [], after.comments ?? [], "comment", commentChanges, options.formatting, manifest);
   changes.push(...commentChanges);
@@ -199,9 +207,9 @@ export function compareDocumentModels(
     const position=(side:"before"|"after",ref:DocumentSourceReference,end=false)=>positions[side].get(ref)![end?1:0];
     // Pair drawing events only at the TS text mapping's same boundary, in source
     // order. Identity is the actual source reference, never a volatile rId.
-    const available=after.filter(source=>source.objectEvent!.kind==="drawing");
-    const drawingProperties=before.filter(source=>source.objectEvent!.kind==="drawing").flatMap(a=>{
-      const index=available.findIndex(b=>position("before",a)===position("after",b));
+    const available=after.filter(source=>(source.objectEvent!.kind==="drawing"||options.metadata&&source.objectEvent!.kind==="note"));
+    const drawingProperties=before.filter(source=>(source.objectEvent!.kind==="drawing"||options.metadata&&source.objectEvent!.kind==="note")).flatMap(a=>{
+      const index=available.findIndex(b=>a.objectEvent!.kind===b.objectEvent!.kind && (a.objectEvent!.kind!=="note"||a.objectEvent!.signature===b.objectEvent!.signature) && position("before",a)===position("after",b));
       if(index<0)return [];
       const b=available.splice(index,1)[0],old=runFact("before",a),next=runFact("after",b);
       const names=[...new Set([...Object.keys(old.supported),...Object.keys(next.supported)])].filter(name=>JSON.stringify(old.supported[name]??[])!==JSON.stringify(next.supported[name]??[]));
@@ -209,7 +217,7 @@ export function compareDocumentModels(
     });
     const propertiesSupported=true;
     const unchangedLinks=before.filter(a=>a.objectEvent!.kind==="hyperlink").flatMap(a=>after.filter(b=>b.objectEvent!.kind==="hyperlink" && a.objectEvent!.signature===b.objectEvent!.signature && position("before",a)===position("after",b) && position("before",a,true)===position("after",b,true)).map(b=>({before:a,after:b})));
-    if(before.length || after.length)decision.objectEvents={unchangedDrawings:drawingProperties.filter(pair=>pair.before.objectEvent!.signature===pair.after.objectEvent!.signature && (!pair.families.length || pair.representation==="preserve-after-history")).map(pair=>({before:pair.before,after:pair.after})),contexts,deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-5",before,after,changed:JSON.stringify(before.map(source=>[source.objectEvent!.kind,position("before",source),position("before",source,true),source.objectEvent!.signature]))!==JSON.stringify(after.map(source=>[source.objectEvent!.kind,position("after",source),position("after",source,true),source.objectEvent!.signature]))};
+    if(before.length || after.length)decision.objectEvents={unchangedDrawings:drawingProperties.filter(pair=>pair.before.objectEvent!.signature===pair.after.objectEvent!.signature && (!pair.families.length || pair.representation==="preserve-after-history")).map(pair=>({before:pair.before,after:pair.after})),contexts,deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-5",before,after,changed:JSON.stringify(before.filter(source=>options.metadata||source.objectEvent!.kind!=="note").map(source=>[source.objectEvent!.kind,position("before",source),position("before",source,true),source.objectEvent!.signature]))!==JSON.stringify(after.filter(source=>options.metadata||source.objectEvent!.kind!=="note").map(source=>[source.objectEvent!.kind,position("after",source),position("after",source,true),source.objectEvent!.signature]))};
   }};
   objectDecisions(manifest.decisions);
   buildDrawingRestoreProjections(manifest);
@@ -222,7 +230,8 @@ export function compareDocumentModels(
     objectViews(decision.children??[],view);
     if(!decision.objectEvents?.changed || !view)continue;
     if(view.kind==="unchanged")view.kind="changed";
-    (view as ManifestFormattingView & {objectLabels?:string[]}).objectLabels=[language==="en"?"Image or hyperlink change":"이미지·하이퍼링크 변경"];
+    const allEvents=[...decision.objectEvents.before,...decision.objectEvents.after];
+    (view as ManifestFormattingView & {objectLabels?:string[]}).objectLabels=[...(allEvents.some(ref=>ref.objectEvent!.kind!=="note")?[language==="en"?"Image or hyperlink change":"이미지·하이퍼링크 변경"]:[]),...(options.metadata&&allEvents.some(ref=>ref.objectEvent!.kind==="note")?[language==="en"?"Footnote or endnote reference change":"각주·미주 참조 변경"]:[])];
     if(view.tableIndex!==undefined){
       const table=tables[view.tableIndex];table.kind="changed";
       for(const side of ["before","after"] as const)for(const [r,row] of table[side].entries())for(const [c,cell]of row.entries()){

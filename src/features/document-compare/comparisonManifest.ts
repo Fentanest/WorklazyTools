@@ -9,7 +9,7 @@ export interface XmlPropertyTree { name: string; attributes: Record<string, stri
 export interface ObjectEventContext { comparisonIndex:number; offset:number; afterParagraph?:DocumentSourceReference; before:Array<{source:DocumentSourceReference;start:number;end:number}>; after:Array<{source:DocumentSourceReference;start:number;end:number}> }
 export interface DeletedDrawingStyleProjection { before:DocumentSourceReference; beforeFact:PropertyFact; policy:"restore-before-unpaired"|"copy-revised-run"|"inherit-after-default"; afterParagraph?:DocumentSourceReference; afterFact?:PropertyFact; cursor?:number; families?:string[]; source?:DocumentSourceReference }
 export interface DrawingPropertyProjection { representation:"revision"|"preserve-after-history"; before: DocumentSourceReference; after: DocumentSourceReference; beforeFact: PropertyFact; afterFact: PropertyFact; families: string[]; excludedFamilies: string[] }
-export interface ObjectSourceEvent {kind:"drawing"|"hyperlink";start:number;end:number;signature:string;supported:boolean;target:string;paragraphPath:number[];runPath:number[]}
+export interface ObjectSourceEvent {kind:"drawing"|"hyperlink"|"note";start:number;end:number;signature:string;supported:boolean;target:string;paragraphPath:number[];runPath:number[]}
 export interface DocumentSourceReference {
   objectEvent?: ObjectSourceEvent;
   objectEventsSupported?: boolean;
@@ -44,7 +44,8 @@ export interface ComparisonDecision {
   screenFormattingFamilies?: string[];
   deletedFormattingPolicy?: "restore-before-unpaired" | "paired-revised";
   wholeRestoreStyles?: Array<{ before: DocumentSourceReference; afterParagraph: DocumentSourceReference; projections: RestoreStyleProjection[] }>;
-  trackedRepresentation: "revision" | "preserve-after";
+  noteId?:string;
+  trackedRepresentation: "revision" | "preserve-after" | "note-reference";
   trackedReason?: "existing-comment-contract";
   segments: WordDiffSegment[];
   /** Raw XML text differs from display text for generated numbering labels. */
@@ -64,6 +65,8 @@ export interface SourceSlices { before: Array<{ source: DocumentSourceReference;
 export interface RestoreStyleProjection { beforeStart: number; afterStart: number; length: number; kind: "equal" | "deleted"; policy: "copy-revised-run" | "inherit-after-default"; source?: DocumentSourceReference }
 export interface TextComparison { sourceSlices?: SourceSlices; restoreStyles?: RestoreStyleProjection[]; before: string; after: string; segments: WordDiffSegment[]; formatting?: { paragraphFamilies: string[]; paragraphHistory: boolean; paragraphScopeId: string; beforeSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; afterSlices: Array<{ source: DocumentSourceReference; range: [number, number] }>; spans: FormattingSpan[]; history: boolean } }
 export interface DocumentComparisonManifest {
+  noteFacts:{before?:import("./noteProjection.ts").NoteFacts;after?:import("./noteProjection.ts").NoteFacts};
+  noteProjection:import("./noteProjection.ts").NoteProjection;
   storyFacts:{before?:StoryFacts;after?:StoryFacts};
   storyProjection:StoryProjection;
   nativeSources: {before:Array<{format:"doc"|"hwp";story:string;paragraph:number;section?:number;control?:number}>;after:Array<{format:"doc"|"hwp";story:string;paragraph:number;section?:number;control?:number}>};
@@ -91,9 +94,10 @@ export interface DocumentComparisonManifest {
 
 export interface SourceCoverage {
   source: DocumentSourceReference;
-  disposition: "decision" | "preserve-after" | "unsupported";
+  noteId?:string;
+  disposition: "decision" | "preserve-after" | "unsupported" | "note-reference";
   decisionId?: string;
-  reason?: "blank-paragraph" | "excluded-table" | "excluded-metadata" | "opaque-content" | "unmapped-source" | "existing-comment-contract";
+  reason?: "blank-paragraph" | "excluded-table" | "excluded-metadata" | "opaque-content" | "unmapped-source" | "existing-comment-contract" | "note-separator";
 }
 
 export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
@@ -114,6 +118,9 @@ export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
       const decision = decisions.find((item) => item[side].some((ref) => key(ref) === key(source)));
       if (!manifest.options.metadata && source.part !== "word/document.xml") return { source, disposition: "preserve-after", reason: "excluded-metadata" };
       if (!manifest.options.tables && tables.some((table) => descendant(source, table))) return { source, disposition: "preserve-after", reason: "excluded-table" };
+      const note=manifest.noteProjection.pairs.find(pair=>pair[side]&&pair[side]!.source.part===source.part&&pair[side]!.source.path.every((value,index)=>source.path[index]===value));
+      if(note&&(!note.before||!note.after))return {source,disposition:'note-reference',noteId:note.id};
+      if(manifest.noteFacts[side]?.containers.some(note=>note.type!=='normal'&&note.source.part===source.part&&note.source.path.every((value,index)=>source.path[index]===value)))return {source,disposition:'preserve-after',reason:'note-separator'};
       if (decision?.trackedRepresentation === "preserve-after") return { source, disposition: "decision", decisionId: decision.id };
       const commentOwner = source.part === "word/comments.xml" ? decisions.find((item) => item.trackedReason === "existing-comment-contract" && item[side].some((ref) => descendant(source, ref))) : undefined;
       if (commentOwner) return { source, disposition: "preserve-after", decisionId: commentOwner.id, reason: "existing-comment-contract" };

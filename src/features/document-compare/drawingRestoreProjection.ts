@@ -9,7 +9,7 @@ export function buildDrawingRestoreProjections(manifest:DocumentComparisonManife
     const events=decision.objectEvents;
     if(!events)continue;
     events.deletedDrawingStyles=[];
-    for(const before of events.before.filter(ref=>ref.objectEvent!.kind==='drawing' && !events.drawingProperties.some(pair=>key(pair.before)===key(ref)))) {
+    for(const before of events.before.filter(ref=>(ref.objectEvent!.kind==='drawing'||manifest.options.metadata&&ref.objectEvent!.kind==='note') && !events.drawingProperties.some(pair=>key(pair.before)===key(ref)))) {
       const beforeFact=manifest.sources.before.find(ref=>ref.part===before.part && JSON.stringify(ref.path)===JSON.stringify(before.objectEvent!.runPath))?.normalizedProperties?.rPr??empty;
       if(!decision.after.length){events.deletedDrawingStyles.push({before,beforeFact,policy:'restore-before-unpaired'});continue;}
       const context=eventContext(decision,'before',before);
