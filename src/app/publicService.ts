@@ -1,6 +1,6 @@
 import { seoByPath, toolSlugByPath } from "./seo.ts";
 import { stripLanguagePrefix } from "../i18n/languages.ts";
-import { VIDEO_STUDIO_PUBLIC } from "./publicServiceConfig.mjs";
+import { VIDEO_STUDIO_PUBLIC, isComparisonToolPublished, isComparisonPathPublished } from "./publicServiceConfig.mjs";
 import { withSiteBasePath } from "./siteBasePath.ts";
 
 // One publication decision is consumed by the catalog, router, static generator and tracking.
@@ -13,7 +13,7 @@ export function isVideoUnavailablePath(pathname: string) {
 }
 
 export function isToolPublished(id: string) {
-  return id !== "video-studio" || VIDEO_STUDIO_PUBLIC;
+  return (id !== "video-studio" || VIDEO_STUDIO_PUBLIC) && isComparisonToolPublished(id);
 }
 
 export type DocumentReadiness = "ready" | "navigation" | "isolation-pending" | "unavailable";
@@ -53,7 +53,7 @@ const workspacePages = new Set(["/tools/office-editor/app", "/tools/excel-merger
 const publicToolCategories = new Set(["spreadsheets", "documents", "media", "text-data", "work", "security-share", "investment-research"]);
 
 export function isKnownPublicPath(path: string) {
-  if (isVideoUnavailablePath(path)) return false;
+  if (isVideoUnavailablePath(path) || !isComparisonPathPublished(path)) return false;
   if (ordinaryPages.has(path) || workspacePages.has(path)) return true;
   if (/^\/tools\/document-compare\/results\/\d+$/.test(path)) return true;
   return Object.hasOwn(seoByPath, path) || Object.hasOwn(toolSlugByPath, path);

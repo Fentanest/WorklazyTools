@@ -1,3 +1,4 @@
+import {isComparisonPathPublished} from "../app/publicServiceConfig.mjs";
 import { useEffect } from "react";
 import { useLocation } from "react-router-dom";
 
@@ -17,9 +18,9 @@ export function RouteSeo() {
     const isTemporaryResult = routePath.startsWith("/tools/document-compare/results/");
     const isOfficeWorkspace = routePath === "/tools/office-editor/app";
     const isExcelPreserveWorkspace = routePath === "/tools/excel-merger/xls-preserve";
-    const isUnavailableVideo = isVideoUnavailablePath(routePath);
+    const isUnavailableTool = isVideoUnavailablePath(routePath)||!isComparisonPathPublished(routePath);
     const baseResultPath = "/tools/document-compare";
-    const seo = isUnavailableVideo
+    const seo = isUnavailableTool
       ? { title: language === "en" ? "Tool Unavailable | Worklazy Tools" : "도구 일시 중단 | Worklazy Tools", description: language === "en" ? "This tool is temporarily unavailable." : "이 도구는 현재 제공하지 않습니다.", noIndex: true }
       : isTemporaryResult
       ? { ...getSeoDefinition(language, baseResultPath), title: language === "en" ? "Document Comparison Result | Worklazy Tools" : "문서 비교 결과 | Worklazy Tools", noIndex: true }
@@ -28,7 +29,7 @@ export function RouteSeo() {
         : isExcelPreserveWorkspace
           ? { ...getSeoDefinition(language, "/tools/excel-merger"), noIndex: true }
       : getSeoDefinition(language, routePath);
-    const canonicalPath = isUnavailableVideo
+    const canonicalPath = isUnavailableTool
       ? "/tools"
       : isTemporaryResult
       ? baseResultPath

@@ -45,8 +45,11 @@ export function assertStaticFaqHtml(html, { filePath = "static output", expected
 }
 
 async function main() {
-const { VIDEO_STUDIO_PUBLIC } = await import("../src/app/publicServiceConfig.mjs");
+const { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonPathPublished } = await import("../src/app/publicServiceConfig.mjs");
 
+const comparisonPublication=JSON.parse(await fs.readFile('dist/comparison-publication.json','utf8'));
+if(comparisonPublication.enabled!==COMPARISON_PORT_PUBLIC)throw new Error('Comparison publication flag differs from built artifact.');
+if(!COMPARISON_PORT_PUBLIC){const sitemap=await fs.readFile('dist/sitemap.xml','utf8');for(const id of COMPARISON_TOOL_IDS)if(sitemap.includes(`/tools/${id}/`))throw new Error('Unpublished comparison route in sitemap.');}
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
 // The Markdown worker has no network fallback: every selected wheel must ship.
@@ -82,7 +85,7 @@ const routes = ["tools/product-banner",
   "tools/document-redactor", "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
   "tools/security-tools", "tools/qr-studio", "tools/qr-studio/bulk", "tools/data-converter",
   "about", "privacy", "terms", "contact", "licenses",
-];
+].filter(route=>isComparisonPathPublished(route));
 const socialSlugByRoute = {
   "tools/image-compare": "image-compare",
   "tools/folder-compare": "folder-compare",

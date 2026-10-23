@@ -1,6 +1,7 @@
+import { isToolPublished } from "./publicService";
 import type { PdfOrganizePreset } from "../features/pdf-editor/pdfOrganizeDirect";
 import type { PdfConvertPreset } from "../features/pdf-editor/pdfConvertDirect";
-import { lazy, Suspense, useLayoutEffect } from "react";
+import { lazy, Suspense, useLayoutEffect, type ReactNode } from "react";
 import { Outlet, Route, Routes, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
@@ -68,7 +69,7 @@ export function App() {
           <Route path="tools/foliotrace" element={<LazyToolRoute label="FolioTrace"><FolioTraceRoute /></LazyToolRoute>} />
           <Route path="tools/excel-merger" element={<ToolReady><ExcelMergerPage /></ToolReady>} />
           <Route path="tools/excel-merger/xls-preserve" element={<ToolReady><ExcelMergerPage /></ToolReady>} />
-          <Route path="tools/excel-compare" element={<LazyToolRoute label="Excel compare"><ExcelComparePage /></LazyToolRoute>} />
+          <Route path="tools/excel-compare" element={<PublishedComparison id="excel-compare"><LazyToolRoute label="Excel compare"><ExcelComparePage /></LazyToolRoute></PublishedComparison>} />
           <Route path="tools/excel-cleaner" element={<LazyToolRoute label="Excel data cleaner"><ExcelCleanerPage /></LazyToolRoute>} />
           <Route path="tools/document-generator" element={<LazyToolRoute label="Document generator"><DocumentGeneratorPage /></LazyToolRoute>} />
           <Route path="tools/pdf-editor" element={<PdfRoute mode="organize" />} />
@@ -92,11 +93,11 @@ export function App() {
           <Route path="tools/pdf-editor/header-footer" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "header-footer" }} />} />
           <Route path="tools/pdf-editor/watermark" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "watermark" }} />} />
           <Route path="tools/pdf-editor/stamp" element={<PdfRoute mode="finish" finishPreset={{ initialTab: "stamp" }} />} />
-          <Route path="tools/document-compare" element={<DocumentCompareSessionProvider />}>
+          <Route path="tools/document-compare" element={<PublishedComparison id="document-compare"><DocumentCompareSessionProvider /></PublishedComparison>}>
             <Route index element={<LazyToolRoute label="Document compare"><DocumentComparePage /></LazyToolRoute>} />
             <Route path="results/:pairNumber" element={<LazyToolRoute label="Document comparison results"><DocumentCompareResultPage /></LazyToolRoute>} />
           </Route>
-          <Route path="tools/pdf-compare" element={<LazyToolRoute label="PDF compare"><PdfComparePage /></LazyToolRoute>} />
+          <Route path="tools/pdf-compare" element={<PublishedComparison id="pdf-compare"><LazyToolRoute label="PDF compare"><PdfComparePage /></LazyToolRoute></PublishedComparison>} />
           <Route path="tools/word-compare/*" element={<LocalizedNavigate to="/tools/document-compare" />} />
           <Route path="tools/hwp-compare/*" element={<LocalizedNavigate to="/tools/document-compare" />} />
           <Route path="tools/hwp-editor" element={<KoreanOnlyRoute><LazyToolRoute label="HWP editor"><HwpEditorPage /></LazyToolRoute></KoreanOnlyRoute>} />
@@ -117,9 +118,9 @@ export function App() {
           <Route path="tools/image-studio/watermark" element={<LazyToolRoute label="Image Studio"><ImageStudioPage preset={{ purpose: "watermark", tab: "editor", panel: "text", interactionMode: "select", text: "" }} /></LazyToolRoute>} />
           <Route path="tools/text-merger" element={<LazyToolRoute label="Text Merger"><TextMergerPage /></LazyToolRoute>} />
           <Route path="tools/text-tools" element={<LazyToolRoute label="Text Tools"><TextToolsPage /></LazyToolRoute>} />
-          <Route path="tools/text-compare" element={<LazyToolRoute label="Text compare"><TextComparePage /></LazyToolRoute>} />
-          <Route path="tools/image-compare" element={<LazyToolRoute label="Image compare"><ImageComparePage /></LazyToolRoute>} />
-          <Route path="tools/folder-compare" element={<LazyToolRoute label="Folder compare"><FolderComparePage /></LazyToolRoute>} />
+          <Route path="tools/text-compare" element={<PublishedComparison id="text-compare"><LazyToolRoute label="Text compare"><TextComparePage /></LazyToolRoute></PublishedComparison>} />
+          <Route path="tools/image-compare" element={<PublishedComparison id="image-compare"><LazyToolRoute label="Image compare"><ImageComparePage /></LazyToolRoute></PublishedComparison>} />
+          <Route path="tools/folder-compare" element={<PublishedComparison id="folder-compare"><LazyToolRoute label="Folder compare"><FolderComparePage /></LazyToolRoute></PublishedComparison>} />
           <Route path="tools/text-formatter" element={<LazyToolRoute label="Formatter"><TextFormatterPage /></LazyToolRoute>} />
           <Route path="tools/work-calculator" element={<LazyToolRoute label="Workday Calculator"><WorkCalculatorPage /></LazyToolRoute>} />
           <Route path="tools/timezone-calculator" element={<LazyToolRoute label="World Time Planner"><TimezoneCalculatorPage /></LazyToolRoute>} />
@@ -209,3 +210,5 @@ function LazyToolRoute({ label, children }: { label: string; children: React.Rea
   const { t } = useTranslation("common");
   return <Suspense fallback={<ToolRouteLoading tool={label} />}><ToolReady>{children}</ToolReady></Suspense>;
 }
+
+function PublishedComparison({id,children}:{id:string;children:ReactNode}){return isToolPublished(id)?children:<UnavailableToolPage comparison/>;}
