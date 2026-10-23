@@ -1,0 +1,13 @@
+import React from 'react';
+import { createRoot } from 'react-dom/client';
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import { FolderComparePage } from '../../../src/features/folder-compare/FolderComparePage';
+import commonEn from '../../../src/locales/en/common.json';
+import commonKo from '../../../src/locales/ko/common.json';
+import { FOLDER_COPY } from '../../../src/features/folder-compare/copy';
+import '../../../src/styles/tailwind.css';
+import '../../../src/styles/global.css';
+import '../../../src/styles/worklazy-theme.css';
+void i18n.use(initReactI18next).init({ lng: new URLSearchParams(location.search).get('language') || 'en', fallbackLng: 'en', resources: { en: { common: commonEn, features: { folderCompare: FOLDER_COPY.en } }, ko: { common: commonKo, features: { folderCompare: FOLDER_COPY.ko } } }, interpolation: { escapeValue: false }, react: { useSuspense: false } });
+createRoot(document.getElementById('root')!).render(<React.StrictMode><FolderComparePage /></React.StrictMode>);

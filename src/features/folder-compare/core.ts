@@ -101,8 +101,9 @@ export async function compareBytes(left: FolderEntry, right: FolderEntry, signal
     const settled = Promise.all([a.done, b.done]); settled.catch(() => {});
     const failed = settled.then(() => new Promise<never>(() => {})); failed.catch(() => {});
     let ac = new Uint8Array(0), bc = new Uint8Array(0), ai = 0, bi = 0, ae = false, be = false;
-    let an = 0, bn = 0, equal = left.size === right.size;
+    let an = 0, bn = 0, turns = 0, equal = left.size === right.size;
     while (!ae || !be || ai < ac.length || bi < bc.length) {
+      if (++turns % 16 === 0) await new Promise(resolve => setTimeout(resolve, 0));
       checkAbort(signal);
       if (ai === ac.length && !ae) { const next = await Promise.race([a.reader.read(), failed]); ae = !!next.done; ac = next.value ?? new Uint8Array(0); ai = 0; an += ac.length; }
       if (bi === bc.length && !be) { const next = await Promise.race([b.reader.read(), failed]); be = !!next.done; bc = next.value ?? new Uint8Array(0); bi = 0; bn += bc.length; }
@@ -131,7 +132,9 @@ export class FolderRun {
     const work = previous.catch(() => {}).then(async () => {
       // Queued replacements can be superseded without ever opening a source.
       if (generation !== this.generation) return;
+      let processed = 0;
       for (const row of rows) {
+        if (++processed % 32 === 0) await new Promise(resolve => setTimeout(resolve, 0));
         if (generation !== this.generation) return;
         if (row.pairing !== 'matched' || row.content !== 'pending') continue;
         if (controller.signal.aborted) { row.content = 'canceled'; row.integrity = 'unchecked'; continue; }
