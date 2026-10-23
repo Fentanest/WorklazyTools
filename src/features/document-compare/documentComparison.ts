@@ -88,7 +88,7 @@ export function compareDocumentModels(
     sources: { before: before.sourceInventory ?? [], after: after.sourceInventory ?? [] },
     exclusions: {
       formatting: options.formatting ? "compare" : "preserve-after",
-      tables: options.tables ? [] : [...before.blocks, ...after.blocks].filter((block) => block.type === "table").flatMap((block) => block.source ? [block.source] : []),
+      tables: options.tables ? [] : [...before.sourceInventory ?? [], ...after.sourceInventory ?? []].filter((source) => source.kind === "tbl"),
       metadata: options.metadata ? [] : [...before.headerFooter, ...after.headerFooter, ...before.notes, ...after.notes, ...before.comments ?? [], ...after.comments ?? []].flatMap((record) => record.source ? [record.source] : []),
     },
   };
@@ -150,10 +150,27 @@ export function compareDocumentModels(
     ));
   }
 
-  const headerFooter = compareRecordList(options.metadata ? before.headerFooter : [], options.metadata ? after.headerFooter : [], "headerFooter", changes, options.formatting, manifest);
-  const note = compareRecordList(options.metadata ? before.notes : [], options.metadata ? after.notes : [], "note", changes, options.formatting, manifest);
+  // Extraction retains every source node. Scope filtering belongs to this shared
+  // decision builder, including paragraphs flattened from metadata tables.
+  const scopedMetadata = (model: ComparisonModel, records: ComparisonRecord[]) => {
+    if (!options.metadata) return [];
+    if (options.tables) return records;
+    const tables = (model.sourceInventory ?? []).filter((source) => source.kind === "tbl");
+    const included = (record: ManifestRecord) => !record.source || !tables.some((table) =>
+      table.part === record.source!.part && table.path.every((index, depth) => record.source!.path[depth] === index));
+    return records.filter(included).flatMap((record) => {
+      if (!record.paragraphs?.length) return [record];
+      const paragraphs = record.paragraphs.filter(included);
+      if (paragraphs.length === record.paragraphs.length) return [record];
+      if (!paragraphs.length) return [];
+      const projected = combineRecords(paragraphs.map((item) => ({ ...item, format: (item as Partial<ComparisonRecord>).format ?? "", formatRuns: (item as Partial<ComparisonRecord>).formatRuns, location: record.location })))!;
+      return [{ ...record, ...projected, paragraphs, rawText: paragraphs.map((item) => item.rawText ?? item.text).join("\n") }];
+    });
+  };
+  const headerFooter = compareRecordList(scopedMetadata(before, before.headerFooter), scopedMetadata(after, after.headerFooter), "headerFooter", changes, options.formatting, manifest);
+  const note = compareRecordList(scopedMetadata(before, before.notes), scopedMetadata(after, after.notes), "note", changes, options.formatting, manifest);
   const commentChanges: WordDiffItem[] = [];
-  const commentViews = compareRecordList(options.metadata ? before.comments ?? [] : [], options.metadata ? after.comments ?? [] : [], "comment", commentChanges, options.formatting, manifest);
+  const commentViews = compareRecordList(scopedMetadata(before, before.comments ?? []), scopedMetadata(after, after.comments ?? []), "comment", commentChanges, options.formatting, manifest);
   changes.push(...commentChanges);
   buildRestoreStyleProjections(manifest);
   buildWordFormatting(manifest, diffCharacters);
