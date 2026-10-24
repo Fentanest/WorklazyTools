@@ -2,19 +2,19 @@ import {maskedSourceFormatting} from './formattingMask.ts';
 import {buildObjectEventContexts,eventPosition,splitBoundaryNoteContexts} from './objectEventContext.ts';
 import type {ComparisonDecision,DocumentComparisonManifest,DocumentSourceReference} from './comparisonManifest.ts';
 export interface NoteContainer {source:DocumentSourceReference;kind:string;id:string;type:string;contentSignature?:string;specialRevisionShape?:string[]}
-export interface NoteFacts {policy:'worklazy-note-facts-1';parts:string[];containers:NoteContainer[];references:Array<{source:DocumentSourceReference;kind:string;id:string}>;errors:string[]}
+export interface NoteFacts {policy:'worklazy-note-facts-1';parts:string[];owners:Array<{kind:string;part:string;rId?:string;rawTarget?:string}>;containers:NoteContainer[];references:Array<{source:DocumentSourceReference;kind:string;id:string}>;errors:string[]}
 export interface NotePair {id:string;kind:string;before?:NoteContainer;after?:NoteContainer;decisionIds:string[];coverage:{before:DocumentSourceReference[];after:DocumentSourceReference[]}}
-export interface NoteProjection {policy:'worklazy-note-projection-1';supported:boolean;reasons:string[];pairs:NotePair[];specialChecks?:Array<{part:string;role:string;before:NoteContainer[];after:NoteContainer[];includedEqual:boolean;redline:boolean}>;partActions?:Array<{part:string;kind:string;before:boolean;after:boolean;create:boolean;specials:NoteContainer[]}>;excludedReferences?:{before:Array<{source:DocumentSourceReference;noteId:string}>;after:Array<{source:DocumentSourceReference;noteId:string}>};references:Array<{decisionId:string;before?:DocumentSourceReference;after?:DocumentSourceReference;noteId:string}>}
+export interface NoteProjection {policy:'worklazy-note-projection-1';supported:boolean;reasons:string[];pairs:NotePair[];specialChecks?:Array<{part:string;role:string;before:NoteContainer[];after:NoteContainer[];includedEqual:boolean;redline:boolean}>;partActions?:Array<{part:string;kind:string;beforePart:string|null;afterPart:string|null;before:boolean;after:boolean;create:boolean;specials:NoteContainer[]}>;excludedReferences?:{before:Array<{source:DocumentSourceReference;noteId:string}>;after:Array<{source:DocumentSourceReference;noteId:string}>};references:Array<{decisionId:string;before?:DocumentSourceReference;after?:DocumentSourceReference;noteId:string}>}
 const key=(ref:DocumentSourceReference)=>JSON.stringify([ref.part,ref.path]);
 export function buildNoteProjection(manifest:DocumentComparisonManifest):NoteProjection {
  const a=manifest.noteFacts.before,b=manifest.noteFacts.after,plan:NoteProjection={policy:'worklazy-note-projection-1',supported:true,reasons:[],pairs:[],references:[]};
  if(!manifest.options.metadata||!a||!b)return plan;
- plan.partActions=['footnote','endnote'].filter(kind=>a.parts.includes('word/'+kind+'s.xml')||b.parts.includes('word/'+kind+'s.xml')).map(kind=>{const part='word/'+kind+'s.xml';return {part,kind,before:a.parts.includes(part),after:b.parts.includes(part),create:!b.parts.includes(part),specials:b.parts.includes(part)?[]:a.containers.filter(note=>note.source.part===part&&note.type!=='normal')};});
+ plan.partActions=['footnote','endnote'].flatMap(kind=>{const old=a.owners.find(owner=>owner.kind===kind)?.part??null,next=b.owners.find(owner=>owner.kind===kind)?.part??null;if(!old&&!next)return [];return [{part:next??old!,kind,beforePart:old,afterPart:next,before:Boolean(old),after:Boolean(next),create:!next,specials:next?[]:a.containers.filter(note=>note.source.part===old&&note.type!=='normal')}];});
  plan.reasons.push(...a.errors,...b.errors);
  plan.specialChecks=[];
  for(const action of plan.partActions.filter(action=>action.before&&action.after)){
-  const special=(facts:NoteFacts)=>facts.containers.filter(note=>note.source.part===action.part&&note.type!=='normal');
-  const old=special(a),next=special(b);
+  const special=(facts:NoteFacts,part:string|null)=>facts.containers.filter(note=>note.source.part===part&&note.type!=='normal');
+  const old=special(a,action.beforePart),next=special(b,action.afterPart);
   for(const role of new Set([...old,...next].map(note=>note.type))){
    const x=old.filter(note=>note.type===role),y=next.filter(note=>note.type===role);
    const includedEqual=x.length===1&&y.length===1&&x[0].contentSignature===y[0].contentSignature&&maskedSourceFormatting(manifest.sources.before,x[0].source,manifest.formattingMask.effective)===maskedSourceFormatting(manifest.sources.after,y[0].source,manifest.formattingMask.effective);
@@ -71,4 +71,14 @@ export function buildNoteProjection(manifest:DocumentComparisonManifest):NotePro
 export function bindNoteDecisions(manifest:DocumentComparisonManifest,pair:NotePair,decisions:ComparisonDecision[]) {
  const visit=(items:ComparisonDecision[])=>{for(const decision of items){pair.decisionIds.push(decision.id);if(!pair.before||!pair.after){decision.trackedRepresentation='note-reference';decision.noteId=pair.id;}visit(decision.children??[]);}};visit(decisions);
  for(const side of ['before','after'] as const){const root=pair[side]?.source;pair.coverage[side]=root?manifest.sources[side].filter(ref=>ref.part===root.part&&root.path.every((item,index)=>ref.path[index]===item)&&['p','tbl'].includes(ref.kind??'')):[];}
+}
+
+export function bindNoteOutputCapabilities(manifest:DocumentComparisonManifest) {
+ const all:ComparisonDecision[]=[];const visit=(items:ComparisonDecision[])=>{for(const item of items){all.push(item);visit(item.children??[]);}};visit(manifest.decisions);
+ for(const pair of manifest.noteProjection.pairs){
+  if(!pair.before||!pair.after||pair.before.source.part===pair.after.source.part)continue;
+  if(all.filter(decision=>pair.decisionIds.includes(decision.id)).some(decision=>decision.objectEvents?.before.some(source=>source.objectEvent?.kind==='hyperlink'&&!decision.objectEvents!.unchangedLinks.some(link=>key(link.before)===key(source))))){
+   manifest.noteProjection.reasons.push('custom-note-link-revision');manifest.noteProjection.supported=false;
+  }
+ }
 }

@@ -474,7 +474,7 @@ def _source_paths(root, part, archive=None):
             if node is not paragraph and node.tag == W + "p": return
             if node.tag in {W+"footnoteReference",W+"endnoteReference"}:
                 kind="footnote" if node.tag==W+"footnoteReference" else "endnote"
-                if archive is None or "word/"+kind+"s.xml" not in archive.namelist():return
+                if archive is None or not any(owner['kind']==kind for owner in _note_part_owners(archive)[0]):return
                 event={"kind":"note","start":cursor[0],"end":cursor[0],"signature":kind,"supported":True,"target":node.get(W+"id",""),"paragraphPath":result[id(paragraph)]["path"],"runPath":result[id(node)]["path"][:-1]}
                 result[id(node)]["objectEvent"]=event;events.append(event);return
             if node.tag in {W + "drawing", W + "pict", W + "hyperlink", "{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:
@@ -688,18 +688,30 @@ def _iter_story_blocks(container):
                 yield from _iter_story_blocks(content)
 
 
-def _note_package_facts(archive,inventory):
-    containers=[];errors=[]
+def _note_part_owners(archive):
     import posixpath
-    main='word/_rels/document.xml.rels';relationships=[]
-    if main in archive.namelist():
-        relationships=ET.fromstring(archive.read(main))
-        for kind in ('footnote','endnote'):
-            refs=[rel for rel in relationships if rel.get('Type')=='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+kind+'s']
-            if len(refs)>1:errors.append('unsupported-note-part-path')
-            for rel in refs:
-                target=rel.get('Target','');part=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
-                if rel.get('TargetMode')=='External' or part!='word/'+kind+'s.xml' or part not in archive.namelist():errors.append('unsupported-note-part-path')
+    owners=[];errors=[];names=archive.namelist();base='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
+    rels=list(ET.fromstring(archive.read('word/_rels/document.xml.rels'))) if 'word/_rels/document.xml.rels' in names else []
+    types=list(ET.fromstring(archive.read('[Content_Types].xml'))) if '[Content_Types].xml' in names else []
+    for kind in ('footnote','endnote'):
+        refs=[rel for rel in rels if rel.get('Type')==base+kind+'s'];fallback='word/'+kind+'s.xml'
+        if not refs:
+            if fallback in names:owners.append({'kind':kind,'part':fallback}) # legacy unreferenced fixtures
+            continue
+        if len(refs)!=1:errors.append('unsupported-note-part-path');continue
+        rel=refs[0];target=rel.get('Target','');part=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
+        mime='application/vnd.openxmlformats-officedocument.wordprocessingml.'+kind+'s+xml'
+        declarations=[n.get('ContentType') for n in types if n.get('PartName')=='/'+part]
+        if not rel.get('Id') or not target or not target.isascii() or any(c.isspace() for c in target) or any(c in target for c in '\\:#?%') or rel.get('TargetMode','') not in ('','Internal') or not part.startswith('word/') or names.count(part)!=1 or declarations!=[mime] or sum(r.get('Id')==rel.get('Id') for r in rels)!=1:
+            errors.append('unsupported-note-part-path');continue
+        if ET.fromstring(archive.read(part)).tag!=W+kind+'s':errors.append('unsupported-note-part-path');continue
+        owners.append({'kind':kind,'part':part,'rId':rel.get('Id'),'rawTarget':target})
+    if len({owner['part'] for owner in owners})!=len(owners):errors.append('unsupported-note-part-path')
+    return owners,errors
+
+def _note_package_facts(archive,inventory):
+    containers=[];owners,errors=_note_part_owners(archive)
+    main='word/_rels/document.xml.rels';relationships=ET.fromstring(archive.read(main)) if main in archive.namelist() else []
     def content_signature(node,part):
         import posixpath
         relpath=posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
@@ -716,9 +728,8 @@ def _note_package_facts(archive,inventory):
                 attrs.append([name,value])
             return [item.tag,attrs,item.text or '',[canonical(child) for child in item if child.tag not in {W+name for name in ('pPr','rPr','tblPr','trPr','tcPr','sectPr')}]]
         return hashlib.sha256(json.dumps(canonical(node,True),ensure_ascii=False).encode()).hexdigest()
-    for kind in ('footnote','endnote'):
-        part='word/'+kind+'s.xml'
-        if part not in archive.namelist():continue
+    for owner in owners:
+        kind,part=owner['kind'],owner['part']
         ids=set()
         for index,node in enumerate(ET.fromstring(archive.read(part))):
             if node.tag!=W+kind:continue
@@ -748,7 +759,7 @@ def _note_package_facts(archive,inventory):
         if any(ref['kind']==kind for ref in references) and sum(rel.get('Type')=='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+kind+'s' for rel in relationships)!=1:errors.append('unsupported-note-part-path')
     for ref in references:
         if not any(note['kind']==ref['kind'] and note['id']==ref['id'] and note['type']=='normal' for note in containers):errors.append('missing-note-target')
-    return {'policy':'worklazy-note-facts-1','containers':containers,'references':references,'errors':sorted(set(errors)), 'parts':[part for part in ('word/footnotes.xml','word/endnotes.xml') if part in archive.namelist()]}
+    return {'policy':'worklazy-note-facts-1','containers':containers,'references':references,'errors':sorted(set(errors)), 'parts':[owner['part'] for owner in owners],'owners':owners}
 
 def _story_package_facts(archive):
     import posixpath
@@ -820,8 +831,9 @@ def _parse_document(data, include_tables, include_metadata):
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         records["storyFacts"]=_story_package_facts(archive)
         story_kinds={item["part"]:item["kind"] for item in records["storyFacts"]["parts"]}
+        note_parts={owner['part'] for owner in _note_part_owners(archive)[0]}
         for part in archive.namelist():
-            if part in story_kinds or re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments|styles)\.xml", part):
+            if part in note_parts or part in story_kinds or re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments|styles)\.xml", part):
                 records["sourceInventory"].extend(_source_paths(ET.fromstring(archive.read(part)), part, archive).values())
         numbering = _NumberingResolver(archive)
         comments = _read_comments(archive, numbering.fresh()) if include_metadata else {}
@@ -933,10 +945,8 @@ def _parse_document(data, include_tables, include_metadata):
                     "format": comment["format"],
                 })
 
-            for path, note_name, element_name in (
-                ("word/footnotes.xml", _l("각주", "Footnote"), "footnote"),
-                ("word/endnotes.xml", _l("미주", "Endnote"), "endnote"),
-            ):
+            for owner in _note_part_owners(archive)[0]:
+                path=owner['part'];element_name=owner['kind'];note_name=_l('각주','Footnote') if element_name=='footnote' else _l('미주','Endnote')
                 if path not in archive.namelist():
                     continue
                 notes_root = ET.fromstring(archive.read(path))

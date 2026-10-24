@@ -265,7 +265,7 @@ def accept_tracked_document(input_path, output_path):
         stories=set()
         if "word/_rels/document.xml.rels" in archive.namelist():
             for rel in ET.fromstring(archive.read("word/_rels/document.xml.rels")):
-                if rel.get("Type") in {"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"+kind for kind in ("header","footer")} and rel.get("TargetMode")!="External":
+                if rel.get("Type") in {"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"+kind for kind in ("header","footer","footnotes","endnotes")} and rel.get("TargetMode")!="External":
                     target=rel.get("Target","");stories.add(target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join("word",target)))
         for info in archive.infolist():
             if _is_accept_part(info.filename) or info.filename in stories:

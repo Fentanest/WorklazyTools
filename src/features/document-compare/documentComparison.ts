@@ -1,5 +1,5 @@
 import {buildTableGridProjections} from "./tableGridProjection.ts";
-import {buildNoteProjection,bindNoteDecisions,type NoteFacts} from "./noteProjection.ts";
+import {buildNoteProjection,bindNoteDecisions,bindNoteOutputCapabilities,type NoteFacts} from "./noteProjection.ts";
 import {buildStoryProjection,bindStoryDecisions,emptyStoryBindingChanges,type StoryFacts} from "./storyProjection.ts";
 import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
 import { normalizeFormattingMask, formattingGroup, maskPolicyVersion, maskedSourceFormatting, type FormattingMask } from "./formattingMask.ts";
@@ -221,6 +221,7 @@ export function compareDocumentModels(
     if(before.length || after.length)decision.objectEvents={unchangedDrawings:drawingProperties.filter(pair=>pair.before.objectEvent!.signature===pair.after.objectEvent!.signature && (!pair.families.length || pair.representation==="preserve-after-history")).map(pair=>({before:pair.before,after:pair.after})),contexts,deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-5",before,after,changed:JSON.stringify(before.filter(source=>options.metadata||source.objectEvent!.kind!=="note").map(source=>[source.objectEvent!.kind,position("before",source),position("before",source,true),source.objectEvent!.signature]))!==JSON.stringify(after.filter(source=>options.metadata||source.objectEvent!.kind!=="note").map(source=>[source.objectEvent!.kind,position("after",source),position("after",source,true),source.objectEvent!.signature]))};
   }};
   objectDecisions(manifest.decisions);
+  bindNoteOutputCapabilities(manifest);
   buildDrawingRestoreProjections(manifest);
   buildMergeProjections(manifest);
   buildRestoreStyleProjections(manifest);

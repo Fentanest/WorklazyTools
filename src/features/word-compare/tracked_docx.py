@@ -50,7 +50,7 @@ class _PackageGraph:
         self.before, self.after = before, after
         self.roots, self.additions, self.ids, self.media = {}, {}, {}, {}
         self.output_owner=None
-        self.story_parts={item["part"] for item in _story_package_facts(after)["parts"]}|{"word/document.xml","word/footnotes.xml","word/endnotes.xml","word/comments.xml"}
+        self.story_parts={item["part"] for item in _story_package_facts(after)["parts"]}|{item["part"] for item in _note_part_owners(after)[0]}|{"word/document.xml","word/footnotes.xml","word/endnotes.xml","word/comments.xml"}
         self.types = ET.fromstring(after.read('[Content_Types].xml')) if '[Content_Types].xml' in after.namelist() else ET.Element(CT+'Types')
         self.before_types = ET.fromstring(before.read('[Content_Types].xml')) if '[Content_Types].xml' in before.namelist() else ET.Element(CT+'Types')
         self.names = set(after.namelist()); self.next_drawing_id = 1
@@ -75,7 +75,7 @@ class _PackageGraph:
         if any(node.get('Type')==kind_uri for node in root):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_RELATIONSHIP')
         used={node.get('Id') for node in root};number=1
         while 'rIdWorklazyNote'+str(number) in used:number+=1
-        ET.SubElement(root,PR+'Relationship',{'Id':'rIdWorklazyNote'+str(number),'Type':kind_uri,'Target':posixpath.basename(part)})
+        ET.SubElement(root,PR+'Relationship',{'Id':'rIdWorklazyNote'+str(number),'Type':kind_uri,'Target':posixpath.relpath(part,'word')})
         self.roots[path]=root
     def mime(self, part, types):
         content=next((node.get('ContentType') for node in types if node.tag==CT+'Override' and node.get('PartName')=='/'+part),None)
@@ -1617,7 +1617,10 @@ def _validate_note_projection(facts,actual):
     if _MANIFEST.get('noteFacts')!=facts:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_FACTS')
     plan=_MANIFEST.get('noteProjection',{})
     if _MANIFEST['options']['metadata']:
-        expected_parts=[{'part':'word/'+kind+'s.xml','kind':kind,'before':'word/'+kind+'s.xml' in facts['before']['parts'],'after':'word/'+kind+'s.xml' in facts['after']['parts'],'create':'word/'+kind+'s.xml' not in facts['after']['parts'],'specials':[] if 'word/'+kind+'s.xml' in facts['after']['parts'] else [note for note in facts['before']['containers'] if note['kind']==kind and note['type']!='normal']} for kind in ('footnote','endnote') if any('word/'+kind+'s.xml' in facts[side]['parts'] for side in ('before','after'))]
+        expected_parts=[]
+        for kind in ('footnote','endnote'):
+            old=next((owner['part'] for owner in facts['before']['owners'] if owner['kind']==kind),None);new=next((owner['part'] for owner in facts['after']['owners'] if owner['kind']==kind),None)
+            if old or new:expected_parts.append({'part':new or old,'kind':kind,'beforePart':old,'afterPart':new,'before':bool(old),'after':bool(new),'create':not new,'specials':[] if new else [note for note in facts['before']['containers'] if note['source']['part']==old and note['type']!='normal']})
         if plan.get('partActions')!=expected_parts:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_PARTS')
         for decision in _MANIFEST_DECISIONS:
             if decision['type']!='paragraph' or len(decision['before'])!=1 or len(decision['after'])!=2:continue
@@ -1639,20 +1642,28 @@ def _validate_note_projection(facts,actual):
             if identity in covered or not any(action['part']==check['part'] and action['before'] and action['after'] for action in expected_parts):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
             covered.add(identity)
             for side in ('before','after'):
-                expected=[note for note in facts[side]['containers'] if note['source']['part']==check['part'] and note['type']==check['role'] and note['type']!='normal']
+                action=next(action for action in expected_parts if action['part']==check['part'])
+                expected=[note for note in facts[side]['containers'] if note['source']['part']==action[side+'Part'] and note['type']==check['role'] and note['type']!='normal']
                 if check.get(side)!=expected:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
             old,new=check['before'],check['after']
             equal=len(old)==len(new)==1 and old[0]['contentSignature']==new[0]['contentSignature'] and selected('before',old[0])==selected('after',new[0])
             redline=len(old)==len(new)==1 and bool(old[0].get('specialRevisionShape')) and old[0].get('specialRevisionShape')==new[0].get('specialRevisionShape')
             if check.get('includedEqual') is not equal or check.get('redline') is not redline:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
             if not equal and not redline:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_SPECIAL')
-        required={(action['part'],note['type']) for action in expected_parts if action['before'] and action['after'] for side in ('before','after') for note in facts[side]['containers'] if note['source']['part']==action['part'] and note['type']!='normal'}
+        required={(action['part'],note['type']) for action in expected_parts if action['before'] and action['after'] for side in ('before','after') for note in facts[side]['containers'] if note['source']['part']==action[side+'Part'] and note['type']!='normal'}
         if covered!=required:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
 
     if plan.get('policy')!='worklazy-note-projection-1':raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE')
     if not _MANIFEST['options']['metadata']:
         if plan!={'policy':'worklazy-note-projection-1','supported':True,'reasons':[],'pairs':[],'references':[]}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE')
         return
+    for pair in plan.get('pairs',[]):
+        old,new=pair.get('before'),pair.get('after')
+        if old and new and old['source']['part']!=new['source']['part']:
+            for decision in _MANIFEST_DECISIONS:
+                if decision['id'] not in pair['decisionIds']:continue
+                events=decision.get('objectEvents',{})
+                if any(source['objectEvent']['kind']=='hyperlink' and not any(link['before']==source for link in events.get('unchangedLinks',[])) for source in events.get('before',[])):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CUSTOM_NOTE_LINK_REVISION')
     if plan.get('supported') is not True or plan.get('reasons') or any(value['errors'] for value in facts.values()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE')
     pairs=plan['pairs'];owned={side:set() for side in ('before','after')};used_refs={side:set() for side in ('before','after')};ids=set()
     for pair in pairs:
@@ -1819,7 +1830,7 @@ def _validate_manifest(before_path, after_path):
         for side in ("before", "after"):
             if decision.get("trackedRepresentation") != "preserve-after":
                 opposite_parts = {key[0] for key in actual["after" if side == "before" else "before"]}
-                if any(ref["part"] not in opposite_parts and not any(pair.get(side+"Part")==ref["part"] for pair in _MANIFEST["storyProjection"]["pairs"]) and not (decision.get('trackedRepresentation')=='note-reference' and any(pair['id']==decision.get('noteId') for pair in _MANIFEST['noteProjection']['pairs'])) for ref in decision[side]):
+                if any(ref["part"] not in opposite_parts and not any(pair.get(side+"Part")==ref["part"] for pair in _MANIFEST["storyProjection"]["pairs"]) and not any(pair.get('before') and pair.get('after') and decision['id'] in pair['decisionIds'] and pair[side]['source']['part']==ref['part'] for pair in _MANIFEST['noteProjection']['pairs']) and not (decision.get('trackedRepresentation')=='note-reference' and any(pair['id']==decision.get('noteId') for pair in _MANIFEST['noteProjection']['pairs'])) for ref in decision[side]):
                     raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
         _validate_segments(decision["textSegments"], decision["beforeText"], decision["afterText"])
         if shape == (1, 2):
@@ -2675,15 +2686,51 @@ def _revisionize_xml_part(before_data, after_data, include_formatting, writer, c
     finally:
         if _PACKAGE_GRAPH is not None:_PACKAGE_GRAPH.output_owner=previous_owner
 
+def _validate_note_numbering(original):
+    if original.find('.//'+W+'numPr') is None:return
+    origin=_MANIFEST_NODE_KEYS.get(original)
+    if origin is None or origin[0]!='before':raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+    if any(name not in _PACKAGE_GRAPH.before.namelist() for name in ('word/numbering.xml','word/_rels/document.xml.rels')):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+    part,path=origin[1];raw=ET.fromstring(_PACKAGE_GRAPH.before.read(part))
+    for index in path:raw=raw[index]
+    rels=list(ET.fromstring(_PACKAGE_GRAPH.before.read('word/_rels/document.xml.rels')))
+    refs=[rel for rel in rels if rel.get('Type')==R[1:-1]+'/numbering']
+    if len(refs)!=1 or refs[0].get('Target')!='numbering.xml' or refs[0].get('TargetMode','') not in ('','Internal') or sum(r.get('Id')==refs[0].get('Id') for r in rels)!=1:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+    source=ET.fromstring(_PACKAGE_GRAPH.before.read('word/numbering.xml'));target=getattr(_PACKAGE_GRAPH,'numbering_root',None);mapping=getattr(_PACKAGE_GRAPH,'numbering_mapping',{})
+    expected_mime='application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml'
+    if source.tag!=W+'numbering' or any([node.get('ContentType') for node in types if node.get('PartName')=='/word/numbering.xml']!=[expected_mime] for types in [_PACKAGE_GRAPH.before_types]+([_PACKAGE_GRAPH.types] if 'word/numbering.xml' in _PACKAGE_GRAPH.after.namelist() else [])):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+    def definition(root,identity):
+        nums=[n for n in root.findall(W+'num') if n.get(W+'numId')==identity] if root is not None else []
+        if len(nums)!=1 or len(nums[0])!=1 or nums[0][0].tag!=W+'abstractNumId':raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+        abstracts=[a for a in root.findall(W+'abstractNum') if a.get(W+'abstractNumId')==nums[0][0].get(W+'val')]
+        if len(abstracts)!=1:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+        abstract=abstracts[0];levels=abstract.findall(W+'lvl')
+        if len(levels)!=1 or levels[0].get(W+'ilvl')!='0' or any(n.tag not in {W+'multiLevelType',W+'lvl'} for n in abstract):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+        values={_local_name(n.tag):n.get(W+'val') for n in levels[0]}
+        if len(levels[0])!=3 or set(values)!={'start','numFmt','lvlText'} or values['numFmt']!='decimal' or values['lvlText']!='%1.' or not (values['start'] or '').isdigit() or int(values['start'])<1:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+        return values
+    raw_props=raw.findall('.//'+W+'numPr');mapped_props=original.findall('.//'+W+'numPr')
+    if len(raw_props)!=len(mapped_props):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+    for old,new in zip(raw_props,mapped_props):
+        identity=old.find(W+'numId');level=old.find(W+'ilvl')
+        if identity is None or level is None or level.get(W+'val')!='0' or len(old)!=2:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+        number=identity.get(W+'val');mapped=mapping.get(number)
+        if not mapped or new.find(W+'numId') is None or new.find(W+'numId').get(W+'val')!=mapped or definition(source,number)!=definition(target,mapped):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_NUMBERING')
+
 def _validate_imported_note(original,include_tables):
-    if any(_is_note_event(node) or node.tag in {W+'numPr',W+'object',W+'sdt',W+'bookmarkStart',W+'bookmarkEnd'} or (node.tag==W+'pict' and not _simple_vml_picture(node)) or (node.tag==W+'tbl' and not include_tables) or (node.tag==W+'hyperlink' and node.get(W+'anchor')) for node in original.iter()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_DEPENDENCY')
+    _validate_note_numbering(original)
+    if any(_is_note_event(node) or node.tag in {W+'object',W+'sdt',W+'bookmarkStart',W+'bookmarkEnd'} or (node.tag==W+'pict' and not _simple_vml_picture(node)) or (node.tag==W+'tbl' and not include_tables) or (node.tag==W+'hyperlink' and node.get(W+'anchor')) for node in original.iter()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_DEPENDENCY')
     styles=ET.fromstring(_PACKAGE_GRAPH.after.read('word/styles.xml')) if 'word/styles.xml' in _PACKAGE_GRAPH.after.namelist() else ET.Element(W+'styles');style_ids={node.get(W+'styleId') for node in styles.findall(W+'style')}
     if any(node.get(W+'val') not in style_ids for node in original.iter() if node.tag in {W+'pStyle',W+'rStyle'}):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_STYLE')
 
-def _revisionize_notes(before_data,after_data,include_formatting,writer,note_tag,include_tables=True):
-    before_root=_parse_xml(before_data) if before_data else ET.Element(W+note_tag+'s');after_root=_parse_xml(after_data) if after_data else ET.Element(W+note_tag+'s');part='word/'+note_tag+'s.xml'
-    _register_manifest_root(before_root,part,'before');_register_manifest_root(after_root,part,'after')
-    action=next(item for item in _MANIFEST['noteProjection']['partActions'] if item['part']==part)
+def _revisionize_notes(before_data,after_data,include_formatting,writer,note_tag,include_tables,action):
+    previous=_PACKAGE_GRAPH.output_owner;_PACKAGE_GRAPH.output_owner=action['part']
+    try:return _revisionize_note_content(before_data,after_data,include_formatting,writer,note_tag,include_tables,action)
+    finally:_PACKAGE_GRAPH.output_owner=previous
+
+def _revisionize_note_content(before_data,after_data,include_formatting,writer,note_tag,include_tables,action):
+    before_root=_parse_xml(before_data) if before_data else ET.Element(W+note_tag+'s');after_root=_parse_xml(after_data) if after_data else ET.Element(W+note_tag+'s');part=action['part']
+    _register_manifest_root(before_root,action['beforePart'] or part,'before');_register_manifest_root(after_root,part,'after')
     if after_data is None and not action['specials']:
         for identity,kind in [('-1','separator'),('0','continuationSeparator')]:
             special=ET.SubElement(after_root,W+note_tag,{W+'id':identity,W+'type':kind});ET.SubElement(ET.SubElement(ET.SubElement(special,W+'p'),W+'r'),W+kind)
@@ -2697,7 +2744,7 @@ def _revisionize_notes(before_data,after_data,include_formatting,writer,note_tag
             after_root.append(_accepted_copy(original))
     for pair in _MANIFEST['noteProjection']['pairs']:
         old,new=pair.get('before'),pair.get('after')
-        if (old or new)['source']['part']!=part:continue
+        if (new or old)['source']['part']!=part:continue
         if old and new:
             before_note=before_root[old['source']['path'][0]];after_note=after_root[new['source']['path'][0]]
             _replace_blocks(after_note,_revision_blocks([child for child in before_note if child.tag in BLOCK_TAGS],[child for child in after_note if child.tag in BLOCK_TAGS],include_formatting,writer,include_tables))
@@ -3023,8 +3070,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
                     if any(pair.get("beforePart")==name for pair in _MANIFEST["storyProjection"]["pairs"])
                 )
                 reference_parts.extend(
-                    name for name in ("word/footnotes.xml", "word/endnotes.xml")
-                    if name in before_names and name in after_names
+                    action['beforePart'] for action in _MANIFEST['noteProjection']['partActions'] if action['before']
                 )
             referenced_number_ids = _referenced_number_ids(before_archive, reference_parts)
             merged_numbering, number_mapping = _merge_numbering(
@@ -3032,6 +3078,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
                 after_archive.read("word/numbering.xml") if "word/numbering.xml" in after_names else None,
                 referenced_number_ids,
             )
+            _PACKAGE_GRAPH.numbering_mapping=number_mapping;_PACKAGE_GRAPH.numbering_root=ET.fromstring(merged_numbering)
             if "word/numbering.xml" in after_names:
                 replacements["word/numbering.xml"] = merged_numbering
             else:
@@ -3076,7 +3123,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
                     replacements[new]=_revisionize_xml_part(before_part(old),after_archive.read(new),bool(include_formatting),writer,include_tables=bool(include_tables),part=new,source_before_part=old)
             for action in _MANIFEST['noteProjection']['partActions']:
                 name,note_tag=action['part'],action['kind']
-                data=_revisionize_notes(before_part(name) if action['before'] else None,after_archive.read(name) if action['after'] else None,bool(include_formatting),writer,note_tag,bool(include_tables))
+                data=_revisionize_notes(before_part(action['beforePart']) if action['before'] else None,after_archive.read(name) if action['after'] else None,bool(include_formatting),writer,note_tag,bool(include_tables),action)
                 (replacements if action['after'] else additions)[name]=data
                 if action['create']:
                     _PACKAGE_GRAPH.add_note_part(name,note_tag)
