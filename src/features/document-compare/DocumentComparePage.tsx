@@ -223,7 +223,7 @@ export function DocumentComparePage() {
             <div className="mt-2 border-t border-border pt-2 [&_[data-ui-component=toggle-row]]:min-h-[45px]">
               <ToggleRow
                 label={L("변경 내용 작성자 통일", "Use one revision author")}
-                description={L("기존 변경 내용을 먼저 수락하고 새 변경 기록의 작성자를 아래 이름으로 통일합니다.", "Accept existing revisions first, then use the name below for all new tracked changes.")}
+                description={L("기존 변경 내용을 먼저 수락한 뒤, 새 변경 기록에 사용할 작성자 이름을 설정합니다.", "Accept existing revisions first, then set the author name for new tracked changes.")}
                 checked={session.rewriteRevisionAuthor}
                 onChange={(checked) => { session.setRewriteRevisionAuthor(checked); resetOutput(); }}
               />
