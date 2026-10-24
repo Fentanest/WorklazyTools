@@ -47,6 +47,29 @@ for formatting in [False,True]:
 json.dumps({'strictSourceWitnesses':2,'positiveProjectionCases':len(VML_CHECKS),'checks':VML_CHECKS})
 `));
 assert(manifests.some(m=>m.decisions.some(d=>d.objectEvents?.unchangedDrawings.length===1&&d.objectEvents.changed===false)));
+const geometry=JSON.parse(py.runPython(String.raw`
+geometry_checks=[]
+for formatting in [False,True]:
+ for axis in ['width','height']:
+  paths=[]
+  for side in ['before','after']:
+   value='144' if side=='after' else '72';style=('width:'+value+'pt;height:72pt') if axis=='width' else ('width:72pt;height:'+value+'pt')
+   path='/tmp/vml-packages/geometry-'+axis+'-'+str(formatting)+'-'+side+'.docx'
+   package(path,p(text('Same ')+image(True).replace('width:72pt;height:72pt',style)),'before');paths.append(path)
+  stem='/tmp/vml-packages/geometry-'+axis+'-'+str(formatting)
+  if formatting:
+   accepted,rejected=project_vml(*paths,stem,formatting=True)
+   def styles(path):
+    with zipfile.ZipFile(path)as z:return [n.get('style')for n in ET.fromstring(z.read('word/document.xml')).iter('{urn:schemas-microsoft-com:vml}shape')]
+   assert styles(accepted)==styles(paths[1]);assert styles(rejected)==styles(paths[0]);outcome='included geometry endpoints exact'
+  else:
+   try:generate_tracked_document(*paths,stem+'-tracked.docx','events',False,True,True)
+   except ValueError as error:assert str(error)=='UNSUPPORTED_TRACKED_SOURCE_VML_EXCLUDED_GEOMETRY',str(error)
+   else:raise AssertionError('W1 excluded geometry reverted to before')
+   assert not os.path.exists(stem+'-tracked.docx');outcome='explicit refusal/no partial output'
+  geometry_checks.append({'axis':axis,'formatting':formatting,'outcome':outcome})
+json.dumps(geometry_checks)
+`));assert.equal(geometry.length,4);console.log(JSON.stringify({pairedGeometryBoundary:geometry}));
 forge=true;const forged=JSON.parse(py.runPython(String.raw`
 source=next(c for c in VML_CASES if c['name']=='vml-body');paths=[]
 for side in ['before','after']:

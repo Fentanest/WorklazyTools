@@ -162,8 +162,18 @@ class _PackageGraph:
         return rid
     def copy(self, source, part, output_owner=None):
         result=copy.deepcopy(source)
-        for picture in result.iter(W+'pict'):
+        for original,picture in zip(source.iter(W+'pict'),result.iter(W+'pict')):
             if not _simple_vml_picture(picture,self.before,part):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_VML_PICTURE')
+            origin=_MANIFEST_NODE_KEYS.get(original)
+            owner=_MANIFEST_EVENT_OWNERS.get(origin)
+            if owner is not None and not _MANIFEST['options']['formatting']:
+                pair=next((p for p in owner.get('objectEvents',{}).get('drawingProperties',[]) if _manifest_key(p['before'])==origin[1]),None)
+                if pair is not None:
+                    after=_MANIFEST_SOURCE_NODES.get(('after',_manifest_key(pair['after'])))
+                    # W1: excluded geometry cannot revert to the copied BEFORE
+                    # shape. Refuse this unsupported paired style change.
+                    if after is None or after.tag!=W+'pict' or picture[1].get('style')!=after[1].get('style'):
+                        raise ValueError('UNSUPPORTED_TRACKED_SOURCE_VML_EXCLUDED_GEOMETRY')
             definition,shape=list(picture);remapped={}
             for item in (definition,shape):
                 while 'worklazy_vml_'+str(self.next_vml_id) in self.vml_ids:self.next_vml_id+=1
