@@ -1565,6 +1565,18 @@ def _validate_story_projection(facts,actual):
             if pair['coverage'][side]!=expected:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
     if any(owned[side]!={item['part'] for item in facts[side]['parts']} for side in ('before','after')):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
 
+def _split_boundary_note_contexts(decision,before,after,actual):
+    assigned={}
+    if len(decision['before'])!=1 or len(decision['after'])!=2:return assigned
+    boundary=decision['splitSlices'][0][1];left,right=decision['after'];length=len(actual['after'][_manifest_key(left)]['rawText'])
+    old=[ref for ref in before if ref['objectEvent']['kind']=='note' and ref['objectEvent']['start']==boundary]
+    def at(parent,position):return [ref for ref in after if ref['objectEvent']['kind']=='note' and ref['objectEvent']['start']==position and ref['part']==parent['part'] and ref['objectEvent']['paragraphPath']==parent['path']]
+    first,last=at(left,length),at(right,0)
+    foreign=any(ref.get('objectEvent',{}).get('kind') not in (None,'note') and ref['part']==decision['before'][0]['part'] and ref['objectEvent']['paragraphPath']==decision['before'][0]['path'] and ref['objectEvent']['start']==boundary for ref in actual['before'].values())
+    if not foreign and len(old)>1 and first and last and len(first)+len(last)==len(old) and [ref['objectEvent']['signature'] for ref in old]==[ref['objectEvent']['signature'] for ref in first+last]:
+        assigned.update({_manifest_key(ref):1 if index<len(first) else 2 for index,ref in enumerate(old)})
+    return assigned
+
 def _validate_note_projection(facts,actual):
     if _MANIFEST.get('noteFacts')!=facts:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_FACTS')
     plan=_MANIFEST.get('noteProjection',{})
@@ -1575,7 +1587,7 @@ def _validate_note_projection(facts,actual):
             if decision['type']!='paragraph' or len(decision['before'])!=1 or len(decision['after'])!=2:continue
             before=decision['before'][0];left,right=decision['after'];boundary=decision['splitSlices'][0][1]
             refs=lambda side,parent:[ref['source']['objectEvent'] for ref in facts[side]['references'] if ref['source']['part']==parent['part'] and ref['source']['objectEvent']['paragraphPath']==parent['path']]
-            if sum(ref['start']==boundary for ref in refs('before',before))>1 and any(ref['start']==len(actual['after'][_manifest_key(left)]['rawText']) for ref in refs('after',left)) and any(ref['start']==0 for ref in refs('after',right)):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_ORDER')
+            if sum(ref['start']==boundary for ref in refs('before',before))>1 and len(_split_boundary_note_contexts(decision,[ref['source'] for ref in facts['before']['references'] if ref['source']['part']==before['part'] and ref['source']['objectEvent']['paragraphPath']==before['path']],[ref['source'] for ref in facts['after']['references'] if any(ref['source']['part']==parent['part'] and ref['source']['objectEvent']['paragraphPath']==parent['path'] for parent in (left,right))],actual))!=sum(ref['start']==boundary for ref in refs('before',before)) and any(ref['start']==len(actual['after'][_manifest_key(left)]['rawText']) for ref in refs('after',left)) and any(ref['start']==0 for ref in refs('after',right)):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_ORDER')
         checks=plan.get('specialChecks');covered=set()
         if not isinstance(checks,list):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
         def selected(side,note):
@@ -1913,6 +1925,7 @@ def _validate_restore_styles(actual):
             raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
         def run_fact(side,ref):return actual[side].get((ref["part"],tuple(ref["objectEvent"]["runPath"])),{}).get("normalizedProperties",{}).get("rPr",{"supported":{},"unsupported":{},"history":False})
         indexes=[1,2] if len(decision["before"])==1 and len(decision["after"])==2 else [1] if len(decision["before"])==2 and len(decision["after"])==1 else [0]
+        assigned=_split_boundary_note_contexts(decision,expected['before'],expected['after'],actual)
         contexts=[];offset=0
         for index in indexes:
             comparison=decision["comparisons"][index]
@@ -1926,7 +1939,7 @@ def _validate_restore_styles(actual):
                     length=len(actual[side][_manifest_key(parent)].get("rawText",""))
                     for ref in expected[side]:
                         event=ref["objectEvent"];position=event["start"]
-                        if ref["part"]==parent["part"] and event["paragraphPath"]==parent["path"] and start<=position and (position<end or position==end==length and (side=="after" or len(decision["before"])==2 or index==indexes[-1])):
+                        if ref["part"]==parent["part"] and event["paragraphPath"]==parent["path"] and ((assigned[_manifest_key(ref)]==index) if side=="before" and _manifest_key(ref) in assigned else start<=position and (position<end or position==end==length and (side=="after" or len(decision["before"])==2 or index==indexes[-1]))):
                             context[side].append({"source":ref,"start":position-start+displacement,"end":event["end"]-start+displacement})
                     displacement+=end-start+(0 if len(decision["before"])==2 and len(decision["after"])==1 else 1)
             contexts.append(context);offset+=len(comparison["after"])+1

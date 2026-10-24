@@ -1,6 +1,20 @@
 import { comparisonSourceSlices } from './restoreStyleProjection.ts';
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ObjectEventContext } from './comparisonManifest.ts';
 const key=(ref:DocumentSourceReference)=>JSON.stringify([ref.part,ref.path]);
+/** Only a complete same-kind boundary ordinal has an unambiguous split schedule.
+ * Source XML order partitions a prefix into the left paragraph and the rest
+ * into the right. IDs and note content never participate. */
+export function splitBoundaryNoteContexts(manifest:DocumentComparisonManifest,decision:ComparisonDecision,before:DocumentSourceReference[],after:DocumentSourceReference[]) {
+  const assigned=new Map<string,number>();
+  if(decision.before.length!==1||decision.after.length!==2)return assigned;
+  const boundary=decision.splitSlices![0][1],leftLength=Array.from(manifest.sources.after.find(ref=>key(ref)===key(decision.after[0]))?.rawText??'').length;
+  const old=before.filter(ref=>ref.objectEvent?.kind==='note'&&ref.objectEvent.start===boundary);
+  const at=(index:number,position:number)=>after.filter(ref=>ref.objectEvent?.kind==='note'&&ref.objectEvent.start===position&&ref.part===decision.after[index].part&&JSON.stringify(ref.objectEvent.paragraphPath)===JSON.stringify(decision.after[index].path));
+  const left=at(0,leftLength),right=at(1,0);
+  const foreign=manifest.sources.before.some(ref=>ref.objectEvent&&ref.objectEvent.kind!=='note'&&ref.part===decision.before[0].part&&JSON.stringify(ref.objectEvent.paragraphPath)===JSON.stringify(decision.before[0].path)&&ref.objectEvent.start===boundary);
+  if(!foreign&&old.length>1&&left.length&&right.length&&left.length+right.length===old.length&&old.every((ref,index)=>ref.objectEvent!.signature===[...left,...right][index].objectEvent!.signature))old.forEach((ref,index)=>assigned.set(key(ref),index<left.length?1:2));
+  return assigned;
+}
 /** Source-event boundaries use the same raw codepoint diff as text emission. */
 export function sourceEventBoundary(decision:ComparisonDecision,position:number) {
   if(position===Array.from(decision.beforeText).length)return Array.from(decision.afterText).length;
@@ -14,10 +28,11 @@ export function sourceEventBoundary(decision:ComparisonDecision,position:number)
 }
 export function buildObjectEventContexts(manifest:DocumentComparisonManifest,decision:ComparisonDecision,before:DocumentSourceReference[],after:DocumentSourceReference[]):ObjectEventContext[] {
   const indexes=decision.before.length===1 && decision.after.length===2?[1,2]:decision.before.length===2&&decision.after.length===1?[1]:[0];
+  const assigned=splitBoundaryNoteContexts(manifest,decision,before,after);
   let offset=0;
   return indexes.map(comparisonIndex=>{
     const comparison=decision.comparisons[comparisonIndex],slices=comparisonSourceSlices(manifest,decision,comparisonIndex);
-    const events=(side:'before'|'after')=>slices[side].flatMap((slice,sliceIndex)=>(side==='before'?before:after).filter(ref=>ref.part===slice.source.part && JSON.stringify(ref.objectEvent!.paragraphPath)===JSON.stringify(slice.source.path) && ref.objectEvent!.start>=slice.range[0] && (ref.objectEvent!.start<slice.range[1] || ref.objectEvent!.start===slice.range[1] && (side==='after' || decision.before.length===2 || comparisonIndex===indexes.at(-1)) && slice.range[1]===Array.from(manifest.sources[side].find(item=>key(item)===key(slice.source))?.rawText??'').length)).map(source=>({source,start:source.objectEvent!.start-slice.range[0]+slices[side].slice(0,sliceIndex).reduce((sum,item)=>sum+item.range[1]-item.range[0]+(decision.before.length===2&&decision.after.length===1?0:1),0),end:source.objectEvent!.end-slice.range[0]+slices[side].slice(0,sliceIndex).reduce((sum,item)=>sum+item.range[1]-item.range[0]+(decision.before.length===2&&decision.after.length===1?0:1),0)})));
+    const events=(side:'before'|'after')=>slices[side].flatMap((slice,sliceIndex)=>(side==='before'?before:after).filter(ref=>ref.part===slice.source.part && JSON.stringify(ref.objectEvent!.paragraphPath)===JSON.stringify(slice.source.path) && (side==='before'&&assigned.has(key(ref))?assigned.get(key(ref))===comparisonIndex:ref.objectEvent!.start>=slice.range[0] && (ref.objectEvent!.start<slice.range[1] || ref.objectEvent!.start===slice.range[1] && (side==='after' || decision.before.length===2 || comparisonIndex===indexes.at(-1)) && slice.range[1]===Array.from(manifest.sources[side].find(item=>key(item)===key(slice.source))?.rawText??'').length))).map(source=>({source,start:source.objectEvent!.start-slice.range[0]+slices[side].slice(0,sliceIndex).reduce((sum,item)=>sum+item.range[1]-item.range[0]+(decision.before.length===2&&decision.after.length===1?0:1),0),end:source.objectEvent!.end-slice.range[0]+slices[side].slice(0,sliceIndex).reduce((sum,item)=>sum+item.range[1]-item.range[0]+(decision.before.length===2&&decision.after.length===1?0:1),0)})));
     const context={comparisonIndex,offset,afterParagraph:slices.after[0]?.source,before:events('before'),after:events('after')};
     offset+=Array.from(comparison.after).length+1;
     return context;

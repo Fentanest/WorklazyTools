@@ -37,26 +37,44 @@ for kind in ['footnote','endnote']:
     if axis=='merge':old,new=new,old;oldnotes,newnotes=newnotes,oldnotes;one,two=two,one
     package('/order-before.docx',old,oldnotes,kind);package('/order-after.docx',new,newnotes,kind)
     assert ordered_graph('/order-before.docx',kind)==one and ordered_graph('/order-after.docx',kind)==two
-    name=kind+'-'+axis+'-'+mode+'-'+str(formatting);guarded=axis=='split' and mode=='both'
+    name=kind+'-'+axis+'-'+mode+'-'+str(formatting)
     if os.path.exists('/order-out.docx'):os.unlink('/order-out.docx')
     try:
      generate_tracked_document('/order-before.docx','/order-after.docx','/order-out.docx','events',formatting,True,True)
-     assert not guarded,'ambiguous source ordinal order exported'
      accept_tracked_document('/order-out.docx','/order-accepted.docx')
      with zipfile.ZipFile('/order-out.docx') as src,zipfile.ZipFile('/order-rejected.docx','w') as dst:
       for entry in src.infolist():dst.writestr(entry,_serialize_xml(reject(_qname_safe_parse(src.read(entry.filename)))[0]) if entry.filename in ['word/document.xml','word/'+kind+'s.xml'] else src.read(entry.filename))
      assert ordered_graph('/order-accepted.docx',kind)==two,('accept ordered graph',name)
      assert ordered_graph('/order-rejected.docx',kind)==one,('reject ordered graph',name)
      results.append({'name':name,'status':'export-ordered-graph-pass'})
-    except ValueError as error:
-     assert guarded and str(error)=='UNSUPPORTED_TRACKED_SOURCE_NOTE_ORDER' and not os.path.exists('/order-out.docx'),(name,str(error))
+    except ValueError as error:raise AssertionError((name,str(error))) from error
+    if axis=='split' and mode=='both':
      a=extract_document_model(open('/order-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/order-after.docx','rb').read(),True,True,'en');manifest=json.loads(worklazyComparisonManifestJson(a,b,formatting,True,True))
-     assert not manifest['noteProjection']['supported'] and 'ambiguous-split-note-order' in manifest['noteProjection']['reasons']
-     manifest['noteProjection']['supported']=True;manifest['noteProjection']['reasons']=[]
-     try:generate_tracked_document('/order-before.docx','/order-after.docx','/order-out.docx','events',formatting,True,True,json.dumps(manifest));raise AssertionError('forged capability exported')
-     except ValueError as forced:assert str(forced)=='UNSUPPORTED_TRACKED_SOURCE_NOTE_ORDER' and not os.path.exists('/order-out.docx')
-     results.append({'name':name,'status':'valid-input-ambiguous-order-refused'})
-    for variant in (['before','after'] if guarded else ['before','after','out','accepted','rejected']):shutil.copyfile('/order-'+variant+'.docx','/boundary-order/'+name+'-'+variant+'.docx')
+     source=next(d for d in manifest['decisions'] if len(d['before'])==1 and len(d['after'])==2)
+     contexts=source['objectEvents']['contexts'];assert [len(c['before']) for c in contexts]==[1,1]
+     assert contexts[0]['before'][0]['source']['path']<contexts[1]['before'][0]['source']['path']
+     for defect in ['old-right-only','swapped-order','omit-context-ref','swap-note-pair']:
+      bad=copy.deepcopy(manifest);decision=next(d for d in bad['decisions'] if d['id']==source['id']);left,right=decision['objectEvents']['contexts']
+      if defect=='old-right-only':
+       event=left['before'].pop();event['start']=event['end']=0;right['before'].insert(0,event)
+      elif defect=='swapped-order':left['before'][0]['source'],right['before'][0]['source']=right['before'][0]['source'],left['before'][0]['source']
+      elif defect=='omit-context-ref':left['before']=[]
+      else:
+       refs=bad['noteProjection']['references'];refs[0]['noteId'],refs[1]['noteId']=refs[1]['noteId'],refs[0]['noteId']
+      if os.path.exists('/bad-order.docx'):os.unlink('/bad-order.docx')
+      try:generate_tracked_document('/order-before.docx','/order-after.docx','/bad-order.docx','events',formatting,True,True,json.dumps(bad));raise AssertionError(defect+' exported')
+      except ValueError:assert not os.path.exists('/bad-order.docx')
+    for variant in ['before','after','out','accepted','rejected']:shutil.copyfile('/order-'+variant+'.docx','/boundary-order/'+name+'-'+variant+'.docx')
+# A non-bijective boundary ordinal remains an explicit refusal, never a guess.
+for kind in ['footnote','endnote']:
+ text='First sentence. Second sentence.'
+ package('/order-before.docx',paragraph(run(text[:16])+reference(kind,7)+reference(kind,17)+run(text[16:])),[note(7,'First',kind),note(17,'Second',kind)],kind)
+ package('/order-after.docx',paragraph(run(text[:16])+reference(kind,9))+paragraph(reference(kind,19)+reference(kind,29)+run(text[16:])),[note(9,'One',kind),note(19,'Two',kind),note(29,'Three',kind)],kind)
+ if os.path.exists('/order-guard.docx'):os.unlink('/order-guard.docx')
+ try:generate_tracked_document('/order-before.docx','/order-after.docx','/order-guard.docx','events',True,True,True);raise AssertionError('incomplete ordinal exported')
+ except ValueError as error:assert str(error)=='UNSUPPORTED_TRACKED_SOURCE_NOTE_ORDER' and not os.path.exists('/order-guard.docx')
+ for side in ['before','after']:shutil.copyfile('/order-'+side+'.docx','/boundary-order/'+kind+'-incomplete-'+side+'.docx')
+ results.append({'name':kind+'-incomplete','status':'incomplete-ordinal-refused'})
 for kind in ['footnote','endnote']:
  text='First sentence. Second sentence.'
  package('/order-before.docx',paragraph(run(text[:16])+reference(kind,7)+reference(kind,17)+run(text[16:])),[note(7,'Before first',kind),note(17,'Before second',kind)],kind)
@@ -72,8 +90,10 @@ for kind in ['footnote','endnote']:
  results.append({'name':kind+'-excluded','status':'metadata-excluded-after-graph-pass'})
 json.dumps(results)
 `));
-assert.equal(result.filter(row=>row.status==='export-ordered-graph-pass').length,20);
-assert.equal(result.filter(row=>row.status==='valid-input-ambiguous-order-refused').length,4);
+assert.equal(result.filter(row=>row.status==='export-ordered-graph-pass').length,24);
+// Four previously refused source pairs now pass with ordered endpoint graphs.
+assert.equal(result.filter(row=>row.status==='incomplete-ordinal-refused').length,2);
+console.log('16 forged source-order/context/note-pair actions refused');
 assert.equal(result.filter(row=>row.status==='metadata-excluded-after-graph-pass').length,2);
 console.log(JSON.stringify(result,null,2));
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/note-boundary-order',{recursive:true});
