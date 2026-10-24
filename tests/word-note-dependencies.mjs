@@ -99,6 +99,21 @@ for case in cases:
    if os.path.exists('/bad-output.docx'):os.unlink('/bad-output.docx')
    try:generate_tracked_document(before,'/bad-owner.docx','/bad-output.docx','events',True,True,True);raise AssertionError(defect+' exported')
    except ValueError:assert not os.path.exists('/bad-output.docx')
+  for side in ['before','after']:
+   path=before if side=='before' else valid_after;part=case['sources'][side]['expectedRawGraph']['mainNoteRelationship']['resolvedPart']
+   def unlinked(name,data):
+    if name!=part:return data
+    root=ET.fromstring(data)
+    for parent in root.iter():
+     for child in list(parent):
+      if child.tag==W+'hyperlink':
+       index=list(parent).index(child);parent.remove(child)
+       for offset,run in enumerate(list(child)):parent.insert(index+offset,run)
+    return _serialize_xml(root)
+   rewrite(path,'/unlinked.docx',unlinked)
+   if os.path.exists('/bad-output.docx'):os.unlink('/bad-output.docx')
+   try:generate_tracked_document('/unlinked.docx' if side=='before' else before,valid_after if side=='before' else '/unlinked.docx','/bad-output.docx','events',True,True,True);raise AssertionError('one-sided custom link exported')
+   except ValueError as error:assert str(error)=='UNSUPPORTED_TRACKED_SOURCE_CUSTOM_NOTE_LINK_REVISION' and not os.path.exists('/bad-output.docx')
   a=extract_document_model(open(before,'rb').read(),True,True,'en');b=extract_document_model(open(valid_after,'rb').read(),True,True,'en');manifest=json.loads(worklazyComparisonManifestJson(a,b,True,True,True))
   for defect in ['owner-part','owner-rid','owner-target','before-part','after-part','omit-owners']:
    bad=copy.deepcopy(manifest)
@@ -136,6 +151,6 @@ for case in cases:
    except ValueError:assert not os.path.exists('/bad-output.docx')
 json.dumps(rows)
 `));
-console.log(JSON.stringify(rows,null,2));console.log('22 numbering dependency guards +20 owner-path guards +12 forged source-owner/actions refused');
+console.log(JSON.stringify(rows,null,2));console.log('22 numbering dependency guards +20 owner-path guards +4 one-sided link guards +12 forged source-owner/actions refused');
 assert.equal(rows.filter(row=>row.status==='literal-policy-endpoints-pass').length,14);assert.equal(rows.filter(row=>row.status==='paired-changed-target-A5-refused').length,2);
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/note-dependency-packages',{recursive:true});for(const name of py.FS.readdir('/dependency-artifacts').filter(n=>n.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/note-dependency-packages/'+name,py.FS.readFile('/dependency-artifacts/'+name));

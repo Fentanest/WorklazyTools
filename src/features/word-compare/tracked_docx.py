@@ -1663,7 +1663,7 @@ def _validate_note_projection(facts,actual):
             for decision in _MANIFEST_DECISIONS:
                 if decision['id'] not in pair['decisionIds']:continue
                 events=decision.get('objectEvents',{})
-                if any(source['objectEvent']['kind']=='hyperlink' and not any(link['before']==source for link in events.get('unchangedLinks',[])) for source in events.get('before',[])):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CUSTOM_NOTE_LINK_REVISION')
+                if any(source['objectEvent']['kind']=='hyperlink' and not any(link[side]==source for link in events.get('unchangedLinks',[])) for side in ('before','after') for source in events.get(side,[])):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CUSTOM_NOTE_LINK_REVISION')
     if plan.get('supported') is not True or plan.get('reasons') or any(value['errors'] for value in facts.values()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE')
     pairs=plan['pairs'];owned={side:set() for side in ('before','after')};used_refs={side:set() for side in ('before','after')};ids=set()
     for pair in pairs:

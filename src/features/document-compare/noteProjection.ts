@@ -77,7 +77,7 @@ export function bindNoteOutputCapabilities(manifest:DocumentComparisonManifest) 
  const all:ComparisonDecision[]=[];const visit=(items:ComparisonDecision[])=>{for(const item of items){all.push(item);visit(item.children??[]);}};visit(manifest.decisions);
  for(const pair of manifest.noteProjection.pairs){
   if(!pair.before||!pair.after||pair.before.source.part===pair.after.source.part)continue;
-  if(all.filter(decision=>pair.decisionIds.includes(decision.id)).some(decision=>decision.objectEvents?.before.some(source=>source.objectEvent?.kind==='hyperlink'&&!decision.objectEvents!.unchangedLinks.some(link=>key(link.before)===key(source))))){
+  if(all.filter(decision=>pair.decisionIds.includes(decision.id)).some(decision=>(['before','after'] as const).some(side=>decision.objectEvents?.[side].some(source=>source.objectEvent?.kind==='hyperlink'&&!decision.objectEvents!.unchangedLinks.some(link=>key(link[side])===key(source)))))){
    manifest.noteProjection.reasons.push('custom-note-link-revision');manifest.noteProjection.supported=false;
   }
  }
