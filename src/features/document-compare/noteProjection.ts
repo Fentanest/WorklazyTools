@@ -30,6 +30,12 @@ export function buildNoteProjection(manifest:DocumentComparisonManifest):NotePro
  const visit=(items:ComparisonDecision[])=>{for(const decision of items){visit(decision.children??[]);if(decision.type!=='paragraph'||decision.trackedRepresentation!=='revision')continue;
   const refs=(side:'before'|'after')=>(side==='before'?a:b).references.filter(ref=>decision[side].some(parent=>parent.part===ref.source.part&&JSON.stringify(parent.path)===JSON.stringify(ref.source.objectEvent!.paragraphPath)));
   const old=refs('before'),next=refs('after'),contexts=buildObjectEventContexts(manifest,decision,old.map(ref=>ref.source),next.map(ref=>ref.source));
+  // Split contexts cannot yet preserve a before ordinal across both revised sides.
+  if(decision.before.length===1&&decision.after.length===2){
+   const boundary=decision.splitSlices![0][1];
+   const leftLength=Array.from(manifest.sources.after.find(ref=>key(ref)===key(decision.after[0]))?.rawText??'').length;
+   if(old.filter(ref=>ref.source.objectEvent!.start===boundary).length>1&&next.some(ref=>ref.source.objectEvent!.start===leftLength&&JSON.stringify(ref.source.objectEvent!.paragraphPath)===JSON.stringify(decision.after[0].path))&&next.some(ref=>ref.source.objectEvent!.start===0&&JSON.stringify(ref.source.objectEvent!.paragraphPath)===JSON.stringify(decision.after[1].path)))plan.reasons.push('ambiguous-split-note-order');
+  }
   const available=[...next];
   for(const ref of old){const index=available.findIndex(candidate=>candidate.kind===ref.kind&&eventPosition(decision,contexts,'before',ref.source)===eventPosition(decision,contexts,'after',candidate.source));
    const target=index<0?undefined:available.splice(index,1)[0];const before=a.containers.find(note=>note.kind===ref.kind&&note.id===ref.id&&note.type==='normal'),after=target?b.containers.find(note=>note.kind===target.kind&&note.id===target.id&&note.type==='normal'):undefined;

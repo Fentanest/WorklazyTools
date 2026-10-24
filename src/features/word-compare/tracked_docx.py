@@ -1385,6 +1385,11 @@ def _validate_note_projection(facts,actual):
     if _MANIFEST['options']['metadata']:
         expected_parts=[{'part':'word/'+kind+'s.xml','kind':kind,'before':'word/'+kind+'s.xml' in facts['before']['parts'],'after':'word/'+kind+'s.xml' in facts['after']['parts'],'create':'word/'+kind+'s.xml' not in facts['after']['parts'],'specials':[] if 'word/'+kind+'s.xml' in facts['after']['parts'] else [note for note in facts['before']['containers'] if note['kind']==kind and note['type']!='normal']} for kind in ('footnote','endnote') if any('word/'+kind+'s.xml' in facts[side]['parts'] for side in ('before','after'))]
         if plan.get('partActions')!=expected_parts:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_PARTS')
+        for decision in _MANIFEST_DECISIONS:
+            if decision['type']!='paragraph' or len(decision['before'])!=1 or len(decision['after'])!=2:continue
+            before=decision['before'][0];left,right=decision['after'];boundary=decision['splitSlices'][0][1]
+            refs=lambda side,parent:[ref['source']['objectEvent'] for ref in facts[side]['references'] if ref['source']['part']==parent['part'] and ref['source']['objectEvent']['paragraphPath']==parent['path']]
+            if sum(ref['start']==boundary for ref in refs('before',before))>1 and any(ref['start']==len(actual['after'][_manifest_key(left)]['rawText']) for ref in refs('after',left)) and any(ref['start']==0 for ref in refs('after',right)):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_ORDER')
         checks=plan.get('specialChecks');covered=set()
         if not isinstance(checks,list):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
         def selected(side,note):
