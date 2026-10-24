@@ -4,7 +4,7 @@ import type {ComparisonDecision,DocumentComparisonManifest,DocumentSourceReferen
 export interface NoteContainer {source:DocumentSourceReference;kind:string;id:string;type:string;contentSignature?:string;specialRevisionShape?:string[]}
 export interface NoteFacts {policy:'worklazy-note-facts-1';parts:string[];containers:NoteContainer[];references:Array<{source:DocumentSourceReference;kind:string;id:string}>;errors:string[]}
 export interface NotePair {id:string;kind:string;before?:NoteContainer;after?:NoteContainer;decisionIds:string[];coverage:{before:DocumentSourceReference[];after:DocumentSourceReference[]}}
-export interface NoteProjection {policy:'worklazy-note-projection-1';supported:boolean;reasons:string[];pairs:NotePair[];specialChecks?:Array<{part:string;role:string;before:NoteContainer[];after:NoteContainer[];includedEqual:boolean;redline:boolean}>;partActions?:Array<{part:string;kind:string;before:boolean;after:boolean;create:boolean;specials:NoteContainer[]}>;references:Array<{decisionId:string;before?:DocumentSourceReference;after?:DocumentSourceReference;noteId:string}>}
+export interface NoteProjection {policy:'worklazy-note-projection-1';supported:boolean;reasons:string[];pairs:NotePair[];specialChecks?:Array<{part:string;role:string;before:NoteContainer[];after:NoteContainer[];includedEqual:boolean;redline:boolean}>;partActions?:Array<{part:string;kind:string;before:boolean;after:boolean;create:boolean;specials:NoteContainer[]}>;excludedReferences?:{before:Array<{source:DocumentSourceReference;noteId:string}>;after:Array<{source:DocumentSourceReference;noteId:string}>};references:Array<{decisionId:string;before?:DocumentSourceReference;after?:DocumentSourceReference;noteId:string}>}
 const key=(ref:DocumentSourceReference)=>JSON.stringify([ref.part,ref.path]);
 export function buildNoteProjection(manifest:DocumentComparisonManifest):NoteProjection {
  const a=manifest.noteFacts.before,b=manifest.noteFacts.after,plan:NoteProjection={policy:'worklazy-note-projection-1',supported:true,reasons:[],pairs:[],references:[]};
@@ -45,6 +45,19 @@ export function buildNoteProjection(manifest:DocumentComparisonManifest):NotePro
   }
   for(const ref of available){const after=b.containers.find(note=>note.kind===ref.kind&&note.id===ref.id&&note.type==='normal');if(after)plan.references.push({decisionId:decision.id,after:ref.source,noteId:add(undefined,after).id});else plan.reasons.push('missing-note-target');}
  }};visit(manifest.decisions);
+ // Excluded table anchors stay revised. Only an already declared included-body
+ // correspondence can supply their note target; no table matching is performed.
+ if(!manifest.options.tables){
+  plan.excludedReferences={before:[],after:[]};
+  for(const side of ['before','after'] as const){
+   const facts=side==='before'?a:b,tables=manifest.sources[side].filter(ref=>ref.kind==='tbl'&&ref.part==='word/document.xml');
+   for(const ref of facts.references.filter(ref=>tables.some(table=>ref.source.part===table.part&&table.path.every((value,index)=>ref.source.path[index]===value)))){
+    const target=facts.containers.find(note=>note.kind===ref.kind&&note.id===ref.id&&note.type==='normal');
+    const pair=plan.pairs.find(pair=>target&&pair.before&&pair.after&&pair[side]&&key(pair[side]!.source)===key(target.source)&&plan.references.some(anchor=>anchor.noteId===pair.id&&anchor.before?.part==='word/document.xml'&&anchor.after?.part==='word/document.xml'&&anchor.before.objectEvent?.paragraphPath.length===2&&anchor.after.objectEvent?.paragraphPath.length===2));
+    if(pair)plan.excludedReferences[side].push({source:ref.source,noteId:pair.id});else plan.reasons.push('excluded-table-note-anchor');
+   }
+  }
+ }
  // Legacy unreferenced note fixtures retain their established path/ID contract;
  // anchored notes never select correspondence using these identifiers.
  for(const old of a.containers.filter(note=>note.type==='normal'&&!plan.pairs.some(pair=>pair.before&&key(pair.before.source)===key(note.source)))){

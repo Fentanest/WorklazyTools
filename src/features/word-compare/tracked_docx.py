@@ -1650,6 +1650,20 @@ def _validate_note_projection(facts,actual):
         matching=next((item for item in property_pairs if (ref.get('before') and item['before']==ref['before']) or (ref.get('after') and item['after']==ref['after'])),None)
         if (matching is not None)!=(bool(ref.get('before')) and bool(ref.get('after'))) or matching is not None and (matching['before']!=ref['before'] or matching['after']!=ref['after']):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
         if set(ref)!={key for key in ('decisionId','noteId','before','after') if key in ('decisionId','noteId') or ref.get(key) is not None}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+    if not _MANIFEST['options']['tables']:
+        excluded=plan.get('excludedReferences')
+        if not isinstance(excluded,dict) or set(excluded)!={'before','after'}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_EXCLUDED')
+        for side in ('before','after'):
+            tables=[source for source in actual[side].values() if source['kind']=='tbl' and source['part']=='word/document.xml']
+            expected=[ref for ref in facts[side]['references'] if any(ref['source']['part']==table['part'] and ref['source']['path'][:len(table['path'])]==table['path'] for table in tables)]
+            if not isinstance(excluded[side],list) or len(excluded[side])!=len(expected):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_EXCLUDED')
+            for item,ref in zip(excluded[side],expected):
+                if not isinstance(item,dict):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_EXCLUDED')
+                pair=next((pair for pair in pairs if pair['id']==item.get('noteId')),None)
+                target=(pair or {}).get(side);key=_manifest_key(ref['source'])
+                if set(item)!={'source','noteId'} or item['source']!=ref['source'] or key in used_refs[side] or not pair or not pair.get('before') or not pair.get('after') or not any(anchor['noteId']==pair['id'] and all(anchor.get(source_side,{}).get('part')=='word/document.xml' and len(anchor[source_side].get('objectEvent',{}).get('paragraphPath',[]))==2 for source_side in ('before','after')) for anchor in plan['references']) or target['kind']!=ref['kind'] or target['id']!=ref['id']:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_EXCLUDED')
+                used_refs[side].add(key)
+    elif 'excludedReferences' in plan:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_EXCLUDED')
     referenced_pairs={ref['noteId'] for ref in plan['references']}
     for pair in pairs:
         if pair['id'] not in referenced_pairs:
