@@ -346,6 +346,22 @@ def _source_paths(root, part, archive=None):
         if archive is not None:
             rel_path = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
             if rel_path in archive.namelist(): rels = {item.get("Id"): item for item in ET.fromstring(archive.read(rel_path))}
+        def leaf_hyperlink(destination):
+            if not destination or any(c in destination for c in "\\:#?%") or archive is None:return None
+            path=destination.lstrip('/') if destination.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),destination))
+            if path.startswith('../') or archive.namelist().count(path)!=1:return None
+            if posixpath.join(posixpath.dirname(path),'_rels',posixpath.basename(path)+'.rels') in archive.namelist():return None
+            if '[Content_Types].xml' not in archive.namelist():return None
+            types=ET.fromstring(archive.read('[Content_Types].xml'));ct='{http://schemas.openxmlformats.org/package/2006/content-types}'
+            overrides=[n.get('ContentType') for n in types if n.tag==ct+'Override' and n.get('PartName')=='/'+path]
+            defaults=[n.get('ContentType') for n in types if n.tag==ct+'Default' and n.get('Extension','').lower()==posixpath.splitext(path)[1].lstrip('.').lower()]
+            if (overrides or defaults)!=['application/xml']:return None
+            data=archive.read(path)
+            try:root=ET.fromstring(data)
+            except ET.ParseError:return None
+            office=('http://schemas.openxmlformats.org/','urn:schemas-microsoft-com:','http://schemas.microsoft.com/office/')
+            if any(n.tag.startswith(tuple('{'+uri for uri in office)) or any(a.startswith('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}') for a in n.attrib) for n in root.iter()):return None
+            return data
         supported = True
         has_image = False
         target = ""
@@ -367,8 +383,13 @@ def _source_paths(root, part, archive=None):
                         if mode == "External": value = json.dumps([kind, mode, destination]); target = destination
                         else:
                             path = destination.lstrip("/") if destination.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), destination))
-                            if archive is None or path not in archive.namelist() or kind!=relationship_base+"image": supported = False
-                            else: value = json.dumps([kind, hashlib.sha256(archive.read(path)).hexdigest()])
+                            if kind==relationship_base+"hyperlink":
+                                unique=sum(1 for rel in ET.fromstring(archive.read(rel_path)) if rel.get('Id')==value)==1
+                                data=leaf_hyperlink(destination) if mode in ('','Internal') and unique else None
+                                if data is None:supported=False
+                                else:value=json.dumps([kind,hashlib.sha256(data).hexdigest(),'application/xml'])
+                            elif archive is None or path not in archive.namelist():supported=False
+                            else:value=json.dumps([kind,hashlib.sha256(archive.read(path)).hexdigest()])
                 attrs.append((name, value))
             return (item.tag, attrs) if item.tag == W + "hyperlink" else (item.tag, attrs, item.text or "", [canonical_event(child) for child in item])
         normalized = normalized_root

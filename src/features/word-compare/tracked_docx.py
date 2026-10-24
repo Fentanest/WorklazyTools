@@ -80,6 +80,25 @@ class _PackageGraph:
         return content or next((node.get('ContentType') for node in types if node.tag==CT+'Default' and node.get('Extension','').lower()==posixpath.splitext(part)[1].lstrip('.').lower()),None)
     def rel_path(self, part):
         return posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
+    def leaf_hyperlink(self, part, target):
+        # Bounded v1: an opaque XML data leaf, never a story or a nested OPC graph.
+        if not target or any(c in target for c in "\\:#?%"):
+            raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+        source=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
+        if source.startswith('../') or source in self.story_parts or self.before.namelist().count(source)!=1:
+            raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+        if self.rel_path(source) in self.before.namelist():raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RESOURCE_GRAPH')
+        overrides=[n.get('ContentType') for n in self.before_types if n.tag==CT+'Override' and n.get('PartName')=='/'+source]
+        defaults=[n.get('ContentType') for n in self.before_types if n.tag==CT+'Default' and n.get('Extension','').lower()==posixpath.splitext(source)[1].lstrip('.').lower()]
+        declarations=overrides or defaults
+        if declarations!=['application/xml']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CONTENT_TYPE')
+        data=self.before.read(source)
+        try:root=ET.fromstring(data)
+        except ET.ParseError:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RESOURCE_GRAPH')
+        office=('http://schemas.openxmlformats.org/','urn:schemas-microsoft-com:','http://schemas.microsoft.com/office/')
+        if any(n.tag.startswith(tuple('{'+uri for uri in office)) or any(a.startswith(R) for a in n.attrib) for n in root.iter()):
+            raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RESOURCE_GRAPH')
+        return source,data,'application/xml'
     def relationship(self, part, rid, output_owner=None):
         output_owner=output_owner or part
         key=('before',part,rid,output_owner)
@@ -95,19 +114,24 @@ class _PackageGraph:
         if root is None:root=ET.fromstring(self.after.read(path)) if path in self.after.namelist() else ET.Element(PR+'Relationships')
         if old.get('TargetMode')!='External':
             source=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
-            if source not in self.before.namelist() or kind!=R[1:-1]+'/image': raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+            if kind==R[1:-1]+'/hyperlink':
+                if old.get('TargetMode','') not in ('','Internal'):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
+                source,_,_=self.leaf_hyperlink(part,target)
+            elif source not in self.before.namelist():raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
             if self.rel_path(source) in self.before.namelist():raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RESOURCE_GRAPH')
             data=self.before.read(source); digest=hashlib.sha256(data).hexdigest()
             content=self.mime(source,self.before_types)
             if content is None: raise ValueError('UNSUPPORTED_TRACKED_SOURCE_CONTENT_TYPE')
-            destination=self.media.get((digest,content))
+            cache_key=(digest,content) if kind==R[1:-1]+'/image' else ('hyperlink',digest,content)
+            destination=self.media.get(cache_key)
             if destination is None:
                 extension=posixpath.splitext(source)[1]
-                destination='word/media/worklazy-'+digest+extension
+                prefix='word/media/worklazy-' if kind==R[1:-1]+'/image' else 'word/worklazy-resource-'
+                destination=prefix+digest+extension
                 suffix=0
                 while destination in self.names:
-                    suffix+=1; destination='word/media/worklazy-'+digest+'-'+str(suffix)+extension
-                self.names.add(destination);self.media[(digest,content)]=destination;self.additions[destination]=data
+                    suffix+=1; destination=prefix+digest+'-'+str(suffix)+extension
+                self.names.add(destination);self.media[cache_key]=destination;self.additions[destination]=data
                 ET.SubElement(self.types,CT+'Override',{'PartName':'/'+destination,'ContentType':content})
             target=posixpath.relpath(destination,posixpath.dirname(output_owner))
         for existing in root:
