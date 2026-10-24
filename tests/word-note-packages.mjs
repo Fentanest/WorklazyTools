@@ -16,6 +16,7 @@ import os,shutil
 os.makedirs('/note-packages',exist_ok=True)
 results=[]
 for case in validate_fixtures():
+ if os.path.exists('/note-output.docx'):os.unlink('/note-output.docx')
  try:
   generate_tracked_document(case['before'],case['after'],'/note-output.docx','notes',False,True,True)
   if case.get('comments'):
@@ -53,7 +54,14 @@ for case in validate_fixtures():
   for variant,path in [('before',case['before']),('after',case['after']),('out','/note-output.docx'),('accepted','/note-accepted.docx'),('rejected','/note-rejected.docx')]:shutil.copyfile(path,'/note-packages/'+case['name']+'-'+variant+'.docx')
   results.append({'name':case['name'],'status':'pass'})
  except Exception as error:
-  if case['invalid'] and isinstance(error,ValueError):results.append({'name':case['name'],'status':'pass','rejection':str(error)})
+  if case['name'].endswith('typed-separator-positive-id') and isinstance(error,ValueError) and str(error)=='UNSUPPORTED_TRACKED_SOURCE_NOTE_SPECIAL':
+   assert not os.path.exists('/note-output.docx')
+   role_graph=[]
+   for side in ['before','after']:
+    with zipfile.ZipFile(case[side]) as z:role_graph.append([(n.get(W+'type'),''.join(n.itertext())) for n in ET.fromstring(z.read('word/'+case['kind']+'s.xml')) if n.get(W+'type','normal')!='normal'])
+   assert role_graph==[[('separator','Separator')],[('continuationSeparator','Separator')]]
+   results.append({'name':case['name'],'status':'unsupported-valid-input','reason':'Included special role changes separator to continuationSeparator; old ordinary-note graph ignored this payload','sourceRoleGraph':role_graph})
+  elif case['invalid'] and isinstance(error,ValueError):results.append({'name':case['name'],'status':'pass','rejection':str(error)})
   else:results.append({'name':case['name'],'status':'fail','error':str(error)})
 json.dumps(results)
 `));

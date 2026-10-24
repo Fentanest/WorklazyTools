@@ -593,6 +593,22 @@ def _iter_story_blocks(container):
 
 def _note_package_facts(archive,inventory):
     containers=[];errors=[]
+    def content_signature(node,part):
+        import posixpath
+        relpath=posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
+        rels={rel.get('Id'):rel for rel in ET.fromstring(archive.read(relpath))} if relpath in archive.namelist() else {}
+        def canonical(item,root=False):
+            attrs=[]
+            for name,value in sorted(item.attrib.items()):
+                if root and name==W+'id' or name.startswith(W+'rsid') or item.tag.endswith('}docPr') and name=='id':continue
+                if name.startswith('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'):
+                    rel=rels.get(value)
+                    if rel is not None:
+                        target=rel.get('Target','');path=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
+                        value=[rel.get('Type'),rel.get('TargetMode',''),target if rel.get('TargetMode')=='External' else hashlib.sha256(archive.read(path)).hexdigest() if path in archive.namelist() else 'missing-target']
+                attrs.append([name,value])
+            return [item.tag,attrs,item.text or '',[canonical(child) for child in item if child.tag not in {W+name for name in ('pPr','rPr','tblPr','trPr','tcPr','sectPr')}]]
+        return hashlib.sha256(json.dumps(canonical(node,True),ensure_ascii=False).encode()).hexdigest()
     for kind in ('footnote','endnote'):
         part='word/'+kind+'s.xml'
         if part not in archive.namelist():continue
@@ -603,6 +619,7 @@ def _note_package_facts(archive,inventory):
             if type_name=='normal' and (identity in ids or not identity.lstrip('-').isdigit()):errors.append('invalid-note-id')
             if type_name=='normal':ids.add(identity)
             containers.append({'source':{'part':part,'path':[index]},'kind':kind,'id':identity,'type':type_name})
+            if type_name!='normal':containers[-1]['contentSignature']=content_signature(node,part)
     references=[{'source':source,'kind':source['objectEvent']['signature'],'id':source['objectEvent']['target']} for source in inventory if source.get('objectEvent',{}).get('kind')=='note']
     for ref in references:
         if not any(note['kind']==ref['kind'] and note['id']==ref['id'] and note['type']=='normal' for note in containers):errors.append('missing-note-target')

@@ -115,7 +115,7 @@ def _fully_deleted_supported_paragraph(paragraph):
         for item in run:
             if any(node.tag in protected for node in item.iter()):return False
             if item.tag==W+"rPr":continue
-            if item.tag in {W+"delText",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:saw_payload=True
+            if item.tag in {W+"delText",W+"footnoteReference",W+"endnoteReference",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:saw_payload=True
             else:return False
         return True
     for child in paragraph:
