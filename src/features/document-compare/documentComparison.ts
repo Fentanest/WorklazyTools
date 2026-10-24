@@ -203,6 +203,8 @@ export function compareDocumentModels(
     if(decision.type!=="paragraph" || (decision.trackedRepresentation!=="revision" && decision.trackedRepresentation!=="replace"))continue;
     const events=(side:"before"|"after")=>decision[side].flatMap(parent=>eventSources(manifest,side,parent.part,parent.path));
     const before=events("before"),after=events("after");
+    // A paragraph without object events gets no objectEvents entry.
+    if(!before.length && !after.length)continue;
     const runFact=(side:"before"|"after",event:DocumentSourceReference)=>findSource(manifest,side,{part:event.part,path:event.objectEvent!.runPath})?.normalizedProperties?.rPr??{supported:{},unsupported:{},history:false};
     const contexts=buildObjectEventContexts(manifest,decision,before,after);
     const positions={before:new Map(before.map(ref=>[ref,[eventPosition(decision,contexts,"before",ref),eventPosition(decision,contexts,"before",ref,true)]])),after:new Map(after.map(ref=>[ref,[eventPosition(decision,contexts,"after",ref),eventPosition(decision,contexts,"after",ref,true)]]))};
@@ -221,7 +223,7 @@ export function compareDocumentModels(
     const unchangedLinks=before.filter(a=>a.objectEvent!.kind==="hyperlink").flatMap(a=>after.filter(b=>b.objectEvent!.kind==="hyperlink" && a.objectEvent!.signature===b.objectEvent!.signature && position("before",a)===position("after",b) && position("before",a,true)===position("after",b,true)).map(b=>({before:a,after:b})));
     if(before.length || after.length)decision.objectEvents={unchangedDrawings:drawingProperties.filter(pair=>pair.before.objectEvent!.signature===pair.after.objectEvent!.signature && (!pair.families.length || pair.representation==="preserve-after-history")).map(pair=>({before:pair.before,after:pair.after})),contexts,deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-5",before,after,changed:JSON.stringify(before.filter(source=>options.metadata||source.objectEvent!.kind!=="note").map(source=>[source.objectEvent!.kind,position("before",source),position("before",source,true),source.objectEvent!.signature]))!==JSON.stringify(after.filter(source=>options.metadata||source.objectEvent!.kind!=="note").map(source=>[source.objectEvent!.kind,position("after",source),position("after",source,true),source.objectEvent!.signature]))};
   }};
-  markReplacedParagraphShapes(manifest.decisions);
+  markReplacedParagraphShapes(manifest, manifest.decisions);
   objectDecisions(manifest.decisions);
   bindNoteOutputCapabilities(manifest);
   buildDrawingRestoreProjections(manifest);
@@ -349,16 +351,28 @@ function compareRecordList(
 }
 
 
-/** Run-level revisions exist only for 1:1, 1:2 (split) and 2:1 (merge) paragraph groups.
- * Any other paired shape is replaced as whole paragraphs, keeping the screen comparison. */
-function markReplacedParagraphShapes(decisions: ComparisonDecision[]) {
+/** Paragraph groups the tracked DOCX records as the whole original deleted and the whole
+ * revision inserted, decided before any run-level projection so none is attached to them.
+ * Run-level revisions exist only for 1:1, 1:2 (split) and 2:1 (merge) groups, and only for
+ * paragraphs without opaque content (fields, text boxes, unsupported objects) that changed.
+ * Paragraphs nested under a moved or regrouped container keep the container's own path. */
+function markReplacedParagraphShapes(manifest: DocumentComparisonManifest, decisions: ComparisonDecision[], unsafe = false) {
   for (const decision of decisions) {
-    markReplacedParagraphShapes(decision.children ?? []);
-    if (decision.type !== "paragraph" || decision.trackedRepresentation !== "revision" || !decision.before.length || !decision.after.length) continue;
+    markReplacedParagraphShapes(manifest, decision.children ?? [], unsafe || decision.moved || decision.before.length !== 1 || decision.after.length !== 1);
+    if (unsafe || decision.type !== "paragraph" || decision.trackedRepresentation !== "revision" || (!decision.before.length && !decision.after.length)) continue;
     const shape = `${decision.before.length}:${decision.after.length}`;
-    if (shape === "1:1" || shape === "1:2" || shape === "2:1") continue;
+    if (decision.before.length && decision.after.length && shape !== "1:1" && shape !== "1:2" && shape !== "2:1") {
+      decision.trackedRepresentation = "replace";
+      decision.trackedReason = "paragraph-shape";
+      continue;
+    }
+    const sources = [...decision.before.map((ref) => findSource(manifest, "before", ref)), ...decision.after.map((ref) => findSource(manifest, "after", ref))];
+    if (!sources.some((source) => source?.opaqueSignature && !source.objectEventsSupported)) continue;
+    const before = decision.before.length === 1 ? findSource(manifest, "before", decision.before[0]) : undefined;
+    const after = decision.after.length === 1 ? findSource(manifest, "after", decision.after[0]) : undefined;
+    if (before && after && !decision.moved && before.rawText === after.rawText && before.copySignature === after.copySignature && before.opaqueSignature === after.opaqueSignature) continue;
     decision.trackedRepresentation = "replace";
-    decision.trackedReason = "paragraph-shape";
+    decision.trackedReason = "opaque-content";
   }
 }
 

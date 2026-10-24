@@ -297,7 +297,7 @@ def _normalized_property_node(node, property_name, policy):
             continue
         local = child.tag[len(W):] if child.tag.startswith(W) else child.tag
         target = supported if child.tag.startswith(W) and local in enabled_here and grid_leaf else unsupported
-        target.setdefault(child.tag, []).append(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+        target.setdefault(child.tag, []).append(_COMPACT_JSON.encode(value))
     return {"supported": supported, "unsupported": unsupported, "history": history}
 
 
@@ -364,6 +364,27 @@ def _stable_named_bookmark_context(root, part):
     return {'name':name,'host':host,'jump':jump,'link':link,'start':start,'end':end}
 
 
+# Property elements are facts of the paragraph, run, table, row, cell or style that owns them
+# (normalizedProperties), not sources of their own. A section break inside a paragraph's
+# properties is a source.
+PROPERTY_CONTAINER_TAGS = {W + name for name in ("pPr", "rPr", "tblPr", "trPr", "tcPr", "tblGrid", "tblPrEx")}
+
+
+_SOURCE_FACTS = {"cache": None}
+_PARSED_PARTS = {"parts": None}
+
+
+def _parsed_part(archive, part):
+    """(root, source map) of `part` from this extraction's inventory pass, parsing it only when
+    the inventory did not cover it."""
+    parsed = _PARSED_PARTS["parts"]
+    if parsed is not None and part in parsed:
+        return parsed[part]
+    root = ET.fromstring(archive.read(part))
+    return root, _source_paths(root, part, archive)
+_COMPACT_JSON = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"))
+
+
 def _source_paths(root, part, archive=None):
     result = {}
     offsets = {}
@@ -376,15 +397,28 @@ def _source_paths(root, part, archive=None):
             return None
         return {"name": node.tag, "attributes": dict(node.attrib), "text": node.text or "", "children": [property_tree(child) for child in node]}
     def visit(node, path, paragraph=None):
+        if node.tag in PROPERTY_CONTAINER_TAGS:
+            for index, child in enumerate(node):
+                if child.tag == W + "sectPr":
+                    visit(child, path + [index], paragraph)
+            return
         reference = {"part": part, "path": path, "kind": node.tag.rsplit("}", 1)[-1]}
         property_names = {"p": ("pPr",), "r": ("rPr",), "tbl": ("tblPr", "tblGrid"), "tr": ("trPr",), "tc": ("tcPr",), "body": ("sectPr",), "style": ("pPr", "rPr")}.get(reference["kind"], ())
-        if node.tag==W+"sectPr":
+        facts = _SOURCE_FACTS["cache"]
+        fact_key = (part, tuple(path))
+        cached = facts.get(fact_key) if facts is not None else None
+        if cached is not None:
+            reference["normalizedProperties"] = cached
+        elif node.tag==W+"sectPr":
             reference["normalizedProperties"]={"sectPr":_normalized_property_node(node,"sectPr",policy)}
         if property_names:
             # Raw snapshots are consumed only for table grids; every other property ships its normalized fact.
             if reference["kind"] == "tbl":
                 reference["propertySnapshots"] = {"tblGrid": property_tree(node.find(W + "tblGrid"))}
-            reference["normalizedProperties"] = {name: _normalized_property_node(node.find(W + name), name, policy) for name in property_names}
+            if cached is None:
+                reference["normalizedProperties"] = {name: _normalized_property_node(node.find(W + name), name, policy) for name in property_names}
+        if facts is not None and cached is None and "normalizedProperties" in reference:
+            facts[fact_key] = reference["normalizedProperties"]
         if node.tag == W + "style":
             reference["attributes"] = dict(node.attrib)
             name = node.find(W + "name")
@@ -521,7 +555,7 @@ def _source_paths(root, part, archive=None):
             else:
                 for child in node: event_walk(child)
         event_walk(paragraph)
-        event_paths=[result[id(node)]["path"] for node in paragraph.iter() if "objectEvent" in result[id(node)]]
+        event_paths=[result[id(node)]["path"] for node in paragraph.iter() if "objectEvent" in result.get(id(node), ())]
         # A legal property-history snapshot on an image run is preserved with
         # that revised run. Content/revision wrappers remain unsupported.
         history_tags={W+name for name in policy.get("enabled",{}).get("rPr",[])+["rPr","lang","rStyle","szCs"]}
@@ -675,8 +709,7 @@ def _read_comments(archive, numbering):
     if "word/comments.xml" not in archive.namelist():
         return {}
 
-    comments_root = ET.fromstring(archive.read("word/comments.xml"))
-    sources = _source_paths(comments_root, "word/comments.xml")
+    comments_root, sources = _parsed_part(archive, "word/comments.xml")
     comments = {}
     for comment_index, comment in enumerate(comments_root.findall(W + "comment"), 1):
         comment_id = comment.attrib.get(W + "id", str(comment_index))
@@ -865,14 +898,17 @@ def _parse_document(data, include_tables, include_metadata):
         note_parts={owner['part'] for owner in _note_part_owners(archive)[0]}
         for part in archive.namelist():
             if part in note_parts or part in story_kinds or re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments|styles)\.xml", part):
-                records["sourceInventory"].extend(_source_paths(ET.fromstring(archive.read(part)), part, archive).values())
+                part_root = ET.fromstring(archive.read(part))
+                part_sources = _source_paths(part_root, part, archive)
+                if _PARSED_PARTS["parts"] is not None:
+                    _PARSED_PARTS["parts"][part] = (part_root, part_sources)
+                records["sourceInventory"].extend(part_sources.values())
         numbering = _NumberingResolver(archive)
         comments = _read_comments(archive, numbering.fresh()) if include_metadata else {}
         comment_locations = {}
-        root = ET.fromstring(archive.read("word/document.xml"))
+        root, sources = _parsed_part(archive, "word/document.xml")
         if root.tag != W + "document":
             raise ValueError(_l("지원하지 않는 Word 문서 형식입니다. 일반 DOCX로 다시 저장한 뒤 비교해 주세요.", "This Word XML format is not supported. Save it as a standard DOCX and compare again."))
-        sources = _source_paths(root, "word/document.xml")
         body = root.find(W + "body")
         paragraph_index = 0
         table_index = 0
@@ -947,8 +983,7 @@ def _parse_document(data, include_tables, include_metadata):
             header_footer_paths = sorted(story_kinds)
             for path in header_footer_paths:
                 story_numbering = numbering.fresh()
-                metadata_root = ET.fromstring(archive.read(path))
-                metadata_sources = _source_paths(metadata_root, path, archive)
+                metadata_root, metadata_sources = _parsed_part(archive, path)
                 file_name = path.split("/")[-1]
                 area = _l("머리말", "Header") if story_kinds[path]=="header" else _l("꼬리말", "Footer")
                 area_number = re.search(r"\d+", file_name)
@@ -980,8 +1015,7 @@ def _parse_document(data, include_tables, include_metadata):
                 path=owner['part'];element_name=owner['kind'];note_name=_l('각주','Footnote') if element_name=='footnote' else _l('미주','Endnote')
                 if path not in archive.namelist():
                     continue
-                notes_root = ET.fromstring(archive.read(path))
-                note_sources = _source_paths(notes_root, path)
+                notes_root, note_sources = _parsed_part(archive, path)
                 story_numbering = numbering.fresh()
                 for note_index, note in enumerate(notes_root.findall(W + element_name), 1):
                     note_id = note.attrib.get(W + "id", str(note_index))
@@ -1061,7 +1095,13 @@ def _extract_document_model(document_bytes, include_tables, include_metadata, la
     """
     global LANGUAGE
     LANGUAGE = "en" if language == "en" else "ko"
-    records = _parse_document(bytes(document_bytes), include_tables, include_metadata)
+    _SOURCE_FACTS["cache"] = {}
+    _PARSED_PARTS["parts"] = {}
+    try:
+        records = _parse_document(bytes(document_bytes), include_tables, include_metadata)
+    finally:
+        _SOURCE_FACTS["cache"] = None
+        _PARSED_PARTS["parts"] = None
 
     def comments_of(record):
         return [

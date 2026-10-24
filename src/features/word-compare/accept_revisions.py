@@ -50,6 +50,8 @@ REMOVED_RECORD_TAGS = PROPERTY_CHANGE_TAGS | REMOVED_RANGE_MARKERS | {
     W + "numberingChange",
 }
 DELETED_WRAPPERS = {W + "del", W + "moveFrom"}
+EMPTIED_WRAPPERS = {W + "hyperlink", W + "fldSimple", W + "smartTag", W + "customXml"}
+WRAPPER_PROPERTIES = {W + "fldData", W + "smartTagPr", W + "customXmlPr"}
 INSERTED_WRAPPERS = {W + "ins", W + "moveTo"}
 COMMENT_MARKERS = {W + "commentRangeStart", W + "commentRangeEnd"}
 
@@ -146,6 +148,11 @@ def _merge_deleted_paragraph_marks(parent):
             if parent.tag == W + "body" and terminal and _fully_deleted_supported_paragraph(paragraph):
                 parent.remove(paragraph)
                 continue
+            # An empty paragraph whose mark was inserted and then deleted (the separator kept
+            # between a replaced table's two versions) never existed in either version.
+            if _has_paragraph_mark(paragraph, "ins") and all(child.tag == W + "pPr" for child in paragraph):
+                parent.remove(paragraph)
+                continue
             _remove_paragraph_mark(paragraph, "del")
             index += 1
             continue
@@ -227,7 +234,13 @@ def _accept_tree(parent):
             parent.remove(child)
             continue
 
+        held_deletion = child.tag in EMPTIED_WRAPPERS and any(node.tag in DELETED_WRAPPERS for node in child)
         _accept_tree(child)
+        # A hyperlink or simple field cannot sit inside w:del, so a deleted one is written as a
+        # wrapper around deleted runs. Like Word, drop the wrapper once accepting empties it.
+        if held_deletion and all(node.tag in WRAPPER_PROPERTIES for node in child):
+            parent.remove(child)
+            continue
         index += 1
 
 

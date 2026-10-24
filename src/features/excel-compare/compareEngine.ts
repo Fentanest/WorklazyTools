@@ -68,7 +68,8 @@ export function compareSpreadsheetPair(
       ? compareByKey(leftBook, rightBook, left, right, options, warnings, checkCanceled)
       : compareByReconciliation(left, right, options, warnings, checkCanceled);
   if (records.some((item) => item.reason.includes("STRING_DATE_PARSE_FAILED"))) warnings.push("STRING_DATE_PARSE_FAILED");
-  const runId = globalThis.crypto.randomUUID();
+  // randomUUID exists only in secure contexts; plain-http previews still need a run id.
+  const runId = globalThis.crypto?.randomUUID?.() ?? `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   records.forEach((item, index) => { item.recordId = `${runId}:${index}`; item.matchingReason = options.mode === "reconcile" ? `RECONCILIATION:${item.reason}` : options.mode === "key" ? `KEY:${options.key?.duplicatePolicy ?? "invalid"}:${options.columnMapping?.length ? "manual-columns" : "auto-columns"}` : `POSITION:${options.columnMapping?.length ? "manual-columns" : "auto-columns"}`; });
   return {
     runId,

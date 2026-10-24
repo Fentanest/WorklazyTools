@@ -45,7 +45,7 @@ export function createExportSnapshot(input: Omit<ExportSnapshot, 'schema' | 'id'
   input.rows.forEach(r=>keys(r,['id','status','left','right','coordinates','metadata']));input.sources.forEach(s=>keys(s,['id','revision','label']));
   if(input.rawSources){keys(input.rawSources,['left','right']);assertReport(typeof input.rawSources.left==='string'&&typeof input.rawSources.right==='string','REPORT_INVALID_SNAPSHOT');}
   if(input.scope)keys(input.scope,['kind','ids','label']);if(input.view)keys(input.view,['width','height','alpha','background','renderOptions']);
-  const prepared = { ...input, language: input.language ?? 'ko', schema: 1 as const, id: input.id ?? crypto.randomUUID(), createdAt: new Date().toISOString(), scope: input.scope ?? { kind: 'all' as const } };
+  const prepared = { ...input, language: input.language ?? 'ko', schema: 1 as const, id: input.id ?? globalThis.crypto?.randomUUID?.() ?? `report-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`, createdAt: new Date().toISOString(), scope: input.scope ?? { kind: 'all' as const } };
   assertReport(['ko','en'].includes(prepared.language),'REPORT_INVALID_SNAPSHOT'); assertReport(prepared.rows.length <= REPORT_LIMITS.rows, 'REPORT_LIMIT');
   assertReport(['complete', 'partial', 'canceled'].includes(prepared.completion), 'REPORT_INVALID_SNAPSHOT');
   assertReport(prepared.sources.every(s => [s.id,s.revision,s.label].every(v=>typeof v==='string')) && prepared.rows.every(r=>[r.id,r.status,r.left,r.right].every(v=>typeof v==='string')) && prepared.warnings.every(w=>typeof w==='string') && typeof prepared.tool==='string', 'REPORT_INVALID_SNAPSHOT');

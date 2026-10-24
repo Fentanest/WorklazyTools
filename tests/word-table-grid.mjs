@@ -44,6 +44,10 @@ def source(path,widths,history=False,alias=False):
  with zipfile.ZipFile(path,'w') as z:
   for n,data in entries.items():z.writestr(n,data)
 checks=[]
+# Like Word, a table left without rows by Accept All or Reject All is gone.
+def kept_grid(path):
+ with zipfile.ZipFile(path) as z:root=ET.fromstring(z.read('word/document.xml'))
+ return [[n.get(W+'w') for n in tbl.find(W+'tblGrid').findall(W+'gridCol')] for tbl in root.iter(W+'tbl') if tbl.find(W+'tr') is not None]
 for name,old,new in [('width',['1000','2000'],['1800','3200']),('insert-column',['1800'],['2500','3200']),('delete-column',['1800','3200'],['2500']),('delete-middle',['1000','2000','3000'],['1500','3500'])]:
  for formatting,layout,tables in [(True,True,True),(True,False,True),(False,True,True),(True,True,False)]:
   set_mask(layout);mask={key:True for key in ['fontFamily','size','style','color','paragraph','numbering']};mask['paragraph']=layout
@@ -61,11 +65,14 @@ for name,old,new in [('width',['1000','2000'],['1800','3200']),('insert-column',
   accept_tracked_document('/grid-out.docx','/grid-accepted.docx')
   with zipfile.ZipFile('/grid-out.docx') as src,zipfile.ZipFile('/grid-rejected.docx','w') as out:
    for entry in src.infolist():out.writestr(entry,_serialize_xml(reject(_qname_safe_parse(src.read(entry.filename)))[0]) if entry.filename=='word/document.xml' else src.read(entry.filename))
-  assert grid('/grid-accepted.docx')==[new]
-  target=old if included else [new[0],old[1],new[1]] if tables and name=='delete-middle' else [new[0]] if tables and name=='insert-column' else [new[0],old[1]] if tables and name=='delete-column' else new
-  assert grid('/grid-rejected.docx')==[target],(name,formatting,layout,grid('/grid-rejected.docx'),target)
+  # Added or removed columns cannot be tracked cell by cell (Word does not accept or reject
+  # cell insertions); the table is recorded as the original deleted and the revision inserted.
+  structural=tables and name!='width'
+  assert (kept_grid if structural else grid)('/grid-accepted.docx')==[new]
+  target=old if included or structural else [new[0],old[1],new[1]] if tables and name=='delete-middle' else [new[0]] if tables and name=='insert-column' else [new[0],old[1]] if tables and name=='delete-column' else new
+  assert (kept_grid if structural else grid)('/grid-rejected.docx')==[target],(name,formatting,layout,grid('/grid-rejected.docx'),target)
   with zipfile.ZipFile('/grid-out.docx') as z:
-   root=ET.fromstring(z.read('word/document.xml'));changes=list(root.iter(W+'tblGridChange'));assert len(changes)==(1 if tables and (included or name!='width') else 0)
+   root=ET.fromstring(z.read('word/document.xml'));changes=list(root.iter(W+'tblGridChange'));assert len(changes)==(1 if tables and included and not structural else 0)
    for change in changes:
     assert set(change.attrib)=={W+'id'} # CT_TblGridChange is CT_Markup, not CT_TrackChange
     assert [c.tag for c in change]==[W+'tblGrid'] and all(c.tag==W+'gridCol' for c in change[0])
@@ -119,7 +126,8 @@ for kind in ['before','after']:
  generate_tracked_document('/own-before.docx','/own-after.docx','/own-out.docx','events',False,True,True)
  assert grid('/own-out.docx')==[['1000','2000'] if kind=='before' else ['2500']]
  checks.append(kind+'-unpaired-source-geometry-only')
-# Included merged/offset geometry and colliding prior grid history fail closed.
+# Included merged/offset geometry and colliding prior grid history cannot be revised column by
+# column; the table is recorded whole (original deleted, revision inserted), exact on both sides.
 for case in ['span','offset','history-structure']:
  source('/guard-before.docx',['1000','2000']);source('/guard-after.docx',['2500'],history=case=='history-structure')
  if case in ['span','offset']:
@@ -133,10 +141,18 @@ for case in ['span','offset','history-structure']:
    for n,data in entries.items():z.writestr(n,data)
  for layout in [False,True]:
   set_mask(layout);mask={key:True for key in ['fontFamily','size','style','color','paragraph','numbering']};mask['paragraph']=layout
-  if os.path.exists('/guard-out.docx'):os.unlink('/guard-out.docx')
-  try:generate_tracked_document('/guard-before.docx','/guard-after.docx','/guard-out.docx','events',True,True,True,formatting_mask_json=json.dumps(mask));raise AssertionError(case+' emitted')
-  except ValueError as error:assert str(error)=='UNSUPPORTED_TRACKED_SOURCE_GRID_GEOMETRY' and not os.path.exists('/guard-out.docx'),str(error)
- checks.append(case+'-geometry-refusal')
+  generate_tracked_document('/guard-before.docx','/guard-after.docx','/guard-out.docx','events',True,True,True,formatting_mask_json=json.dumps(mask))
+  accept_tracked_document('/guard-out.docx','/guard-accepted.docx')
+  with zipfile.ZipFile('/guard-out.docx') as src,zipfile.ZipFile('/guard-rejected.docx','w') as out:
+   for entry in src.infolist():out.writestr(entry,_serialize_xml(reject(_qname_safe_parse(src.read(entry.filename)))[0]) if entry.filename=='word/document.xml' else src.read(entry.filename))
+  assert kept_grid('/guard-accepted.docx')==grid('/guard-after.docx'),(case,'accept grid')
+  assert kept_grid('/guard-rejected.docx')==grid('/guard-before.docx'),(case,'reject grid')
+  def geometry(path):
+   with zipfile.ZipFile(path) as z:table=ET.fromstring(z.read('word/document.xml')).find('.//'+W+'tbl')
+   return ([(n.tag,n.get(W+'val')) for n in table.iter() if n.tag in (W+'gridSpan',W+'gridBefore')],[''.join(t.text or '' for t in cell.iter(W+'t')) for cell in table.iter(W+'tc')])
+  assert geometry('/guard-accepted.docx')==geometry('/guard-after.docx'),(case,'accept geometry')
+  assert geometry('/guard-rejected.docx')==geometry('/guard-before.docx'),(case,'reject geometry')
+ checks.append(case+'-geometry-replaced')
 
 json.dumps(checks)
 `));

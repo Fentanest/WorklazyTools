@@ -174,10 +174,16 @@ worker.onmessage = async (event: MessageEvent) => {
             trackedBuffer = trackedBytes.slice().buffer;
             transfers.push(trackedBuffer);
           } catch (error) {
-            if (!/COMPARISON_MANIFEST|COMPARISON_DECISION|UNMAPPED_VISIBLE_XML_NODE|SHARED_DIFF|UNSUPPORTED_TRACKED_SOURCE/.test(String(error))) throw error;
-            result.warnings.push(L(
+            // The tracked file is an extra download: any failure here (a guarded source shape,
+            // memory exhaustion or an unexpected generator error) drops only this pair's DOCX.
+            trackedBuffer = undefined;
+            const guarded = /COMPARISON_MANIFEST|COMPARISON_DECISION|UNMAPPED_VISIBLE_XML_NODE|SHARED_DIFF|UNSUPPORTED_TRACKED_SOURCE/.test(String(error));
+            result.warnings.push(guarded ? L(
               "일부 원문 위치를 변경 추적 파일에 안전하게 연결할 수 없어 DOCX 다운로드를 제공하지 않습니다. 화면 비교 결과를 확인해 주세요.",
               "The tracked DOCX download is unavailable because some source locations could not be represented safely. Review the on-screen comparison.",
+            ) : L(
+              "변경 추적 파일을 만드는 중 문제가 생겨 이 문서 쌍의 DOCX 다운로드를 제공하지 않습니다. 화면 비교 결과는 그대로 확인할 수 있습니다.",
+              "The tracked DOCX download is unavailable for this document pair because creating it failed. The on-screen comparison is still available.",
             ));
           }
         }

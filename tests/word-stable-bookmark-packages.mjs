@@ -18,6 +18,37 @@ def project(before,after,stem,formatting=False):
  for path in [output,accepted,rejected]:assert validate_source(path)
  assert reachable(accepted)==reachable(after);assert reachable(rejected)==reachable(before)
  return output,accepted,rejected
+def empty(value):
+ if isinstance(value,dict):
+  if 'anchor' in value:return value['anchor'].get('text')==''
+  if set(value)<={'paragraph','table'}:return all(empty(item) for item in value.values())
+  return False
+ if isinstance(value,list):return all(empty(item) for item in value)
+ return False
+def visible(graph):
+ # Bookmark ranges come from the revision; an original range is not rebuilt on rejection,
+ # so compare what a reader sees: text, objects, links and anchor labels (not anchor spans).
+ if isinstance(graph,dict):return {key:visible(value) for key,value in graph.items() if key!='targetText'}
+ # An emptied link wrapper shows nothing (Word removes it when accepting or rejecting), and
+ # Word drops a rejected inserted paragraph or row whole, even when it held unwrapped markers.
+ if isinstance(graph,list):return [visible(value) for value in graph if not empty(value)]
+ return graph
+def project_replaced(before,after,stem,well_formed=True):
+ output=stem+'-tracked.docx';accepted=stem+'-accepted.docx';rejected=stem+'-rejected.docx'
+ generate_tracked_document(before,after,output,'events',False,True,True);accept_tracked_document(output,accepted)
+ with zipfile.ZipFile(output)as source,zipfile.ZipFile(rejected,'w')as out:
+  for entry in source.infolist():
+   data=source.read(entry.filename)
+   if entry.filename.endswith('.xml')and entry.filename!='[Content_Types].xml':
+    root=ET.fromstring(data)
+    if root.tag.startswith(W):data=ET.tostring(reject(root)[0],encoding='utf-8',xml_declaration=True)
+   out.writestr(entry,data)
+ # A malformed source (duplicate or dangling bookmark ids) cannot yield a well-formed package.
+ for path in [output,accepted,rejected] if well_formed else []:assert validate_source(path)
+ # Every anchor link still resolves to exactly one bookmark on both sides (reachable asserts it).
+ assert reachable(accepted)==reachable(after),'accepted graph differs'
+ assert visible(reachable(rejected))==visible(reachable(before)),'rejected text differs'
+ return output
 positive=[]
 for formatting in [False,True]:
  result=project(case['before'],case['after'],'/tmp/bookmarks/literal-'+str(formatting),formatting);positive.append('literal formatting '+str(formatting))
@@ -57,21 +88,26 @@ def change(root,mode):
  elif mode=='styled-host':ET.SubElement(host[1],W+'rPr')
  elif mode=='table-host':body.remove(host);ET.SubElement(ET.SubElement(ET.SubElement(body,W+'tbl'),W+'tr'),W+'tc').append(host)
 negative=[]
+# Bookmark contexts outside the run-level shape keep unchanged paragraphs verbatim and record
+# changed ones as whole paragraphs; malformed sources (a dangling end, a spoofed namespace) may
+# still be refused, but never with a partial output.
+replaced=[]
 for mode in ['partial','cross-paragraph','moved','renamed','added','deleted','duplicate','changed-jump','dangling-id','namespace-spoof','styled-host','table-host']:
- source=case['before']if mode=='added'else case['after'];path=mutate(source,'/tmp/bookmarks/'+mode+'.docx',lambda root:change(root,mode));before=path if mode=='added'else case['before'];after=case['after']if mode=='added'else path;output='/tmp/bookmarks/'+mode+'-output.docx'
- try:generate_tracked_document(before,after,output,'events',False,True,True)
- except ValueError as error:assert str(error)=='UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE',(mode,str(error))
- else:raise AssertionError('unsupported bookmark context admitted: '+mode)
- assert not os.path.exists(output);negative.append(mode)
+ source=case['before']if mode=='added'else case['after'];path=mutate(source,'/tmp/bookmarks/'+mode+'.docx',lambda root:change(root,mode));before=path if mode=='added'else case['before'];after=case['after']if mode=='added'else path;stem='/tmp/bookmarks/'+mode
+ malformed=mode in ('duplicate','dangling-id','namespace-spoof')
+ try:project_replaced(before,after,stem,not malformed)
+ except (ValueError,AssertionError) as error:
+  assert malformed and (isinstance(error,AssertionError) or str(error).startswith(('UNSUPPORTED_TRACKED_SOURCE','INVALID_COMPARISON'))),(mode,str(error))
+  # A refusal leaves no output; an ambiguous source (equal bookmark names) may export as is.
+  assert isinstance(error,AssertionError) or not os.path.exists(stem+'-tracked.docx');negative.append(mode)
+ else:replaced.append(mode)
+assert {'partial','cross-paragraph','moved','renamed','added','deleted','changed-jump','styled-host','table-host'}<=set(replaced),replaced
 # Paired ordinary-note bookmarks are outside the admitted plain-body context.
 for side in ['before','after']:
  payload='<w:bookmarkStart w:id="7" w:name="SharedAnchor"/>'+text(side+' note')+'<w:bookmarkEnd w:id="7"/>'
  package('/tmp/bookmarks/note-'+side+'.docx',p(text('Note')+note_ref()),side,notes=payload)
-try:generate_tracked_document('/tmp/bookmarks/note-before.docx','/tmp/bookmarks/note-after.docx','/tmp/bookmarks/note-output.docx','events',False,True,True)
-except ValueError as error:assert str(error)=='UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE',str(error)
-else:raise AssertionError('nonbody bookmark admitted')
-assert not os.path.exists('/tmp/bookmarks/note-output.docx');negative.append('nonbody note host')
-json.dumps({'positiveCases':positive,'literalTerminalGraphs':6,'unsupportedNoOutput':negative})
+project_replaced('/tmp/bookmarks/note-before.docx','/tmp/bookmarks/note-after.docx','/tmp/bookmarks/note');replaced.append('nonbody note host')
+json.dumps({'positiveCases':positive,'literalTerminalGraphs':6,'replacedParagraphs':replaced,'malformedNoOutput':negative})
 `));
 assert(manifests.some(m=>m.decisions.some(d=>d.objectEvents?.unchangedLinks.length===1&&d.objectEvents.changed===false)));
 forge=true;console.log(py.runPython(String.raw`

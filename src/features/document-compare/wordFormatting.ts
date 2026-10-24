@@ -7,15 +7,37 @@ import policy from "../word-compare/formatting-policy.json" with { type: "json" 
 const local = (name: string) => name.startsWith(W) ? name.slice(W.length) : name;
 const key = (ref: DocumentSourceReference) => JSON.stringify([ref.part, ref.path]);
 const emptyFact: PropertyFact = { supported: {}, unsupported: {}, history: false };
+// Facts are shared objects (one per source property), so pairs repeat; results are cached per pair.
+const rawChangedCache = [new WeakMap<PropertyFact, WeakMap<PropertyFact, string[]>>(), new WeakMap<PropertyFact, WeakMap<PropertyFact, string[]>>()];
 function rawChanged(before: PropertyFact | undefined, after: PropertyFact | undefined, supported = true) {
-  const a = before?.[supported ? "supported" : "unsupported"] ?? {}, b = after?.[supported ? "supported" : "unsupported"] ?? {};
-  return [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((name) => JSON.stringify(a[name] ?? []) !== JSON.stringify(b[name] ?? []));
+  const left = before ?? emptyFact, right = after ?? emptyFact, cache = rawChangedCache[supported ? 0 : 1];
+  let byAfter = cache.get(left);
+  if (!byAfter) cache.set(left, byAfter = new WeakMap());
+  let names = byAfter.get(right);
+  if (!names) {
+    const a = left[supported ? "supported" : "unsupported"] ?? {}, b = right[supported ? "supported" : "unsupported"] ?? {};
+    names = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((name) => JSON.stringify(a[name] ?? []) !== JSON.stringify(b[name] ?? []));
+    byAfter.set(right, names);
+  }
+  return [...names];
 }
 function changed(manifest: DocumentComparisonManifest, property: string, before: PropertyFact | undefined, after: PropertyFact | undefined, supported = true) {
   const names = rawChanged(before, after);
   return supported ? names.filter(name => manifest.formattingMask.effective[formattingGroup(property,name)]) : [...rawChanged(before,after,false), ...names.filter(name => !manifest.formattingMask.effective[formattingGroup(property,name)])];
 }
 interface StyleEntry { fact: PropertyFact; source: DocumentSourceReference }
+interface RunFactDiff { names: string[]; excluded: string[]; unsupported: boolean }
+// Runs share their fact objects, so a paragraph's characters repeat a few fact pairs.
+const runFactDiffs = new WeakMap<DocumentComparisonManifest, WeakMap<PropertyFact, Map<PropertyFact, RunFactDiff>>>();
+function runFactDiff(manifest: DocumentComparisonManifest, before: PropertyFact, after: PropertyFact): RunFactDiff {
+  let byBefore = runFactDiffs.get(manifest);
+  if (!byBefore) runFactDiffs.set(manifest, byBefore = new WeakMap());
+  let byAfter = byBefore.get(before);
+  if (!byAfter) byBefore.set(before, byAfter = new Map());
+  let diff = byAfter.get(after);
+  if (!diff) byAfter.set(after, diff = { names: changed(manifest, "rPr", before, after), excluded: changed(manifest, "rPr", before, after, false), unsupported: rawChanged(before, after, false).length > 0 });
+  return diff;
+}
 function rawStyles(manifest: DocumentComparisonManifest, side: "before" | "after", refs: DocumentSourceReference[], joinBreaks: boolean) {
   const result: Array<StyleEntry | undefined> = [];
   for (const [index, ref] of refs.entries()) {
@@ -46,17 +68,17 @@ function attachComparison(manifest: DocumentComparisonManifest, decision: Compar
     if (segment.type === "equal") for (let offset = 0; offset < size; offset++) {
       const a = beforeStyles[before + offset], b = afterStyles[after + offset];
       if (!a || !b) { manifest.formattingExcluded.push(decision.id); continue; }
-      const names = changed(manifest, "rPr", a.fact, b.fact), excluded = changed(manifest, "rPr", a.fact, b.fact, false);
-      if (rawChanged(a.fact,b.fact,false).length) manifest.formattingExcluded.push(decision.id);
-      if (previousScope && previousScope.beforeStart! + previousScope.length! === before + offset && previousScope.afterStart! + previousScope.length! === after + offset && key(previousScope.before) === key(a.source) && key(previousScope.after) === key(b.source)) previousScope.length!++;
+      const diff = runFactDiff(manifest, a.fact, b.fact), names = diff.names;
+      if (diff.unsupported) manifest.formattingExcluded.push(decision.id);
+      if (previousScope && previousScope.beforeStart! + previousScope.length! === before + offset && previousScope.afterStart! + previousScope.length! === after + offset && (previousScope.before === a.source || key(previousScope.before) === key(a.source)) && (previousScope.after === b.source || key(previousScope.after) === key(b.source))) previousScope.length!++;
       else {
-        previousScope = { id: `${comparisonId}:rPr:${before + offset}:${after + offset}`, before: a.source, after: b.source, property: "rPr", beforeFact: a.fact, afterFact: b.fact, families: names, excludedFamilies: excluded, comparisonId, beforeStart: before + offset, afterStart: after + offset, length: 1 };
+        previousScope = { id: `${comparisonId}:rPr:${before + offset}:${after + offset}`, before: a.source, after: b.source, property: "rPr", beforeFact: a.fact, afterFact: b.fact, families: [...names], excludedFamilies: [...diff.excluded], comparisonId, beforeStart: before + offset, afterStart: after + offset, length: 1 };
         manifest.formattingScopes.push(previousScope);
       }
       if (names.length) {
         const previous = spans.at(-1);
         if (previous?.scopeId === previousScope.id) previous.length++;
-        else spans.push({ beforeStart: before + offset, afterStart: after + offset, length: 1, families: names, history: b.fact.history, scopeId: previousScope.id });
+        else spans.push({ beforeStart: before + offset, afterStart: after + offset, length: 1, families: [...names], history: b.fact.history, scopeId: previousScope.id });
       }
     }
     if (segment.type !== "added") before += size;
@@ -86,6 +108,8 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
       if(pair.excludedFamilies.some(name=>!Object.hasOwn(pair.beforeFact.supported,name)&&!Object.hasOwn(pair.afterFact.supported,name)))manifest.formattingExcluded.push(decision.id);
     }
     decision.screenFormattingFamilies = [...screenFamilies];
+    // Whole-paragraph replacements show formatting on screen but carry no run-level scopes.
+    if (decision.trackedRepresentation !== "revision") continue;
     if (decision.before.length === 1 && decision.after.length === 1) attachComparison(manifest, decision, decision.comparisons[0], left, right, decision.before[0], decision.after[0], [{ source: decision.before[0], range: [0, left.length] }], [{ source: decision.after[0], range: [0, right.length] }]);
     if (decision.before.length === 1 && decision.after.length === 2) for (let index = 0; index < 2; index++) {
       const [start, end] = decision.splitSlices![index];

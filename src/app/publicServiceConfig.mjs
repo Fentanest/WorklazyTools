@@ -2,8 +2,9 @@
 export const VIDEO_STUDIO_PUBLIC = false;
 
 // Static rollback: WORKLAZY_COMPARISON_PORT=off npm run build.
-// The affected document tool closes as one unit; screen and DOCX never use different engines.
-export const COMPARISON_TOOL_IDS=Object.freeze(['text-compare','image-compare','folder-compare','document-compare','excel-compare','pdf-compare']);
+// Closes only the tools the comparison port added. Document, Excel and PDF comparison existed
+// before the port and keep their single engine, so switching the port off never removes them.
+export const COMPARISON_TOOL_IDS=Object.freeze(['text-compare','image-compare','folder-compare']);
 export const COMPARISON_PORT_PUBLIC=typeof __COMPARISON_PORT_PUBLIC__!=='undefined'
   ? __COMPARISON_PORT_PUBLIC__ : !(typeof process!=='undefined'&&process.env.WORKLAZY_COMPARISON_PORT==='off');
 export function isComparisonToolPublished(id,enabled=COMPARISON_PORT_PUBLIC){return enabled||!COMPARISON_TOOL_IDS.includes(id);}

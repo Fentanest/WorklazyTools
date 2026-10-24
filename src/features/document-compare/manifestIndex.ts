@@ -81,3 +81,13 @@ export function subtreeSources(manifest: DocumentComparisonManifest, side: Side,
   for (let position = low; position < list.length && root.path.every((value, offset) => list[position].path[offset] === value); position++) result.push(list[position]);
   return result.sort((a, b) => index.order.get(a)! - index.order.get(b)!);
 }
+
+const textLengths = new WeakMap<DocumentSourceReference, number>();
+/** Code-point length of the inventory entry's `rawText` for `target` (0 when absent). */
+export function sourceTextLength(manifest: DocumentComparisonManifest, side: Side, target: Pick<DocumentSourceReference, "part" | "path">) {
+  const source = findSource(manifest, side, target);
+  if (!source) return 0;
+  let length = textLengths.get(source);
+  if (length === undefined) { length = Array.from(source.rawText ?? "").length; textLengths.set(source, length); }
+  return length;
+}

@@ -1,9 +1,9 @@
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, SourceSlices } from "./comparisonManifest.ts";
-import { childSources, findSource, paragraphSources } from "./manifestIndex.ts";
+import { childSources, findSource, paragraphSources, sourceTextLength } from "./manifestIndex.ts";
 const key = (ref: DocumentSourceReference) => JSON.stringify([ref.part, ref.path]);
 const sameSource = (a: DocumentSourceReference | undefined, b: DocumentSourceReference | undefined) => a === b || (a ? key(a) : "") === (b ? key(b) : "");
 export function comparisonSourceSlices(manifest: DocumentComparisonManifest, decision: ComparisonDecision, index: number): SourceSlices {
-  const full = (side: "before" | "after", refs: DocumentSourceReference[]) => refs.map((source) => ({ source, range: [0, Array.from(findSource(manifest, side, source)?.rawText ?? "").length] as [number, number] }));
+  const full = (side: "before" | "after", refs: DocumentSourceReference[]) => refs.map((source) => ({ source, range: [0, sourceTextLength(manifest, side, source)] as [number, number] }));
   if (decision.before.length === 1 && decision.after.length === 2) return { before: [{ source: decision.before[0], range: decision.splitSlices![index - 1] }], after: full("after", [decision.after[index - 1]]) };
   return { before: full("before", decision.before), after: full("after", decision.after) };
 }

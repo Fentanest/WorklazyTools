@@ -163,7 +163,11 @@ class _PackageGraph:
     def copy(self, source, part, output_owner=None):
         result=copy.deepcopy(source)
         for original,picture in zip(source.iter(W+'pict'),result.iter(W+'pict')):
-            if not _simple_vml_picture(picture,self.before,part):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_VML_PICTURE')
+            if not _simple_vml_picture(picture,self.before,part):
+                # Whole-paragraph replacements copy any VML; identities are renumbered below.
+                if not _REPLACE_COPY["active"]:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_VML_PICTURE')
+                self.renumber_vml(picture)
+                continue
             origin=_MANIFEST_NODE_KEYS.get(original)
             owner=_MANIFEST_EVENT_OWNERS.get(origin)
             if owner is not None and not _MANIFEST['formattingMask']['effective']['paragraph']:
@@ -186,6 +190,62 @@ class _PackageGraph:
             if node.tag=='{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr':
                 node.set('id',str(self.next_drawing_id));self.next_drawing_id+=1
         return result
+    def renumber_vml(self, picture):
+        """Give every VML shape of a copied original picture a fresh id, keeping internal references."""
+        v='{urn:schemas-microsoft-com:vml}';o='{urn:schemas-microsoft-com:office:office}'
+        remapped={}
+        for node in picture.iter():
+            if node.tag.startswith(v) and node.get('id'):
+                while 'worklazy_vml_'+str(self.next_vml_id) in self.vml_ids:self.next_vml_id+=1
+                value='worklazy_vml_'+str(self.next_vml_id);self.next_vml_id+=1;self.vml_ids.add(value)
+                remapped[node.get('id')]=value;node.set('id',value)
+        for node in picture.iter():
+            for name in ('type',o+'connectortype'):
+                value=node.get(name)
+                if value and value.startswith('#') and value[1:] in remapped:node.set(name,'#'+remapped[value[1:]])
+            if node.get(o+'spid'):
+                while 'worklazy_vml_'+str(self.next_vml_id) in self.vml_ids:self.next_vml_id+=1
+                value='_x0000_s'+str(30000+self.next_vml_id);self.next_vml_id+=1
+                node.set(o+'spid',value)
+    def import_story(self, rid, reference_tag):
+        """Copy the original header/footer story a deleted section break refers to under a new
+        part name and return the main document's relationship id for it, so Reject All restores
+        the section's own stories (Accept All folds the section into the next one)."""
+        key=('story',rid,reference_tag)
+        if key in self.ids:return self.ids[key]
+        kind='header' if reference_tag==W+'headerReference' else 'footer'
+        relationship_type=R[1:-1]+'/'+kind
+        content='application/vnd.openxmlformats-officedocument.wordprocessingml.'+kind+'+xml'
+        path=self.rel_path('word/document.xml')
+        if path not in self.before.namelist():raise ValueError('UNSUPPORTED_TRACKED_SOURCE_REPLACE_SECTION')
+        candidates=[node for node in ET.fromstring(self.before.read(path)) if node.get('Id')==rid]
+        if len(candidates)!=1 or candidates[0].get('Type')!=relationship_type or candidates[0].get('TargetMode')=='External':raise ValueError('UNSUPPORTED_TRACKED_SOURCE_REPLACE_SECTION')
+        target=candidates[0].get('Target','')
+        source=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
+        if source not in self.before.namelist() or self.mime(source,self.before_types)!=content:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_REPLACE_SECTION')
+        story=_accepted_copy(_qname_safe_parse(self.before.read(source)))
+        parents={child:parent for parent in story.iter() for child in parent}
+        for node in list(story.iter()):
+            for name in (W14+'paraId',W14+'textId'):node.attrib.pop(name,None)
+            if node.tag in REPLACE_MARKER_TAGS and node.tag!=W+'proofErr' or node.tag in (W+'footnoteReference',W+'endnoteReference'):
+                parents[node].remove(node)
+        number=1
+        while 'word/worklazy-'+kind+str(number)+'.xml' in self.names:number+=1
+        destination='word/worklazy-'+kind+str(number)+'.xml'
+        previous=_REPLACE_COPY["active"];_REPLACE_COPY["active"]=True
+        try:story=self.copy(story,source,destination)
+        finally:_REPLACE_COPY["active"]=previous
+        self.names.add(destination);self.story_parts.add(destination)
+        self.additions[destination]=_serialize_xml(story)
+        ET.SubElement(self.types,CT+'Override',{'PartName':'/'+destination,'ContentType':content})
+        root=self.roots.get(path)
+        if root is None:root=ET.fromstring(self.after.read(path)) if path in self.after.namelist() else ET.Element(PR+'Relationships')
+        used={node.get('Id') for node in root};number=1
+        while 'rIdWorklazyStory'+str(number) in used:number+=1
+        identity='rIdWorklazyStory'+str(number)
+        ET.SubElement(root,PR+'Relationship',{'Id':identity,'Type':relationship_type,'Target':posixpath.relpath(destination,'word')})
+        self.roots[path]=root;self.ids[key]=identity
+        return identity
     def validate(self, replacements, additions):
         names=self.names | set(additions)
         types=ET.fromstring(replacements.get('[Content_Types].xml',self.after.read('[Content_Types].xml'))) if '[Content_Types].xml' in self.after.namelist() else self.types
@@ -280,6 +340,17 @@ class _RevisionWriter:
         }
 
 
+_QNAME_ATTRIBUTES = frozenset({
+    "{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable",
+    "{http://schemas.openxmlformats.org/markup-compatibility/2006}MustUnderstand",
+    "{http://schemas.openxmlformats.org/markup-compatibility/2006}ProcessContent",
+    "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveElements",
+    "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveAttributes",
+    "{http://www.w3.org/2001/XMLSchema-instance}type",
+    "Requires",
+})
+
+
 def _qname_safe_parse(data, register_namespaces=True):
     pending = {}; contexts = []; root = None
     for event, value in ET.iterparse(io.BytesIO(data), events=("start-ns", "start", "end")):
@@ -289,10 +360,15 @@ def _qname_safe_parse(data, register_namespaces=True):
                 try: ET.register_namespace(prefix or "", uri)
                 except ValueError: pass
         elif event == "start":
-            context = dict(contexts[-1]) if contexts else {}; context.update(pending); pending.clear(); contexts.append(context)
+            # Contexts are read-only once pushed; a child without declarations shares its parent's.
+            if pending or not contexts:
+                context = dict(contexts[-1]) if contexts else {}; context.update(pending); pending.clear()
+            else:
+                context = contexts[-1]
+            contexts.append(context)
             if root is None: root = value
             if value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice" and not value.get("Requires", "").split():raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
-            for name, raw in list(value.attrib.items()):
+            for name, raw in (list(value.attrib.items()) if not _QNAME_ATTRIBUTES.isdisjoint(value.attrib) else ()):
                 prefixes = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable", "{http://schemas.openxmlformats.org/markup-compatibility/2006}MustUnderstand"} or (name == "Requires" and value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice")
                 typed = name == "{http://www.w3.org/2001/XMLSchema-instance}type"
                 qnames = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}ProcessContent", "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveElements", "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveAttributes"}
@@ -863,7 +939,19 @@ def _whole_paragraph_revision(source, kind, writer):
             if after is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
             paragraph_properties = _project_properties(paragraph_properties, after.find(W + "pPr"), "pPr")
     if paragraph_properties is not None:
-        paragraph.append(copy.deepcopy(paragraph_properties) if kind == "ins" else _accepted_copy(paragraph_properties))
+        section = paragraph_properties.find(W + "sectPr") if kind == "del" else None
+        if section is not None:
+            # The original header/footer links point at original parts; link the revised neighbour's.
+            index = list(paragraph_properties).index(section)
+            paragraph_properties.remove(section)
+            try:
+                copied = _accepted_copy(paragraph_properties)
+            finally:
+                paragraph_properties.insert(index, section)
+            copied.insert(index, _deleted_section_copy(section, _donor_section(section)))
+            paragraph.append(copied)
+        else:
+            paragraph.append(copy.deepcopy(paragraph_properties) if kind == "ins" else _accepted_copy(paragraph_properties))
     _mark_paragraph_end(paragraph, kind, writer)
     if kind == "ins":
         tokens, events = _styled_tokens(source, collect_events=True)
@@ -908,6 +996,342 @@ def _whole_paragraph_revision(source, kind, writer):
         paragraph.extend(_revision_containers(kind, tokens[position:end], writer))
         position = end
     return paragraph
+
+
+W14 = "{http://schemas.microsoft.com/office/word/2010/wordml}"
+REPLACE_MARKER_TAGS = {W + "bookmarkStart", W + "bookmarkEnd", W + "permStart", W + "permEnd", W + "proofErr",
+                       W + "commentRangeStart", W + "commentRangeEnd", W + "moveFromRangeStart", W + "moveFromRangeEnd",
+                       W + "moveToRangeStart", W + "moveToRangeEnd", W + "customXmlInsRangeStart", W + "customXmlInsRangeEnd",
+                       W + "customXmlDelRangeStart", W + "customXmlDelRangeEnd"}
+REPLACE_RUN_CONTAINERS = {W + "hyperlink", W + "smartTag", W + "customXml", W + "fldSimple", W + "dir", W + "bdo"}
+# Decisions the generator records as whole paragraphs (id -> reason): paragraphs whose change cannot
+# be represented run by run are deleted from the original and inserted from the revision, so both
+# Accept All and Reject All stay exact while unchanged bookmarks, fields and text boxes stay intact.
+_REPLACED = {}
+_REPLACE_COPY = {"active": False}
+_ORIGINAL_MARKS = {"after_names": None, "next_id": None}
+# Note references inside deleted copies get their own note: each note may be referenced once.
+_NOTE_CLONES = {"items": [], "next": {}}
+
+
+def _note_part(kind):
+    return next((action["part"] for action in (_MANIFEST or {}).get("noteProjection", {}).get("partActions", []) if action.get("kind") == kind), None)
+
+
+def _clone_note_reference(node):
+    kind = "footnote" if node.tag == W + "footnoteReference" else "endnote"
+    # Only a note the revision also references is shared; an original-only note is already imported.
+    shared = {pair["after"]["id"] for pair in (_MANIFEST or {}).get("noteProjection", {}).get("pairs", []) if pair.get("after") and pair.get("before") and pair["after"].get("kind", kind) == kind}
+    if node.get(W + "id") not in shared:
+        return
+    part = _note_part(kind)
+    if part is None:
+        raise ValueError("UNSUPPORTED_TRACKED_SOURCE_REPLACE_NOTE")
+    if kind not in _NOTE_CLONES["next"]:
+        used = {int(value) for value in _NOTE_IDS.values() if str(value).lstrip("-").isdigit()}
+        archive = _PACKAGE_GRAPH.after if _PACKAGE_GRAPH is not None else None
+        if archive is not None and part in archive.namelist():
+            used.update(int(n.get(W + "id")) for n in ET.fromstring(archive.read(part)) if (n.get(W + "id") or "").lstrip("-").isdigit())
+        _NOTE_CLONES["next"][kind] = max(used | {0}) + 1
+    identity = str(_NOTE_CLONES["next"][kind])
+    _NOTE_CLONES["next"][kind] += 1
+    _NOTE_CLONES["items"].append((part, kind, identity, node.get(W + "id")))
+    node.set(W + "id", identity)
+
+
+def _append_note_clones(replacements, additions, after_archive):
+    """Copy each referenced note (with its revisions) under the id its deleted copy points at."""
+    for part in sorted({item[0] for item in _NOTE_CLONES["items"]}):
+        target = replacements if part in replacements else additions if part in additions else replacements
+        data = replacements.get(part) or additions.get(part) or after_archive.read(part)
+        root = _parse_xml(data)
+        notes = {note.get(W + "id"): note for note in root}
+        for item_part, kind, identity, source in _NOTE_CLONES["items"]:
+            if item_part != part:
+                continue
+            original = notes.get(source)
+            if original is None or original.tag != W + kind:
+                raise ValueError("UNSUPPORTED_TRACKED_SOURCE_REPLACE_NOTE")
+            clone = copy.deepcopy(original)
+            clone.set(W + "id", identity)
+            _strip_note_clone(clone)
+            root.append(clone)
+        target[part] = _serialize_xml(root)
+
+
+def _strip_note_clone(clone):
+    for node in list(clone.iter()):
+        for name in (W14 + "paraId", W14 + "textId"):
+            node.attrib.pop(name, None)
+    parents = {child: parent for parent in clone.iter() for child in parent}
+    for node in [node for node in clone.iter() if node.tag in (W + "bookmarkStart", W + "bookmarkEnd") or node.tag in REPLACE_MARKER_TAGS or node.tag == W + "commentReference"]:
+        parents[node].remove(node)
+
+
+def _strip_original_markers(copy_root):
+    """Clean a copy of original content for a whole-block deletion.
+
+    A bookmark whose name the revision also has is dropped (the revision's survives in its place;
+    two equal names make Word discard one). Other original bookmarks are kept with fresh ids so
+    links of the original still resolve after Reject All. Comment, permission and proofing
+    markers and w14 paragraph ids belong to the revision and are dropped."""
+    if _ORIGINAL_MARKS["after_names"] is None:
+        names, ids = set(), [0]
+        archive = _PACKAGE_GRAPH.after if _PACKAGE_GRAPH is not None else None
+        parts = sorted(_PACKAGE_GRAPH.story_parts & set(archive.namelist())) if archive is not None else []
+        for part in parts:
+            for node in _qname_safe_parse(archive.read(part)).iter(W + "bookmarkStart"):
+                names.add(node.get(W + "name"))
+                if (node.get(W + "id") or "").isdigit():
+                    ids.append(int(node.get(W + "id")))
+        _ORIGINAL_MARKS["after_names"], _ORIGINAL_MARKS["next_id"] = names, max(ids) + 1000
+    for node in list(copy_root.iter()):
+        # Only identity attributes: other w14 attributes (w14:val of ligatures, ...) are required content.
+        for name in (W14 + "paraId", W14 + "textId"):
+            node.attrib.pop(name, None)
+    kept = {}
+    # Only ranges that start and end inside this copy can be kept whole.
+    ends = {node.get(W + "id") for node in copy_root.iter(W + "bookmarkEnd")}
+    for node in copy_root.iter(W + "bookmarkStart"):
+        label = node.get(W + "name") or ""
+        if label != "_GoBack" and label not in _ORIGINAL_MARKS["after_names"] and node.get(W + "id") in ends:
+            kept[node.get(W + "id")] = str(_ORIGINAL_MARKS["next_id"])
+            _ORIGINAL_MARKS["next_id"] += 1
+    parents = {child: parent for parent in copy_root.iter() for child in parent}
+    for node in list(copy_root.iter()):
+        if node.tag in (W + "bookmarkStart", W + "bookmarkEnd") and node.get(W + "id") in kept:
+            node.set(W + "id", kept[node.get(W + "id")])
+            continue
+        if node.tag in REPLACE_MARKER_TAGS or node.tag == W + "commentReference":
+            parents[node].remove(node)
+    for node in list(copy_root.iter()):
+        if node.tag in (W + "footnoteReference", W + "endnoteReference"):
+            _clone_note_reference(node)
+
+
+def _replace_decision(decision, reason):
+    """Record `decision` as a whole-block replacement; False when it cannot be one.
+
+    Paragraph groups of any shape qualify. A 1:1 table qualifies as a whole: every decision
+    inside it is carried by the table copy."""
+    if decision is None or decision.get("trackedRepresentation") not in {"revision", "replace"}:
+        return False
+    if decision.get("type") == "table":
+        if len(decision.get("before", [])) != 1 or len(decision.get("after", [])) != 1:
+            return False
+        def nested(items):
+            for item in items:
+                _REPLACED.setdefault(item["id"], "inside-replaced-table")
+                nested(item.get("children", []))
+        nested(decision.get("children", []))
+    elif decision.get("type") != "paragraph" or (not decision.get("before") and not decision.get("after")):
+        return False
+    _REPLACED.setdefault(decision["id"], reason)
+    return True
+
+
+def _spend_replaced(decision):
+    """Mark the property actions and grid projections of a replaced block (and its nested
+    decisions) as handled: the copies carry the original and revised properties verbatim."""
+    ids = set()
+    def visit(item):
+        ids.add(item["id"])
+        if item.get("type") == "table" and item.get("trackedRepresentation") == "revision":
+            for side in ("before", "after"):
+                if item.get(side):
+                    _MANIFEST_GRID_USED.add((item["id"], side))
+        for child in item.get("children", []):
+            visit(child)
+    visit(decision)
+    for action in (_MANIFEST or {}).get("propertyActions", []):
+        if action.get("decisionId") in ids:
+            _MANIFEST_PROPERTY_USED.add(action["id"])
+
+
+def _replace_table(source, kind, writer):
+    """One side of a whole-table replacement: every row and paragraph marked, content kept."""
+    side = "after" if kind == "ins" else "before"
+    _consume_manifest_subtree(side, source)
+    _REPLACE_COPY["active"] = kind == "del"
+    try:
+        table = _accepted_copy(source, preserve_comments=(kind == "ins"))
+    finally:
+        _REPLACE_COPY["active"] = False
+    if kind == "del":
+        _strip_original_markers(table)
+    parents = {child: parent for parent in table.iter() for child in parent}
+    def in_text_box(node):
+        while node in parents:
+            node = parents[node]
+            if node.tag == W + "txbxContent":
+                return True
+        return False
+    for paragraph in [paragraph for paragraph in table.iter(W + "p") if not in_text_box(paragraph)]:
+        _wrap_runs(paragraph, kind, writer)
+        _mark_paragraph_end(paragraph, kind, writer)
+    for row in list(table.iter(W + "tr")):
+        _mark_row(row, kind, writer)
+    _consume_copied_objects(source)
+    return table
+
+
+def _is_replaced(decision):
+    return bool(decision) and (decision.get("trackedRepresentation") == "replace" or decision.get("id") in _REPLACED)
+
+
+def _wrap_runs(container, kind, writer):
+    """Wrap every run of an accepted paragraph copy in w:ins / w:del, keeping run content."""
+    children = list(container)
+    container[:] = []
+    pending = None
+    for child in children:
+        if child.tag == W + "r":
+            if kind == "del":
+                for item in child:
+                    if item.tag == W + "t":
+                        item.tag = W + "delText"
+                    elif item.tag == W + "instrText":
+                        item.tag = W + "delInstrText"
+            if pending is None:
+                pending = ET.Element(W + kind, writer.attributes())
+                container.append(pending)
+            pending.append(child)
+            continue
+        pending = None
+        if child.tag in REPLACE_MARKER_TAGS:
+            if kind == "ins" or child.tag in (W + "bookmarkStart", W + "bookmarkEnd"):
+                container.append(child)
+            continue
+        if child.tag in REPLACE_RUN_CONTAINERS:
+            _wrap_runs(child, kind, writer)
+            container.append(child)
+            continue
+        if child.tag == CONTENT_CONTROL_TAG:
+            content = child.find(CONTENT_CONTROL_BODY_TAG)
+            if content is not None:
+                _wrap_runs(content, kind, writer)
+            container.append(child)
+            continue
+        if child.tag in {W + "pPr", W + "rPr", W + "sdtPr", W + "sdtEndPr"}:
+            container.append(child)
+            continue
+        raise ValueError("UNSUPPORTED_TRACKED_SOURCE_REPLACE_CONTENT")
+
+
+def _donor_section(before_section):
+    """The revised section a deleted break folds into: the next break (in section order) that the
+    revision also has, else the revised final section."""
+    origin = _MANIFEST_NODE_KEYS.get(before_section)
+    sections = _MANIFEST["storyProjection"]["sections"] if _MANIFEST is not None else []
+    index = next((i for i, pair in enumerate(sections) if pair.get("before") and origin is not None and _manifest_key(pair["before"]["source"]) == origin[1]), None)
+    for pair in (sections[index + 1:] if index is not None else []):
+        if pair.get("after"):
+            node = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(pair["after"]["source"])))
+            if node is not None:
+                return node
+    return None
+
+
+def _deleted_section_copy(section, donor):
+    """A deleted break keeps its own layout and copies of its own header/footer stories, which
+    Reject All brings back; it links the donor's stories when its own cannot be copied or the
+    donor inherits a kind the break defines."""
+    copied = copy.deepcopy(section)
+    own = [child for child in copied if child.tag in {W + "headerReference", W + "footerReference"}]
+    for child in list(copied):
+        if child.tag in {W + "headerReference", W + "footerReference", W + "sectPrChange"}:
+            copied.remove(child)
+    def kinds(node):
+        return {(child.tag, child.get(W + "type", "default")) for child in (node if node is not None else []) if child.tag in {W + "headerReference", W + "footerReference"}}
+    try:
+        # Accept All hands a deleted section's stories to a following section that inherits that
+        # kind, so the copies are used only when the following section defines each kind itself.
+        if not kinds(copy.deepcopy(section)) <= kinds(donor):
+            raise ValueError("UNSUPPORTED_TRACKED_SOURCE_REPLACE_SECTION")
+        references = []
+        for child in own:
+            reference = copy.deepcopy(child)
+            reference.set(R + "id", _PACKAGE_GRAPH.import_story(child.get(R + "id"), child.tag))
+            references.append(reference)
+    except (ValueError, AttributeError, KeyError, ET.ParseError):
+        references = [copy.deepcopy(child) for child in (donor if donor is not None else []) if child.tag in {W + "headerReference", W + "footerReference"}]
+    for offset, reference in enumerate(references):
+        copied.insert(offset, reference)
+    if any(name.startswith(R) for node in copied.iter() if node.tag not in {W + "headerReference", W + "footerReference"} for name in node.attrib):
+        raise ValueError("UNSUPPORTED_TRACKED_SOURCE_REPLACE_SECTION")
+    return copied
+
+
+def _replace_paragraph(source, kind, writer, counterpart=None):
+    """One side of a whole-paragraph replacement (the original deleted, or the revision inserted)."""
+    if source.tag != W + "p":
+        raise ValueError("UNSUPPORTED_TRACKED_SOURCE_REPLACE_CONTENT")
+    properties = source.find(W + "pPr")
+    section = properties.find(W + "sectPr") if properties is not None else None
+    _REPLACE_COPY["active"] = kind == "del"
+    try:
+        return _replace_paragraph_copy(source, kind, writer, counterpart, properties, section)
+    finally:
+        _REPLACE_COPY["active"] = False
+
+
+def _replace_paragraph_copy(source, kind, writer, counterpart, properties, section):
+    if kind == "del" and section is not None:
+        # Header/footer links of a deleted section break point at original parts. Keep the
+        # break and link the revised section's stories, whose content changes are tracked there.
+        target = counterpart.find(W + "pPr/" + W + "sectPr") if counterpart is not None else None
+        if target is None:
+            target = _donor_section(section)
+        index = list(properties).index(section)
+        properties.remove(section)
+        try:
+            paragraph = _accepted_copy(source)
+        finally:
+            properties.insert(index, section)
+        copied = _deleted_section_copy(section, target)
+        paragraph_properties = paragraph.find(W + "pPr")
+        if paragraph_properties is None:
+            paragraph_properties = ET.Element(W + "pPr")
+            paragraph.insert(0, paragraph_properties)
+        anchor = next((i for i, child in enumerate(paragraph_properties) if child.tag in {W + "rPr", W + "pPrChange"}), len(paragraph_properties))
+        paragraph_properties.insert(anchor, copied)
+    else:
+        paragraph = _accepted_copy(source, preserve_comments=(kind == "ins"))
+    if kind == "del":
+        _strip_original_markers(paragraph)
+    _wrap_runs(paragraph, kind, writer)
+    _mark_paragraph_end(paragraph, kind, writer)
+    _consume_copied_objects(source)
+    return paragraph
+
+
+def _is_deleted_in_source(paragraph):
+    """A paragraph whose mark and content the source file itself already deleted: its accepted
+    view has no paragraph there (the empty remainder joins the next paragraph)."""
+    mark = paragraph.find(W + "pPr/" + W + "rPr/" + W + "del")
+    if mark is None:
+        return False
+    accepted = _accepted_copy(paragraph)
+    return not _comparison_text(accepted) and all(child.tag == W + "pPr" or child.tag in REPLACE_MARKER_TAGS for child in accepted)
+
+
+def _has_field_structure(paragraph):
+    """Complex or simple field markup: run rebuilding would drop it and unbalance the field."""
+    return any(node.tag in (W + "fldChar", W + "instrText", W + "delInstrText", W + "fldSimple") for node in paragraph.iter())
+
+
+def _paragraph_copies_after(before, after, include_formatting):
+    """True when `_paragraph_revision_content` keeps the revised paragraph verbatim."""
+    before_text, after_text = _comparison_text(before), _comparison_text(after)
+    if before_text != after_text and _has_visible_text_revision(after):
+        return True
+    formatting = (_MANIFEST_ACTIVE_COMPARISON or {}).get("formatting", {})
+    paragraph_families = formatting.get("paragraphFamilies", []) if include_formatting else []
+    spans = formatting.get("spans", []) if include_formatting else []
+    decision = _MANIFEST_ACTIVE_DECISION or {}
+    format_changed = bool(paragraph_families or spans or any(pair["families"] for pair in decision.get("objectEvents", {}).get("drawingProperties", [])))
+    object_changed = bool(decision.get("mergeProjection")) or (decision.get("objectEvents") or {}).get("changed", False)
+    return before_text == after_text and not format_changed and not object_changed
 
 
 def _shared_text_opcodes(before, after):
@@ -1056,7 +1480,22 @@ def _drawing_revision(source, kind, writer):
     return revision
 
 
+_STABLE_BOOKMARK = {"validated": False}
+
+
 def _validate_stable_bookmark_decisions(nodes):
+    """Run-level bookmark preservation for the single host/jump shape; other bookmark contexts
+    are kept verbatim when unchanged and replaced as whole paragraphs when changed."""
+    _STABLE_BOOKMARK["validated"] = False
+    try:
+        # True only when the single host/jump context was found and validated.
+        _STABLE_BOOKMARK["validated"] = _validate_stable_bookmark_shape(nodes) is True
+    except ValueError as error:
+        if "BOOKMARK_RANGE" not in str(error):
+            raise
+
+
+def _validate_stable_bookmark_shape(nodes):
     roots={side:nodes[side].get(('word/document.xml',())) for side in ('before','after')}
     if not any(root is not None and any(n.tag in {W+'bookmarkStart',W+'bookmarkEnd'} or n.tag==W+'hyperlink' and n.get(W+'anchor') is not None for n in root.iter()) for root in roots.values()):return
     if not any(root is not None and any(n.tag==W+'hyperlink' and n.get(W+'anchor') is not None for n in root.iter()) for root in roots.values()):
@@ -1080,6 +1519,101 @@ def _validate_stable_bookmark_decisions(nodes):
         if role=='jump':
             links=owner.get('objectEvents',{}).get('unchangedLinks',[])
             if len(links)!=1 or _manifest_key(links[0]['before'])!=keys['before']['link'] or _manifest_key(links[0]['after'])!=keys['after']['link']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE')
+    return True
+
+
+def _has_bookmark_markers(paragraph):
+    return any(node.tag in {W+'bookmarkStart',W+'bookmarkEnd'} for node in paragraph.iter())
+
+
+def _paragraph_block_revision(before,after,include_formatting,writer):
+    """Blocks emitted for one paired paragraph: its revision, or a whole-paragraph replacement."""
+    markers=_has_bookmark_markers(before) or _has_bookmark_markers(after)
+    if markers and not _STABLE_BOOKMARK["validated"]:
+        if _paragraph_copies_after(before,after,include_formatting):
+            result=copy.deepcopy(after);_consume_copied_objects(before);_consume_copied_objects(after);return [result]
+        _replace_decision(_MANIFEST_ACTIVE_DECISION,"bookmark-context")
+        return _replacement_pair([before],[after],writer,include_formatting)
+    return [_paragraph_revision(before,after,include_formatting,writer)]
+
+
+def _replacement_pair(before_nodes,after_nodes,writer,include_formatting=True):
+    """Whole-paragraph replacement of one decision; its section property actions are spent here."""
+    decision=_MANIFEST_ACTIVE_DECISION or {}
+    for action in (_MANIFEST or {}).get("propertyActions",[]):
+        if action.get("decisionId")==decision.get("id"):_MANIFEST_PROPERTY_USED.add(action["id"])
+    if len(before_nodes)==len(after_nodes)==1:
+        old_section=before_nodes[0].find(W+"pPr/"+W+"sectPr");new_section=after_nodes[0].find(W+"pPr/"+W+"sectPr")
+        if (old_section is None)==(new_section is None):
+            return [_replace_in_place(before_nodes[0],after_nodes[0],writer,include_formatting)]
+    counterpart=after_nodes[-1] if after_nodes else None
+    return [_replace_paragraph(node,"del",writer,counterpart) for node in before_nodes]+[_replace_paragraph(node,"ins",writer) for node in after_nodes]
+
+
+PARAGRAPH_BASE_EXCLUDED = {W + "rPr", W + "sectPr", W + "pPrChange"}
+
+
+def _replace_in_place(before, after, writer, include_formatting=True):
+    """One paragraph holding all original runs deleted and all revised runs inserted.
+
+    The paragraph mark is not a revision, so the revision's bookmarks and comment ranges stay
+    unwrapped and survive both Accept All and Reject All (covering the revised or the original
+    text). Paragraph and section properties come from the revision with the original recorded
+    as pPrChange/sectPrChange, so both endpoints keep their own formatting."""
+    _REPLACE_COPY["active"] = True
+    try:
+        properties = before.find(W + "pPr")
+        section = properties.find(W + "sectPr") if properties is not None else None
+        index = list(properties).index(section) if section is not None else None
+        if section is not None:
+            properties.remove(section)
+        try:
+            old = _accepted_copy(before)
+        finally:
+            if section is not None:
+                properties.insert(index, section)
+    finally:
+        _REPLACE_COPY["active"] = False
+    _strip_original_markers(old)
+    _wrap_runs(old, "del", writer)
+    paragraph = _accepted_copy(after, preserve_comments=True)
+    _wrap_runs(paragraph, "ins", writer)
+    new_properties = paragraph.find(W + "pPr")
+    content = [child for child in old if child.tag != W + "pPr"]
+    anchor = 1 if new_properties is not None else 0
+    for offset, child in enumerate(content):
+        paragraph.insert(anchor + offset, child)
+    if include_formatting:
+        old_properties = old.find(W + "pPr")
+        def base(node):
+            return [_canonical_property(child) for child in node if child.tag not in PARAGRAPH_BASE_EXCLUDED] if node is not None else []
+        if base(old_properties) != base(new_properties):
+            if new_properties is None:
+                new_properties = ET.Element(W + "pPr")
+                paragraph.insert(0, new_properties)
+            change = ET.Element(W + "pPrChange", writer.attributes())
+            previous = ET.SubElement(change, W + "pPr")
+            for child in (old_properties if old_properties is not None else []):
+                if child.tag not in PARAGRAPH_BASE_EXCLUDED:
+                    previous.append(copy.deepcopy(child))
+            new_properties.append(change)
+        new_section = new_properties.find(W + "sectPr") if new_properties is not None else None
+        if section is not None and new_section is not None:
+            original = copy.deepcopy(section)
+            for child in list(original):
+                if child.tag in {W + "headerReference", W + "footerReference", W + "sectPrChange"}:
+                    original.remove(child)
+            current = [_canonical_property(child) for child in new_section if child.tag not in {W + "headerReference", W + "footerReference", W + "sectPrChange"}]
+            if current != [_canonical_property(child) for child in original] and new_section.find(W + "sectPrChange") is None:
+                change = ET.SubElement(new_section, W + "sectPrChange", writer.attributes())
+                change.append(original)
+    _consume_copied_objects(before)
+    _consume_copied_objects(after)
+    return paragraph
+
+
+def _canonical_property(node):
+    return (node.tag, sorted(node.attrib.items()), (node.text or "").strip(), [_canonical_property(child) for child in node])
 
 
 def _paragraph_revision(before,after,include_formatting,writer):
@@ -1284,7 +1818,21 @@ def _paragraph_revision_content(before, after, include_formatting, writer):
                 emit_inserted(j1, j2, i1)
     emit_before_events(len(before_tokens))
     emit_events(len(after_tokens))
+    _merge_adjacent_links(paragraph)
     return paragraph
+
+
+def _merge_adjacent_links(paragraph):
+    """Text revisions inside one link are emitted per run group, each in its own copy of the
+    link wrapper; rejoin neighbouring copies of the same link so each endpoint keeps one link."""
+    index = 1
+    while index < len(paragraph):
+        previous, current = paragraph[index - 1], paragraph[index]
+        if previous.tag == current.tag == W + "hyperlink" and previous.attrib == current.attrib:
+            previous.extend(list(current))
+            paragraph.remove(current)
+            continue
+        index += 1
 
 
 
@@ -1424,7 +1972,9 @@ def _whole_table_revision(source, kind, writer):
         if kind=='ins':
             originals=list(original.iter(W+'p'));parents={child:parent for parent in row.iter() for child in parent}
             for paragraph,actual in zip(list(row.iter(W+'p')),originals):
-                parent=parents[paragraph];index=list(parent).index(paragraph);parent.remove(paragraph);parent.insert(index,_whole_paragraph_revision(actual,'ins',writer))
+                # Run rebuilding drops bookmark markers; wrap such cell paragraphs verbatim instead.
+                inserted=_replace_paragraph(actual,'ins',writer) if _has_bookmark_markers(actual) else _whole_paragraph_revision(actual,'ins',writer)
+                parent=parents[paragraph];index=list(parent).index(paragraph);parent.remove(paragraph);parent.insert(index,inserted)
         _mark_row(row, kind, writer)
     return table
 
@@ -1497,6 +2047,66 @@ _MANIFEST_ACTIVE_COMPARISON = None
 _MANIFEST_PROPERTY_USED = set()
 _MANIFEST_SOURCE_NODES = {}
 _MANIFEST_ALLOWED_PROPERTIES = {}
+_ACTUAL_INDEX = {"actual": None}
+
+
+def _actual_index(actual):
+    """Lookups the validators repeat per decision, row and cell: children of a source by kind,
+    object events and runs of a paragraph, styles by id. Built once per inventory."""
+    if _ACTUAL_INDEX.get("actual") is actual:
+        return _ACTUAL_INDEX
+    children, events, runs, styles = {}, {}, {}, {}
+    for side in ("before", "after"):
+        styles[side] = {}
+        for key, source in actual[side].items():
+            if key[1]:
+                children.setdefault((side, key[0], key[1][:-1], source["kind"]), []).append(key)
+            event = source.get("objectEvent")
+            if event:
+                events.setdefault((side, source["part"], tuple(event["paragraphPath"])), []).append(source)
+            if "textRange" in source and source.get("paragraphPath") is not None:
+                runs.setdefault((side, key[0], tuple(source["paragraphPath"])), []).append((key, source))
+            if source["kind"] == "style":
+                styles[side].setdefault(source.get("attributes", {}).get(W + "styleId"), []).append(key)
+    for keys in children.values():
+        keys.sort()
+    _ACTUAL_INDEX.clear()
+    _ACTUAL_INDEX.update(actual=actual, children=children, events=events, runs=runs, styles=styles)
+    return _ACTUAL_INDEX
+
+
+def _actual_subtree(actual, side, root):
+    """Sources at or below `root`, in inventory (document) order."""
+    index = _actual_index(actual)
+    ordered = index.get("ordered")
+    if ordered is None:
+        ordered = index["ordered"] = {}
+        for key_side in ("before", "after"):
+            for key in actual[key_side]:
+                ordered.setdefault((key_side, key[0]), []).append(key[1])
+        for paths in ordered.values():
+            paths.sort()
+    part, path = root["part"], tuple(root["path"])
+    paths = ordered.get((side, part), [])
+    start = bisect.bisect_left(paths, path)
+    found = []
+    for candidate in paths[start:]:
+        if candidate[:len(path)] != path:
+            break
+        found.append(actual[side][(part, candidate)])
+    return found
+
+
+def _actual_children(actual, side, parent, kind):
+    return list(_actual_index(actual)["children"].get((side, parent[0], tuple(parent[1]), kind), []))
+
+
+def _actual_events(actual, side, part, path):
+    return list(_actual_index(actual)["events"].get((side, part, tuple(path)), []))
+
+
+def _actual_runs(actual, side, part, path):
+    return list(_actual_index(actual)["runs"].get((side, part, tuple(path)), []))
 _MANIFEST_MERGE_SIDES = {}
 _MANIFEST_SYNTHETIC_TOKENS = {}
 _MANIFEST_OBJECT_EXPECTED = {}
@@ -1505,10 +2115,23 @@ _MANIFEST_GRID_USED = set()
 _MANIFEST_OBJECT_CONSUMED = {}
 
 
+_MANIFEST_KEY_CACHE = {}
+_INT_TYPE = {int}
+
+
 def _manifest_key(source):
-    if not isinstance(source, dict) or not isinstance(source.get("part"), str) or not isinstance(source.get("path"), list) or any(type(index) is not int or index < 0 for index in source["path"]):
+    cached = _MANIFEST_KEY_CACHE.get(id(source))
+    if cached is not None and cached[0] is source and cached[2] == len(source.get("path", ())):
+        return cached[1]
+    if not isinstance(source, dict) or not isinstance(source.get("part"), str) or not isinstance(source.get("path"), list):
         raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_REF")
-    return (source["part"], tuple(source["path"]))
+    path = tuple(source["path"])
+    if path and (not set(map(type, path)) <= _INT_TYPE or min(path) < 0):
+        raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_REF")
+    key = (source["part"], path)
+    if _MANIFEST is not None:
+        _MANIFEST_KEY_CACHE[id(source)] = (source, key, len(source["path"]))
+    return key
 
 
 def _source_envelope(nodes,side_name,value):
@@ -1536,6 +2159,27 @@ def _validate_story_projection(facts,actual):
             if pair.get(side) is not None and pair[side] not in facts[side]['sections']:raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
         if pair['final']:
             if pair['id']!='section:final-body' or pair.get('ownerDecisionId') is not None or any(not pair[side]['final'] for side in ('before','after') if pair.get(side)):raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
+        elif pair.get('oneSided') is True:
+            # A break inside a paragraph only one side has; it is deleted or inserted with it.
+            owner=next((d for d in _MANIFEST_DECISIONS if d['id']==pair.get('ownerDecisionId')),None)
+            present=[side for side in ('before','after') if pair.get(side) is not None]
+            if owner is None or len(present)!=1 or pair['id']!='section:'+owner['id']:raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
+            side=present[0];other='after' if side=='before' else 'before'
+            if owner['type']!='paragraph' or owner['moved'] or len(owner[side])!=1 or owner[other]:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_BOUNDARY')
+            section=pair[side];paragraph=owner[side][0]
+            if section['final'] or section['source']['part']!=paragraph['part'] or len(section['source']['path'])!=len(paragraph['path'])+2 or section['source']['path'][:len(paragraph['path'])]!=paragraph['path']:raise ValueError('INVALID_COMPARISON_MANIFEST_SECTION_OWNER')
+            if not any(ref['kind']=='body' and ref['part']==paragraph['part'] and ref['path']==paragraph['path'][:-1] for ref in actual[side].values()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_ENVELOPE')
+        elif pair.get('blankOwner') is True:
+            # Breaks on omitted empty paragraphs: the revised paragraph is kept, so the break must
+            # sit directly in the body on an empty paragraph that no decision owns, on both sides.
+            if pair.get('ownerDecisionId') is not None or not pair['id'].startswith('section:blank:'):raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
+            for side in ('before','after'):
+                section=pair.get(side)
+                if section is None or section['final']:raise ValueError('INVALID_COMPARISON_MANIFEST_SECTION_OWNER')
+                source=section['source'];owner_key=(source['part'],tuple(source['path'][:-2]))
+                owner=actual[side].get(owner_key)
+                if owner is None or owner['kind']!='p' or owner.get('rawText','').strip() or owner.get('opaqueSignature') or actual[side].get((owner_key[0],owner_key[1][:-1]),{}).get('kind')!='body':raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_BOUNDARY')
+                if any(_manifest_key(ref)==owner_key for decision in _MANIFEST_DECISIONS for ref in decision[side]):raise ValueError('INVALID_COMPARISON_MANIFEST_SECTION_OWNER')
         else:
             owner=next((d for d in _MANIFEST_DECISIONS if d['id']==pair.get('ownerDecisionId')),None)
             if owner is None or owner['type']!='paragraph' or owner['moved'] or len(owner['before'])!=1 or len(owner['after'])!=1 or pair['id']!='section:'+owner['id']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_BOUNDARY')
@@ -1554,13 +2198,13 @@ def _validate_story_projection(facts,actual):
     if a['errors'] or b['errors']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY')
     if any(not p['final'] for p in sections):
         if not any(s['final'] for s in a['sections']) or not any(s['final'] for s in b['sections']):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTIONS')
-        if any(p.get('before',{}).get('activation')!=p.get('after',{}).get('activation') for p in sections):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_ACTIVATION')
+        if any(p.get('before',{}).get('activation')!=p.get('after',{}).get('activation') for p in sections if not p.get('oneSided')):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_ACTIVATION')
     if a.get('settings')!=b.get('settings'):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY_ACTIVATION')
     if any(('before' in item)!=('after' in item) for item in plan.get('bindings',[])):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY_BINDING')
     pairs=plan.get('pairs',[]);pair_ids={pair['id'] for pair in pairs}
     if len(pair_ids)!=len(pairs):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
     slots=sorted({ref['kind']+':'+ref['variant'] for ref in a['bindings']+b['bindings']});expected_bindings=[];routes=[];used=set();donors={'before':{},'after':{}}
-    for section in sections:
+    for section in [section for section in sections if not section.get('oneSided')]:
         for slot in slots:
             refs={side:next((ref for ref in facts[side]['bindings'] if section.get(side) and ref['section']==section[side]['source'] and ref['kind']+':'+ref['variant']==slot),None) for side in ('before','after')}
             old,new=refs['before'],refs['after'];kind,variant=slot.split(':')
@@ -1584,18 +2228,20 @@ def _validate_story_projection(facts,actual):
     for pair in pairs:
         old,new=pair.get('beforePart'),pair.get('afterPart')
         kind=pair['kind'];identity='story:'+json.dumps([kind,old,new],ensure_ascii=False,separators=(',',':'))
-        representation='inline' if old and new else 'unsupported-binding'
+        one_sided={side:{json.dumps([s[side]['source']['part'],s[side]['source']['path']]) for s in sections if s.get('oneSided') and s.get(side)} for side in ('before','after')}
+        section_only=bool(old)!=bool(new) and all(json.dumps([ref['section']['part'],ref['section']['path']]) in one_sided[side] for side,part in [('before',old),('after',new)] if part for ref in facts[side]['bindings'] if ref['targetPart']==part) and any(ref['targetPart']==(old or new) for ref in facts['before' if old else 'after']['bindings'])
+        representation='inline' if old and new else 'section-only' if section_only else 'unsupported-binding'
         if pair['id']!=identity or pair['representation']!=representation:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
         for side,part in [('before',old),('after',new)]:
             if part is None:continue
             if part in owned[side] or not any(item['part']==part and item['kind']==kind for item in facts[side]['parts']):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_OWNER')
             owned[side].add(part)
-        if pair['id'] not in used and (old!=new or any(item['active'] for side,part in [('before',old),('after',new)] for item in facts[side]['parts'] if item['part']==part)):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
+        if pair['id'] not in used and representation!='section-only' and (old!=new or any(item['active'] for side,part in [('before',old),('after',new)] for item in facts[side]['parts'] if item['part']==part)):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
         decisions=[decision for decision in _MANIFEST_DECISIONS if any(ref['part']==part for side,part in [('before',old),('after',new)] if part for ref in decision[side])]
         if pair['decisionIds']!=[decision['id'] for decision in decisions] or any(decision['id'] in covered_decisions for decision in decisions):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
         covered_decisions.update(pair['decisionIds'])
         for decision in decisions:
-            if any(ref['part']!=part for side,part in [('before',old),('after',new)] for ref in decision[side]) or decision.get('trackedRepresentation')!='revision':raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
+            if any(ref['part']!=part for side,part in [('before',old),('after',new)] for ref in decision[side]) or decision.get('trackedRepresentation') not in {'revision','replace'}:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
         for side,part in [('before',old),('after',new)]:
             expected=[ref for ref in actual[side].values() if ref['part']==part and ref['kind'] in ('p','tbl')]
             if pair['coverage'][side]!=expected:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_COVERAGE')
@@ -1648,8 +2294,7 @@ def _validate_note_projection(facts,actual):
             old,new=check['before'],check['after']
             equal=len(old)==len(new)==1 and old[0]['contentSignature']==new[0]['contentSignature'] and selected('before',old[0])==selected('after',new[0])
             redline=len(old)==len(new)==1 and bool(old[0].get('specialRevisionShape')) and old[0].get('specialRevisionShape')==new[0].get('specialRevisionShape')
-            if check.get('includedEqual') is not equal or check.get('redline') is not redline:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
-            if not equal and not redline:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_SPECIAL')
+            if check.get('includedEqual') is not equal or check.get('redline') is not redline or check.get('preserveAfter',False) is not (not equal and not redline):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
         required={(action['part'],note['type']) for action in expected_parts if action['before'] and action['after'] for side in ('before','after') for note in facts[side]['containers'] if note['source']['part']==action[side+'Part'] and note['type']!='normal'}
         if covered!=required:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
 
@@ -1721,6 +2366,44 @@ def _validate_note_projection(facts,actual):
     for side in ('before','after'):
         if used_refs[side]!={_manifest_key(ref['source']) for ref in facts[side]['references']} or owned[side]!={_manifest_key(note['source']) for note in facts[side]['containers'] if note['type']=='normal' or any(check.get('redline') and check[side]==[note] for check in plan['specialChecks'])}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
 
+def _split_envelope_supported(nodes,owner):
+    """Run-level split needs the original and both revisions in one plain paragraph envelope."""
+    old_ref=owner["before"][0];new_refs=owner["after"]
+    old_parent=nodes["before"][(old_ref["part"],tuple(old_ref["path"][:-1]))]
+    new_parent=nodes["after"][(new_refs[0]["part"],tuple(new_refs[0]["path"][:-1]))]
+    if any(value["part"]!=new_refs[0]["part"] or value["path"][:-1]!=new_refs[0]["path"][:-1] for value in new_refs) or old_parent.tag!=new_parent.tag:return False
+    old_envelope=_source_envelope(nodes,"before",old_ref)
+    if any(_source_envelope(nodes,"after",value)!=old_envelope for value in new_refs):return False
+    for split_side in ("before","after"):
+        for value in owner[split_side]:
+            paragraph=nodes[split_side][_manifest_key(value)]
+            properties=paragraph.find(W+"pPr")
+            if any(child.tag not in {W+"pPr",W+"r"} for child in paragraph) or paragraph.find(W+"pPr/"+W+"sectPr") is not None or (properties is not None and any(child.tag in TRACK_CHANGE_TAGS for child in properties.iter())):return False
+            for run in paragraph.findall(W+"r"):
+                if any(child.tag not in {W+"rPr",W+"t",W+"tab",W+"br",W+"cr",W+"footnoteReference",W+"endnoteReference",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"} for child in run):return False
+    return True
+
+
+def _merge_envelope_supported(nodes,decision):
+    """Run-level merge needs both originals and the target to share one plain paragraph envelope."""
+    refs=decision["before"];target=decision["after"][0]
+    parent=nodes["before"][(refs[0]["part"],tuple(refs[0]["path"][:-1]))]
+    after_parent=nodes["after"][(target["part"],tuple(target["path"][:-1]))]
+    if parent.tag!=after_parent.tag or any(ref["part"]!=refs[0]["part"] or ref["path"][:-1]!=refs[0]["path"][:-1] for ref in refs):return False
+    envelope=_source_envelope(nodes,"after",target)
+    if any(_source_envelope(nodes,"before",ref)!=envelope for ref in refs):return False
+    noise=set(json.loads(WORKLAZY_FORMATTING_POLICY_JSON)["noiseAttributes"])|{"{http://schemas.microsoft.com/office/word/2010/wordml}paraId","{http://schemas.microsoft.com/office/word/2010/wordml}textId"}
+    attrs={name:value for name,value in nodes["after"][_manifest_key(target)].attrib.items() if name not in noise}
+    for merge_side in ("before","after"):
+        for ref in decision[merge_side]:
+            paragraph=nodes[merge_side][_manifest_key(ref)];properties=paragraph.find(W+"pPr")
+            if {name:value for name,value in paragraph.attrib.items() if name not in noise}!=attrs or any(child.tag not in {W+"pPr",W+"r",W+"commentRangeStart",W+"commentRangeEnd"} for child in paragraph):return False
+            if paragraph.find(W+"pPr/"+W+"sectPr") is not None or properties is not None and any(child.tag in TRACK_CHANGE_TAGS for child in properties.iter()):return False
+            for run in paragraph.findall(W+"r"):
+                if any(child.tag not in {W+"rPr",W+"t",W+"tab",W+"br",W+"cr",W+"footnoteReference",W+"endnoteReference",W+"drawing",W+"commentReference","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"} for child in run):return False
+    return True
+
+
 def _validate_manifest(before_path, after_path):
     """Validate ownership against raw input, without choosing correspondences."""
     actual = {}
@@ -1764,6 +2447,7 @@ def _validate_manifest(before_path, after_path):
     _validate_story_projection(story_facts,actual)
     _validate_note_projection(note_facts,actual)
     owners = {"before": {}, "after": {}}
+    parts_of = {side: {key[0] for key in actual[side]} for side in ("before", "after")}
     for decision in _MANIFEST_DECISIONS:
         decision_id = decision.get("id")
         if not isinstance(decision_id, str) or decision_id in ids:
@@ -1771,18 +2455,21 @@ def _validate_manifest(before_path, after_path):
         ids.add(decision_id)
         representation = decision.get("trackedRepresentation")
         reason = decision.get("trackedReason")
-        if representation not in {"revision", "preserve-after","note-reference"}:
+        if representation not in {"revision", "preserve-after","note-reference","replace"}:
             raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
         if representation=="note-reference" and not any(pair["id"]==decision.get("noteId") and decision["id"] in pair["decisionIds"] and not(pair.get("before") and pair.get("after")) for pair in _MANIFEST["noteProjection"]["pairs"]):raise ValueError("INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE")
         if representation == "preserve-after":
             refs = decision["before"] + decision["after"]
             if reason != "existing-comment-contract" or not refs or any(ref["part"] != "word/comments.xml" for ref in refs):
                 raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
+        elif representation == "replace":
+            if reason not in {"paragraph-shape", "opaque-content"} or decision["type"] != "paragraph":
+                raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
         elif reason is not None:
             raise ValueError("INVALID_COMPARISON_MANIFEST_REPRESENTATION")
         before_refs, after_refs = decision["before"], decision["after"]
         shape = (len(before_refs), len(after_refs))
-        if shape not in {(1, 0), (0, 1), (1, 1), (1, 2), (2, 1)}:
+        if shape not in {(1, 0), (0, 1), (1, 1), (1, 2), (2, 1)} and not (representation == "replace" and before_refs and after_refs):
             raise ValueError("INVALID_COMPARISON_MANIFEST_GROUP")
         for side in ("before", "after"):
             for ref in decision[side]:
@@ -1801,22 +2488,8 @@ def _validate_manifest(before_path, after_path):
                 raw = "\n".join(actual[side][_manifest_key(ref)].get("rawText", "") for ref in decision[side])
                 if raw != decision[side + "Text"]:
                     raise ValueError("INVALID_COMPARISON_MANIFEST_TEXT_BOUNDS")
-        if shape==(2,1) and decision.get("trackedRepresentation")=="revision":
-            refs=decision["before"];target=decision["after"][0]
-            parent=nodes["before"][(refs[0]["part"],tuple(refs[0]["path"][:-1]))]
-            after_parent=nodes["after"][(target["part"],tuple(target["path"][:-1]))]
-            if parent.tag!=after_parent.tag or any(ref["part"]!=refs[0]["part"] or ref["path"][:-1]!=refs[0]["path"][:-1] for ref in refs):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
-            envelope=_source_envelope(nodes,"after",target)
-            if any(_source_envelope(nodes,"before",ref)!=envelope for ref in refs):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
-            noise=set(json.loads(WORKLAZY_FORMATTING_POLICY_JSON)["noiseAttributes"])|{"{http://schemas.microsoft.com/office/word/2010/wordml}paraId","{http://schemas.microsoft.com/office/word/2010/wordml}textId"}
-            attrs={name:value for name,value in nodes["after"][_manifest_key(target)].attrib.items() if name not in noise}
-            for merge_side in ("before","after"):
-                for ref in decision[merge_side]:
-                    paragraph=nodes[merge_side][_manifest_key(ref)];properties=paragraph.find(W+"pPr")
-                    if {name:value for name,value in paragraph.attrib.items() if name not in noise}!=attrs or any(child.tag not in {W+"pPr",W+"r",W+"commentRangeStart",W+"commentRangeEnd"} for child in paragraph):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
-                    if paragraph.find(W+"pPr/"+W+"sectPr") is not None or properties is not None and any(child.tag in TRACK_CHANGE_TAGS for child in properties.iter()):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
-                    for run in paragraph.findall(W+"r"):
-                        if any(child.tag not in {W+"rPr",W+"t",W+"tab",W+"br",W+"cr",W+"footnoteReference",W+"endnoteReference",W+"drawing",W+"commentReference","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"} for child in run):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
+        if shape==(2,1) and decision.get("trackedRepresentation")=="revision" and not _merge_envelope_supported(nodes,decision):
+            if not _replace_decision(decision,"merge-envelope"):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE")
         allowed_pairs = {(decision["beforeText"], decision["afterText"])}
         if shape == (1, 2):
             slices = decision.get("splitSlices", [])
@@ -1831,7 +2504,7 @@ def _validate_manifest(before_path, after_path):
             _validate_segments(comparison["segments"], comparison["before"], comparison["after"])
         for side in ("before", "after"):
             if decision.get("trackedRepresentation") != "preserve-after":
-                opposite_parts = {key[0] for key in actual["after" if side == "before" else "before"]}
+                opposite_parts = parts_of["after" if side == "before" else "before"]
                 if any(ref["part"] not in opposite_parts and not any(pair.get(side+"Part")==ref["part"] for pair in _MANIFEST["storyProjection"]["pairs"]) and not any(pair.get('before') and pair.get('after') and decision['id'] in pair['decisionIds'] and pair[side]['source']['part']==ref['part'] for pair in _MANIFEST['noteProjection']['pairs']) and not (decision.get('trackedRepresentation')=='note-reference' and any(pair['id']==decision.get('noteId') for pair in _MANIFEST['noteProjection']['pairs'])) for ref in decision[side]):
                     raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
         _validate_segments(decision["textSegments"], decision["beforeText"], decision["afterText"])
@@ -1861,6 +2534,7 @@ def _validate_manifest(before_path, after_path):
 
     _validate_restore_styles(actual)
     _validate_formatting_manifest(actual, json.loads(WORKLAZY_FORMATTING_POLICY_JSON))
+    _replace_structural_tables(nodes)
     _validate_table_grids(actual)
 
     for side in ("before", "after"):
@@ -1869,6 +2543,9 @@ def _validate_manifest(before_path, after_path):
         if len(coverage) != len(structural) or len({_manifest_key(item["source"]) for item in coverage}) != len(coverage):
             raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
         tables = [key for key, ref in actual[side].items() if ref["kind"] == "tbl"]
+        comment_candidates = [candidate for candidate in _MANIFEST_DECISIONS if candidate.get("trackedReason") == "existing-comment-contract"]
+        axis_tables = [parent for parent in _MANIFEST_DECISIONS if parent["type"]=="table" and (parent.get("moved") or (len(parent["before"]),len(parent["after"])) not in {(1,1),(1,0),(0,1)})]
+        unpaired_tables = [parent for parent in _MANIFEST_DECISIONS if parent["type"] == "table" and (parent.get("moved") or len(parent["before"]) != 1 or len(parent["after"]) != 1)]
         for item in coverage:
             key = _manifest_key(item["source"])
             if key not in structural:
@@ -1890,7 +2567,7 @@ def _validate_manifest(before_path, after_path):
             if note and not(note.get('before') and note.get('after')):
                 if item['disposition']!='note-reference' or item.get('noteId')!=note['id']:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
                 continue
-            comment_owner = next((candidate for candidate in _MANIFEST_DECISIONS if candidate.get("trackedReason") == "existing-comment-contract" and any(parent["part"] == key[0] and key[1][:len(parent["path"])] == tuple(parent["path"]) for parent in candidate[side])), None)
+            comment_owner = next((candidate for candidate in comment_candidates if any(parent["part"] == key[0] and key[1][:len(parent["path"])] == tuple(parent["path"]) for parent in candidate[side])), None)
             if comment_owner is not None:
                 if owner is not None:
                     if item["disposition"] != "decision" or item.get("decisionId") != owner["id"]:
@@ -1898,28 +2575,38 @@ def _validate_manifest(before_path, after_path):
                 elif item["disposition"] != "preserve-after" or item.get("decisionId") != comment_owner["id"] or item.get("reason") != "existing-comment-contract":
                     raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
                 continue
+            carrier = None
+            if owner is None:
+                for length in range(len(key[1]) - 1, 0, -1):
+                    ancestor = (key[0], key[1][:length])
+                    if ancestor in structural and structural[ancestor]["kind"] in ("p", "tbl") and owners[side].get(ancestor) is not None:
+                        carrier = owners[side][ancestor]
+                        break
+            if carrier is not None:
+                # Text box content moves with its anchoring paragraph (copied or replaced whole); a
+                # table inside a cell has no run-level path, so a paired outer table is replaced whole.
+                if item["disposition"] != "nested" or item.get("decisionId") != carrier["id"]:
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
+                if carrier["type"] == "table" and len(carrier["before"]) == 1 and len(carrier["after"]) == 1 and not _replace_decision(carrier, "nested-table"):
+                    raise ValueError("UNSUPPORTED_TRACKED_SOURCE_NESTED_TABLE")
+                continue
             if ref.get("unsupportedObjectQName"):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
+            if owner is not None and _is_replaced(owner):
+                if item["disposition"] != "decision" or item.get("decisionId") != owner["id"]:
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
+                continue
             event_owner = owner if owner and ref.get("objectEventsSupported") else None
             if event_owner is not None:
-                if len(owner["before"])==1 and len(owner["after"])==2:
-                    old_ref=owner["before"][0];new_refs=owner["after"]
-                    old_parent=nodes["before"][(old_ref["part"],tuple(old_ref["path"][:-1]))]
-                    new_parent=nodes["after"][(new_refs[0]["part"],tuple(new_refs[0]["path"][:-1]))]
-                    if any(value["part"]!=new_refs[0]["part"] or value["path"][:-1]!=new_refs[0]["path"][:-1] for value in new_refs) or old_parent.tag!=new_parent.tag:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
-                    old_envelope=_source_envelope(nodes,"before",old_ref)
-                    if any(_source_envelope(nodes,"after",value)!=old_envelope for value in new_refs):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
-                    for split_side in ("before","after"):
-                        for value in owner[split_side]:
-                            paragraph=nodes[split_side][_manifest_key(value)]
-                            properties=paragraph.find(W+"pPr")
-                            if any(child.tag not in {W+"pPr",W+"r"} for child in paragraph) or paragraph.find(W+"pPr/"+W+"sectPr") is not None or (properties is not None and any(child.tag in TRACK_CHANGE_TAGS for child in properties.iter())):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
-                            for run in paragraph.findall(W+"r"):
-                                if any(child.tag not in {W+"rPr",W+"t",W+"tab",W+"br",W+"cr",W+"footnoteReference",W+"endnoteReference",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"} for child in run):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+                if len(owner["before"])==1 and len(owner["after"])==2 and not _split_envelope_supported(nodes,owner):
+                    if not _replace_decision(owner,"split-envelope"):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+                    if item["disposition"] != "decision" or item.get("decisionId") != owner["id"]:
+                        raise ValueError("INVALID_COMPARISON_MANIFEST_COVERAGE")
+                    continue
 
-                if any(parent["type"]=="table" and (parent.get("moved") or (len(parent["before"]),len(parent["after"])) not in {(1,1),(1,0),(0,1)}) and any(ref["part"]==key[0] and key[1][:len(ref["path"])]==tuple(ref["path"]) for ref in parent[side]) for parent in _MANIFEST_DECISIONS):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_TABLE_OBJECT_AXIS")
+                if any(any(ref["part"]==key[0] and key[1][:len(ref["path"])]==tuple(ref["path"]) for ref in parent[side]) for parent in axis_tables):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_TABLE_OBJECT_AXIS")
                 declared = event_owner.get("objectEvents", {}).get(side)
                 if declared is not None:declared=[source for source in declared if source["part"]==key[0] and source["objectEvent"]["paragraphPath"]==list(key[1])]
-                expected = [source for source in actual[side].values() if source.get("objectEvent") and source["part"] == key[0] and source["objectEvent"]["paragraphPath"] == list(key[1])]
+                expected = _actual_events(actual, side, key[0], key[1])
                 # Per-paragraph coverage is checked here; exact whole-decision
                 # membership and TS slice contexts are verified below.
                 if len(owner["before"]) > 2 or len(owner["after"]) > 2 or (len(owner["after"])==2 and any(source["objectEvent"]["kind"] not in {"drawing","note"} for side in ("before","after") for source in owner.get("objectEvents",{}).get(side,[]))) or declared is None or len(declared) != len(expected) or {_manifest_key(source): source for source in declared} != {_manifest_key(source): source for source in expected}:
@@ -1927,7 +2614,7 @@ def _validate_manifest(before_path, after_path):
             if ref.get("opaqueSignature") and event_owner is None:
                 if owner is None or len(owner["before"]) != 1 or len(owner["after"]) != 1:
                     raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
-                unsafe_parent = any(parent["type"] == "table" and (parent.get("moved") or len(parent["before"]) != 1 or len(parent["after"]) != 1) and any(ref["part"] == key[0] and key[1][:len(ref["path"])] == tuple(ref["path"]) for ref in parent[side]) for parent in _MANIFEST_DECISIONS)
+                unsafe_parent = any(any(ref["part"] == key[0] and key[1][:len(ref["path"])] == tuple(ref["path"]) for ref in parent[side]) for parent in unpaired_tables)
                 if unsafe_parent or owner.get("moved") or owner["beforeText"] != owner["afterText"]:
                     raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
                 before_copy = actual["before"][_manifest_key(owner["before"][0])].get("copySignature")
@@ -1952,7 +2639,7 @@ def _validate_restore_styles(actual):
     if _MANIFEST.get("restoreStylePolicyVersion") != "worklazy-restore-style-1": raise ValueError("STALE_COMPARISON_MANIFEST")
     def children(side, parent, kind):
         part, path = parent
-        return sorted(key for key, source in actual[side].items() if key[0] == part and source["kind"] == kind and len(key[1]) == len(path) + 1 and key[1][:len(path)] == path)
+        return _actual_children(actual, side, (part, path), kind)
     expected_pairs = set()
     for decision in _MANIFEST_DECISIONS:
         if any(field in decision for field in ("sourceSlices", "restoreStyles")) or any(any(field in comparison for field in ("wholeRestoreStyles", "deletedFormattingPolicy")) for comparison in decision.get("comparisons", [])):
@@ -1976,7 +2663,9 @@ def _validate_restore_styles(actual):
     if len(pairs) != len(expected_pairs) or {(_manifest_key(pair["before"]), _manifest_key(pair["after"]), pair["property"]) for pair in pairs} != expected_pairs:
         raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_PROPERTY_PAIRS")
     for decision in _MANIFEST_DECISIONS:
-        expected = {side:[source for ref in decision[side] for source in actual[side].values() if source.get("objectEvent") and source["part"] == ref["part"] and source["objectEvent"]["paragraphPath"] == ref["path"]] for side in ("before","after")} if decision["type"] == "paragraph" and decision.get("trackedRepresentation") == "revision" else {"before":[],"after":[]}
+        # Whole-paragraph replacements copy their objects verbatim; events only label the screen.
+        if _is_replaced(decision):continue
+        expected = {side:[source for ref in decision[side] for source in _actual_events(actual, side, ref["part"], ref["path"])] for side in ("before","after")} if decision["type"] == "paragraph" and decision.get("trackedRepresentation") == "revision" else {"before":[],"after":[]}
         events=decision.get("objectEvents")
         if not any(expected.values()):
             if events is not None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
@@ -1986,7 +2675,8 @@ def _validate_restore_styles(actual):
             if events[side] != expected[side]:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EVENTS")
         if len(decision["after"])==2 and any(ref["objectEvent"]["kind"] not in {"drawing","note"} for side in ("before","after") for ref in expected[side]):
             if events.get("propertiesSupported") is not True:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
-            raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+            if not _replace_decision(decision,"split-objects"):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
+            continue
         def run_fact(side,ref):return actual[side].get((ref["part"],tuple(ref["objectEvent"]["runPath"])),{}).get("normalizedProperties",{}).get("rPr",{"supported":{},"unsupported":{},"history":False})
         indexes=[1,2] if len(decision["before"])==1 and len(decision["after"])==2 else [1] if len(decision["before"])==2 and len(decision["after"])==1 else [0]
         assigned=_split_boundary_note_contexts(decision,expected['before'],expected['after'],actual)
@@ -2064,7 +2754,7 @@ def _validate_restore_styles(actual):
             if decision["after"]:
                 context=context_of("before",ref);paragraph=context["afterParagraph"]
                 cursor=local_boundary(context,next(item["start"] for item in context["before"] if item["source"]==ref))
-                runs=[source for source in actual["after"].values() if source["kind"]=="r" and source["part"]==paragraph["part"] and source.get("paragraphPath")==paragraph["path"] and "textRange" in source]
+                runs=[source for _,source in _actual_runs(actual,"after",paragraph["part"],paragraph["path"]) if source["kind"]=="r" and source["part"]==paragraph["part"]]
                 length=len(actual["after"][_manifest_key(paragraph)].get("rawText",""))
                 def at(position):return next((source for source in runs if source["textRange"][0]<=position<source["textRange"][1]),None)
                 source=at(cursor) or at(min(cursor,length)-1)
@@ -2111,15 +2801,26 @@ def _validate_restore_styles(actual):
             after_events.append({"source":ref,"side":role})
         if value!={"policy":"worklazy-merge-1","beforeBoundary":boundary,"afterBoundary":target,"properties":properties,"beforeEvents":before_events,"afterEvents":after_events}:raise ValueError("INVALID_COMPARISON_MANIFEST_MERGE_PROJECTION")
     for decision in _MANIFEST_DECISIONS:
-        if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision": continue
+        try:
+            _validate_decision_restore_styles(decision, actual)
+        except ValueError as error:
+            # A revised character without an owning run (text inside a nested story such as a text
+            # box) cannot take a run-level style: record the paragraph as a replacement instead.
+            if str(error) != "UNSUPPORTED_TRACKED_SOURCE" or not _replace_decision(decision, "restore-style-gap"):
+                raise
+
+
+def _validate_decision_restore_styles(decision, actual):
+    if True:
+        if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision": return
         has_comparison_projection = any("sourceSlices" in comparison or "restoreStyles" in comparison for comparison in decision.get("comparisons", []))
         if not decision["before"] or not decision["after"]:
             if "wholeRestoreStyles" in decision or has_comparison_projection or (not decision["before"] and "deletedFormattingPolicy" in decision):
                 raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
         if not decision["after"]:
             if decision.get("deletedFormattingPolicy") != "restore-before-unpaired": raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
-            continue
-        if not decision["before"]: continue
+            return
+        if not decision["before"]: return
         if decision.get("deletedFormattingPolicy") != "paired-revised": raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
         shape = (len(decision["before"]), len(decision["after"]))
         emitted = [0] if shape == (1, 1) else [1, 2] if shape == (1, 2) else [1]
@@ -2141,7 +2842,7 @@ def _validate_restore_styles(actual):
                 if side == "after":
                     for item in slices:
                         ref = item["source"]; start, end = item["range"]
-                        runs = [(key, source["textRange"]) for key, source in actual[side].items() if key[0] == ref["part"] and source.get("paragraphPath") == ref["path"] and "textRange" in source]
+                        runs = [(key, source["textRange"]) for key, source in _actual_runs(actual, side, ref["part"], ref["path"])]
                         runs.sort(key=lambda pair: pair[1]); cursor = 0
                         for offset in range(start, end):
                             while cursor < len(runs) and runs[cursor][1][1] <= offset: cursor += 1
@@ -2193,6 +2894,29 @@ def _mask_enabled(property_name, name):
     return _MANIFEST["formattingMask"]["effective"][group]
 
 
+def _replace_structural_tables(nodes):
+    """Cell-level table revisions are exact for text and properties in a stable grid. A table
+    whose columns are added or removed, or whose paired rows change their cell count, is
+    recorded whole instead (Word otherwise splits or misaligns the accepted table)."""
+    for decision in _MANIFEST_DECISIONS:
+        if decision["type"] != "table" or decision.get("trackedRepresentation") != "revision" or decision.get("moved") or len(decision["before"]) != 1 or len(decision["after"]) != 1 or _is_replaced(decision):
+            continue
+        if any(pair.get("beforeIndex") is None or pair.get("afterIndex") is None for pair in decision.get("columns", [])):
+            _replace_decision(decision, "table-columns")
+            continue
+        tables = {side: nodes[side].get(_manifest_key(decision[side][0])) for side in ("before", "after")}
+        if any(table is None for table in tables.values()):
+            continue
+        rows = {side: tables[side].findall(W + "tr") for side in ("before", "after")}
+        for pair in decision.get("rows", []):
+            old, new = pair.get("beforeIndex"), pair.get("afterIndex")
+            if old is None or new is None or old >= len(rows["before"]) or new >= len(rows["after"]):
+                continue
+            if len(rows["before"][old].findall(W + "tc")) != len(rows["after"][new].findall(W + "tc")):
+                _replace_decision(decision, "table-row-cells")
+                break
+
+
 def _validate_table_grids(actual):
     empty=json.dumps([W+'gridCol',[],'',[]],separators=(',',':'))
     for decision in _MANIFEST_DECISIONS:
@@ -2215,8 +2939,8 @@ def _validate_table_grids(actual):
         current=[values('after')[index] if index<len(values('after')) else empty for index in range(counts['after'])]
         def footprint(side):
             root=refs[side];result=[]
-            for source in actual[side].values():
-                if root and source['part']==root['part'] and source['path'][:len(root['path'])]==root['path']:
+            for source in (_actual_subtree(actual,side,root) if root else []):
+                if True:
                     result.extend((name,data) for name,data in source.get('normalizedProperties',{}).get('tcPr',{}).get('supported',{}).items() if name in {W+'gridSpan',W+'vMerge'})
                     result.extend((name,data) for name,data in source.get('normalizedProperties',{}).get('trPr',{}).get('unsupported',{}).items() if name in {W+'gridBefore',W+'gridAfter'})
             return result
@@ -2229,15 +2953,15 @@ def _validate_table_grids(actual):
             for side in ('before','after'):
                 root=refs[side]
                 unsafe=unsafe or bool(fact(side)['unsupported'])
-                for source in actual[side].values():
-                    if root and source['part']==root['part'] and source['path'][:len(root['path'])]==root['path']:
+                for source in (_actual_subtree(actual,side,root) if root else []):
+                    if True:
                         for name,data in source.get('normalizedProperties',{}).get('trPr',{}).get('unsupported',{}).items():
                             if name in {W+'gridBefore',W+'gridAfter'} and any(not any(attribute==W+'val' and value=='0' for attribute,value in json.loads(item)[1]) for item in data):unsafe=True
                         for name,data in source.get('normalizedProperties',{}).get('tcPr',{}).get('supported',{}).items():
                             if name==W+'vMerge' or name==W+'gridSpan' and any(not any(attribute==W+'val' and value=='1' for attribute,value in json.loads(item)[1]) for item in data):unsafe=True
             if unsafe:expected.update(supported=False,reason='unsupported-grid-geometry-or-history')
         if supplied!=expected:raise ValueError('INVALID_COMPARISON_MANIFEST_GRID')
-        if not expected['supported']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_GRID_GEOMETRY')
+        if not expected['supported'] and not _replace_decision(decision,'grid-geometry'):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_GRID_GEOMETRY')
 
 
 def _validate_formatting_manifest(actual, policy):
@@ -2255,10 +2979,12 @@ def _validate_formatting_manifest(actual, policy):
     for runs in run_index.values():
         runs.sort(key=lambda item: item[1])
     scopes = _MANIFEST.get("formattingScopes", [])
+    decision_ids = {decision["id"] for decision in _MANIFEST_DECISIONS}
+    moved_ids = {decision["id"] for decision in _MANIFEST_DECISIONS if decision.get("moved")}
     scope_by_id = {}
     direct_pairs = set()
     for scope in scopes:
-        if not _MANIFEST["options"]["formatting"] or scope["id"] in scope_by_id or any(scope["id"] == decision["id"] for decision in _MANIFEST_DECISIONS):
+        if not _MANIFEST["options"]["formatting"] or scope["id"] in scope_by_id or scope["id"] in decision_ids:
             raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_SCOPE")
         scope_by_id[scope["id"]] = scope
         property_name = scope["property"]
@@ -2285,20 +3011,20 @@ def _validate_formatting_manifest(actual, policy):
     action_scopes, action_ids = set(), set()
     for action in actions:
         scope = scope_by_id.get(action.get("scopeId"))
-        if scope is None or "comparisonId" in scope or not scope["families"] or action["scopeId"] in action_scopes or action["id"] in action_ids or action["id"] in scope_by_id or any(action["id"] == decision["id"] for decision in _MANIFEST_DECISIONS):
+        if scope is None or "comparisonId" in scope or not scope["families"] or action["scopeId"] in action_scopes or action["id"] in action_ids or action["id"] in scope_by_id or action["id"] in decision_ids:
             raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_ACTION")
         if action['property']=='tblGrid' and action['representation']!='preserve-after-history' and any(scope[side+'Fact']['unsupported'] for side in ('before','after')):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_GRID_DEPENDENCY')
         action_scopes.add(action["scopeId"]); action_ids.add(action["id"])
         if action["families"] != scope["families"] or action["property"] != scope["property"] or any(_manifest_key(action[side]) != _manifest_key(scope[side]) for side in ("before", "after")):
             raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_ACTION")
-        if action["representation"] != ("preserve-after-history" if scope["afterFact"]["history"] else "whole-node-revision" if any(decision["id"] == action.get("decisionId") and decision.get("moved") for decision in _MANIFEST_DECISIONS) else "revision"):
+        if action["representation"] != ("preserve-after-history" if scope["afterFact"]["history"] else "whole-node-revision" if action.get("decisionId") in moved_ids else "revision"):
             raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_HISTORY")
     if action_scopes != {scope["id"] for scope in scopes if "comparisonId" not in scope and scope["families"]}:
         raise ValueError("INVALID_COMPARISON_MANIFEST_MISSING_PROPERTY_ACTION")
 
     def children(side, parent, kind):
         part, path = parent
-        return sorted(key for key, source in actual[side].items() if source["kind"] == kind and key[0] == part and len(key[1]) == len(path) + 1 and key[1][:len(path)] == path)
+        return _actual_children(actual, side, (part, path), kind)
     expected_pairs = set()
     def expect(before, after, property_name):
         if before is not None and after is not None:
@@ -2322,8 +3048,8 @@ def _validate_formatting_manifest(actual, policy):
         for after, source in actual["after"].items():
             if source["kind"] != "style": continue
             style_id = source.get("attributes", {}).get(W + "styleId")
-            matches = [key for key, old in actual["before"].items() if old["kind"] == "style" and old.get("attributes", {}).get(W + "styleId") == style_id]
-            if len(matches) > 1: raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
+            matches = _actual_index(actual)["styles"]["before"].get(style_id, [])
+            # Duplicate style ids pair with the first definition, as the screen comparison does.
             if matches:
                 expect(matches[0], after, "pPr"); expect(matches[0], after, "rPr")
         for section in _MANIFEST['storyProjection']['sections']:
@@ -2332,7 +3058,7 @@ def _validate_formatting_manifest(actual, policy):
     if _MANIFEST["options"]["formatting"]:
         for side in ("before", "after"):
             for key, source in actual[side].items():
-                if source["kind"] == "style" and not any(other["kind"] == "style" and other.get("attributes", {}).get(W + "styleId") == source.get("attributes", {}).get(W + "styleId") for other in actual["after" if side == "before" else "before"].values()):
+                if source["kind"] == "style" and source.get("attributes", {}).get(W + "styleId") not in _actual_index(actual)["styles"]["after" if side == "before" else "before"]:
                     expected_exclusions.update((side, key, name) for name in ("pPr", "rPr"))
     exclusions = _MANIFEST.get("propertyExclusions", [])
     if len(exclusions) != len(expected_exclusions) or {(item["side"], _manifest_key(item["source"]), item["property"]) for item in exclusions if item["reason"] == "unpaired-style"} != expected_exclusions:
@@ -2341,8 +3067,22 @@ def _validate_formatting_manifest(actual, policy):
         raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_SCOPE_COVERAGE")
 
     used_scopes = {scope["id"] for scope in scopes if "comparisonId" not in scope}
-    for decision in _MANIFEST_DECISIONS:
-        if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision" or not decision["before"] or not decision["after"]: continue
+    scopes_by_comparison, scopes_by_prefix = {}, {}
+    for scope in scopes:
+        if "comparisonId" in scope:
+            scopes_by_comparison.setdefault(scope["comparisonId"], []).append(scope)
+            # Every "<decision>:comparison:" prefix the id carries, as startswith() would match.
+            text, cursor = str(scope["comparisonId"]), 0
+            while True:
+                found = text.find(":comparison:", cursor)
+                if found < 0:
+                    break
+                scopes_by_prefix.setdefault(text[:found], set()).add(scope["id"])
+                cursor = found + 1
+    def decision_scopes(decision):
+        return set(scopes_by_prefix.get(decision["id"], ()))
+    def check_decision(decision):
+        if decision["type"] != "paragraph" or decision.get("trackedRepresentation") != "revision" or not decision["before"] or not decision["after"]: return
         shape = (len(decision["before"]), len(decision["after"]))
         emitted = [0] if shape == (1, 1) else [1, 2] if shape == (1, 2) else [1]
         for index in emitted:
@@ -2383,7 +3123,7 @@ def _validate_formatting_manifest(actual, policy):
                 if segment["type"] != "added": before += size
                 if segment["type"] != "deleted": after += size
             covered = set()
-            runs = [scope for scope in scopes if scope.get("comparisonId") == comparison_id and scope["property"] == "rPr"]
+            runs = [scope for scope in scopes_by_comparison.get(comparison_id, []) if scope["property"] == "rPr"]
             spans = {span["scopeId"]: span for span in formatting["spans"]}
             if len(spans) != len(formatting["spans"]): raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_DUPLICATE")
             for scope in runs:
@@ -2399,6 +3139,17 @@ def _validate_formatting_manifest(actual, policy):
                 used_scopes.add(scope["id"])
             if covered != expected_chars or set(spans) != {scope["id"] for scope in runs if scope["families"]}:
                 raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_SCOPE_COVERAGE")
+    for decision in _MANIFEST_DECISIONS:
+        if _is_replaced(decision):
+            used_scopes.update(decision_scopes(decision))
+            continue
+        try:
+            check_decision(decision)
+        except ValueError as error:
+            # Characters without an owning run (nested stories) cannot take run-level formatting.
+            if str(error) != "UNSUPPORTED_TRACKED_SOURCE" or not _replace_decision(decision, "format-style-gap"):
+                raise
+            used_scopes.update(decision_scopes(decision))
     if used_scopes != set(scope_by_id):
         raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_SCOPE_COVERAGE")
 
@@ -2433,7 +3184,8 @@ def _consume_manifest_subtree(side, node):
 
 
 def _resolve_manifest_sources(manifest):
-    """Restore `{"$src":[side,index]}` stubs written by serializeManifestForTracked."""
+    """Restore `{"$src":[side,index]}` and `{"$fact":[side,index,property]}` stubs written by
+    serializeManifestForTracked."""
     if not isinstance(manifest, dict):
         return manifest
     sources = manifest.get("sources")
@@ -2447,6 +3199,14 @@ def _resolve_manifest_sources(manifest):
                 if not isinstance(sources, dict) or not isinstance(stub, list) or len(stub) != 2 or stub[0] not in ("before", "after") or not isinstance(stub[1], int) or not 0 <= stub[1] < len(sources.get(stub[0], [])):
                     raise ValueError("INVALID_COMPARISON_MANIFEST")
                 holder[key] = sources[stub[0]][stub[1]]
+            elif len(value) == 1 and "$fact" in value:
+                stub = value["$fact"]
+                if not isinstance(sources, dict) or not isinstance(stub, list) or len(stub) != 3 or stub[0] not in ("before", "after") or not isinstance(stub[1], int) or not 0 <= stub[1] < len(sources.get(stub[0], [])):
+                    raise ValueError("INVALID_COMPARISON_MANIFEST")
+                properties = sources[stub[0]][stub[1]].get("normalizedProperties")
+                if not isinstance(properties, dict) or not isinstance(stub[2], str) or stub[2] not in properties:
+                    raise ValueError("INVALID_COMPARISON_MANIFEST")
+                holder[key] = properties[stub[2]]
             else:
                 stack.extend((value, name) for name in value)
         elif isinstance(value, list):
@@ -2473,7 +3233,8 @@ def _install_manifest(manifest):
             _MANIFEST_DECISIONS.append(decision)
             visit(decision.get("children", []))
     visit(manifest["decisions"])
-    _MANIFEST_GRID_USED.clear();_MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
+    _MANIFEST_GRID_USED.clear();_MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear();_REPLACED.clear();_ORIGINAL_MARKS.update(after_names=None,next_id=None);_NOTE_CLONES.update(items=[],next={})
+    _MANIFEST_KEY_CACHE.clear();_MANIFEST_REF_OWNERS.clear();_ACTUAL_INDEX.clear();_ACTUAL_INDEX["actual"]=None
     for decision in _MANIFEST_DECISIONS:
         for side in ("before","after"):
             for ref in decision.get("objectEvents",{}).get(side,[]):
@@ -2505,11 +3266,30 @@ def _manifest_decision(before, after):
     raise ValueError("MISSING_COMPARISON_DECISION")
 
 
+_MANIFEST_REF_OWNERS = {}
+
+
+def _manifest_ref_owners():
+    """Decision positions by owned source key, built once per manifest."""
+    if not _MANIFEST_REF_OWNERS:
+        _MANIFEST_REF_OWNERS["built"] = True
+        for position, decision in enumerate(_MANIFEST_DECISIONS):
+            for side in ("before", "after"):
+                for ref in decision[side]:
+                    _MANIFEST_REF_OWNERS.setdefault((side, _manifest_key(ref)), set()).add(position)
+    return _MANIFEST_REF_OWNERS
+
+
 def _manifest_block_groups(before, after, include_tables=True):
     left = {_MANIFEST_NODE_KEYS.get(node, (None, None))[1]: index for index, node in enumerate(before)}
     right = {_MANIFEST_NODE_KEYS.get(node, (None, None))[1]: index for index, node in enumerate(after)}
     result = []
-    for decision in _MANIFEST_DECISIONS:
+    ref_owners = _manifest_ref_owners()
+    positions = set()
+    for side, keys in (("before", left), ("after", right)):
+        for key in keys:
+            positions.update(ref_owners.get((side, key), ()))
+    for decision in (_MANIFEST_DECISIONS[position] for position in sorted(positions)):
         a = [left[_manifest_key(ref)] for ref in decision["before"] if _manifest_key(ref) in left]
         b = [right[_manifest_key(ref)] for ref in decision["after"] if _manifest_key(ref) in right]
         if a or b:
@@ -2534,15 +3314,212 @@ def _manifest_block_groups(before, after, include_tables=True):
             if _comparison_text(node).strip():
                 raise ValueError("UNMAPPED_VISIBLE_XML_NODE")
             result.append(([], [index], {"untracked": True}))
+    _balance_blank_paragraphs(before, after, result)
     # Keep after order. Deletions remain at the source boundary preceding their
-    # next matched source node, rather than being collected at document end.
+    # next matched source node, rather than being collected at document end, in
+    # their original order.
+    matched = sorted((xs[0], ys[0]) for xs, ys, _ in result if xs and ys)
+    keys = [x for x, _ in matched]
+    following = [len(after)] * (len(matched) + 1)
+    for index in range(len(matched) - 1, -1, -1):
+        following[index] = min(matched[index][1], following[index + 1])
     def position(item):
         a, b, _ = item
         if b:
-            return (b[0], 1)
-        next_positions = [ys[0] for xs, ys, _ in result if xs and ys and a and xs[0] > a[-1]]
-        return (min(next_positions) if next_positions else len(after), 0)
+            return (b[0], 1, 0)
+        return (following[bisect.bisect_right(keys, a[-1])], 0, a[0])
     return sorted(result, key=position)
+
+
+def _revise_blank_section_break(kept, source, writer):
+    """A kept empty paragraph that ends a section paired by order records its section changes."""
+    after_section = source.find(W + "pPr/" + W + "sectPr") if source.tag == W + "p" else None
+    if after_section is None or _MANIFEST is None:
+        return
+    origin = _MANIFEST_NODE_KEYS.get(after_section)
+    pair = next((pair for pair in _MANIFEST["storyProjection"]["sections"] if pair.get("blankOwner") and pair.get("after") and origin is not None and _manifest_key(pair["after"]["source"]) == origin[1]), None)
+    if pair is None:
+        return
+    before_section = _MANIFEST_SOURCE_NODES.get(("before", _manifest_key(pair["before"]["source"])))
+    if before_section is None:
+        raise ValueError("INVALID_COMPARISON_MANIFEST_SECTION_OWNER")
+    action = _property_action(before_section, after_section, W + "sectPr")
+    if action is None:
+        return
+    properties = kept.find(W + "pPr")
+    current = properties.find(W + "sectPr")
+    revised = _property_revision(current, before_section, W + "sectPr", W + "sectPrChange", writer, action["families"], action["representation"] == "preserve-after-history")
+    index = list(properties).index(current)
+    properties.remove(current)
+    properties.insert(index, revised)
+
+
+def _is_plain_blank(node):
+    """An empty line: nothing but properties, markers and empty runs. A paragraph whose mark is
+    already a tracked deletion vanishes on acceptance, and one holding a section break or field
+    characters carries structure, so neither counts."""
+    if node.tag != W + "p" or _comparison_text(node).strip() or node.find(W + "pPr/" + W + "sectPr") is not None or node.find(W + "pPr/" + W + "rPr/" + W + "del") is not None:
+        return False
+    for child in node:
+        if child.tag == W + "r":
+            if any(item.tag != W + "rPr" for item in child):
+                return False
+        elif child.tag not in {W + "pPr", W + "bookmarkStart", W + "bookmarkEnd", W + "proofErr", W + "permStart", W + "permEnd"}:
+            return False
+    return True
+
+
+def _balance_blank_paragraphs(before, after, result):
+    """Empty paragraphs are left out of the comparison. Between the same neighbouring decisions,
+    keep as many revised empty paragraphs as both sides have, mark the revision's extra ones as
+    inserted and record the original's extra ones as deleted, so paragraph counts match on both
+    Accept All and Reject All. Empty paragraphs holding a section break pair by order instead."""
+    covered_before = {index for indexes, _, _ in result for index in indexes}
+    pairs = sorted((xs[0], ys[0]) for xs, ys, _ in result if xs and ys)
+    pair_keys = [a for a, _ in pairs]
+    after_anchors = sorted(b for _, b in pairs)
+    def anchor_of_before(index):
+        position = bisect.bisect_right(pair_keys, index)
+        return pairs[position][1] if position < len(pairs) else len(after)
+    def anchor_of_after(index):
+        position = bisect.bisect_right(after_anchors, index)
+        return after_anchors[position] if position < len(after_anchors) else len(after)
+    groups = {}
+    for index, node in enumerate(before):
+        if index not in covered_before and _is_plain_blank(node):
+            groups.setdefault(anchor_of_before(index), [[], []])[0].append(index)
+    for item in result:
+        xs, ys, decision = item
+        if decision.get("untracked") and len(ys) == 1 and _is_plain_blank(after[ys[0]]):
+            groups.setdefault(anchor_of_after(ys[0]), [[], []])[1].append(item)
+    for anchor, (old, new) in groups.items():
+        shared = min(len(old), len(new))
+        for item in sorted(new, key=lambda entry: entry[1][0])[shared:]:
+            item[2]["insertedBlank"] = True
+        for index in old[shared:]:
+            result.append(([index], [], {"deletedBlank": True}))
+
+
+def _field_spans(blocks):
+    """Block index ranges of complex fields that open in one paragraph and close in a later one
+    (a table of contents, an index), counted in the accepted view of each block."""
+    spans, depth, start = [], 0, None
+    for index, block in enumerate(blocks):
+        parents = {child: parent for parent in block.iter() for child in parent}
+        for node in block.iter(W + "fldChar"):
+            cursor, deleted = node, False
+            while cursor in parents:
+                cursor = parents[cursor]
+                if cursor.tag in DELETED_CONTENT_TAGS:
+                    deleted = True
+                    break
+            if deleted:
+                continue
+            kind = node.get(W + "fldCharType")
+            if kind == "begin":
+                if depth == 0:
+                    start = index
+                depth += 1
+            elif kind == "end" and depth:
+                depth -= 1
+                if depth == 0 and start is not None and index > start:
+                    spans.append((start, index))
+    return spans
+
+
+def _field_regions(before_blocks, after_blocks, alignment):
+    """Join alignment groups that touch the same multi-paragraph field into one region. A field
+    rebuilt paragraph by paragraph interleaves deleted and inserted field characters, which Word
+    cannot reject cleanly; a changed region is recorded as all original paragraphs deleted, then
+    all revised paragraphs inserted. Returns {group index: region} for changed regions."""
+    spans = {"before": _field_spans(before_blocks), "after": _field_spans(after_blocks)}
+    if not spans["before"] and not spans["after"]:
+        return {}
+    parent = list(range(len(alignment) + len(spans["before"]) + len(spans["after"])))
+    def find(node):
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
+    def union(a, b):
+        parent[find(a)] = find(b)
+    offset = {"before": len(alignment), "after": len(alignment) + len(spans["before"])}
+    for group, (xs, ys, _) in enumerate(alignment):
+        for side, indexes in (("before", xs), ("after", ys)):
+            for span_index, (first, last) in enumerate(spans[side]):
+                if any(first <= index <= last for index in indexes):
+                    union(group, offset[side] + span_index)
+    components = {}
+    for group in range(len(alignment)):
+        components.setdefault(find(group), []).append(group)
+    regions = {}
+    for root, groups in components.items():
+        touched = [index for index, (start, _) in enumerate(spans["before"]) if find(offset["before"] + index) == root] + [index for index, _ in enumerate(spans["after"]) if find(offset["after"] + index) == root]
+        if not touched:
+            continue
+        before_indexes, after_indexes = set(), set()
+        for group in groups:
+            before_indexes.update(alignment[group][0]); after_indexes.update(alignment[group][1])
+        for side, collected in (("before", before_indexes), ("after", after_indexes)):
+            for span_index, (first, last) in enumerate(spans[side]):
+                if find(offset[side] + span_index) == root:
+                    collected.update(range(first, last + 1))
+        blocks = [before_blocks[index] for index in before_indexes] + [after_blocks[index] for index in after_indexes]
+        if any(block.tag != W + "p" for block in blocks):
+            continue
+        decisions = [alignment[group][2] for group in groups]
+        changed = any(decision.get("insertedBlank") or decision.get("deletedBlank") or (not decision.get("untracked") and (
+            len(decision.get("before", [])) != len(decision.get("after", [])) or decision.get("moved") or _is_replaced(decision)
+            or decision.get("beforeText") != decision.get("afterText")
+            or any(comparison.get("formatting", {}).get("spans") or comparison.get("formatting", {}).get("paragraphFamilies") for comparison in decision.get("comparisons", []))
+            or (decision.get("objectEvents") or {}).get("changed"))) for decision in decisions)
+        if not changed:
+            continue
+        # Emit where the region's first revised paragraph stands, inside any content control around it.
+        anchor = next((group for group in sorted(groups) if alignment[group][1]), min(groups))
+        region = {"before": sorted(before_indexes), "after": sorted(after_indexes), "groups": set(groups), "anchor": anchor}
+        for group in groups:
+            regions[group] = region
+    return regions
+
+
+def _fused_one_sided(before_blocks, after_blocks, alignment, regions, original_after_blocks):
+    """Adjacent one-paragraph deletion and insertion that whole-paragraph marks cannot carry: a
+    field (its deleted copy would stand beside the revised one) or a paragraph inside a content
+    control (a deleted paragraph has no envelope to return to). They become one paragraph with
+    the original runs deleted and the revised runs inserted. Returns {group: (before, after) or None}."""
+    in_control = set()
+    def visit(node, inside):
+        if node.tag == CONTENT_CONTROL_TAG:
+            for child in _content_control_blocks(node):
+                visit(child, True)
+        elif inside:
+            in_control.add(id(node))
+    for block in original_after_blocks:
+        visit(block, False)
+    def one_sided(group):
+        xs, ys, decision = alignment[group]
+        if group in regions or decision.get("untracked") or decision.get("moved") or decision.get("insertedBlank") or decision.get("deletedBlank"):
+            return None
+        if len(xs) == 1 and not ys and before_blocks[xs[0]].tag == W + "p":
+            return "del"
+        if len(ys) == 1 and not xs and after_blocks[ys[0]].tag == W + "p":
+            return "ins"
+        return None
+    fused, group = {}, 0
+    while group + 1 < len(alignment):
+        kinds = (one_sided(group), one_sided(group + 1))
+        if set(kinds) == {"del", "ins"}:
+            deleted, inserted = (group, group + 1) if kinds[0] == "del" else (group + 1, group)
+            before = before_blocks[alignment[deleted][0][0]]
+            after = after_blocks[alignment[inserted][1][0]]
+            if _has_field_structure(before) or _has_field_structure(after) or id(after) in in_control:
+                fused[inserted] = (before, after)
+                fused[deleted] = None
+                group += 2
+                continue
+        group += 1
+    return fused
 
 
 def _manifest_flat_blocks(blocks):
@@ -2601,15 +3578,53 @@ def _revision_blocks_impl(before_blocks, after_blocks, include_formatting, write
     after_blocks = _manifest_flat_blocks(after_blocks)
     emitted = []
     alignment = _manifest_block_groups(before_blocks, after_blocks, include_tables)
-    for before_indexes, after_indexes, decision in alignment:
+    regions = _field_regions(before_blocks, after_blocks, alignment)
+    fused = _fused_one_sided(before_blocks, after_blocks, alignment, regions, original_after_blocks)
+    for group_index, (before_indexes, after_indexes, decision) in enumerate(alignment):
         _MANIFEST_ACTIVE_DECISION = decision
         _MANIFEST_ACTIVE_COMPARISON = decision.get("comparisons", [None])[0]
         revised = []
         target = after_blocks[after_indexes[0]] if after_indexes else None
         emitted.append((target, revised))
-        if decision.get("untracked"):
-            revised.extend(copy.deepcopy(after_blocks[index]) for index in after_indexes)
+        if group_index in fused:
+            for action in (_MANIFEST or {}).get("propertyActions", []):
+                if action.get("decisionId") == decision.get("id"):
+                    _MANIFEST_PROPERTY_USED.add(action["id"])
+            if fused[group_index] is not None:
+                revised.extend(_replacement_pair([fused[group_index][0]], [fused[group_index][1]], writer, include_formatting))
             continue
+        region = regions.get(group_index)
+        if region is not None:
+            if not decision.get("untracked") and not decision.get("deletedBlank"):
+                _spend_replaced(decision)
+            if group_index == region["anchor"]:
+                # Each version's field opens and closes inside its own run of paragraphs; nesting one
+                # tracked field inside the other makes Word drop both. (At the end of a content
+                # control the inserted last mark cannot join what follows, so Reject All keeps one
+                # extra empty line there.)
+                revised.extend(_replace_paragraph(before_blocks[index], "del", writer) for index in region["before"])
+                revised.extend(_replace_paragraph(after_blocks[index], "ins", writer) for index in region["after"])
+            continue
+        if decision.get("untracked"):
+            for index in after_indexes:
+                kept = copy.deepcopy(after_blocks[index])
+                if include_formatting:
+                    _revise_blank_section_break(kept, after_blocks[index], writer)
+                if decision.get("insertedBlank"):
+                    _mark_paragraph_end(kept, "ins", writer)
+                revised.append(kept)
+            continue
+        group_before = [before_blocks[index] for index in before_indexes]
+        group_after = [after_blocks[index] for index in after_indexes]
+        paragraphs = group_before + group_after
+        if paragraphs and all(node.tag == W + "p" for node in paragraphs) and decision.get("type") == "paragraph":
+            # Whole-paragraph, moved, split and merge revisions rebuild runs and drop bookmark
+            # markers; carry the revision's markers verbatim instead (1:1 pairs decide per paragraph).
+            if not _STABLE_BOOKMARK["validated"] and any(_has_bookmark_markers(node) for node in paragraphs) and not (len(group_before) == len(group_after) == 1 and not decision.get("moved")):
+                _replace_decision(decision, "bookmark-context")
+            if _is_replaced(decision):
+                revised.extend(_replacement_pair(group_before, group_after, writer, include_formatting))
+                continue
         if len(before_indexes) == 1 and len(after_indexes) == 2:
             before = before_blocks[before_indexes[0]]
             first_after = after_blocks[after_indexes[0]]
@@ -2637,14 +3652,21 @@ def _revision_blocks_impl(before_blocks, after_blocks, include_formatting, write
                 revised.append(copy.deepcopy(after))
             continue
         if before is None:
-            if after.tag == W + "p":
+            if after.tag == W + "p" and _has_field_structure(after):
+                revised.append(_replace_paragraph(after, "ins", writer))
+            elif after.tag == W + "p":
                 revised.append(_whole_paragraph_revision(after, "ins", writer))
             elif after.tag == W + "tbl":
                 revised.append(_whole_table_revision(after, "ins", writer))
             else:
                 revised.append(_whole_content_control_revision(after, "ins", writer, include_formatting, include_tables))
         elif after is None:
-            if before.tag == W + "p":
+            if before.tag == W + "p" and _is_deleted_in_source(before):
+                # Re-deleting it would bring an extra paragraph back on Reject All.
+                continue
+            if before.tag == W + "p" and _has_field_structure(before):
+                revised.append(_replace_paragraph(before, "del", writer))
+            elif before.tag == W + "p":
                 revised.append(_whole_paragraph_revision(before, "del", writer))
             elif before.tag == W + "tbl":
                 revised.append(_whole_table_revision(before, "del", writer))
@@ -2653,9 +3675,22 @@ def _revision_blocks_impl(before_blocks, after_blocks, include_formatting, write
         elif before.tag == CONTENT_CONTROL_TAG or after.tag == CONTENT_CONTROL_TAG:
             revised.extend(_content_control_revision(before, after, include_formatting, writer, include_tables))
         elif before.tag == W + "p" and after.tag == W + "p":
-            revised.append(_paragraph_revision(before, after, include_formatting, writer))
+            if _is_replaced(decision):
+                revised.extend(_replacement_pair([before], [after], writer, include_formatting))
+            else:
+                revised.extend(_paragraph_block_revision(before, after, include_formatting, writer))
         elif before.tag == W + "tbl" and after.tag == W + "tbl":
-            revised.append(_table_revision(before, after, include_formatting, writer))
+            if _is_replaced(decision):
+                _spend_replaced(decision)
+                # A paragraph whose mark is both inserted and deleted keeps the two tables apart in the
+                # tracked view (Word joins adjacent tables) and disappears on Accept All and Reject All.
+                separator = ET.Element(W + "p")
+                marks = ET.SubElement(ET.SubElement(separator, W + "pPr"), W + "rPr")
+                marks.append(ET.Element(W + "ins", writer.attributes()))
+                marks.append(ET.Element(W + "del", writer.attributes()))
+                revised.extend([_replace_table(before, "del", writer), separator, _replace_table(after, "ins", writer)])
+            else:
+                revised.append(_table_revision(before, after, include_formatting, writer))
         else:
             revised.append(copy.deepcopy(after))
     return _manifest_rewrap(original_after_blocks, emitted)
@@ -2686,6 +3721,25 @@ def _replace_blocks(container, replacements):
         container.insert(insertion_index + offset, replacement)
 
 
+def _dedupe_paragraph_ids(root):
+    """Copies of original paragraphs may repeat a revised paragraph's w14:paraId. Keep the id on
+    the live paragraph (comments and co-authoring refer to it) and drop it from the deleted copy."""
+    occurrences = {}
+    for paragraph in root.iter(W + "p"):
+        identity = paragraph.get(W14 + "paraId")
+        if identity:
+            occurrences.setdefault(identity, []).append(paragraph)
+    for paragraphs in occurrences.values():
+        if len(paragraphs) < 2:
+            continue
+        deleted = [paragraph for paragraph in paragraphs if paragraph.find(W + "pPr/" + W + "rPr/" + W + "del") is not None]
+        keep = next((paragraph for paragraph in paragraphs if paragraph not in deleted), paragraphs[0])
+        for paragraph in paragraphs:
+            if paragraph is not keep:
+                paragraph.attrib.pop(W14 + "paraId", None)
+                paragraph.attrib.pop(W14 + "textId", None)
+
+
 def _revisionize_xml_part(before_data, after_data, include_formatting, writer, container_tag=None, include_tables=True, part="word/document.xml",source_before_part=None):
     previous_owner=_PACKAGE_GRAPH.output_owner if _PACKAGE_GRAPH is not None else None
     if _PACKAGE_GRAPH is not None:_PACKAGE_GRAPH.output_owner=part
@@ -2706,6 +3760,7 @@ def _revisionize_xml_part(before_data, after_data, include_formatting, writer, c
         )
         if include_formatting and container_tag == "body":
             _apply_property_revision(after_container, before_container, W + "sectPr", W + "sectPrChange", writer)
+        _dedupe_paragraph_ids(after_root)
         return _serialize_xml(after_root)
     finally:
         if _PACKAGE_GRAPH is not None:_PACKAGE_GRAPH.output_owner=previous_owner
@@ -3152,8 +4207,14 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
                 if action['create']:
                     _PACKAGE_GRAPH.add_note_part(name,note_tag)
 
+        if _NOTE_CLONES["items"]:
+            _append_note_clones(replacements, additions, after_archive)
+
+        # Stories only a removed or added section break referred to are shown on screen but have no
+        # part in the tracked file; the break links the neighbouring revised section's stories.
+        section_only = {identity for pair in _MANIFEST["storyProjection"]["pairs"] if pair.get("representation") == "section-only" for identity in pair["decisionIds"]}
         for decision in _MANIFEST_DECISIONS:
-            if decision.get("trackedRepresentation") == "preserve-after":
+            if decision.get("trackedRepresentation") == "preserve-after" or decision["id"] in section_only:
                 continue
             for side in ("before", "after"):
                 for ref in decision[side]:
@@ -3186,6 +4247,8 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         # Do not retain source nodes or text decisions after failure/cancellation.
         _MANIFEST = None
         _PACKAGE_GRAPH = None
+        _ACTUAL_INDEX.clear(); _ACTUAL_INDEX["actual"] = None
+        _MANIFEST_KEY_CACHE.clear(); _MANIFEST_REF_OWNERS.clear()
         _NOTE_IDS.clear()
         _MANIFEST_NODE_KEYS = {}
         _MANIFEST_DECISIONS = []
@@ -3196,4 +4259,4 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _MANIFEST_PROPERTY_USED = set()
         _MANIFEST_SOURCE_NODES = {}
         _MANIFEST_ALLOWED_PROPERTIES = {}
-        _MANIFEST_GRID_USED.clear();_MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
+        _MANIFEST_GRID_USED.clear();_MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear();_REPLACED.clear()

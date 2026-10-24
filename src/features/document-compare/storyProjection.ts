@@ -1,7 +1,7 @@
 import {buildSectionPairs,sourceKey,type SectionPair} from './sectionProjection.ts';
 import type {ComparisonDecision,DocumentComparisonManifest,DocumentSourceReference} from './comparisonManifest.ts';
 export interface StoryFacts {policy:'worklazy-story-facts-1';parts:Array<{part:string;kind:'header'|'footer';sha256:string;contentType:string|null;active:boolean}>;sections:Array<{source:DocumentSourceReference;final:boolean;history:boolean;activation?:{type:string;titlePage:boolean}}>;bindings:Array<{section:DocumentSourceReference;reference:DocumentSourceReference;kind:'header'|'footer';variant:string;ownerPart:string;rId:string;type:string;rawTarget:string;targetMode:string;targetPart:string}>;settings?:{evenAndOddHeaders:boolean};errors:string[]}
-export interface StoryPair {id:string;kind:'header'|'footer';beforePart?:string;afterPart?:string;representation:'inline'|'unsupported-binding';decisionIds:string[];coverage:{before:DocumentSourceReference[];after:DocumentSourceReference[]}}
+export interface StoryPair {id:string;kind:'header'|'footer';beforePart?:string;afterPart?:string;representation:'inline'|'unsupported-binding'|'section-only';decisionIds:string[];coverage:{before:DocumentSourceReference[];after:DocumentSourceReference[]}}
 export interface StoryProjection {policy:'worklazy-story-projection-2';supported:boolean;reasons:string[];sections:SectionPair[];routes:Array<{sectionId:string;kind:'header'|'footer';variant:string;before:{explicit:boolean;donorSectionId?:string;part?:string};after:{explicit:boolean;donorSectionId?:string;part?:string};storyId?:string}>;pairs:StoryPair[];bindings:Array<{id:string;sectionId:string;kind:'header'|'footer';variant:string;before?:StoryFacts['bindings'][number];after?:StoryFacts['bindings'][number];storyId:string}>}
 export function buildStoryProjection(manifest:DocumentComparisonManifest):StoryProjection {
  const a=manifest.storyFacts.before,b=manifest.storyFacts.after;
@@ -12,7 +12,8 @@ export function buildStoryProjection(manifest:DocumentComparisonManifest):StoryP
  plan.reasons.push(...a.errors,...b.errors);
  const slots=[...new Set([...a.bindings,...b.bindings].map(ref=>ref.kind+':'+ref.variant))].sort();
  const donors:{before:Record<string,{donorSectionId:string;part:string}>;after:Record<string,{donorSectionId:string;part:string}>}={before:{},after:{}};
- for(const section of plan.sections)for(const slot of slots){
+ // One-sided breaks take their stories from the neighbouring revised section; they own no bindings.
+ for(const section of plan.sections.filter(section=>!section.oneSided))for(const slot of slots){
   const old=a.bindings.find(ref=>section.before&&sourceKey(ref.section)===sourceKey(section.before.source)&&ref.kind+':'+ref.variant===slot),next=b.bindings.find(ref=>section.after&&sourceKey(ref.section)===sourceKey(section.after.source)&&ref.kind+':'+ref.variant===slot);
   const [kind,variant]=slot.split(':') as ['header'|'footer',string];
   if(old||next){let pair=plan.pairs.find(pair=>pair.beforePart===old?.targetPart&&pair.afterPart===next?.targetPart);
@@ -24,6 +25,14 @@ export function buildStoryProjection(manifest:DocumentComparisonManifest):StoryP
   const pair=plan.pairs.find(pair=>pair.beforePart===before.part&&pair.afterPart===after.part);
   plan.routes.push({sectionId:section.id,kind,variant,before,after,storyId:pair?.id});
   if(Boolean(before.part)!==Boolean(after.part)||before.donorSectionId!==after.donorSectionId)plan.reasons.push('changed-story-inheritance');
+ }
+ // A story only a removed or added section refers to is not compared; the break keeps the
+ // neighbouring revised section's stories on both sides.
+ const oneSidedSources={before:new Set(plan.sections.filter(section=>section.oneSided&&section.before).map(section=>sourceKey(section.before!.source))),after:new Set(plan.sections.filter(section=>section.oneSided&&section.after).map(section=>sourceKey(section.after!.source)))};
+ for(const [side,facts] of [['before',a],['after',b]] as const)for(const part of [...new Set(facts.bindings.filter(ref=>oneSidedSources[side].has(sourceKey(ref.section))).map(ref=>ref.targetPart))].sort()){
+  if(plan.pairs.some(pair=>pair[side==='before'?'beforePart':'afterPart']===part))continue;
+  const kind=facts.parts.find(item=>item.part===part)?.kind??'header';
+  plan.pairs.push({id:'story:'+JSON.stringify([kind,side==='before'?part:null,side==='after'?part:null]),kind,beforePart:side==='before'?part:undefined,afterPart:side==='after'?part:undefined,representation:'section-only',decisionIds:[],coverage:{before:[],after:[]}});
  }
  // Preserve existing conventional orphan-story comparisons, scoped by part.
  for(const part of [...new Set([...a.parts,...b.parts].filter(part=>!part.active).map(part=>part.part))].sort()){

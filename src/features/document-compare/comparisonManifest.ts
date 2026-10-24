@@ -49,7 +49,7 @@ export interface ComparisonDecision {
   noteId?:string;
   /** "replace": recorded in the tracked DOCX as the whole original block deleted and the whole revised block inserted. */
   trackedRepresentation: "revision" | "preserve-after" | "note-reference" | "replace";
-  trackedReason?: "existing-comment-contract" | "paragraph-shape";
+  trackedReason?: "existing-comment-contract" | "paragraph-shape" | "opaque-content";
   segments: WordDiffSegment[];
   /** Raw XML text differs from display text for generated numbering labels. */
   textSegments: WordDiffSegment[];
@@ -98,7 +98,8 @@ export interface DocumentComparisonManifest {
 export interface SourceCoverage {
   source: DocumentSourceReference;
   noteId?:string;
-  disposition: "decision" | "preserve-after" | "unsupported" | "note-reference" | "note-special";
+  /** "nested": a paragraph or table inside another owned paragraph (text box content) or table (a table in a cell), carried by that block's decision. */
+  disposition: "decision" | "preserve-after" | "unsupported" | "note-reference" | "note-special" | "nested";
   decisionId?: string;
   reason?: "blank-paragraph" | "excluded-table" | "excluded-metadata" | "opaque-content" | "unmapped-source" | "existing-comment-contract" | "note-separator";
 }
@@ -131,10 +132,15 @@ export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
       if (decision?.trackedRepresentation === "preserve-after") return { source, disposition: "decision", decisionId: decision.id };
       const commentOwner = source.part === "word/comments.xml" ? decisions.find((item) => item.trackedReason === "existing-comment-contract" && item[side].some((ref) => descendant(source, ref))) : undefined;
       if (commentOwner) return { source, disposition: "preserve-after", decisionId: commentOwner.id, reason: "existing-comment-contract" };
+      if (!decision) for (let length = source.path.length - 1; length > 0; length--) {
+        const ancestor = findSource(manifest, side, { part: source.part, path: source.path.slice(0, length) });
+        const carrier = ancestor?.kind === "p" || ancestor?.kind === "tbl" ? owners.get(key(ancestor)) : undefined;
+        if (carrier) return { source, disposition: "nested", decisionId: carrier.id };
+      }
       if (source.opaqueSignature && !source.objectEventsSupported) {
         const before = decision?.before.length === 1 ? findSource(manifest, "before", decision.before[0]) : undefined;
         const after = decision?.after.length === 1 ? findSource(manifest, "after", decision.after[0]) : undefined;
-        if (!before || !after || (decision && unsafeAncestors.has(decision.id)) || decision?.moved || before.rawText !== after.rawText || before.copySignature !== after.copySignature || before.opaqueSignature !== after.opaqueSignature) return { source, disposition: "unsupported", reason: "opaque-content" };
+        if (decision?.trackedRepresentation !== "replace" && (!before || !after || (decision && unsafeAncestors.has(decision.id)) || decision?.moved || before.rawText !== after.rawText || before.copySignature !== after.copySignature || before.opaqueSignature !== after.opaqueSignature)) return { source, disposition: "unsupported", reason: "opaque-content" };
       }
       if (decision) return { source, disposition: "decision", decisionId: decision.id };
       if (source.kind === "p" && !source.rawText?.trim() && !source.opaqueSignature) return { source, disposition: "preserve-after", reason: "blank-paragraph" };

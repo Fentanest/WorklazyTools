@@ -117,7 +117,9 @@ for kind in ['footnote','endnote']:
     for n,data in entries.items():z.writestr(n,data)
   select_size(scenario!='properties-mask')
   mask={name:True for name in ['fontFamily','size','style','color','paragraph','numbering']};mask['size']=scenario!='properties-mask'
-  supported=scenario in ['negative-ids','renumber','properties-off','properties-on','properties-mask','text','metadata-off','volatile-rel'];formatting=scenario!='properties-off';metadata=scenario!='metadata-off'
+  # Separator differences the redline cannot carry keep the revised separator on both sides.
+  preserved=scenario in ['role','missing','control-style','control-mixed','control-missing','duplicate']
+  supported=preserved or scenario in ['negative-ids','renumber','properties-off','properties-on','properties-mask','text','metadata-off','volatile-rel'];formatting=scenario!='properties-off';metadata=scenario!='metadata-off'
   if os.path.exists('/paired-special-out.docx'):os.unlink('/paired-special-out.docx')
   try:
    generate_tracked_document('/paired-special-before.docx','/paired-special-after.docx','/paired-special-out.docx','events',formatting,True,metadata,formatting_mask_json=json.dumps(mask))
@@ -127,7 +129,7 @@ for kind in ['footnote','endnote']:
    with zipfile.ZipFile('/paired-special-out.docx') as source,zipfile.ZipFile('/paired-special-rejected.docx','w') as output:
     for entry in source.infolist():output.writestr(entry,_serialize_xml(reject(_qname_safe_parse(source.read(entry.filename)))[0]) if entry.filename in ['word/document.xml','word/'+kind+'s.xml'] else source.read(entry.filename))
    assert special_graph('/paired-special-accepted.docx',kind)==special_graph('/paired-special-after.docx',kind),(kind,scenario,'accept special')
-   target='after' if scenario in ['properties-off','properties-mask','metadata-off','volatile-rel'] else 'before'
+   target='after' if preserved or scenario in ['properties-off','properties-mask','metadata-off','volatile-rel'] else 'before'
    assert special_graph('/paired-special-rejected.docx',kind)==special_graph('/paired-special-'+target+'.docx',kind),(kind,scenario,'reject special',special_graph('/paired-special-rejected.docx',kind),special_graph('/paired-special-'+target+'.docx',kind))
    if scenario in ['text','properties-on']:
     a=extract_document_model(open('/paired-special-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/paired-special-after.docx','rb').read(),True,True,'en');manifest=json.loads(worklazyComparisonManifestJson(a,b,formatting,True,metadata))

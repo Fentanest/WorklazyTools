@@ -87,7 +87,7 @@
     "targetAuthor": "Worklazy Oracle",
     "fixturePairIds": ["base", "split", "boundary", "formatting", "revisions"],
     "expectedStoryParts": 13,
-    "expectedStructuralRevisions": 5
+    "expectedStructuralRevisions": 9
   },
   "preservedPackageParts": [
     "word/comments.xml",

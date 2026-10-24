@@ -19,8 +19,9 @@ export function buildNoteProjection(manifest:DocumentComparisonManifest):NotePro
    const x=old.filter(note=>note.type===role),y=next.filter(note=>note.type===role);
    const includedEqual=x.length===1&&y.length===1&&x[0].contentSignature===y[0].contentSignature&&maskedSourceFormatting(manifest.sources.before,x[0].source,manifest.formattingMask.effective)===maskedSourceFormatting(manifest.sources.after,y[0].source,manifest.formattingMask.effective);
    const redline=x.length===1&&y.length===1&&Boolean(x[0].specialRevisionShape)&&JSON.stringify(x[0].specialRevisionShape)===JSON.stringify(y[0].specialRevisionShape);
-   plan.specialChecks.push({part:action.part,role,before:x,after:y,includedEqual,redline});
-   if(!includedEqual&&!redline)plan.reasons.push('unsupported-paired-note-special');
+   // A separator that differs in a shape the redline cannot carry keeps the revised separator,
+   // like other excluded layout; it never blocks the tracked document.
+   plan.specialChecks.push({part:action.part,role,before:x,after:y,includedEqual,redline,...(!includedEqual&&!redline?{preserveAfter:true}:{})});
   }
  }
 
@@ -29,9 +30,14 @@ export function buildNoteProjection(manifest:DocumentComparisonManifest):NotePro
   if(!pair){pair={id,kind:(old??next)!.kind,before:old,after:next,decisionIds:[],coverage:{before:[],after:[]}};plan.pairs.push(pair);}return pair;
  };
  for(const check of plan.specialChecks??[])if(check.redline)add(check.before[0],check.after[0]);
+ // Note references by owning paragraph, in reference order.
+ const referencesByParagraph={before:new Map<string,typeof a.references>(),after:new Map<string,typeof b.references>()};
+ for(const [side,facts] of [['before',a],['after',b]] as const)for(const ref of facts.references){const id=JSON.stringify([ref.source.part,ref.source.objectEvent!.paragraphPath]);const list=referencesByParagraph[side].get(id);if(list)list.push(ref);else referencesByParagraph[side].set(id,[ref]);}
  const visit=(items:ComparisonDecision[])=>{for(const decision of items){visit(decision.children??[]);if(decision.type!=='paragraph'||decision.trackedRepresentation!=='revision')continue;
-  const refs=(side:'before'|'after')=>(side==='before'?a:b).references.filter(ref=>decision[side].some(parent=>parent.part===ref.source.part&&JSON.stringify(parent.path)===JSON.stringify(ref.source.objectEvent!.paragraphPath)));
-  const old=refs('before'),next=refs('after'),contexts=buildObjectEventContexts(manifest,decision,old.map(ref=>ref.source),next.map(ref=>ref.source));
+  const refs=(side:'before'|'after')=>{const owners=new Set(decision[side].map(parent=>JSON.stringify([parent.part,parent.path])));return (side==='before'?a:b).references.length&&owners.size?[...owners].some(id=>referencesByParagraph[side].has(id))?(side==='before'?a:b).references.filter(ref=>owners.has(JSON.stringify([ref.source.part,ref.source.objectEvent!.paragraphPath]))):[]:[];};
+  const old=refs('before'),next=refs('after');
+  if(!old.length&&!next.length)continue;
+  const contexts=buildObjectEventContexts(manifest,decision,old.map(ref=>ref.source),next.map(ref=>ref.source));
   // Refuse only boundary ordinals without a complete source-order schedule.
   if(decision.before.length===1&&decision.after.length===2){
    const boundary=decision.splitSlices![0][1];

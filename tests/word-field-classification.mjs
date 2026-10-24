@@ -16,14 +16,21 @@ try:
 except ValueError as e:assert 'not supported' in str(e)
 m=worklazyComparisonManifestJson(a,b,False,True,True)
 # This checkpoint annotates fields without changing their cached-text decisions.
-# Existing opaque-field rebuild limit remains fail-closed until P.
-# Simple field wrappers also carry opaque structure; changing their cache must
-# fail closed until the output event codec supports it.
+# A changed simple-field cache cannot be revised run by run inside the wrapper, so the
+# paragraph is recorded whole: the original deleted and the revision inserted, each
+# keeping its own field wrapper, so Accept All and Reject All both keep the field.
 for side,value in [('before','Old'),('after','New')]:
     with zipfile.ZipFile('/simple-'+side+'.docx','w') as z:z.writestr('word/document.xml','<w:document xmlns:w="'+WORD_NS+'"><w:body><w:p><w:fldSimple w:instr="DOCPROPERTY Title"><w:r><w:t>'+value+'</w:t></w:r></w:fldSimple></w:p></w:body></w:document>')
-try:
-    generate_tracked_document('/simple-before.docx','/simple-after.docx','/unsafe.docx','field',False,True,True);raise AssertionError('simple field lost its wrapper')
-except ValueError as e:assert 'UNSUPPORTED_TRACKED_SOURCE' in str(e)
+generate_tracked_document('/simple-before.docx','/simple-after.docx','/simple-tracked.docx','field',False,True,True)
+with zipfile.ZipFile('/simple-tracked.docx') as z:tracked=ET.fromstring(z.read('word/document.xml'))
+fields=tracked.findall('.//'+W+'fldSimple')
+assert [field.get(W+'instr') for field in fields]==['DOCPROPERTY Title','DOCPROPERTY Title'],'simple field lost its wrapper'
+marked={('del' if field.find(W+'del') is not None else 'ins' if field.find(W+'ins') is not None else None):''.join(node.text or '' for node in field.iter() if node.tag in (W+'t',W+'delText')) for field in fields}
+assert marked=={'del':'Old','ins':'New'},marked
+assert all(field.find('.//'+W+'t') is None for field in fields if field.find(W+'del') is not None)
+accept_tracked_document('/simple-tracked.docx','/simple-accepted.docx')
+with zipfile.ZipFile('/simple-accepted.docx') as z:accepted=ET.fromstring(z.read('word/document.xml'))
+assert [''.join(node.text or '' for node in field.iter(W+'t')) for field in accepted.findall('.//'+W+'fldSimple')]==['New']
 # Unchanged fields may partition equivalent per-character formatting into
 # different runs. Preserve the revised wrapper without rejecting that copy.
 for side,runs in [('before','<w:r><w:t>Field</w:t></w:r><w:r><w:t xml:space="preserve"> result</w:t></w:r>'),('after','<w:r><w:t>Field result</w:t></w:r>')]:

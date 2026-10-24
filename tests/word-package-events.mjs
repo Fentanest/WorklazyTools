@@ -369,11 +369,18 @@ with zipfile.ZipFile('/history-after.docx') as source:entries={name:source.read(
 entries['word/document.xml']=entries['word/document.xml'].replace(b'</w:rPrChange>',b'<w:rPr/></w:rPrChange>')
 with zipfile.ZipFile('/malformed-history.docx','w') as output:
  for name,data in entries.items():output.writestr(name,data)
+# A refused export leaves no file; an export never copies the malformed payload (a paragraph
+# recorded whole carries the revision's accepted state) and keeps both endpoints exact.
 for formatting in [False,True]:
  if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
- try:generate_tracked_document('/history-before.docx','/malformed-history.docx','/bad.docx','events',formatting,True,True);raise AssertionError('malformed property history accepted')
- except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE' in str(error)
- assert not os.path.exists('/bad.docx')
+ try:generate_tracked_document('/history-before.docx','/malformed-history.docx','/bad.docx','events',formatting,True,True)
+ except ValueError as error:
+  assert 'UNSUPPORTED_TRACKED_SOURCE' in str(error);assert not os.path.exists('/bad.docx');continue
+ with zipfile.ZipFile('/bad.docx') as z:out=ET.fromstring(z.read('word/document.xml'))
+ assert all(len(change.findall(W+'rPr'))==1 for change in out.iter(W+'rPrChange')),'malformed property history copied'
+ accept_tracked_document('/bad.docx','/bad-accepted.docx')
+ assert view('/bad-accepted.docx')==view('/history-after.docx'),'malformed history accept view'
+ assert view('/bad.docx',True)==view('/history-before.docx'),'malformed history reject view'
 
 `);
 // W1 unmatched drawing restoration: use revised text styles, never vacuous
@@ -495,8 +502,8 @@ for context in ['body','cell','header','nested SDT']:
 }
 console.log('112 split drawing source/resource/style package targets +560 context negatives passed');
 py.runPython(String.raw`
-# Split support is source-bounded: do not silently discard other markers or
-# redistribute leaves between distinct content-control envelopes.
+# Run-level split is source-bounded: other markers, distinct content-control envelopes,
+# links and paragraph history are recorded as whole paragraphs instead, exact on both sides.
 for unsupported in ['bookmark','before-envelope','after-envelopes','hyperlink','paragraph-history']:
  first='First sentence. ';second='Second sentence.'
  before=p(text(first)+image_run('20','Arial','FF0000','en-US')+text(second));after=p(text(first))+p(image_run('40','Calibri','0000FF','ko-KR')+text(second))
@@ -506,14 +513,15 @@ for unsupported in ['bookmark','before-envelope','after-envelopes','hyperlink','
  if unsupported=='paragraph-history':after=after.replace('<w:p>','<w:p><w:pPr><w:rPr><w:ins w:id="17" w:author="Original author"/></w:rPr></w:pPr>',1)
  if unsupported=='hyperlink':before=p(link(first)+image_run('20','Arial','FF0000','en-US')+text(second))
  for side,body in [('before',before),('after',after)]:package('/unsafe-split-'+side+'.docx',body,OLDPNG,'https://same.example')
- if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
- try:generate_tracked_document('/unsafe-split-before.docx','/unsafe-split-after.docx','/bad.docx','events',False,True,True,None,requested_json);raise AssertionError(unsupported+' accepted')
- except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE' in str(error),(unsupported,str(error))
- assert not os.path.exists('/bad.docx')
+ generate_tracked_document('/unsafe-split-before.docx','/unsafe-split-after.docx','/replaced-split.docx','events',False,True,True,None,requested_json)
+ accept_tracked_document('/replaced-split.docx','/replaced-split-accepted.docx')
+ assert view('/replaced-split-accepted.docx')==view('/unsafe-split-after.docx'),(unsupported,'accept')
+ assert view('/replaced-split.docx',True)==view('/unsafe-split-before.docx'),(unsupported,'reject')
 `);
 py.runPython(String.raw`
-# The complete SDT ancestor envelope, not merely the immediate parent tag,
-# must remain representable. These are real source changes, not forged refs.
+# The complete SDT ancestor envelope, not merely the immediate parent tag, decides whether a
+# run-level split is representable. Envelope properties have no revision markup, so a changed
+# envelope keeps the revised one while its paragraphs are recorded whole, exact in text.
 def control(body,tag='stable',attrs='',content_attrs=''):
  return '<w:sdt'+attrs+'><w:sdtPr><w:tag w:val="'+tag+'"/></w:sdtPr><w:sdtContent'+content_attrs+'>'+body+'</w:sdtContent></w:sdt>'
 for mutation in ['tag','alias','lock','outer-tag','sdt-attribute','content-attribute','end-properties']:
@@ -529,10 +537,10 @@ for mutation in ['tag','alias','lock','outer-tag','sdt-attribute','content-attri
  else:old=old.replace('<w:sdtContent>','<w:sdtEndPr><w:rPr><w:b/></w:rPr></w:sdtEndPr><w:sdtContent>')
  for side,body in [('before',old),('after',new)]:package('/envelope-'+side+'.docx',body,OLDPNG,'https://same.example')
  for formatting in [False,True]:
-  if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
-  try:generate_tracked_document('/envelope-before.docx','/envelope-after.docx','/bad.docx','events',formatting,True,True,None,requested_json);raise AssertionError((mutation,'accepted'))
-  except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE' in str(error),(mutation,str(error))
-  assert not os.path.exists('/bad.docx')
+  generate_tracked_document('/envelope-before.docx','/envelope-after.docx','/envelope-out.docx','events',formatting,True,True,None,requested_json)
+  accept_tracked_document('/envelope-out.docx','/envelope-accepted.docx')
+  assert view('/envelope-accepted.docx')==view('/envelope-after.docx'),(mutation,'accept')
+  assert view('/envelope-out.docx',True)==view('/envelope-before.docx'),(mutation,'reject')
  # Save actual reviewer/source regressions independently of the invalid result.
  for side in ['before','after']:shutil.copyfile('/envelope-'+side+'.docx','/p-packages/envelope-'+mutation+'-'+side+'.docx')
 `);
@@ -648,10 +656,11 @@ for unsafe in ['unequal-control','outer-control','separate-controls','bookmark',
   before=before.replace('<w:p>','<w:p xmlns:test="urn:paragraph" xmlns:mc="'+MC+'" mc:Ignorable="test" test:state="original">')
   after=after.replace('<w:p>','<w:p xmlns:test="urn:paragraph" xmlns:mc="'+MC+'" mc:Ignorable="test" test:state="revised">')
  for side,body in [('before',before),('after',after)]:package('/unsafe-merge-'+side+'.docx',body,OLDPNG,'https://same.example')
- if os.path.exists('/bad.docx'):os.unlink('/bad.docx')
- try:generate_tracked_document('/unsafe-merge-before.docx','/unsafe-merge-after.docx','/bad.docx','events',False,True,True,None,requested_json);raise AssertionError(unsafe+' accepted')
- except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE_MERGE_ENVELOPE' in str(error),(unsafe,str(error))
- assert not os.path.exists('/bad.docx')
+ # Merge envelopes the run-level merge cannot carry are recorded as whole paragraphs.
+ generate_tracked_document('/unsafe-merge-before.docx','/unsafe-merge-after.docx','/replaced-merge.docx','events',False,True,True,None,requested_json)
+ accept_tracked_document('/replaced-merge.docx','/replaced-merge-accepted.docx')
+ assert view('/replaced-merge-accepted.docx')==view('/unsafe-merge-after.docx'),(unsafe,'accept')
+ assert view('/replaced-merge.docx',True)==view('/unsafe-merge-before.docx'),(unsafe,'reject')
 # Missing routing and missing matched-event consumption cannot silently emit.
 before=para(text('First sentence. ')+image_run('20','Arial','FF0000','ko-KR'),'left')+para(text('Second sentence.'),'right')
 after=para(text('First sentence. ')+image_run('40','Calibri','0000FF','ko-KR')+text('Second sentence.'),'center')
