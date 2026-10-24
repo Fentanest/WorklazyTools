@@ -73,6 +73,22 @@ root=ET.fromstring(entries['word/document.xml']);t=root.find('.//'+W+'tbl');old=
 with zipfile.ZipFile('/mixed-rows.docx','w') as z:
  for n,data in entries.items():z.writestr(n,data)
 accept_tracked_document('/mixed-rows.docx','/mixed-accepted.docx');assert endpoint('/mixed-accepted.docx')==endpoint(plain)
+# Valid row-content wrappers are not a fully accounted direct-row table.
+# Preserve each wrapper and its live row while accepting the direct deletion.
+for wrapper in ['sdt','customXml']:
+ root=ET.fromstring(entries['word/document.xml']);table=root.find('.//'+W+'tbl')
+ live=table.findall(W+'tr')[1];table.remove(live)
+ envelope=ET.SubElement(table,W+wrapper)
+ if wrapper=='sdt':
+  ET.SubElement(envelope,W+'sdtPr');content=ET.SubElement(envelope,W+'sdtContent')
+ else:content=envelope
+ live.find('.//'+W+'t').text='LIVE WRAPPED ROW';content.append(live)
+ accepted=ET.fromstring(_accept_xml(_serialize_xml(root)))
+ surviving=accepted.find('.//'+W+'tbl');assert surviving is not None,wrapper+' lost table'
+ assert surviving.find(W+'tr') is None,wrapper+' retained deleted direct row'
+ assert len(surviving.findall('.//'+W+'tr'))==1,wrapper+' lost wrapped row'
+ assert surviving.find(W+wrapper) is not None,wrapper+' lost envelope'
+ assert 'LIVE WRAPPED ROW' in ''.join(accepted.itertext()),wrapper+' lost live text'
 json.dumps(results)
 `));console.log(JSON.stringify(rows,null,2));
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/whole-table-packages',{recursive:true});for(const name of py.FS.readdir('/whole-artifacts').filter(n=>n.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/whole-table-packages/'+name,py.FS.readFile('/whole-artifacts/'+name));

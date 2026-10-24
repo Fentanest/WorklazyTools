@@ -193,10 +193,13 @@ def _accept_tree(parent):
         child = parent[index]
 
         # A formerly populated table whose every row is explicitly deleted has
-        # no surviving container. Never prune a source zero-row table here.
+        # no surviving container only for the fully accounted direct-row shape.
+        # Row wrappers (e.g. SDT/customXml) may hold live rows or other content;
+        # leave their container intact. Never prune a source zero-row table.
         if child.tag==W+'tbl':
             rows=child.findall(W+'tr')
-            if rows and all(_row_is_deleted(row) for row in rows):
+            if (rows and all(node.tag in {W+'tblPr', W+'tblGrid', W+'tr'} for node in child)
+                    and all(_row_is_deleted(row) for row in rows)):
                 parent.remove(child)
                 continue
 
