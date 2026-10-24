@@ -117,6 +117,21 @@ class _PackageGraph:
             if kind==R[1:-1]+'/hyperlink':
                 if old.get('TargetMode','') not in ('','Internal'):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
                 source,_,_=self.leaf_hyperlink(part,target)
+                # A paired link revision leaves an opposite empty hyperlink at a
+                # terminal endpoint. Only an already-declared whole deletion may
+                # import this leaf until a faithful paired representation exists.
+                decision=globals().get('_MANIFEST_ACTIVE_DECISION')
+                if decision is None and globals().get('_MANIFEST') is not None:
+                    raise ValueError('UNSUPPORTED_TRACKED_SOURCE_INTERNAL_LINK_REVISION')
+                if decision is not None:
+                    refs=decision.get('before',[]);terminal=False
+                    if decision.get('type')=='paragraph' and len(refs)==1 and not decision.get('after'):
+                        owner,index_path=_manifest_key(refs[0])
+                        parent=_MANIFEST_SOURCE_NODES.get(('before',(owner,index_path[:-1])))
+                        if part==owner=='word/document.xml' and parent is not None and parent.tag==W+'body' and index_path:
+                            following=list(parent)[index_path[-1]+1:]
+                            terminal=all(n.tag==W+'sectPr' for n in following)
+                    if not terminal:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_INTERNAL_LINK_REVISION')
             elif source not in self.before.namelist():raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RELATIONSHIP')
             if self.rel_path(source) in self.before.namelist():raise ValueError('UNSUPPORTED_TRACKED_SOURCE_RESOURCE_GRAPH')
             data=self.before.read(source); digest=hashlib.sha256(data).hexdigest()

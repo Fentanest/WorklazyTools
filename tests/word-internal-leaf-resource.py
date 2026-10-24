@@ -48,6 +48,13 @@ class LeafBoundaries(unittest.TestCase):
         self.assertEqual(len(graph.additions),1);name,data=next(iter(graph.additions.items()));self.assertEqual(data,self.before['word/target.xml']);self.assertEqual(graph.mime(name,graph.types),'application/xml')
         self.assertNotEqual(name,'word/target.xml');self.assertNotEqual(rid,'rLink');self.assertTrue(event(archive(self.before))['supported'])
         self.assertNotEqual(event(archive(self.before))['signature'],event(archive(self.after))['signature'])
+    def test_paired_revision_guard_without_changing_decision(self):
+        decision={'before':[{'path':[0]}],'after':[{'path':[0]}]};scope['_MANIFEST_ACTIVE_DECISION']=decision
+        try:
+            with self.assertRaisesRegex(ValueError,'UNSUPPORTED_TRACKED_SOURCE_INTERNAL_LINK_REVISION'):
+                self.copier(self.before).relationship('word/document.xml','rLink')
+            self.assertEqual(decision,{'before':[{'path':[0]}],'after':[{'path':[0]}]})
+        finally:scope['_MANIFEST_ACTIVE_DECISION']=None
     def test_renamed_resource_and_rid_identity(self):
         changed=patch(self.before,target='../customXml/data.xml');changed['customXml/data.xml']=changed.pop('word/target.xml')
         rels=ET.fromstring(changed['word/_rels/document.xml.rels']);next(n for n in rels if n.get('Id')=='rLink').set('Id','renamed');changed['word/_rels/document.xml.rels']=ET.tostring(rels)
