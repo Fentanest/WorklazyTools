@@ -192,6 +192,13 @@ def _inherit_mc_context(result, source):
 def _source_copy(source):
     origin = _MANIFEST_NODE_KEYS.get(source)
     result=_PACKAGE_GRAPH.copy(source, origin[1][0],_PACKAGE_GRAPH.output_owner) if _PACKAGE_GRAPH is not None and origin and origin[0] == "before" else copy.deepcopy(source)
+    if _MANIFEST is not None and origin and origin[0]=='before':
+        parents={child:parent for parent in result.iter() for child in parent}
+        for original,cloned in list(zip(source.iter(),result.iter())):
+            if not _is_note_event(original):continue
+            if _MANIFEST['options']['metadata']:
+                action=_note_action(original);cloned.set(W+'id',_NOTE_IDS[action['noteId']])
+            elif cloned in parents:parents[cloned].remove(cloned)
     return _inherit_mc_context(result,source)
 
 
@@ -773,7 +780,9 @@ def _whole_paragraph_revision(source, kind, writer):
             if position>cursor:paragraph.extend(_revision_containers(kind,tokens[cursor:position],writer,strip_history=True))
             for event in events.get(position,[]):
                 if _is_drawing_event(event):paragraph.append(_drawing_revision(event,"del",writer))
-                elif _is_note_event(event):paragraph.append(_note_event(event,"del",writer))
+                elif _is_note_event(event):
+                    if _MANIFEST["options"]["metadata"]:paragraph.append(_note_event(event,"del",writer))
+                    else:_consume_object(event)
             cursor=position
         return paragraph
 
@@ -862,13 +871,21 @@ def _linked_run(run, token):
     hyperlink=_source_copy(token["link"]);hyperlink[:]=[run];return hyperlink
 
 
+def _source_event_decision(source):
+    origin=_MANIFEST_NODE_KEYS.get(source)
+    if origin is None:raise ValueError('INVALID_COMPARISON_MANIFEST_OBJECT_SOURCE')
+    owner=_MANIFEST_EVENT_OWNERS.get(origin)
+    if owner is None:raise ValueError('INVALID_COMPARISON_MANIFEST_OBJECT_SOURCE')
+    return owner
+
+
 def _link_source_key(token):
     link=token.get("link")
     if link is None:return None
     origin=_MANIFEST_NODE_KEYS.get(link)
     if origin is None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_SOURCE")
     side,key=origin
-    entry=next((source for source in _MANIFEST_ACTIVE_DECISION.get("objectEvents",{}).get(side,[]) if _manifest_key(source)==key),None)
+    entry=next((source for source in _source_event_decision(link).get("objectEvents",{}).get(side,[]) if _manifest_key(source)==key),None)
     if entry is None:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_SOURCE")
     return origin[1]
 
@@ -880,6 +897,12 @@ def _note_action(source):
     if origin is None:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
     return next(item for item in _MANIFEST['noteProjection']['references'] if item.get(origin[0]) and _manifest_key(item[origin[0]])==origin[1])
 def _note_event(source,kind,writer):
+    if not _MANIFEST['options']['metadata']:
+        if kind!='ins':raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_SCOPE')
+        origin=_MANIFEST_NODE_KEYS[source];parent=_MANIFEST_SOURCE_NODES[(origin[0],(origin[1][0],origin[1][1][:-1]))]
+        run=ET.Element(W+'r');properties=parent.find(W+'rPr')
+        if properties is not None:run.append(copy.deepcopy(properties))
+        run.append(copy.deepcopy(source));_consume_object(source);return run
     action=_note_action(source);result=_drawing_revision(source,kind,writer)
     for node in result.iter():
         if _is_note_event(node):node.set(W+'id',_NOTE_IDS[action['noteId']])
@@ -906,7 +929,8 @@ def _drawing_revision(source, kind, writer):
     parent=_MANIFEST_SOURCE_NODES.get((origin[0],(origin[1][0],origin[1][1][:-1]))) if origin else None
     properties=parent.find(W+"rPr") if parent is not None and parent.tag==W+"r" else None
     if kind=="del" and origin:
-        projection=next((pair for pair in (_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents",{}).get("drawingProperties",[]) if _manifest_key(pair["before"])==origin[1]),None)
+        owner=_source_event_decision(source)
+        projection=next((pair for pair in owner.get("objectEvents",{}).get("drawingProperties",[]) if _manifest_key(pair["before"])==origin[1]),None)
         if projection is not None:
             after_ref=projection["after"]
             after_run=_MANIFEST_SOURCE_NODES.get(("after",(after_ref["part"],tuple(after_ref["objectEvent"]["runPath"]))))
@@ -919,7 +943,7 @@ def _drawing_revision(source, kind, writer):
             previous=value.find(W+"rPrChange/"+W+"rPr") if families and value is not None else None
             properties=previous if previous is not None else value
         else:
-            restore=next((entry for entry in (_MANIFEST_ACTIVE_DECISION or {}).get("objectEvents",{}).get("deletedDrawingStyles",[]) if _manifest_key(entry["before"])==origin[1]),None)
+            restore=next((entry for entry in owner.get("objectEvents",{}).get("deletedDrawingStyles",[]) if _manifest_key(entry["before"])==origin[1]),None)
             if restore is None:raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE")
             if restore["policy"]!="restore-before-unpaired":
                 after_run=_MANIFEST_SOURCE_NODES.get(("after",_manifest_key(restore["source"]))) if "source" in restore else None
@@ -1313,6 +1337,7 @@ _MANIFEST_ALLOWED_PROPERTIES = {}
 _MANIFEST_MERGE_SIDES = {}
 _MANIFEST_SYNTHETIC_TOKENS = {}
 _MANIFEST_OBJECT_EXPECTED = {}
+_MANIFEST_EVENT_OWNERS = {}
 _MANIFEST_OBJECT_CONSUMED = {}
 
 
@@ -2129,12 +2154,13 @@ def _install_manifest(manifest):
             _MANIFEST_DECISIONS.append(decision)
             visit(decision.get("children", []))
     visit(manifest["decisions"])
-    _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
+    _MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
     for decision in _MANIFEST_DECISIONS:
         for side in ("before","after"):
             for ref in decision.get("objectEvents",{}).get(side,[]):
                 event=ref["objectEvent"];key=(side,_manifest_key(ref))
                 if key in _MANIFEST_OBJECT_EXPECTED:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_EMISSION")
+                _MANIFEST_EVENT_OWNERS[key]=decision
                 _MANIFEST_OBJECT_EXPECTED[key]=set(range(event["start"],event["end"])) if event["kind"]=="hyperlink" and event["end"]>event["start"] else {None}
 
 
@@ -2814,4 +2840,4 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _MANIFEST_PROPERTY_USED = set()
         _MANIFEST_SOURCE_NODES = {}
         _MANIFEST_ALLOWED_PROPERTIES = {}
-        _MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
+        _MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()

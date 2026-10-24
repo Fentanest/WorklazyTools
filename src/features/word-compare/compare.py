@@ -593,6 +593,16 @@ def _iter_story_blocks(container):
 
 def _note_package_facts(archive,inventory):
     containers=[];errors=[]
+    import posixpath
+    main='word/_rels/document.xml.rels';relationships=[]
+    if main in archive.namelist():
+        relationships=ET.fromstring(archive.read(main))
+        for kind in ('footnote','endnote'):
+            refs=[rel for rel in relationships if rel.get('Type')=='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+kind+'s']
+            if len(refs)>1:errors.append('unsupported-note-part-path')
+            for rel in refs:
+                target=rel.get('Target','');part=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
+                if rel.get('TargetMode')=='External' or part!='word/'+kind+'s.xml' or part not in archive.namelist():errors.append('unsupported-note-part-path')
     def content_signature(node,part):
         import posixpath
         relpath=posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
@@ -621,6 +631,8 @@ def _note_package_facts(archive,inventory):
             containers.append({'source':{'part':part,'path':[index]},'kind':kind,'id':identity,'type':type_name})
             if type_name!='normal':containers[-1]['contentSignature']=content_signature(node,part)
     references=[{'source':source,'kind':source['objectEvent']['signature'],'id':source['objectEvent']['target']} for source in inventory if source.get('objectEvent',{}).get('kind')=='note']
+    for kind in ('footnote','endnote'):
+        if any(ref['kind']==kind for ref in references) and sum(rel.get('Type')=='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+kind+'s' for rel in relationships)!=1:errors.append('unsupported-note-part-path')
     for ref in references:
         if not any(note['kind']==ref['kind'] and note['id']==ref['id'] and note['type']=='normal' for note in containers):errors.append('missing-note-target')
     return {'policy':'worklazy-note-facts-1','containers':containers,'references':references,'errors':sorted(set(errors)), 'parts':[part for part in ('word/footnotes.xml','word/endnotes.xml') if part in archive.namelist()]}
