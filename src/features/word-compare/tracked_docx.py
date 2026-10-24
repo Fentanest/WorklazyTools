@@ -1346,7 +1346,6 @@ def _whole_table_revision(source, kind, writer):
     _consume_manifest_subtree("after" if kind == "ins" else "before", source)
     projection=_table_grid_projection(source)
     table = copy.deepcopy(source) if kind == "ins" else _accepted_copy(source)
-    if kind=="ins":_consume_copied_objects(source)
     if kind == "del":
         _restore_whole_properties(table, source, "tblPr")
         _restore_whole_properties(table, source, "tblGrid")
@@ -1365,6 +1364,10 @@ def _whole_table_revision(source, kind, writer):
         if kind == "del":
             _restore_whole_properties(row, original, "trPr")
             _revisionize_deleted_row(row, writer, original)
+        if kind=='ins':
+            originals=list(original.iter(W+'p'));parents={child:parent for parent in row.iter() for child in parent}
+            for paragraph,actual in zip(list(row.iter(W+'p')),originals):
+                parent=parents[paragraph];index=list(parent).index(paragraph);parent.remove(paragraph);parent.insert(index,_whole_paragraph_revision(actual,'ins',writer))
         _mark_row(row, kind, writer)
     return table
 
@@ -1653,6 +1656,10 @@ def _validate_manifest(before_path, after_path):
                 visit(root, [])
 
     ids = set()
+    if _MANIFEST['options']['tables']:
+        for side in ('before','after'):
+            for key,node in nodes[side].items():
+                if key[0]=='word/document.xml' and node.tag==W+'tbl' and not node.findall(W+'tr'):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_ZERO_ROW_TABLE')
     _validate_story_projection(story_facts,actual)
     _validate_note_projection(note_facts,actual)
     owners = {"before": {}, "after": {}}
@@ -1808,7 +1815,7 @@ def _validate_manifest(before_path, after_path):
                             for run in paragraph.findall(W+"r"):
                                 if any(child.tag not in {W+"rPr",W+"t",W+"tab",W+"br",W+"cr",W+"footnoteReference",W+"endnoteReference",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"} for child in run):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_SPLIT_ENVELOPE")
 
-                if any(parent["type"]=="table" and (parent.get("moved") or len(parent["before"])!=1 or len(parent["after"])!=1) and any(ref["part"]==key[0] and key[1][:len(ref["path"])]==tuple(ref["path"]) for ref in parent[side]) for parent in _MANIFEST_DECISIONS):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_TABLE_OBJECT_AXIS")
+                if any(parent["type"]=="table" and (parent.get("moved") or (len(parent["before"]),len(parent["after"])) not in {(1,1),(1,0),(0,1)}) and any(ref["part"]==key[0] and key[1][:len(ref["path"])]==tuple(ref["path"]) for ref in parent[side]) for parent in _MANIFEST_DECISIONS):raise ValueError("UNSUPPORTED_TRACKED_SOURCE_TABLE_OBJECT_AXIS")
                 declared = event_owner.get("objectEvents", {}).get(side)
                 if declared is not None:declared=[source for source in declared if source["part"]==key[0] and source["objectEvent"]["paragraphPath"]==list(key[1])]
                 expected = [source for source in actual[side].values() if source.get("objectEvent") and source["part"] == key[0] and source["objectEvent"]["paragraphPath"] == list(key[1])]

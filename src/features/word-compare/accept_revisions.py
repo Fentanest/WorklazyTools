@@ -192,6 +192,14 @@ def _accept_tree(parent):
     while index < len(parent):
         child = parent[index]
 
+        # A formerly populated table whose every row is explicitly deleted has
+        # no surviving container. Never prune a source zero-row table here.
+        if child.tag==W+'tbl':
+            rows=child.findall(W+'tr')
+            if rows and all(_row_is_deleted(row) for row in rows):
+                parent.remove(child)
+                continue
+
         if child.tag == W + "tr" and _row_is_deleted(child):
             parent.remove(child)
             continue
