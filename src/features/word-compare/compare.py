@@ -271,6 +271,49 @@ def _normalized_property_fact(tree, property_name, policy):
     return {"supported": supported, "unsupported": unsupported, "history": history}
 
 
+def _simple_vml_picture(node, archive=None, part=None):
+    """Bounded inline image shape (no controls, OLE, textbox or nested graph)."""
+    v='{urn:schemas-microsoft-com:vml}';o='{urn:schemas-microsoft-com:office:office}'
+    r='{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
+    if node.tag!=W+'pict' or node.attrib or [n.tag for n in node]!=[v+'shapetype',v+'shape']:return False
+    definition,shape=list(node);type_id=definition.get('id','');shape_id=shape.get('id','')
+    if not all(re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.-]*',value) for value in (type_id,shape_id)) or type_id==shape_id:return False
+    if definition.attrib!={'id':type_id,'coordsize':'21600,21600',o+'spt':'75','path':'m0,0l21600,0,21600,21600,0,21600xe'} or len(definition):return False
+    if set(shape.attrib)!={'id','type','style'} or shape.get('type')!='#'+type_id or [n.tag for n in shape]!=[v+'imagedata']:return False
+    styles={}
+    for declaration in shape.get('style','').strip().strip(';').split(';'):
+        pair=declaration.split(':')
+        if len(pair)!=2:return False
+        key,value=(p.strip() for p in pair)
+        if key in styles or key not in {'width','height'} or not re.fullmatch(r'(?:[0-9]+(?:\.[0-9]+)?)pt',value) or not 0<float(value[:-2])<10000:return False
+        styles[key]=value
+    if set(styles)!={'width','height'}:return False
+    image=shape[0]
+    if len(image) or set(image.attrib)-{r+'id',o+'title'} or not image.get(r+'id'):return False
+    if any((n.text or '').strip() or (n.tail or '').strip() for n in node.iter()):return False
+    if archive is None:return True
+    import posixpath
+    rel_path=posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
+    if rel_path not in archive.namelist() or '[Content_Types].xml' not in archive.namelist():return False
+    relationships=[n for n in ET.fromstring(archive.read(rel_path)) if n.get('Id')==image.get(r+'id')]
+    if len(relationships)!=1:return False
+    rel=relationships[0];target=rel.get('Target','')
+    if rel.get('Type')!=r[1:-1]+'/image' or rel.get('TargetMode','') not in ('','Internal') or not target or any(c in target for c in "\\:#?%"):return False
+    path=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
+    if path.startswith('../') or archive.namelist().count(path)!=1 or posixpath.join(posixpath.dirname(path),'_rels',posixpath.basename(path)+'.rels') in archive.namelist():return False
+    ct='{http://schemas.openxmlformats.org/package/2006/content-types}';types=ET.fromstring(archive.read('[Content_Types].xml'))
+    overrides=[n.get('ContentType') for n in types if n.tag==ct+'Override' and n.get('PartName')=='/'+path]
+    defaults=[n.get('ContentType') for n in types if n.tag==ct+'Default' and n.get('Extension','').lower()==posixpath.splitext(path)[1].lstrip('.').lower()]
+    if (overrides or defaults)!=['image/png']:return False
+    data=archive.read(path)
+    if len(data)<24 or data[:8]!=b'\x89PNG\r\n\x1a\n' or data[12:16]!=b'IHDR' or int.from_bytes(data[16:20],'big')==0 or int.from_bytes(data[20:24],'big')==0:return False
+    root=ET.fromstring(archive.read(part));ids=[n.get('id') for n in root.iter() if n.tag in {v+'shape',v+'shapetype'}]
+    pictures=[p for p in root.iter(W+'pict') if any(n.tag==v+'shape' and n.get('id')==shape_id for n in p)]
+    if len(pictures)!=1:return False
+    parents={child:parent for parent in root.iter() for child in parent};run=parents.get(pictures[0]);paragraph=parents.get(run)
+    return ids.count(type_id)==ids.count(shape_id)==1 and run is not None and run.tag==W+'r' and paragraph is not None and paragraph.tag==W+'p'
+
+
 def _source_paths(root, part, archive=None):
     result = {}
     offsets = {}
@@ -362,7 +405,8 @@ def _source_paths(root, part, archive=None):
             office=('http://schemas.openxmlformats.org/','urn:schemas-microsoft-com:','http://schemas.microsoft.com/office/')
             if any(n.tag.startswith(tuple('{'+uri for uri in office)) or any(a.startswith('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}') for a in n.attrib) for n in root.iter()):return None
             return data
-        supported = True
+        supported = node.tag!=W+"pict" or _simple_vml_picture(node,archive,part)
+        vml_picture=node.tag==W+"pict" and supported
         has_image = False
         target = ""
         def canonical_event(item):
@@ -371,13 +415,16 @@ def _source_paths(root, part, archive=None):
             for name, value in sorted(item.attrib.items()):
                 if item.tag == "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr" and name == "id": continue
                 if name.startswith("xmlns:"):continue
+                if vml_picture and item.tag in {"{urn:schemas-microsoft-com:vml}shape","{urn:schemas-microsoft-com:vml}shapetype"}:
+                    if name=="id":continue
+                    if name=="type":value="#picture-type"
                 if name.startswith("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"):
                     relationship = rels.get(value)
                     if relationship is None: supported = False
                     else:
                         kind, mode, destination = relationship.get("Type", ""), relationship.get("TargetMode", ""), relationship.get("Target", "")
                         if item.tag==W+"hyperlink" and kind!=relationship_base+"hyperlink":supported=False
-                        if item.tag=="{http://schemas.openxmlformats.org/drawingml/2006/main}blip" and kind!=relationship_base+"image":supported=False
+                        if item.tag in {"{http://schemas.openxmlformats.org/drawingml/2006/main}blip","{urn:schemas-microsoft-com:vml}imagedata"} and kind!=relationship_base+"image":supported=False
                         if kind==relationship_base+"image":has_image=True
                         if kind not in {relationship_base+"image",relationship_base+"hyperlink"}: supported = False
                         if mode == "External": value = json.dumps([kind, mode, destination]); target = destination
@@ -397,7 +444,7 @@ def _source_paths(root, part, archive=None):
         value = canonical_event(normalized)
         if node.tag == W + "hyperlink" and (node.get(W + "anchor") or node.find('.//' + W + 'drawing') is not None or any(child.tag!=W+"r" for child in node)): supported = False
         if node.tag != W + "hyperlink" and not has_image:supported=False
-        if node.find('.//'+W+'pict') is not None:supported=False
+        if node.tag!=W+'pict' and node.find('.//'+W+'pict') is not None:supported=False
         return hashlib.sha256(json.dumps(value, ensure_ascii=False).encode()).hexdigest(), supported, target
     for paragraph in root.iter(W + "p"):
         cursor = [0]; events = []
@@ -408,7 +455,7 @@ def _source_paths(root, part, archive=None):
                 if archive is None or "word/"+kind+"s.xml" not in archive.namelist():return
                 event={"kind":"note","start":cursor[0],"end":cursor[0],"signature":kind,"supported":True,"target":node.get(W+"id",""),"paragraphPath":result[id(paragraph)]["path"],"runPath":result[id(node)]["path"][:-1]}
                 result[id(node)]["objectEvent"]=event;events.append(event);return
-            if node.tag in {W + "drawing", W + "hyperlink", "{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:
+            if node.tag in {W + "drawing", W + "pict", W + "hyperlink", "{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:
                 start = cursor[0]
                 if node.tag == W + "hyperlink":
                     for child in node: event_walk(child)

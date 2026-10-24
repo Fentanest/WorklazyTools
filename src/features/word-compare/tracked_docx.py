@@ -54,11 +54,13 @@ class _PackageGraph:
         self.types = ET.fromstring(after.read('[Content_Types].xml')) if '[Content_Types].xml' in after.namelist() else ET.Element(CT+'Types')
         self.before_types = ET.fromstring(before.read('[Content_Types].xml')) if '[Content_Types].xml' in before.namelist() else ET.Element(CT+'Types')
         self.names = set(after.namelist()); self.next_drawing_id = 1
+        self.vml_ids=set();self.next_vml_id=1
         for part in after.namelist():
             if part.startswith('word/media/'):
                 self.media[(hashlib.sha256(after.read(part)).hexdigest(),self.mime(part,self.types))] = part
             if part in self.story_parts:
                 for node in ET.fromstring(after.read(part)).iter():
+                    if node.tag in {'{urn:schemas-microsoft-com:vml}shape','{urn:schemas-microsoft-com:vml}shapetype'} and node.get('id'):self.vml_ids.add(node.get('id'))
                     if node.tag=='{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr' and node.get('id','').isdigit(): self.next_drawing_id = max(self.next_drawing_id,int(node.get('id'))+1)
     def add_note_part(self, part, kind):
         self.names.add(part)
@@ -160,6 +162,14 @@ class _PackageGraph:
         return rid
     def copy(self, source, part, output_owner=None):
         result=copy.deepcopy(source)
+        for picture in result.iter(W+'pict'):
+            if not _simple_vml_picture(picture,self.before,part):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_VML_PICTURE')
+            definition,shape=list(picture);remapped={}
+            for item in (definition,shape):
+                while 'worklazy_vml_'+str(self.next_vml_id) in self.vml_ids:self.next_vml_id+=1
+                value='worklazy_vml_'+str(self.next_vml_id);self.next_vml_id+=1;self.vml_ids.add(value)
+                remapped[item.get('id')]=value;item.set('id',value)
+            shape.set('type','#'+remapped[shape.get('type')[1:]])
         for node in result.iter():
             for name,value in list(node.attrib.items()):
                 if name.startswith(R):node.set(name,self.relationship(part,value,output_owner))
@@ -533,6 +543,7 @@ def _block_kind(element):
 
 def _is_drawing_event(node):
     if node.tag == W + "drawing":return True
+    if node.tag == W + "pict":return _simple_vml_picture(node)
     if node.tag!="{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent":return False
     origin=_MANIFEST_NODE_KEYS.get(node)
     if origin is None:return False
@@ -2587,7 +2598,7 @@ def _revisionize_xml_part(before_data, after_data, include_formatting, writer, c
         if _PACKAGE_GRAPH is not None:_PACKAGE_GRAPH.output_owner=previous_owner
 
 def _validate_imported_note(original,include_tables):
-    if any(_is_note_event(node) or node.tag in {W+'numPr',W+'pict',W+'object',W+'sdt',W+'bookmarkStart',W+'bookmarkEnd'} or (node.tag==W+'tbl' and not include_tables) or (node.tag==W+'hyperlink' and node.get(W+'anchor')) for node in original.iter()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_DEPENDENCY')
+    if any(_is_note_event(node) or node.tag in {W+'numPr',W+'object',W+'sdt',W+'bookmarkStart',W+'bookmarkEnd'} or (node.tag==W+'pict' and not _simple_vml_picture(node)) or (node.tag==W+'tbl' and not include_tables) or (node.tag==W+'hyperlink' and node.get(W+'anchor')) for node in original.iter()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_DEPENDENCY')
     styles=ET.fromstring(_PACKAGE_GRAPH.after.read('word/styles.xml')) if 'word/styles.xml' in _PACKAGE_GRAPH.after.namelist() else ET.Element(W+'styles');style_ids={node.get(W+'styleId') for node in styles.findall(W+'style')}
     if any(node.get(W+'val') not in style_ids for node in original.iter() if node.tag in {W+'pStyle',W+'rStyle'}):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_STYLE')
 
