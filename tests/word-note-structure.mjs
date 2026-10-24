@@ -75,14 +75,36 @@ for(const result of results.filter(result=>result.pass)){const axis=result.name.
 console.log(JSON.stringify(results,null,2));
 assert.equal(results.filter(result=>!result.pass).length,0);
 py.runPython(`
+def special_graph(path,kind):
+ with zipfile.ZipFile(path) as z:
+  part='word/'+kind+'s.xml';root=ET.fromstring(z.read(part))
+  relpath='word/_rels/'+kind+'s.xml.rels';rels={r.get('Id'):r.get('Target') for r in ET.fromstring(z.read(relpath))} if relpath in z.namelist() else {}
+  def canonical(node):return None if node is None or (node.tag in {W+'pPr',W+'rPr'} and not node.attrib and not list(node)) else (node.tag,sorted(node.attrib.items()),node.text or '',[canonical(c) for c in node])
+  result=[]
+  for special in root:
+   if special.get(W+'type','normal')=='normal':continue
+   paragraphs=[]
+   for p in special.findall(W+'p'):
+    chars=[(c,canonical(r.find(W+'rPr'))) for r in p.iter(W+'r') for c in _element_text(r)]
+    controls=[canonical(c) for c in p.iter() if c.tag in {W+'separator',W+'continuationSeparator',W+'continuationNotice'}]
+    links=[(rels.get(link.get(R+'id')),_element_text(link)) for link in p.iter(W+'hyperlink')]
+    paragraphs.append((canonical(p.find(W+'pPr')),chars,controls,links))
+   result.append((special.get(W+'type'),paragraphs))
+  return result
 checks=0
 for kind in ['footnote','endnote']:
- for scenario in ['renumber','properties-off','properties-on','properties-mask','role','missing','text','metadata-off','volatile-rel']:
+ for scenario in ['renumber','properties-off','properties-on','properties-mask','role','missing','text','metadata-off','volatile-rel','control-style','control-mixed','duplicate','control-missing','negative-ids']:
   before_special=note(77,'Separator',kind,'separator').replace('</w:p>','<w:r><w:'+('separator')+'/></w:r></w:p>')
   after_special=before_special.replace('w:id="77"','w:id="88"')
+  if scenario=='negative-ids':
+   before_special=before_special.replace('w:id="77"','w:id="-1"');after_special=after_special.replace('w:id="88"','w:id="-9"')
   if scenario.startswith('properties'):after_special=after_special.replace('<w:r><w:t>','<w:r><w:rPr><w:sz w:val="40"/></w:rPr><w:t>')
   if scenario in ['role','metadata-off']:after_special=after_special.replace('separator','continuationSeparator')
   if scenario=='text':after_special=after_special.replace('Separator','CHANGED SEPARATOR')
+  if scenario=='control-style':after_special=after_special.replace('<w:r><w:separator/>','<w:r><w:rPr><w:sz w:val="40"/></w:rPr><w:separator/>')
+  if scenario=='control-mixed':after_special=after_special.replace('<w:r><w:separator/></w:r>','').replace('<w:t>Separator','<w:separator/><w:t>Separator')
+  if scenario=='control-missing':after_special=after_special.replace('<w:r><w:separator/></w:r>','')
+  if scenario=='duplicate':after_special+=after_special.replace('w:id="88"','w:id="89"')
   if scenario=='volatile-rel':
    before_special=before_special.replace('</w:p>','<w:hyperlink r:id="rIdShared">'+run('Link')+'</w:hyperlink></w:p>')
    after_special=before_special.replace('w:id="77"','w:id="88"').replace('rIdShared','rIdRenumbered')
@@ -95,16 +117,34 @@ for kind in ['footnote','endnote']:
     for n,data in entries.items():z.writestr(n,data)
   select_size(scenario!='properties-mask')
   mask={name:True for name in ['fontFamily','size','style','color','paragraph','numbering']};mask['size']=scenario!='properties-mask'
-  supported=scenario in ['renumber','properties-off','properties-mask','metadata-off','volatile-rel'];formatting=scenario!='properties-off';metadata=scenario!='metadata-off'
+  supported=scenario in ['negative-ids','renumber','properties-off','properties-on','properties-mask','text','metadata-off','volatile-rel'];formatting=scenario!='properties-off';metadata=scenario!='metadata-off'
   if os.path.exists('/paired-special-out.docx'):os.unlink('/paired-special-out.docx')
   try:
    generate_tracked_document('/paired-special-before.docx','/paired-special-after.docx','/paired-special-out.docx','events',formatting,True,metadata,formatting_mask_json=json.dumps(mask))
    assert supported,(scenario,'unsafe included special difference exported')
    accept_tracked_document('/paired-special-out.docx','/paired-special-accepted.docx')
    assert note_graph('/paired-special-accepted.docx',kind)==note_graph('/paired-special-after.docx',kind)
-   with zipfile.ZipFile('/paired-special-out.docx') as z,zipfile.ZipFile('/paired-special-after.docx') as after:
-    special=lambda data:[ET.tostring(n) for n in ET.fromstring(data) if n.get(W+'type','normal')!='normal']
-    assert special(z.read('word/'+kind+'s.xml'))==special(after.read('word/'+kind+'s.xml'))
+   with zipfile.ZipFile('/paired-special-out.docx') as source,zipfile.ZipFile('/paired-special-rejected.docx','w') as output:
+    for entry in source.infolist():output.writestr(entry,_serialize_xml(reject(_qname_safe_parse(source.read(entry.filename)))[0]) if entry.filename in ['word/document.xml','word/'+kind+'s.xml'] else source.read(entry.filename))
+   assert special_graph('/paired-special-accepted.docx',kind)==special_graph('/paired-special-after.docx',kind),(kind,scenario,'accept special')
+   target='after' if scenario in ['properties-off','properties-mask','metadata-off','volatile-rel'] else 'before'
+   assert special_graph('/paired-special-rejected.docx',kind)==special_graph('/paired-special-'+target+'.docx',kind),(kind,scenario,'reject special',special_graph('/paired-special-rejected.docx',kind),special_graph('/paired-special-'+target+'.docx',kind))
+   if scenario in ['text','properties-on']:
+    a=extract_document_model(open('/paired-special-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/paired-special-after.docx','rb').read(),True,True,'en');manifest=json.loads(worklazyComparisonManifestJson(a,b,formatting,True,metadata))
+    check=manifest['noteProjection']['specialChecks'][0];assert check['redline'] and not check['includedEqual']
+    pair=next(pair for pair in manifest['noteProjection']['pairs'] if pair['before']['type']=='separator');assert pair['decisionIds'] and pair['before']['id']!=pair['after']['id']
+    decision=next(d for d in manifest['decisions'] if d['id']==pair['decisionIds'][0]);assert decision['beforeText']=='Separator' and decision['afterText']==('CHANGED SEPARATOR' if scenario=='text' else 'Separator')
+    for defect in ['omit-pair','false-redline','false-equal','source-shape','omit-decision']:
+     bad=copy.deepcopy(manifest)
+     if defect=='omit-pair':bad['noteProjection']['pairs'].remove(next(p for p in bad['noteProjection']['pairs'] if p['before']['type']=='separator'))
+     elif defect=='false-redline':bad['noteProjection']['specialChecks'][0]['redline']=False
+     elif defect=='false-equal':bad['noteProjection']['specialChecks'][0]['includedEqual']=True
+     elif defect=='source-shape':bad['noteFacts']['before']['containers'][0]['specialRevisionShape']=[]
+     else:bad['decisions']=[d for d in bad['decisions'] if d['id']!=pair['decisionIds'][0]]
+     if os.path.exists('/bad-special.docx'):os.unlink('/bad-special.docx')
+     try:generate_tracked_document('/paired-special-before.docx','/paired-special-after.docx','/bad-special.docx','events',formatting,True,metadata,json.dumps(bad),json.dumps(mask));raise AssertionError(defect+' exported')
+     except ValueError:assert not os.path.exists('/bad-special.docx')
+
   except ValueError as error:
    assert not supported,(scenario,str(error))
    assert str(error)=='UNSUPPORTED_TRACKED_SOURCE_NOTE_SPECIAL' and not os.path.exists('/paired-special-out.docx')
@@ -120,7 +160,7 @@ for kind in ['footnote','endnote']:
     except ValueError:assert not os.path.exists('/paired-special-out.docx')
   for side in ['before','after']:shutil.copyfile('/paired-special-'+side+'.docx','/note-structure/'+kind+'-special-'+scenario+'-'+side+'.docx')
   if supported:
-   for side in ['out','accepted']:shutil.copyfile('/paired-special-'+side+'.docx','/note-structure/'+kind+'-special-'+scenario+'-'+side+'.docx')
+   for side in ['out','accepted','rejected']:shutil.copyfile('/paired-special-'+side+'.docx','/note-structure/'+kind+'-special-'+scenario+'-'+side+'.docx')
   checks+=1
 select_size(True)
 # The terminal-deletion codec admits reference payload only INSIDE deletion.
@@ -130,7 +170,7 @@ for kind in ['footnote','endnote']:
   data=('<w:document xmlns:w="'+WNS+'"><w:body>'+body+'</w:body></w:document>').encode()
   root=ET.fromstring(_accept_xml(data));assert len(root.find(W+'body'))==(1 if protected else 0)
 `);
-console.log('18 paired special-role/property/mask/ID/resource scope cases +24 forged guards +4 terminal-marker codec targets passed');
+console.log('28 paired special-role/property/mask/ID/resource scope cases +36 forged guards +20 forged redline actions +4 terminal-marker codec targets passed');
 
 fs.mkdirSync('docs/jobs/todo/diffchecker-port-20261023/note-structure',{recursive:true});
 for(const name of py.FS.readdir('/note-structure').filter(name=>name.endsWith('.docx')))fs.writeFileSync('docs/jobs/todo/diffchecker-port-20261023/note-structure/'+name,py.FS.readFile('/note-structure/'+name));

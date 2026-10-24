@@ -1595,7 +1595,9 @@ def _validate_note_projection(facts,actual):
                 if check.get(side)!=expected:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
             old,new=check['before'],check['after']
             equal=len(old)==len(new)==1 and old[0]['contentSignature']==new[0]['contentSignature'] and selected('before',old[0])==selected('after',new[0])
-            if check.get('includedEqual') is not equal or not equal:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_SPECIAL')
+            redline=len(old)==len(new)==1 and bool(old[0].get('specialRevisionShape')) and old[0].get('specialRevisionShape')==new[0].get('specialRevisionShape')
+            if check.get('includedEqual') is not equal or check.get('redline') is not redline:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
+            if not equal and not redline:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_NOTE_SPECIAL')
         required={(action['part'],note['type']) for action in expected_parts if action['before'] and action['after'] for side in ('before','after') for note in facts[side]['containers'] if note['source']['part']==action['part'] and note['type']!='normal'}
         if covered!=required:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_SPECIAL')
 
@@ -1612,7 +1614,7 @@ def _validate_note_projection(facts,actual):
         for side,note in [('before',old),('after',new)]:
             if note is None:continue
             key=_manifest_key(note['source'])
-            if note not in facts[side]['containers'] or note['type']!='normal' or key in owned[side]:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_OWNER')
+            if note not in facts[side]['containers'] or (note['type']!='normal' and not any(check.get('redline') and check[side]==[note] for check in plan['specialChecks'])) or key in owned[side]:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_OWNER')
             owned[side].add(key)
         decisions=[decision for decision in _MANIFEST_DECISIONS if any(ref['part']==note['source']['part'] and ref['path'][:1]==note['source']['path'] for side,note in [('before',old),('after',new)] if note for ref in decision[side])]
         if pair['decisionIds']!=[decision['id'] for decision in decisions]:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
@@ -1640,9 +1642,11 @@ def _validate_note_projection(facts,actual):
     for pair in pairs:
         if pair['id'] not in referenced_pairs:
             old,new=pair.get('before'),pair.get('after')
-            if not old or not new or old['id']!=new['id'] or old['source']!=new['source'] or any(item['kind']==note['kind'] and item['id']==note['id'] for side,note in [('before',old),('after',new)] for item in facts[side]['references']):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+            if old and new and old['type']!='normal':
+                if old['type']!=new['type'] or not any(check.get('redline') and check['before']==[old] and check['after']==[new] for check in plan['specialChecks']):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
+            elif not old or not new or old['id']!=new['id'] or old['source']!=new['source'] or any(item['kind']==note['kind'] and item['id']==note['id'] for side,note in [('before',old),('after',new)] for item in facts[side]['references']):raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_REFERENCE')
     for side in ('before','after'):
-        if used_refs[side]!={_manifest_key(ref['source']) for ref in facts[side]['references']} or owned[side]!={_manifest_key(note['source']) for note in facts[side]['containers'] if note['type']=='normal'}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
+        if used_refs[side]!={_manifest_key(ref['source']) for ref in facts[side]['references']} or owned[side]!={_manifest_key(note['source']) for note in facts[side]['containers'] if note['type']=='normal' or any(check.get('redline') and check[side]==[note] for check in plan['specialChecks'])}:raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
 
 def _validate_manifest(before_path, after_path):
     """Validate ownership against raw input, without choosing correspondences."""
@@ -1802,7 +1806,7 @@ def _validate_manifest(before_path, after_path):
                     raise ValueError("INVALID_COMPARISON_MANIFEST_EXCLUSION")
                 continue
             special=next((note for note in note_facts[side]['containers'] if note['type']!='normal' and note['source']['part']==key[0] and tuple(note['source']['path'])==key[1][:1]),None)
-            if special:
+            if special and not any(pair.get(side)==special for pair in _MANIFEST['noteProjection']['pairs']):
                 imported=side=='before' and any(action['create'] and special in action['specials'] for action in _MANIFEST['noteProjection'].get('partActions',[]))
                 if item['disposition']!=('note-special' if imported else 'preserve-after') or item.get('reason')!='note-separator':raise ValueError('INVALID_COMPARISON_MANIFEST_NOTE_COVERAGE')
                 continue

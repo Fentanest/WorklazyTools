@@ -704,7 +704,23 @@ def _note_package_facts(archive,inventory):
             if type_name=='normal' and (identity in ids or not identity.lstrip('-').isdigit()):errors.append('invalid-note-id')
             if type_name=='normal':ids.add(identity)
             containers.append({'source':{'part':part,'path':[index]},'kind':kind,'id':identity,'type':type_name})
-            if type_name!='normal':containers[-1]['contentSignature']=content_signature(node,part)
+            if type_name!='normal':
+                containers[-1]['contentSignature']=content_signature(node,part)
+                # Finite text/property redline shape: one plain paragraph with
+                # unchanged isolated terminal special-control runs.
+                paragraphs=list(node);controls=[];valid=len(paragraphs)==1 and paragraphs[0].tag==W+'p' and not paragraphs[0].attrib and set(node.attrib)<={W+'id',W+'type'}
+                if valid:
+                    seen_control=False
+                    for run in paragraphs[0]:
+                        if run.tag==W+'pPr':continue
+                        if run.tag!=W+'r' or run.attrib:valid=False;break
+                        children=[child for child in run if child.tag!=W+'rPr']
+                        if len(children)==1 and children[0].tag in {W+'separator',W+'continuationSeparator',W+'continuationNotice'} and not children[0].attrib and not list(children[0]) and not (children[0].text or '').strip():
+                            if run.find(W+'rPr') is not None:valid=False;break
+                            seen_control=True;controls.append(children[0].tag)
+                        elif seen_control or any(child.tag!=W+'t' for child in children):valid=False;break
+                if valid and identity.lstrip('-').isdigit() and type_name in {'separator','continuationSeparator'} and _text(node).strip() and controls==[W+type_name]:containers[-1]['specialRevisionShape']=controls
+
     references=[{'source':source,'kind':source['objectEvent']['signature'],'id':source['objectEvent']['target']} for source in inventory if source.get('objectEvent',{}).get('kind')=='note']
     for kind in ('footnote','endnote'):
         if any(ref['kind']==kind for ref in references) and sum(rel.get('Type')=='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+kind+'s' for rel in relationships)!=1:errors.append('unsupported-note-part-path')
@@ -906,17 +922,20 @@ def _parse_document(data, include_tables, include_metadata):
                 story_numbering = numbering.fresh()
                 for note_index, note in enumerate(notes_root.findall(W + element_name), 1):
                     note_id = note.attrib.get(W + "id", str(note_index))
-                    if note.get(W+"type","normal")!="normal":continue
+                    if note.get(W+"type","normal")!="normal" and not any(_text(p).strip() for p in note.iter(W+"p")):continue
                     try:
-                        if int(note_id) < 0:
+                        if int(note_id) < 0 and note.get(W+"type","normal")=="normal":
                             continue
                     except ValueError:
                         pass
+                    role=note.get(W+'type','normal')
+                    special_label={'separator':_l('구분선','separator'),'continuationSeparator':_l('연속 구분선','continuation separator'),'continuationNotice':_l('연속 알림','continuation notice')}.get(role)
+                    display_id=special_label or note_id
                     for paragraph_index, paragraph in enumerate(note.iter(W + "p"), 1):
                         record = _paragraph_record(
                             paragraph,
                             "note",
-                            _l(f"{note_name} {note_id} · {paragraph_index}번째 문단", f"{note_name} {note_id} · paragraph {paragraph_index}"),
+                            _l(f"{note_name} {display_id} · {paragraph_index}번째 문단", f"{note_name} {display_id} · paragraph {paragraph_index}"),
                             story_numbering,
                         )
                         record["source"] = note_sources[id(paragraph)]

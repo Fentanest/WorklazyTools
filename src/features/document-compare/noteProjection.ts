@@ -1,10 +1,10 @@
 import {maskedSourceFormatting} from './formattingMask.ts';
 import {buildObjectEventContexts,eventPosition} from './objectEventContext.ts';
 import type {ComparisonDecision,DocumentComparisonManifest,DocumentSourceReference} from './comparisonManifest.ts';
-export interface NoteContainer {source:DocumentSourceReference;kind:string;id:string;type:string;contentSignature?:string}
+export interface NoteContainer {source:DocumentSourceReference;kind:string;id:string;type:string;contentSignature?:string;specialRevisionShape?:string[]}
 export interface NoteFacts {policy:'worklazy-note-facts-1';parts:string[];containers:NoteContainer[];references:Array<{source:DocumentSourceReference;kind:string;id:string}>;errors:string[]}
 export interface NotePair {id:string;kind:string;before?:NoteContainer;after?:NoteContainer;decisionIds:string[];coverage:{before:DocumentSourceReference[];after:DocumentSourceReference[]}}
-export interface NoteProjection {policy:'worklazy-note-projection-1';supported:boolean;reasons:string[];pairs:NotePair[];specialChecks?:Array<{part:string;role:string;before:NoteContainer[];after:NoteContainer[];includedEqual:boolean}>;partActions?:Array<{part:string;kind:string;before:boolean;after:boolean;create:boolean;specials:NoteContainer[]}>;references:Array<{decisionId:string;before?:DocumentSourceReference;after?:DocumentSourceReference;noteId:string}>}
+export interface NoteProjection {policy:'worklazy-note-projection-1';supported:boolean;reasons:string[];pairs:NotePair[];specialChecks?:Array<{part:string;role:string;before:NoteContainer[];after:NoteContainer[];includedEqual:boolean;redline:boolean}>;partActions?:Array<{part:string;kind:string;before:boolean;after:boolean;create:boolean;specials:NoteContainer[]}>;references:Array<{decisionId:string;before?:DocumentSourceReference;after?:DocumentSourceReference;noteId:string}>}
 const key=(ref:DocumentSourceReference)=>JSON.stringify([ref.part,ref.path]);
 export function buildNoteProjection(manifest:DocumentComparisonManifest):NoteProjection {
  const a=manifest.noteFacts.before,b=manifest.noteFacts.after,plan:NoteProjection={policy:'worklazy-note-projection-1',supported:true,reasons:[],pairs:[],references:[]};
@@ -18,8 +18,9 @@ export function buildNoteProjection(manifest:DocumentComparisonManifest):NotePro
   for(const role of new Set([...old,...next].map(note=>note.type))){
    const x=old.filter(note=>note.type===role),y=next.filter(note=>note.type===role);
    const includedEqual=x.length===1&&y.length===1&&x[0].contentSignature===y[0].contentSignature&&maskedSourceFormatting(manifest.sources.before,x[0].source,manifest.formattingMask.effective)===maskedSourceFormatting(manifest.sources.after,y[0].source,manifest.formattingMask.effective);
-   plan.specialChecks.push({part:action.part,role,before:x,after:y,includedEqual});
-   if(!includedEqual)plan.reasons.push('unsupported-paired-note-special');
+   const redline=x.length===1&&y.length===1&&Boolean(x[0].specialRevisionShape)&&JSON.stringify(x[0].specialRevisionShape)===JSON.stringify(y[0].specialRevisionShape);
+   plan.specialChecks.push({part:action.part,role,before:x,after:y,includedEqual,redline});
+   if(!includedEqual&&!redline)plan.reasons.push('unsupported-paired-note-special');
   }
  }
 
@@ -27,6 +28,7 @@ export function buildNoteProjection(manifest:DocumentComparisonManifest):NotePro
   const id='note:'+JSON.stringify([old?.source??null,next?.source??null]);let pair=plan.pairs.find(pair=>pair.id===id);
   if(!pair){pair={id,kind:(old??next)!.kind,before:old,after:next,decisionIds:[],coverage:{before:[],after:[]}};plan.pairs.push(pair);}return pair;
  };
+ for(const check of plan.specialChecks??[])if(check.redline)add(check.before[0],check.after[0]);
  const visit=(items:ComparisonDecision[])=>{for(const decision of items){visit(decision.children??[]);if(decision.type!=='paragraph'||decision.trackedRepresentation!=='revision')continue;
   const refs=(side:'before'|'after')=>(side==='before'?a:b).references.filter(ref=>decision[side].some(parent=>parent.part===ref.source.part&&JSON.stringify(parent.path)===JSON.stringify(ref.source.objectEvent!.paragraphPath)));
   const old=refs('before'),next=refs('after'),contexts=buildObjectEventContexts(manifest,decision,old.map(ref=>ref.source),next.map(ref=>ref.source));
