@@ -70,6 +70,18 @@ for formatting in [False,True]:
   geometry_checks.append({'axis':axis,'formatting':formatting,'outcome':outcome})
 json.dumps(geometry_checks)
 `));assert.equal(geometry.length,4);console.log(JSON.stringify({pairedGeometryBoundary:geometry}));
+const layoutMask=JSON.parse(py.runPython(String.raw`
+from js import worklazyDrawingMask
+mask={g:True for g in ['fontFamily','size','style','color','paragraph','numbering']};mask['paragraph']=False;worklazyDrawingMask(json.dumps(mask))
+layout_checks=[]
+for axis in ['width','height']:
+ before='/tmp/vml-packages/geometry-'+axis+'-False-before.docx';after='/tmp/vml-packages/geometry-'+axis+'-False-after.docx';output='/tmp/vml-packages/layout-mask-'+axis+'-tracked.docx'
+ try:generate_tracked_document(before,after,output,'events',True,True,True,formatting_mask_json=json.dumps(mask))
+ except ValueError as error:assert str(error)=='UNSUPPORTED_TRACKED_SOURCE_VML_EXCLUDED_GEOMETRY',str(error)
+ else:raise AssertionError('effective paragraph/layout exclusion bypassed')
+ assert not os.path.exists(output);layout_checks.append({'axis':axis,'masterFormatting':True,'requestedParagraph':False,'noPartialOutput':True})
+json.dumps(layout_checks)
+`));assert.equal(layoutMask.length,2);assert(manifests.slice(-2).every(m=>m.options.formatting===true&&m.formattingMask.requested.paragraph===false&&m.formattingMask.effective.paragraph===false&&m.formattingMask.effective.fontFamily===true));console.log(JSON.stringify({effectiveLayoutMask:layoutMask,actualMasks:manifests.slice(-2).map(m=>m.formattingMask)}));requested=undefined;
 forge=true;const forged=JSON.parse(py.runPython(String.raw`
 source=next(c for c in VML_CASES if c['name']=='vml-body');paths=[]
 for side in ['before','after']:

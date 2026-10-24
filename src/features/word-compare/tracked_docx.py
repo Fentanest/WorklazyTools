@@ -166,7 +166,7 @@ class _PackageGraph:
             if not _simple_vml_picture(picture,self.before,part):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_VML_PICTURE')
             origin=_MANIFEST_NODE_KEYS.get(original)
             owner=_MANIFEST_EVENT_OWNERS.get(origin)
-            if owner is not None and not _MANIFEST['options']['formatting']:
+            if owner is not None and not _MANIFEST['formattingMask']['effective']['paragraph']:
                 pair=next((p for p in owner.get('objectEvents',{}).get('drawingProperties',[]) if _manifest_key(p['before'])==origin[1]),None)
                 if pair is not None:
                     after=_MANIFEST_SOURCE_NODES.get(('after',_manifest_key(pair['after'])))
