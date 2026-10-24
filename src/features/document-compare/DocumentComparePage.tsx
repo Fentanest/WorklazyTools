@@ -116,17 +116,26 @@ export function DocumentComparePage() {
         operation.update(session.excelOutput ? Math.round(nextProgress * 0.8) : nextProgress, message);
       }, language, controller.signal);
       const results = workerResults.map((item) => item.result);
+      controller.signal.throwIfAborted();
       let reports: ArrayBuffer[] = [];
+      let reportUnavailable = false;
       if (session.excelOutput) {
         operation.update(80, L(`${results.length}개 Excel 보고서를 준비합니다.`, `Preparing ${results.length} Excel reports.`));
+        try {
         reports = await createComparisonExcelReports(results, (nextProgress, message) => {
           operation.update(80 + Math.round(nextProgress * 0.2), message);
         }, language, controller.signal);
+        } catch (reason) {
+          if (controller.signal.aborted || (reason instanceof DOMException && reason.name === "AbortError")) throw reason;
+          reportUnavailable = true; // Report serialization failed; completed comparisons stay usable.
+        }
       }
+      controller.signal.throwIfAborted();
       session.replaceResults(results.map((result, index) => {
         const trackedBuffer = workerResults[index]?.trackedBuffer;
         return {
           pairNumber: index + 1,
+          reportUnavailable,
           originalBeforeUrl:URL.createObjectURL(pairs[index].beforeFile),
           originalAfterUrl:URL.createObjectURL(pairs[index].afterFile),
           result,
@@ -135,7 +144,9 @@ export function DocumentComparePage() {
           trackedFileName: trackedBuffer ? trackedFileName(index + 1, result.beforeName, result.afterName, language) : undefined,
         };
       }));
-      operation.succeed(L(`${results.length}개 문서 쌍의 결과를 모두 만들었습니다.`, `Created results for all ${results.length} document pairs.`));
+      operation.succeed(reportUnavailable
+        ? L("비교를 완료했습니다. Excel 보고서는 만들지 못했지만 비교 결과와 생성된 파일은 유지됩니다.", "Comparison complete. Excel reports are unavailable; comparison results and generated files are preserved.")
+        : L(`${results.length}개 문서 쌍의 결과를 모두 만들었습니다.`, `Created results for all ${results.length} document pairs.`));
     } catch (reason) {
       const message = comparisonErrorMessage(reason, language);
       setError(message);
@@ -256,6 +267,7 @@ export function DocumentComparePage() {
             {item.reportUrl && <FileShareButton url={item.reportUrl} fileName={item.reportFileName || L("문서-비교보고서.xlsx", "document-comparison-report.xlsx")} />}
             {item.trackedUrl && <Button render={<a href={item.trackedUrl} download={item.trackedFileName} data-testid="document-tracked-download" />} className="rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90" onClick={() => setSaved(true)}><Download size={15} /> {L("Word 변경 추적", "Tracked Word file")}</Button>}
           </div>
+          {item.reportUnavailable && <UtilityNotice data-testid="document-excel-unavailable" className="col-span-full" kind="info">{L("Excel 보고서를 만들지 못했습니다. 비교 결과와 생성된 파일은 유지됩니다.", "The Excel report is unavailable. Comparison results and generated files are preserved.")}</UtilityNotice>}
         </Card>)}</div>
       </section>}
 

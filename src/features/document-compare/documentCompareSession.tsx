@@ -11,6 +11,7 @@ export interface DocumentPairResult {
   result: WordCompareResult;
   reportUrl?: string;
   reportFileName?: string;
+  reportUnavailable?: boolean;
   originalBeforeUrl?: string;
   originalAfterUrl?: string;
   trackedUrl?: string;

@@ -1,3 +1,4 @@
+import {encodeWordReportCells} from "./wordReportText.ts";
 import ExcelJS from "exceljs";
 
 import type { WordCompareResult } from "./types";
@@ -86,6 +87,7 @@ export async function buildWordReport(result: WordCompareResult, language: "ko" 
   buildWordTableSheets(workbook, result, local);
 
   reportProgress(85, local("보고서 서식 적용 완료 · Excel 파일 저장 중…", "Report formatting complete · Saving the Excel file…"));
+  encodeWordReportCells(workbook);
   return toArrayBuffer(await workbook.xlsx.writeBuffer());
 }
 
