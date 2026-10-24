@@ -1,5 +1,6 @@
 import { comparisonSourceSlices } from './restoreStyleProjection.ts';
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ObjectEventContext } from './comparisonManifest.ts';
+import { eventSources, findSource } from './manifestIndex.ts';
 const key=(ref:DocumentSourceReference)=>JSON.stringify([ref.part,ref.path]);
 /** Only a complete same-kind boundary ordinal has an unambiguous split schedule.
  * Source XML order partitions a prefix into the left paragraph and the rest
@@ -7,11 +8,11 @@ const key=(ref:DocumentSourceReference)=>JSON.stringify([ref.part,ref.path]);
 export function splitBoundaryNoteContexts(manifest:DocumentComparisonManifest,decision:ComparisonDecision,before:DocumentSourceReference[],after:DocumentSourceReference[]) {
   const assigned=new Map<string,number>();
   if(decision.before.length!==1||decision.after.length!==2)return assigned;
-  const boundary=decision.splitSlices![0][1],leftLength=Array.from(manifest.sources.after.find(ref=>key(ref)===key(decision.after[0]))?.rawText??'').length;
+  const boundary=decision.splitSlices![0][1],leftLength=Array.from(findSource(manifest,'after',decision.after[0])?.rawText??'').length;
   const old=before.filter(ref=>ref.objectEvent?.kind==='note'&&ref.objectEvent.start===boundary);
   const at=(index:number,position:number)=>after.filter(ref=>ref.objectEvent?.kind==='note'&&ref.objectEvent.start===position&&ref.part===decision.after[index].part&&JSON.stringify(ref.objectEvent.paragraphPath)===JSON.stringify(decision.after[index].path));
   const left=at(0,leftLength),right=at(1,0);
-  const foreign=manifest.sources.before.some(ref=>ref.objectEvent&&ref.objectEvent.kind!=='note'&&ref.part===decision.before[0].part&&JSON.stringify(ref.objectEvent.paragraphPath)===JSON.stringify(decision.before[0].path)&&ref.objectEvent.start===boundary);
+  const foreign=eventSources(manifest,'before',decision.before[0].part,decision.before[0].path).some(ref=>ref.objectEvent!.kind!=='note'&&ref.objectEvent!.start===boundary);
   if(!foreign&&old.length>1&&left.length&&right.length&&left.length+right.length===old.length&&old.every((ref,index)=>ref.objectEvent!.signature===[...left,...right][index].objectEvent!.signature))old.forEach((ref,index)=>assigned.set(key(ref),index<left.length?1:2));
   return assigned;
 }

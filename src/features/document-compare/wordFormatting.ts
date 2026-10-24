@@ -1,11 +1,11 @@
 import { formattingGroup } from "./formattingMask.ts";
+import { childSources, findSource, paragraphSources } from "./manifestIndex.ts";
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, FormattingScope, PropertyFact, TextComparison } from "./comparisonManifest.ts";
 
 const W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}";
 import policy from "../word-compare/formatting-policy.json" with { type: "json" };
 const local = (name: string) => name.startsWith(W) ? name.slice(W.length) : name;
 const key = (ref: DocumentSourceReference) => JSON.stringify([ref.part, ref.path]);
-const samePath = (a: number[], b: number[]) => JSON.stringify(a) === JSON.stringify(b);
 const emptyFact: PropertyFact = { supported: {}, unsupported: {}, history: false };
 function rawChanged(before: PropertyFact | undefined, after: PropertyFact | undefined, supported = true) {
   const a = before?.[supported ? "supported" : "unsupported"] ?? {}, b = after?.[supported ? "supported" : "unsupported"] ?? {};
@@ -20,11 +20,11 @@ function rawStyles(manifest: DocumentComparisonManifest, side: "before" | "after
   const result: Array<StyleEntry | undefined> = [];
   for (const [index, ref] of refs.entries()) {
     if (index && joinBreaks) result.push(undefined);
-    const paragraph = manifest.sources[side].find((source) => key(source) === key(ref));
+    const paragraph = findSource(manifest, side, ref);
     const length = Array.from(paragraph?.rawText ?? "").length;
     const styles = Array<StyleEntry | undefined>(length).fill(undefined);
-    for (const source of manifest.sources[side]) {
-      if (source.part !== ref.part || !source.paragraphPath || !samePath(source.paragraphPath, ref.path) || !source.textRange) continue;
+    for (const source of paragraphSources(manifest, side, ref.part, ref.path)) {
+      if (!source.textRange) continue;
       for (let position = source.textRange[0]; position < source.textRange[1] && position < length; position++) styles[position] = { fact: source.normalizedProperties?.rPr ?? emptyFact, source };
     }
     result.push(...styles);
@@ -32,7 +32,7 @@ function rawStyles(manifest: DocumentComparisonManifest, side: "before" | "after
   return result;
 }
 function attachComparison(manifest: DocumentComparisonManifest, decision: ComparisonDecision, comparison: TextComparison, beforeStyles: Array<StyleEntry | undefined>, afterStyles: Array<StyleEntry | undefined>, beforeRef: DocumentSourceReference, afterRef: DocumentSourceReference, beforeSlices: NonNullable<TextComparison["formatting"]>["beforeSlices"], afterSlices: NonNullable<TextComparison["formatting"]>["afterSlices"]) {
-  const source = (side: "before" | "after", ref: DocumentSourceReference) => manifest.sources[side].find((item) => key(item) === key(ref))!;
+  const source = (side: "before" | "after", ref: DocumentSourceReference) => findSource(manifest, side, ref)!;
   const oldParagraph = source("before", beforeRef).normalizedProperties?.pPr ?? emptyFact, newParagraph = source("after", afterRef).normalizedProperties?.pPr ?? emptyFact;
   const comparisonId = `${decision.id}:comparison:${decision.comparisons.indexOf(comparison)}`;
   const paragraphScopeId = `${comparisonId}:pPr`;
@@ -72,7 +72,7 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
   const visit = (items: ComparisonDecision[]) => { for (const decision of items) { decisions.push(decision); visit(decision.children ?? []); } };
   visit(manifest.decisions);
   for (const decision of decisions) {
-    if (decision.type !== "paragraph" || decision.trackedRepresentation !== "revision" || !decision.before.length || !decision.after.length) continue;
+    if (decision.type !== "paragraph" || (decision.trackedRepresentation !== "revision" && decision.trackedRepresentation !== "replace") || !decision.before.length || !decision.after.length) continue;
     const left = rawStyles(manifest, "before", decision.before, true), right = rawStyles(manifest, "after", decision.after, true);
     const screenFamilies = new Set<string>(); let oldOffset = 0, newOffset = 0;
     for (const segment of characterDiff(decision.beforeText, decision.afterText)) {
@@ -91,9 +91,10 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
       const [start, end] = decision.splitSlices![index];
       attachComparison(manifest, decision, decision.comparisons[index + 1], left.slice(start, end), rawStyles(manifest, "after", [decision.after[index]], false), decision.before[0], decision.after[index], [{ source: decision.before[0], range: [start, end] }], [{ source: decision.after[index], range: [0, Array.from(decision.comparisons[index + 1].after).length] }]);
     }
-    if (decision.before.length === 2 && decision.after.length === 1) attachComparison(manifest, decision, decision.comparisons[1], rawStyles(manifest, "before", decision.before, false), right, decision.before[0], decision.after[0], decision.before.map((source) => ({ source, range: [0, Array.from(manifest.sources.before.find((ref) => key(ref) === key(source))?.rawText ?? "").length] })), [{ source: decision.after[0], range: [0, right.length] }]);
+    if (decision.before.length === 2 && decision.after.length === 1) attachComparison(manifest, decision, decision.comparisons[1], rawStyles(manifest, "before", decision.before, false), right, decision.before[0], decision.after[0], decision.before.map((source) => ({ source, range: [0, Array.from(findSource(manifest, "before", source)?.rawText ?? "").length] })), [{ source: decision.after[0], range: [0, right.length] }]);
   }
-  const children = (side: "before" | "after", parent: DocumentSourceReference, kind: string) => manifest.sources[side].filter((source) => source.part === parent.part && source.kind === kind && source.path.length === parent.path.length + 1 && parent.path.every((index, offset) => source.path[offset] === index));
+  const children = (side: "before" | "after", parent: DocumentSourceReference, kind: string) => childSources(manifest, side, parent, kind);
+  const movedDecisionIds = new Set(decisions.filter((decision) => decision.moved).map((decision) => decision.id));
   const add = (before: DocumentSourceReference | undefined, after: DocumentSourceReference | undefined, property: string, decisionId?: string) => {
     if (!before || !after) return;
     const old = before.normalizedProperties?.[property] ?? emptyFact, next = after.normalizedProperties?.[property] ?? emptyFact;
@@ -101,10 +102,10 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
     const scopeId = `scope:${JSON.stringify([key(before), key(after), property])}`;
     manifest.formattingScopes.push({ id: scopeId, before, after, property, beforeFact: old, afterFact: next, families: names, excludedFamilies: excluded });
     if (rawChanged(old,next,false).length) manifest.formattingExcluded.push(decisionId ?? property);
-    if (names.length) manifest.propertyActions.push({ id: `format:${scopeId}`, scopeId, before, after, property, families: names, representation: next.history ? "preserve-after-history" : decisions.some((decision) => decision.id === decisionId && decision.moved) ? "whole-node-revision" : "revision", decisionId });
+    if (names.length) manifest.propertyActions.push({ id: `format:${scopeId}`, scopeId, before, after, property, families: names, representation: next.history ? "preserve-after-history" : decisionId !== undefined && movedDecisionIds.has(decisionId) ? "whole-node-revision" : "revision", decisionId });
   };
   for (const decision of decisions.filter((item) => item.type === "table" && item.before.length === 1 && item.after.length === 1)) {
-    const before = manifest.sources.before.find((ref) => key(ref) === key(decision.before[0]))!, after = manifest.sources.after.find((ref) => key(ref) === key(decision.after[0]))!;
+    const before = findSource(manifest, "before", decision.before[0])!, after = findSource(manifest, "after", decision.after[0])!;
     add(before, after, "tblPr", decision.id); add(before, after, "tblGrid", decision.id);
     const a = children("before", before, "tr"), b = children("after", after, "tr");
     for (const row of decision.rows ?? []) {
@@ -114,16 +115,19 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
       for (const column of decision.columns ?? []) if (column.beforeIndex !== null && column.afterIndex !== null) add(left[column.beforeIndex], right[column.afterIndex], "tcPr", decision.id);
     }
   }
-  for(const section of manifest.storyProjection.sections)if(!section.final&&section.before&&section.after)add(manifest.sources.before.find(ref=>key(ref)===key(section.before!.source)),manifest.sources.after.find(ref=>key(ref)===key(section.after!.source)),"sectPr",section.ownerDecisionId);
+  for(const section of manifest.storyProjection.sections)if(!section.final&&section.before&&section.after)add(findSource(manifest,"before",section.before!.source),findSource(manifest,"after",section.after!.source),"sectPr",section.ownerDecisionId);
   add(manifest.sources.before.find((ref) => ref.kind === "body"), manifest.sources.after.find((ref) => ref.kind === "body"), "sectPr");
+  // First style per styleId on each side, as the per-style `find`/`some` scans did.
+  const stylesById = { before: new Map<string | undefined, DocumentSourceReference>(), after: new Map<string | undefined, DocumentSourceReference>() };
+  for (const side of ["before", "after"] as const) for (const ref of manifest.sources[side]) if (ref.kind === "style" && !stylesById[side].has(ref.attributes?.[W + "styleId"])) stylesById[side].set(ref.attributes?.[W + "styleId"], ref);
   for (const side of ["before", "after"] as const) for (const source of manifest.sources[side].filter((ref) => ref.kind === "style")) {
-    if (!manifest.sources[side === "before" ? "after" : "before"].some((ref) => ref.kind === "style" && ref.attributes?.[W + "styleId"] === source.attributes?.[W + "styleId"])) {
+    if (!stylesById[side === "before" ? "after" : "before"].has(source.attributes?.[W + "styleId"])) {
       for (const property of ["pPr", "rPr"]) manifest.propertyExclusions.push({ side, source, property, reason: "unpaired-style" });
       manifest.formattingExcluded.push("unpaired-style");
     }
   }
   for (const after of manifest.sources.after.filter((ref) => ref.kind === "style")) {
-    const before = manifest.sources.before.find((ref) => ref.kind === "style" && ref.attributes?.[W + "styleId"] === after.attributes?.[W + "styleId"]);
+    const before = stylesById.before.get(after.attributes?.[W + "styleId"]);
     add(before, after, "pPr"); add(before, after, "rPr");
   }
 }

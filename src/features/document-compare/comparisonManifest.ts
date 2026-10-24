@@ -2,6 +2,7 @@ import type {StoryFacts,StoryProjection} from "./storyProjection.ts";
 import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
 import type { FormattingMask } from "./formattingMask.ts";
 import type { WordDiffSegment, WordTableAxisPair } from "../excel-merger/types";
+import { findSource } from "./manifestIndex.ts";
 
 /** Paths address actual XML children (including property nodes), never filtered paragraph indexes. */
 export interface PropertyFact { supported: Record<string, string[]>; unsupported: Record<string, string[]>; history: boolean }
@@ -46,8 +47,9 @@ export interface ComparisonDecision {
   deletedFormattingPolicy?: "restore-before-unpaired" | "paired-revised";
   wholeRestoreStyles?: Array<{ before: DocumentSourceReference; afterParagraph: DocumentSourceReference; projections: RestoreStyleProjection[] }>;
   noteId?:string;
-  trackedRepresentation: "revision" | "preserve-after" | "note-reference";
-  trackedReason?: "existing-comment-contract";
+  /** "replace": recorded in the tracked DOCX as the whole original block deleted and the whole revised block inserted. */
+  trackedRepresentation: "revision" | "preserve-after" | "note-reference" | "replace";
+  trackedReason?: "existing-comment-contract" | "paragraph-shape";
   segments: WordDiffSegment[];
   /** Raw XML text differs from display text for generated numbering labels. */
   textSegments: WordDiffSegment[];
@@ -115,8 +117,11 @@ export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
   for (const side of ["before", "after"] as const) {
     const sources = manifest.sources[side];
     const tables = sources.filter((source) => source.kind === "tbl");
+    // First decision (in visit order) that owns each source, as `decisions.find` did per source.
+    const owners = new Map<string, ComparisonDecision>();
+    for (const item of decisions) for (const ref of item[side]) { const id = key(ref); if (!owners.has(id)) owners.set(id, item); }
     manifest.coverage[side] = sources.filter((source) => source.kind === "p" || source.kind === "tbl").map((source) => {
-      const decision = decisions.find((item) => item[side].some((ref) => key(ref) === key(source)));
+      const decision = owners.get(key(source));
       if (!manifest.options.metadata && source.part !== "word/document.xml") return { source, disposition: "preserve-after", reason: "excluded-metadata" };
       if (!manifest.options.tables && tables.some((table) => descendant(source, table))) return { source, disposition: "preserve-after", reason: "excluded-table" };
       const note=manifest.noteProjection.pairs.find(pair=>pair[side]&&pair[side]!.source.part===source.part&&pair[side]!.source.path.every((value,index)=>source.path[index]===value));
@@ -127,8 +132,8 @@ export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
       const commentOwner = source.part === "word/comments.xml" ? decisions.find((item) => item.trackedReason === "existing-comment-contract" && item[side].some((ref) => descendant(source, ref))) : undefined;
       if (commentOwner) return { source, disposition: "preserve-after", decisionId: commentOwner.id, reason: "existing-comment-contract" };
       if (source.opaqueSignature && !source.objectEventsSupported) {
-        const before = decision?.before.length === 1 ? manifest.sources.before.find((ref) => key(ref) === key(decision.before[0])) : undefined;
-        const after = decision?.after.length === 1 ? manifest.sources.after.find((ref) => key(ref) === key(decision.after[0])) : undefined;
+        const before = decision?.before.length === 1 ? findSource(manifest, "before", decision.before[0]) : undefined;
+        const after = decision?.after.length === 1 ? findSource(manifest, "after", decision.after[0]) : undefined;
         if (!before || !after || (decision && unsafeAncestors.has(decision.id)) || decision?.moved || before.rawText !== after.rawText || before.copySignature !== after.copySignature || before.opaqueSignature !== after.opaqueSignature) return { source, disposition: "unsupported", reason: "opaque-content" };
       }
       if (decision) return { source, disposition: "decision", decisionId: decision.id };

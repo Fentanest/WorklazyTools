@@ -237,37 +237,67 @@ def _run_style(run):
 
 def _normalized_property_fact(tree, property_name, policy):
     """Normalize one source snapshot; never compare documents or choose edits."""
+    return _normalized_property_node(_PropertyTreeNode(tree) if tree else None, property_name, policy)
+
+
+class _PropertyTreeNode:
+    """Element-like view over a property_tree dict so both inputs share one normalizer."""
+    __slots__ = ("tag", "attrib", "text", "_children")
+    def __init__(self, tree):
+        self.tag, self.attrib, self.text, self._children = tree["name"], tree["attributes"], tree["text"], tree["children"]
+    def __iter__(self):
+        return (_PropertyTreeNode(child) for child in self._children)
+
+
+_POLICY_SETS = {}
+
+
+def _policy_sets(policy):
+    cached = _POLICY_SETS.get(id(policy))
+    if cached is None or cached[0] is not policy:
+        enabled = policy.get("enabled", {})
+        cached = (policy, set(policy.get("toggles", [])), set(policy.get("noiseAttributes", [])), {W + name + "Change" for name in enabled}, enabled)
+        _POLICY_SETS[id(policy)] = cached
+    return cached[1:]
+
+
+def _normalized_property_node(node, property_name, policy):
+    """`_normalized_property_fact` over an XML element (or None), without building a snapshot tree."""
     supported, unsupported = {}, {}
     history = False
-    toggles = set(policy.get("toggles", []))
-    noise_attributes = set(policy.get("noiseAttributes", []))
-    for name, value in (tree or {}).get("attributes", {}).items():
+    toggles, noise_attributes, change_names, enabled = _policy_sets(policy)
+    if node is None:
+        return {"supported": supported, "unsupported": unsupported, "history": history}
+    for name, value in node.attrib.items():
         if name not in noise_attributes:
             unsupported["@" + name] = [json.dumps(value, ensure_ascii=False)]
-    def canonical(node):
-        attributes = sorted((name, value) for name, value in node["attributes"].items() if name not in noise_attributes)
-        local = node["name"][len(W):] if node["name"].startswith(W) else node["name"]
-        if node["name"].startswith(W) and local in toggles:
-            value = node["attributes"].get(W + "val", "true").lower()
+    def canonical(item):
+        attributes = sorted((name, value) for name, value in item.attrib.items() if name not in noise_attributes)
+        local = item.tag[len(W):] if item.tag.startswith(W) else item.tag
+        if item.tag.startswith(W) and local in toggles:
+            value = item.attrib.get(W + "val", "true").lower()
             if value in {"false", "off", "0"}:
                 return None
-            return [node["name"], [(name, value) for name, value in attributes if name != W + "val"], "on", [canonical(child) for child in node["children"]]]
-        children = [canonical(child) for child in node["children"] if child["name"] not in {W + name + "Change" for name in policy.get("enabled", {})}]
-        return [node["name"], attributes, node["text"] if node["text"].strip() else "", children]
-    for child in (tree or {}).get("children", []):
-        if child["name"] == W + property_name + "Change":
+            return [item.tag, [(name, value) for name, value in attributes if name != W + "val"], "on", [canonical(child) for child in item]]
+        children = [canonical(child) for child in item if child.tag not in change_names]
+        text = item.text or ""
+        return [item.tag, attributes, text if text.strip() else "", children]
+    enabled_here = enabled.get(property_name, [])
+    for child in node:
+        if child.tag == W + property_name + "Change":
             history = True
             continue
-        if property_name=="sectPr" and child["name"] in {W+"headerReference",W+"footerReference"} or property_name=="pPr" and child["name"]==W+"sectPr":continue
+        if property_name=="sectPr" and child.tag in {W+"headerReference",W+"footerReference"} or property_name=="pPr" and child.tag==W+"sectPr":continue
         value = canonical(child)
-        grid_leaf = property_name!='tblGrid' or child['name']!=W+'gridCol' or (not child['children'] and not child['text'].strip() and set(child['attributes'])-noise_attributes <= {W+'w'} and (W+'w' not in child['attributes'] or re.fullmatch(r'(?:[+]?[0-9]+|[0-9]+(?:\.[0-9]+)?(?:mm|cm|in|pt|pc|pi))',child['attributes'][W+'w'])))
+        child_text = child.text or ""
+        grid_leaf = property_name!='tblGrid' or child.tag!=W+'gridCol' or (not len(list(child)) and not child_text.strip() and set(child.attrib)-noise_attributes <= {W+'w'} and (W+'w' not in child.attrib or re.fullmatch(r'(?:[+]?[0-9]+|[0-9]+(?:\.[0-9]+)?(?:mm|cm|in|pt|pc|pi))',child.attrib[W+'w'])))
         if property_name=='tblGrid' and grid_leaf and value is not None:
             value[1]=[(name,str(int(v)) if name==W+'w' and re.fullmatch(r'[+]?[0-9]+',v) else v) for name,v in value[1]]
         if value is None:
             continue
-        local = child["name"][len(W):] if child["name"].startswith(W) else child["name"]
-        target = supported if child["name"].startswith(W) and local in policy.get("enabled", {}).get(property_name, []) and grid_leaf else unsupported
-        target.setdefault(child["name"], []).append(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+        local = child.tag[len(W):] if child.tag.startswith(W) else child.tag
+        target = supported if child.tag.startswith(W) and local in enabled_here and grid_leaf else unsupported
+        target.setdefault(child.tag, []).append(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
     return {"supported": supported, "unsupported": unsupported, "history": history}
 
 
@@ -349,11 +379,12 @@ def _source_paths(root, part, archive=None):
         reference = {"part": part, "path": path, "kind": node.tag.rsplit("}", 1)[-1]}
         property_names = {"p": ("pPr",), "r": ("rPr",), "tbl": ("tblPr", "tblGrid"), "tr": ("trPr",), "tc": ("tcPr",), "body": ("sectPr",), "style": ("pPr", "rPr")}.get(reference["kind"], ())
         if node.tag==W+"sectPr":
-            reference["propertySnapshots"]={"sectPr":property_tree(node)}
-            reference["normalizedProperties"]={"sectPr":_normalized_property_fact(reference["propertySnapshots"]["sectPr"],"sectPr",policy)}
+            reference["normalizedProperties"]={"sectPr":_normalized_property_node(node,"sectPr",policy)}
         if property_names:
-            reference["propertySnapshots"] = {name: property_tree(node.find(W + name)) for name in property_names}
-            reference["normalizedProperties"] = {name: _normalized_property_fact(tree, name, policy) for name, tree in reference["propertySnapshots"].items()}
+            # Raw snapshots are consumed only for table grids; every other property ships its normalized fact.
+            if reference["kind"] == "tbl":
+                reference["propertySnapshots"] = {"tblGrid": property_tree(node.find(W + "tblGrid"))}
+            reference["normalizedProperties"] = {name: _normalized_property_node(node.find(W + name), name, policy) for name in property_names}
         if node.tag == W + "style":
             reference["attributes"] = dict(node.attrib)
             name = node.find(W + "name")
@@ -1003,7 +1034,26 @@ def _cell_payload(cell):
     }
 
 
+_EXTRACT_CACHE = []
+
+
 def extract_document_model(document_bytes, include_tables, include_metadata, language="ko"):
+    """Memoized `_extract_document_model`: the tracked-DOCX validator re-reads the same
+    input bytes the screen comparison just extracted, so the last two results are reused."""
+    data = bytes(document_bytes)
+    key = (hashlib.sha256(data).hexdigest(), bool(include_tables), bool(include_metadata), "en" if language == "en" else "ko")
+    for cached_key, cached in _EXTRACT_CACHE:
+        if cached_key == key:
+            global LANGUAGE
+            LANGUAGE = key[3]
+            return cached
+    result = _extract_document_model(data, include_tables, include_metadata, language)
+    _EXTRACT_CACHE.append((key, result))
+    del _EXTRACT_CACHE[:-2]
+    return result
+
+
+def _extract_document_model(document_bytes, include_tables, include_metadata, language="ko"):
     """Return only the format-specific extraction model.
 
     Paragraph matching and result generation live in the shared TypeScript

@@ -1,7 +1,9 @@
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, SourceSlices } from "./comparisonManifest.ts";
+import { childSources, findSource, paragraphSources } from "./manifestIndex.ts";
 const key = (ref: DocumentSourceReference) => JSON.stringify([ref.part, ref.path]);
+const sameSource = (a: DocumentSourceReference | undefined, b: DocumentSourceReference | undefined) => a === b || (a ? key(a) : "") === (b ? key(b) : "");
 export function comparisonSourceSlices(manifest: DocumentComparisonManifest, decision: ComparisonDecision, index: number): SourceSlices {
-  const full = (side: "before" | "after", refs: DocumentSourceReference[]) => refs.map((source) => ({ source, range: [0, Array.from(manifest.sources[side].find((ref) => key(ref) === key(source))?.rawText ?? "").length] as [number, number] }));
+  const full = (side: "before" | "after", refs: DocumentSourceReference[]) => refs.map((source) => ({ source, range: [0, Array.from(findSource(manifest, side, source)?.rawText ?? "").length] as [number, number] }));
   if (decision.before.length === 1 && decision.after.length === 2) return { before: [{ source: decision.before[0], range: decision.splitSlices![index - 1] }], after: full("after", [decision.after[index - 1]]) };
   return { before: full("before", decision.before), after: full("after", decision.after) };
 }
@@ -21,8 +23,14 @@ export function buildRestoreStyleProjections(manifest: DocumentComparisonManifes
         comparison.sourceSlices = slices;
         const styles: Array<DocumentSourceReference | undefined> = [];
         for (const slice of slices.after) {
-          const runs = manifest.sources.after.filter((ref) => ref.part === slice.source.part && ref.paragraphPath && JSON.stringify(ref.paragraphPath) === JSON.stringify(slice.source.path));
-          for (let position = slice.range[0]; position < slice.range[1]; position++) styles.push(runs.find((ref) => ref.textRange && ref.textRange[0] <= position && position < ref.textRange[1]));
+          // First run (in source order) covering each position, as `runs.find` did per position.
+          const [start, end] = slice.range;
+          const covering = new Array<DocumentSourceReference | undefined>(Math.max(0, end - start));
+          for (const ref of paragraphSources(manifest, "after", slice.source.part, slice.source.path)) {
+            if (!ref.textRange) continue;
+            for (let position = Math.max(start, ref.textRange[0]); position < Math.min(end, ref.textRange[1]); position++) covering[position - start] ??= ref;
+          }
+          for (let position = start; position < end; position++) styles.push(covering[position - start]);
         }
         comparison.restoreStyles = [];
         let before = 0, after = 0;
@@ -33,7 +41,7 @@ export function buildRestoreStyleProjections(manifest: DocumentComparisonManifes
             const source = styles[cursor] ?? styles[Math.min(cursor, styles.length) - 1];
             const policy = source ? "copy-revised-run" : "inherit-after-default";
             const previous = comparison.restoreStyles.at(-1);
-            if (previous && previous.beforeStart + previous.length === before + offset && previous.afterStart + (previous.kind === "equal" ? previous.length : 0) === cursor && previous.kind === segment.type && previous.policy === policy && (previous.source ? key(previous.source) : "") === (source ? key(source) : "")) previous.length++;
+            if (previous && previous.beforeStart + previous.length === before + offset && previous.afterStart + (previous.kind === "equal" ? previous.length : 0) === cursor && previous.kind === segment.type && previous.policy === policy && sameSource(previous.source, source)) previous.length++;
             else comparison.restoreStyles.push({ beforeStart: before + offset, afterStart: cursor, length: 1, kind: segment.type, policy, ...(source ? { source } : {}) });
           }
           if (segment.type !== "added") before += size;
@@ -57,7 +65,7 @@ export function buildRestoreStyleProjections(manifest: DocumentComparisonManifes
     }
   };
   visit(manifest.decisions);
-  const children = (side: "before" | "after", parent: DocumentSourceReference, kind: string) => manifest.sources[side].filter((source) => source.part === parent.part && source.kind === kind && source.path.length === parent.path.length + 1 && parent.path.every((index, offset) => source.path[offset] === index));
+  const children = (side: "before" | "after", parent: DocumentSourceReference, kind: string) => childSources(manifest, side, parent, kind);
   const add = (before: DocumentSourceReference | undefined, after: DocumentSourceReference | undefined, property: string) => { if (before && after) manifest.restorePropertyPairs.push({ before, after, property }); };
   const tables = (items: ComparisonDecision[]) => { for (const decision of items) {
     tables(decision.children ?? []);

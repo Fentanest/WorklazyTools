@@ -248,11 +248,12 @@ export function ExcelComparePage() {
    controllerRef.current = undefined;
    return;
   }
-  if (successes.length>= 2&&successes.every(item=>!item.result.reportError)) {
+  const reportable = successes.filter((item) => !item.result.reportError);
+  if (reportable.length >= 2) {
    operation.update(94, t("features:excelCompare.progress.ZIPPING"));
    try {
     const writer = new BlobWriter("application/zip");
-    await writeZipArchive(successes.map((item) => ({ fileName: item.fileName, blob: item.blob })), writer, controller.signal);
+    await writeZipArchive(reportable.map((item) => ({ fileName: item.fileName, blob: item.blob })), writer, controller.signal);
     const blob = await writer.getData();
     const fileName = createUniqueSafeFileName("worklazy-excel-comparisons.zip", names, "comparisons.zip");
     const url = keepObjectUrl(URL.createObjectURL(blob), objectUrls);
@@ -298,7 +299,7 @@ export function ExcelComparePage() {
 
    <UtilitySectionCard step={2} title={t("features:excelCompare.method.title")} description={t("features:excelCompare.method.description")}>
     <div className="grid grid-cols-3 gap-2 max-[720px]:grid-cols-1" data-testid="excel-compare-mode-grid" role="radiogroup" aria-label={t("features:excelCompare.method.title")}>
-     {(["position", "key", "reconcile"] as ExcelCompareMode[]).map((value) => { const selected = mode === value; return <button type="button" role="radio" data-excel-mode={value} aria-checked={selected} data-selected={selected || undefined} className={`min-h-20 rounded-2xl border p-3 text-left outline-none transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary/60 focus-visible:ring-3 focus-visible:ring-primary/30 dark:hover:border-primary/70 ${selected ? "border-primary bg-primary/5 text-foreground ring-2 ring-primary/25 dark:border-primary dark:bg-primary/70 dark:ring-primary/30" : "border-border bg-muted/45 text-foreground"}`} key={value} onClick={() => setMode(value)}><strong className="block text-sm">{t(`features:excelCompare.method.${value}` as never)}</strong><small className="mt-1 block text-xs leading-relaxed text-muted-foreground">{t(`features:excelCompare.method.${value}Description` as never)}</small></button>; })}
+     {(["position", "key", "reconcile"] as ExcelCompareMode[]).map((value) => { const selected = mode === value; return <button type="button" role="radio" data-excel-mode={value} aria-checked={selected} data-selected={selected || undefined} className={`min-h-20 rounded-2xl border p-3 text-left outline-none transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-0.5 focus-visible:ring-3 focus-visible:ring-primary/30 ${selected ? "border-primary bg-primary/5 text-foreground ring-2 ring-primary/25 dark:border-primary dark:bg-primary/70 dark:ring-primary/30" : "border-border bg-muted/45 text-foreground hover:border-primary/60 dark:hover:border-primary/70"}`} key={value} onClick={() => setMode(value)}><strong className="block text-sm">{t(`features:excelCompare.method.${value}` as never)}</strong><small className="mt-1 block text-xs leading-relaxed text-muted-foreground">{t(`features:excelCompare.method.${value}Description` as never)}</small></button>; })}
     </div>
    </UtilitySectionCard>
 
@@ -318,7 +319,7 @@ export function ExcelComparePage() {
     <div><p className="text-xs font-extrabold tracking-[.08em] text-primary uppercase dark:text-primary">RESULTS</p><h2 className="mt-1 font-heading text-xl font-medium" id="excel-compare-results-title">{t("features:excelCompare.results.title")}</h2><p className="mt-2 text-sm text-muted-foreground">{t("features:excelCompare.results.description", { success: completed.length, failed: failed.length })} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">{t("features:excelCompare.results.guideLink" as never)} &darr;</a></p></div>
     <div className="mt-3 grid grid-cols-2 gap-2 max-[620px]:grid-cols-1" data-testid="excel-report-downloads">
      {completed.map((item, index) => item.result.reportError?<p key={item.pairId} role="status" data-testid="excel-report-unavailable" className="rounded-xl border border-border p-3">{t("features:excelCompare.results.reportUnavailable" as never,{number:index+1})} {t(`features:excelCompare.results.reportError.${item.result.reportError}` as never)}</p>:<Button render={<a href={item.url} download={item.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left" key={item.pairId}><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.pairReport", { number: index + 1 })}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{item.fileName} · {formatBytes(item.blob.size)}</small></span></Button>)}
-     {completed.length>=2&&completed.some(item=>item.result.reportError)&&<p data-testid="excel-report-bundle-unavailable" className="text-sm">{t("features:excelCompare.results.bundleUnavailable" as never)}</p>}
+     {completed.length>=2&&completed.some(item=>item.result.reportError)&&<p data-testid="excel-report-bundle-unavailable" className="text-sm">{t((zipResult?"features:excelCompare.results.bundlePartial":"features:excelCompare.results.bundleUnavailable") as never)}</p>}
      {zipResult && <Button render={<a href={zipResult.url} download={zipResult.fileName} data-testid="excel-report-download" />} variant="secondary" className="h-auto min-h-12 justify-start rounded-xl px-3 py-2 text-left"><Download size={18} /><span className="min-w-0"><strong className="block">{t("features:excelCompare.results.zip")}</strong><small className="block overflow-hidden text-ellipsis text-xs text-muted-foreground">{zipResult.fileName} · {formatBytes(zipResult.size)}</small></span></Button>}
     </div>
     {completed.length> 0 && <p className="mt-2 text-xs text-muted-foreground">{t("features:excelCompare.results.downloadCheck")}</p>}

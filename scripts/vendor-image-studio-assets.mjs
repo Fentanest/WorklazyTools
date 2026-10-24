@@ -1,8 +1,9 @@
+import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
+const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifestPath = path.join(projectRoot, "src", "features", "image-studio", "stickers.manifest.json");
 const manifestBytes = await fs.readFile(manifestPath);
 const manifest = JSON.parse(manifestBytes.toString("utf8"));

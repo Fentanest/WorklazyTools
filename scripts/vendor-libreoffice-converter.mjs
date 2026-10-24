@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { createReadStream, createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
@@ -22,7 +23,7 @@ const moduleStartAnchor = 'self.Module={mainScriptUrlOrBlob:e';
 const moduleStartReplacement = 'self.__worklazyFont=await(async()=>{const r=await fetch(new URL("NanumGothic-Regular.ttf",e));if(!r.ok)throw new Error("Office font download failed");const b=new Uint8Array(await r.arrayBuffer());if(b.byteLength!==2054744)throw new Error("Office font size mismatch");return b})(),self.Module={noInitialRun:!0,preRun:[()=>{for(const d of ["/instdir","/instdir/share","/instdir/share/fonts","/instdir/share/fonts/truetype"])try{self.Module.FS.mkdir(d)}catch{}self.Module.FS.writeFile("/instdir/share/fonts/truetype/NanumGothic-Regular.ttf",self.__worklazyFont)}],mainScriptUrlOrBlob:e';
 const patchedWorkerSha256 = "9396e0969f4d37001f00bbff6957aa9009e623a1c1e51d99707cdeb548dda999";
 const fontSha256 = "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31";
-const root = path.resolve(new URL("..", import.meta.url).pathname);
+const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const source = path.join(root, "node_modules", "@matbee", "libreoffice-converter");
 const packageInfo = JSON.parse(await fs.readFile(path.join(source, "package.json"), "utf8"));
 if (packageInfo.version !== VERSION) throw new Error(`LibreOffice converter version mismatch: ${packageInfo.version}`);

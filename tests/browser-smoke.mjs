@@ -23,7 +23,7 @@ const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "worklazytools-test-"));
 try {
   const fixtures = await createFixtures(tempDir);
   const browser = await puppeteer.launch({
-    executablePath: "/usr/bin/google-chrome",
+    executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome",
     headless: true,
     protocolTimeout: 300_000,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],

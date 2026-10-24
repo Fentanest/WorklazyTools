@@ -8,6 +8,7 @@ import formattingPolicy from "./formatting-policy.json";
 import pyodidePackage from "pyodide/package.json";
 import type { WordCompareResult } from "../excel-merger/types";
 import { compareDocumentModels, diffText, type ComparisonModel } from "../document-compare/documentComparison";
+import { serializeManifestForTracked } from "../document-compare/manifestWire";
 import { sniffDocumentFormat, type DocumentFormat } from "../document-compare/documentFormat";
 import { extractLegacyDocModel } from "./docModel";
 
@@ -166,7 +167,7 @@ worker.onmessage = async (event: MessageEvent) => {
               event.data.options.formatting,
               event.data.options.tables,
               event.data.options.metadata,
-              JSON.stringify(result.manifest),
+              serializeManifestForTracked(result.manifest),
               JSON.stringify(result.manifest.formattingMask.requested),
             );
             const trackedBytes = pyodide.FS.readFile(trackedPath) as Uint8Array;

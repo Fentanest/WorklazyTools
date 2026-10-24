@@ -24,6 +24,7 @@ import { buildRestoreStyleProjections } from "./restoreStyleProjection.ts";
 import { buildWordFormatting, projectWordFormatting, type ManifestFormattingView } from "./wordFormatting.ts";
 import { completeManifestCoverage, freezeComparisonManifest } from "./comparisonManifest.ts";
 import type { ComparisonDecision, DocumentComparisonManifest, DocumentSourceReference, ManifestRecord } from "./comparisonManifest.ts";
+import { eventSources, findSource } from "./manifestIndex.ts";
 
 export interface ComparisonRecord {
   nativeSource?: {format:"doc"|"hwp";story:string;paragraph:number;section?:number;control?:number};
@@ -199,10 +200,10 @@ export function compareDocumentModels(
   changes.push(...commentChanges);
   const objectDecisions = (items:ComparisonDecision[]) => { for(const decision of items) {
     objectDecisions(decision.children ?? []);
-    if(decision.type!=="paragraph" || decision.trackedRepresentation!=="revision")continue;
-    const events=(side:"before"|"after")=>decision[side].flatMap(parent=>manifest.sources[side].filter(source=>source.objectEvent && source.part===parent.part && JSON.stringify(source.objectEvent.paragraphPath)===JSON.stringify(parent.path)));
+    if(decision.type!=="paragraph" || (decision.trackedRepresentation!=="revision" && decision.trackedRepresentation!=="replace"))continue;
+    const events=(side:"before"|"after")=>decision[side].flatMap(parent=>eventSources(manifest,side,parent.part,parent.path));
     const before=events("before"),after=events("after");
-    const runFact=(side:"before"|"after",event:DocumentSourceReference)=>manifest.sources[side].find(source=>source.part===event.part && JSON.stringify(source.path)===JSON.stringify(event.objectEvent!.runPath))?.normalizedProperties?.rPr??{supported:{},unsupported:{},history:false};
+    const runFact=(side:"before"|"after",event:DocumentSourceReference)=>findSource(manifest,side,{part:event.part,path:event.objectEvent!.runPath})?.normalizedProperties?.rPr??{supported:{},unsupported:{},history:false};
     const contexts=buildObjectEventContexts(manifest,decision,before,after);
     const positions={before:new Map(before.map(ref=>[ref,[eventPosition(decision,contexts,"before",ref),eventPosition(decision,contexts,"before",ref,true)]])),after:new Map(after.map(ref=>[ref,[eventPosition(decision,contexts,"after",ref),eventPosition(decision,contexts,"after",ref,true)]]))};
     const position=(side:"before"|"after",ref:DocumentSourceReference,end=false)=>positions[side].get(ref)![end?1:0];
@@ -220,6 +221,7 @@ export function compareDocumentModels(
     const unchangedLinks=before.filter(a=>a.objectEvent!.kind==="hyperlink").flatMap(a=>after.filter(b=>b.objectEvent!.kind==="hyperlink" && a.objectEvent!.signature===b.objectEvent!.signature && position("before",a)===position("after",b) && position("before",a,true)===position("after",b,true)).map(b=>({before:a,after:b})));
     if(before.length || after.length)decision.objectEvents={unchangedDrawings:drawingProperties.filter(pair=>pair.before.objectEvent!.signature===pair.after.objectEvent!.signature && (!pair.families.length || pair.representation==="preserve-after-history")).map(pair=>({before:pair.before,after:pair.after})),contexts,deletedDrawingStyles:[],drawingProperties,unchangedLinks,propertiesSupported,policy:"worklazy-source-events-5",before,after,changed:JSON.stringify(before.filter(source=>options.metadata||source.objectEvent!.kind!=="note").map(source=>[source.objectEvent!.kind,position("before",source),position("before",source,true),source.objectEvent!.signature]))!==JSON.stringify(after.filter(source=>options.metadata||source.objectEvent!.kind!=="note").map(source=>[source.objectEvent!.kind,position("after",source),position("after",source,true),source.objectEvent!.signature]))};
   }};
+  markReplacedParagraphShapes(manifest.decisions);
   objectDecisions(manifest.decisions);
   bindNoteOutputCapabilities(manifest);
   buildDrawingRestoreProjections(manifest);
@@ -347,6 +349,19 @@ function compareRecordList(
 }
 
 
+/** Run-level revisions exist only for 1:1, 1:2 (split) and 2:1 (merge) paragraph groups.
+ * Any other paired shape is replaced as whole paragraphs, keeping the screen comparison. */
+function markReplacedParagraphShapes(decisions: ComparisonDecision[]) {
+  for (const decision of decisions) {
+    markReplacedParagraphShapes(decision.children ?? []);
+    if (decision.type !== "paragraph" || decision.trackedRepresentation !== "revision" || !decision.before.length || !decision.after.length) continue;
+    const shape = `${decision.before.length}:${decision.after.length}`;
+    if (shape === "1:1" || shape === "1:2" || shape === "2:1") continue;
+    decision.trackedRepresentation = "replace";
+    decision.trackedReason = "paragraph-shape";
+  }
+}
+
 function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = false, type: ComparisonDecision["type"] = "paragraph", context = "paragraph"): ComparisonDecision {
   const beforeText = before.map((record) => record.rawText ?? record.text).join("\n");
   const afterText = after.map((record) => record.rawText ?? record.text).join("\n");
@@ -373,7 +388,8 @@ function decisionOf(before: ManifestRecord[], after: ManifestRecord[], moved = f
     splitSlices,
     trackedRepresentation: "revision",
     id: [...before, ...after].some((record) => record.source)
-      ? JSON.stringify([type, before.map((record) => record.source ? Object.fromEntries(Object.entries(record.source).filter(([name])=>!["objectEvent","objectEventsSupported","unsupportedObjectQName"].includes(name))) : null), after.map((record) => record.source ? Object.fromEntries(Object.entries(record.source).filter(([name])=>!["objectEvent","objectEventsSupported","unsupportedObjectQName"].includes(name))) : null)])
+      // XML position identifies a source within its side; property facts would only bloat every derived id.
+      ? JSON.stringify([type, before.map((record) => record.source ? [record.source.part, record.source.path, record.source.kind] : null), after.map((record) => record.source ? [record.source.part, record.source.path, record.source.kind] : null)])
       : `source-less:${type}:${context}`,
     type, before: before.flatMap((record) => record.source ? [record.source] : []),
     after: after.flatMap((record) => record.source ? [record.source] : []), moved,

@@ -1729,7 +1729,9 @@ def _validate_manifest(before_path, after_path):
     nodes = {}
     for side, path in (("before", before_path), ("after", after_path)):
         with open(path, "rb") as source:
-            model = json.loads(extract_document_model(source.read(), True, True, "en"))
+            # Same language as the screen extraction so its memoized model is reused; the
+            # validated facts (inventory, fields, story/note facts, revision) are language-independent.
+            model = json.loads(extract_document_model(source.read(), True, True, LANGUAGE))
         if _MANIFEST.get("fields", {}).get(side) != model.get("fields", []):
             raise ValueError("INVALID_COMPARISON_MANIFEST_FIELD_ANNOTATIONS")
         provenance = _MANIFEST.get("provenance", {}).get(side)
@@ -2430,6 +2432,28 @@ def _consume_manifest_subtree(side, node):
             _MANIFEST_USED.add(decision["id"])
 
 
+def _resolve_manifest_sources(manifest):
+    """Restore `{"$src":[side,index]}` stubs written by serializeManifestForTracked."""
+    if not isinstance(manifest, dict):
+        return manifest
+    sources = manifest.get("sources")
+    stack = [(manifest, key) for key in manifest if key != "sources"]
+    while stack:
+        holder, key = stack.pop()
+        value = holder[key]
+        if isinstance(value, dict):
+            if len(value) == 1 and "$src" in value:
+                stub = value["$src"]
+                if not isinstance(sources, dict) or not isinstance(stub, list) or len(stub) != 2 or stub[0] not in ("before", "after") or not isinstance(stub[1], int) or not 0 <= stub[1] < len(sources.get(stub[0], [])):
+                    raise ValueError("INVALID_COMPARISON_MANIFEST")
+                holder[key] = sources[stub[0]][stub[1]]
+            else:
+                stack.extend((value, name) for name in value)
+        elif isinstance(value, list):
+            stack.extend((value, index) for index in range(len(value)))
+    return manifest
+
+
 def _install_manifest(manifest):
     global _MANIFEST, _MANIFEST_NODE_KEYS, _MANIFEST_DECISIONS, _MANIFEST_USED, _MANIFEST_CONSUMED, _MANIFEST_ACTIVE_DECISION, _MANIFEST_ACTIVE_COMPARISON, _MANIFEST_PROPERTY_USED, _MANIFEST_SOURCE_NODES, _MANIFEST_ALLOWED_PROPERTIES
     if not isinstance(manifest, dict) or manifest.get("version") != 1:
@@ -3034,7 +3058,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
             after_model = extract_document_model(source.read(), True, True)
         manifest_json = worklazyComparisonManifestJson(before_model, after_model, bool(include_formatting), bool(include_tables), bool(include_metadata))
     try:
-        _install_manifest(json.loads(manifest_json))
+        _install_manifest(_resolve_manifest_sources(json.loads(manifest_json)))
     except (KeyError, TypeError, IndexError, RecursionError) as error:
         raise ValueError("INVALID_COMPARISON_MANIFEST") from error
     requested_mask = json.loads(formatting_mask_json) if formatting_mask_json is not None else {group: True for group in ("fontFamily", "size", "style", "color", "paragraph", "numbering")}

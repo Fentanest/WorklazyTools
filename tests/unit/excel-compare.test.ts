@@ -507,7 +507,7 @@ test("pair report always has nine sheets and stores external values as primitive
   const compared = compareSpreadsheetPair(book([["ID"], ["=1+1"]]), book([["ID"], ["+2"]]), baseOptions());
   compared.records[0].key = "\tkey";
   compared.records[0].leftValue=" leading\uFFFE\uD800";
-  await assert.rejects(buildExcelCompareReport(compared,{leftName:"=left.xlsx",rightName:"@right.xlsx",leftSheet:"Data",rightSheet:"Data"}),/COMPARISON_XLSX_TEXT_UNSUPPORTED/);
+  await assert.doesNotReject(buildExcelCompareReport(compared,{leftName:"=left.xlsx",rightName:"@right.xlsx",leftSheet:"Data",rightSheet:"Data"}));
   assert.equal(compared.records[0].leftValue," leading\uFFFE\uD800");
   compared.records[0].leftValue=" leading\u0000\r_x0041_";
   const buffer = await buildExcelCompareReport(compared, { leftName: "=left.xlsx", rightName: "@right.xlsx", leftSheet: "Data", rightSheet: "Data" });

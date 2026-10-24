@@ -2383,7 +2383,8 @@
         "COMPARISON_XLSX_TEXT_UNSUPPORTED": "Some text is too long for a workbook cell or contains characters this export cannot preserve. Nothing was replaced or truncated; comparison results remain available.",
         "REPORT_GENERATION_FAILED": "The report could not be created. Comparison results remain available. Try a smaller result selection or retry."
       },
-      "bundleUnavailable": "The combined ZIP is unavailable because some reports could not be created. Available individual reports can still be downloaded."
+      "bundleUnavailable": "The combined ZIP is unavailable because fewer than two reports could be created. Available individual reports can still be downloaded.",
+      "bundlePartial": "Comparisons whose report could not be created are left out of the combined ZIP. Their results remain on screen."
     },
     "status": {
       "matched": "Matched",
