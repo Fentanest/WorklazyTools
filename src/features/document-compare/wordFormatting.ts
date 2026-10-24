@@ -114,6 +114,7 @@ export function buildWordFormatting(manifest: DocumentComparisonManifest, charac
       for (const column of decision.columns ?? []) if (column.beforeIndex !== null && column.afterIndex !== null) add(left[column.beforeIndex], right[column.afterIndex], "tcPr", decision.id);
     }
   }
+  for(const section of manifest.storyProjection.sections)if(!section.final&&section.before&&section.after)add(manifest.sources.before.find(ref=>key(ref)===key(section.before!.source)),manifest.sources.after.find(ref=>key(ref)===key(section.after!.source)),"sectPr",section.ownerDecisionId);
   add(manifest.sources.before.find((ref) => ref.kind === "body"), manifest.sources.after.find((ref) => ref.kind === "body"), "sectPr");
   for (const side of ["before", "after"] as const) for (const source of manifest.sources[side].filter((ref) => ref.kind === "style")) {
     if (!manifest.sources[side === "before" ? "after" : "before"].some((ref) => ref.kind === "style" && ref.attributes?.[W + "styleId"] === source.attributes?.[W + "styleId"])) {

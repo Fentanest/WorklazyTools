@@ -1,20 +1,29 @@
+import {buildSectionPairs,sourceKey,type SectionPair} from './sectionProjection.ts';
 import type {ComparisonDecision,DocumentComparisonManifest,DocumentSourceReference} from './comparisonManifest.ts';
-export interface StoryFacts {policy:'worklazy-story-facts-1';parts:Array<{part:string;kind:'header'|'footer';sha256:string;contentType:string|null;active:boolean}>;sections:Array<{source:DocumentSourceReference;final:boolean;history:boolean}>;bindings:Array<{section:DocumentSourceReference;reference:DocumentSourceReference;kind:'header'|'footer';variant:string;ownerPart:string;rId:string;type:string;rawTarget:string;targetMode:string;targetPart:string}>;errors:string[]}
+export interface StoryFacts {policy:'worklazy-story-facts-1';parts:Array<{part:string;kind:'header'|'footer';sha256:string;contentType:string|null;active:boolean}>;sections:Array<{source:DocumentSourceReference;final:boolean;history:boolean;activation?:{type:string;titlePage:boolean}}>;bindings:Array<{section:DocumentSourceReference;reference:DocumentSourceReference;kind:'header'|'footer';variant:string;ownerPart:string;rId:string;type:string;rawTarget:string;targetMode:string;targetPart:string}>;settings?:{evenAndOddHeaders:boolean};errors:string[]}
 export interface StoryPair {id:string;kind:'header'|'footer';beforePart?:string;afterPart?:string;representation:'inline'|'unsupported-binding';decisionIds:string[];coverage:{before:DocumentSourceReference[];after:DocumentSourceReference[]}}
-export interface StoryProjection {policy:'worklazy-story-projection-1';supported:boolean;reasons:string[];pairs:StoryPair[];bindings:Array<{id:string;kind:'header'|'footer';variant:string;before?:StoryFacts['bindings'][number];after?:StoryFacts['bindings'][number];storyId:string}>}
+export interface StoryProjection {policy:'worklazy-story-projection-2';supported:boolean;reasons:string[];sections:SectionPair[];routes:Array<{sectionId:string;kind:'header'|'footer';variant:string;before:{explicit:boolean;donorSectionId?:string;part?:string};after:{explicit:boolean;donorSectionId?:string;part?:string};storyId?:string}>;pairs:StoryPair[];bindings:Array<{id:string;sectionId:string;kind:'header'|'footer';variant:string;before?:StoryFacts['bindings'][number];after?:StoryFacts['bindings'][number];storyId:string}>}
 export function buildStoryProjection(manifest:DocumentComparisonManifest):StoryProjection {
  const a=manifest.storyFacts.before,b=manifest.storyFacts.after;
- const plan:StoryProjection={policy:'worklazy-story-projection-1',supported:true,reasons:[],pairs:[],bindings:[]};
- if(!manifest.options.metadata||!a||!b)return plan;
+ const plan:StoryProjection={policy:'worklazy-story-projection-2',supported:true,reasons:[],sections:[],routes:[],pairs:[],bindings:[]};
+ if(!a||!b)return plan;
+ const sections=buildSectionPairs(manifest,a,b);plan.sections=sections.pairs;plan.reasons.push(...sections.reasons);
+ if(!manifest.options.metadata){plan.supported=!plan.reasons.length;return plan;}
  plan.reasons.push(...a.errors,...b.errors);
- if((a.bindings.length||b.bindings.length)&&([...a.sections,...b.sections].some(section=>!section.final)||a.sections.length>1||b.sections.length>1))plan.reasons.push('complex-section-bindings');
  const slots=[...new Set([...a.bindings,...b.bindings].map(ref=>ref.kind+':'+ref.variant))].sort();
- for(const slot of slots){
-  const old=a.bindings.find(ref=>ref.kind+':'+ref.variant===slot),next=b.bindings.find(ref=>ref.kind+':'+ref.variant===slot);
-  const kind=(old??next)!.kind;
-  let pair=plan.pairs.find(pair=>pair.beforePart===old?.targetPart&&pair.afterPart===next?.targetPart);
-  if(!pair){pair={id:'story:'+JSON.stringify([kind,old?.targetPart??null,next?.targetPart??null]),kind,beforePart:old?.targetPart,afterPart:next?.targetPart,representation:old&&next?'inline':'unsupported-binding',decisionIds:[],coverage:{before:[],after:[]}};plan.pairs.push(pair);}
-  plan.bindings.push({id:'binding:'+slot,kind,variant:(old??next)!.variant,before:old,after:next,storyId:pair.id});
+ const donors:{before:Record<string,{donorSectionId:string;part:string}>;after:Record<string,{donorSectionId:string;part:string}>}={before:{},after:{}};
+ for(const section of plan.sections)for(const slot of slots){
+  const old=a.bindings.find(ref=>section.before&&sourceKey(ref.section)===sourceKey(section.before.source)&&ref.kind+':'+ref.variant===slot),next=b.bindings.find(ref=>section.after&&sourceKey(ref.section)===sourceKey(section.after.source)&&ref.kind+':'+ref.variant===slot);
+  const [kind,variant]=slot.split(':') as ['header'|'footer',string];
+  if(old||next){let pair=plan.pairs.find(pair=>pair.beforePart===old?.targetPart&&pair.afterPart===next?.targetPart);
+   if(!pair){pair={id:'story:'+JSON.stringify([kind,old?.targetPart??null,next?.targetPart??null]),kind,beforePart:old?.targetPart,afterPart:next?.targetPart,representation:old&&next?'inline':'unsupported-binding',decisionIds:[],coverage:{before:[],after:[]}};plan.pairs.push(pair);}
+   plan.bindings.push({id:'binding:'+section.id+':'+slot,sectionId:section.id,kind,variant,before:old,after:next,storyId:pair.id});
+  }
+  if(old)donors.before[slot]={donorSectionId:section.id,part:old.targetPart};if(next)donors.after[slot]={donorSectionId:section.id,part:next.targetPart};
+  const before={explicit:!!old,...donors.before[slot]},after={explicit:!!next,...donors.after[slot]};
+  const pair=plan.pairs.find(pair=>pair.beforePart===before.part&&pair.afterPart===after.part);
+  plan.routes.push({sectionId:section.id,kind,variant,before,after,storyId:pair?.id});
+  if(Boolean(before.part)!==Boolean(after.part)||before.donorSectionId!==after.donorSectionId)plan.reasons.push('changed-story-inheritance');
  }
  // Preserve existing conventional orphan-story comparisons, scoped by part.
  for(const part of [...new Set([...a.parts,...b.parts].filter(part=>!part.active).map(part=>part.part))].sort()){

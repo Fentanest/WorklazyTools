@@ -104,7 +104,7 @@ export function compareDocumentModels(
     : { emptyCell: (row, column) => `빈 셀 ${row}:${column}`, table: (index) => `표 ${index}` };
   const manifest: DocumentComparisonManifest = {
     noteFacts:{before:before.noteFacts,after:after.noteFacts},noteProjection:{policy:"worklazy-note-projection-1",supported:true,reasons:[],pairs:[],references:[]},
-    storyFacts:{before:before.storyFacts,after:after.storyFacts},storyProjection:{policy:"worklazy-story-projection-1",supported:true,reasons:[],pairs:[],bindings:[]},
+    storyFacts:{before:before.storyFacts,after:after.storyFacts},storyProjection:{policy:"worklazy-story-projection-2",supported:true,reasons:[],sections:[],routes:[],pairs:[],bindings:[]},
     nativeSources: {before:before.blocks.flatMap(block=>block.nativeSource?[block.nativeSource]:[]),after:after.blocks.flatMap(block=>block.nativeSource?[block.nativeSource]:[])},
     capabilities: {before:before.capabilities,after:after.capabilities}, provenance: {before:before.provenance,after:after.provenance}, fields:{before:before.fields ?? [],after:after.fields ?? []},
     version: 1, decisions: [], policyVersion: "worklazy-document-1",

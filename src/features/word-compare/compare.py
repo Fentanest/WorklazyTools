@@ -258,6 +258,7 @@ def _normalized_property_fact(tree, property_name, policy):
         if child["name"] == W + property_name + "Change":
             history = True
             continue
+        if property_name=="sectPr" and child["name"] in {W+"headerReference",W+"footerReference"} or property_name=="pPr" and child["name"]==W+"sectPr":continue
         value = canonical(child)
         grid_leaf = property_name!='tblGrid' or child['name']!=W+'gridCol' or (not child['children'] and not child['text'].strip() and set(child['attributes'])-noise_attributes <= {W+'w'} and (W+'w' not in child['attributes'] or re.fullmatch(r'(?:[+]?[0-9]+|[0-9]+(?:\.[0-9]+)?(?:mm|cm|in|pt|pc|pi))',child['attributes'][W+'w'])))
         if property_name=='tblGrid' and grid_leaf and value is not None:
@@ -284,6 +285,9 @@ def _source_paths(root, part, archive=None):
     def visit(node, path, paragraph=None):
         reference = {"part": part, "path": path, "kind": node.tag.rsplit("}", 1)[-1]}
         property_names = {"p": ("pPr",), "r": ("rPr",), "tbl": ("tblPr", "tblGrid"), "tr": ("trPr",), "tc": ("tcPr",), "body": ("sectPr",), "style": ("pPr", "rPr")}.get(reference["kind"], ())
+        if node.tag==W+"sectPr":
+            reference["propertySnapshots"]={"sectPr":property_tree(node)}
+            reference["normalizedProperties"]={"sectPr":_normalized_property_fact(reference["propertySnapshots"]["sectPr"],"sectPr",policy)}
         if property_names:
             reference["propertySnapshots"] = {name: property_tree(node.find(W + name)) for name in property_names}
             reference["normalizedProperties"] = {name: _normalized_property_fact(tree, name, policy) for name, tree in reference["propertySnapshots"].items()}
@@ -675,7 +679,7 @@ def _story_package_facts(archive):
     root=ET.fromstring(archive.read('word/document.xml'))
     def visit(node,path,ancestors):
         if node.tag==W+'sectPr' and not any(parent.tag in (W+'sectPrChange',W+'pPrChange') for parent in ancestors):
-            section={'part':'word/document.xml','path':path};sections.append({'source':section,'final':bool(ancestors and ancestors[-1].tag==W+'body'),'history':node.find(W+'sectPrChange') is not None})
+            section={'part':'word/document.xml','path':path};sections.append({'source':section,'final':bool(ancestors and ancestors[-1].tag==W+'body'),'history':node.find(W+'sectPrChange') is not None,'activation':{'type':node.find(W+'type').get(W+'val','nextPage') if node.find(W+'type') is not None else 'nextPage','titlePage':node.find(W+'titlePg') is not None and node.find(W+'titlePg').get(W+'val','true').lower() not in ('false','off','0')}})
             slots=set()
             for index,child in enumerate(node):
                 if child.tag not in (W+'headerReference',W+'footerReference'):continue
@@ -691,7 +695,9 @@ def _story_package_facts(archive):
                 bindings.append({'section':section,'reference':{'part':'word/document.xml','path':path+[index]},'kind':kind,'variant':variant,'ownerPart':'word/document.xml','rId':rid,'type':rel.get('Type'),'rawTarget':target,'targetMode':rel.get('TargetMode',''),'targetPart':part})
         for index,child in enumerate(node):visit(child,path+[index],ancestors+[node])
     visit(root,[],[])
-    return {'policy':'worklazy-story-facts-1','parts':sorted(parts.values(),key=lambda item:item['part']),'sections':sections,'bindings':bindings,'errors':sorted(set(errors))}
+    settings=ET.fromstring(archive.read('word/settings.xml')) if 'word/settings.xml' in names else ET.Element(W+'settings')
+    even=settings.find(W+'evenAndOddHeaders')
+    return {'policy':'worklazy-story-facts-1','parts':sorted(parts.values(),key=lambda item:item['part']),'sections':sections,'bindings':bindings,'settings':{'evenAndOddHeaders':even is not None and even.get(W+'val','true').lower() not in ('false','off','0')},'errors':sorted(set(errors))}
 
 def _parse_document(data, include_tables, include_metadata):
     records = {

@@ -340,6 +340,9 @@ def _property_revision(after_properties, before_properties, property_tag, change
     order = [child.tag for child in before_properties] if before_properties is not None else []
     order.extend(child.tag for child in previous if child.tag not in order)
     previous[:] = sorted(list(previous), key=lambda child: order.index(child.tag))
+    if property_tag==W+"pPr":
+        for child in list(previous):
+            if child.tag in {W+"rPr",W+"sectPr"}:previous.remove(child)
     if property_tag==W+"sectPr":
         for child in list(previous):
             if child.tag in {W+"headerReference",W+"footerReference"}:previous.remove(child)
@@ -993,7 +996,21 @@ def _drawing_revision(source, kind, writer):
     return revision
 
 
-def _paragraph_revision(before, after, include_formatting, writer):
+def _paragraph_revision(before,after,include_formatting,writer):
+    result=_paragraph_revision_content(before,after,include_formatting,writer)
+    if include_formatting and _MANIFEST is not None:
+        a=before.find(W+'pPr/'+W+'sectPr');b=after.find(W+'pPr/'+W+'sectPr')
+        if a is not None and b is not None:
+            action=_property_action(a,b,W+'sectPr')
+            if action is not None:
+                current=result.find(W+'pPr/'+W+'sectPr')
+                if current is None:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_PROPERTIES')
+                revised=_property_revision(current,a,W+'sectPr',W+'sectPrChange',writer,action['families'],action['representation']=='preserve-after-history')
+                props=result.find(W+'pPr');index=list(props).index(current);props.remove(current);props.insert(index,revised)
+    return result
+
+
+def _paragraph_revision_content(before, after, include_formatting, writer):
     before_text = _comparison_text(before)
     after_text = _comparison_text(after)
     # Source revisions cannot be nested safely inside a second insertion or
@@ -1410,27 +1427,60 @@ def _source_envelope(nodes,side_name,value):
 def _validate_story_projection(facts,actual):
     if _MANIFEST.get('storyFacts')!=facts:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_FACTS')
     plan=_MANIFEST.get('storyProjection',{})
-    if plan.get('policy')!='worklazy-story-projection-1':raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
+    if plan.get('policy')!='worklazy-story-projection-2':raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
+    a,b=facts['before'],facts['after'];sections=plan.get('sections');ids=set()
+    if not isinstance(sections,list):raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
+    for pair in sections:
+        if pair['id'] in ids:raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
+        ids.add(pair['id'])
+        for side in ('before','after'):
+            if pair.get(side) is not None and pair[side] not in facts[side]['sections']:raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
+        if pair['final']:
+            if pair['id']!='section:final-body' or pair.get('ownerDecisionId') is not None or any(not pair[side]['final'] for side in ('before','after') if pair.get(side)):raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
+        else:
+            owner=next((d for d in _MANIFEST_DECISIONS if d['id']==pair.get('ownerDecisionId')),None)
+            if owner is None or owner['type']!='paragraph' or owner['moved'] or len(owner['before'])!=1 or len(owner['after'])!=1 or pair['id']!='section:'+owner['id']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_BOUNDARY')
+            for side in ('before','after'):
+                section=pair.get(side);paragraph=owner[side][0]
+                if section is None or section['final'] or section['source']['part']!=paragraph['part'] or len(section['source']['path'])!=len(paragraph['path'])+2 or section['source']['path'][:len(paragraph['path'])]!=paragraph['path']:raise ValueError('INVALID_COMPARISON_MANIFEST_SECTION_OWNER')
+                if not any(ref['kind']=='body' and ref['part']==paragraph['part'] and ref['path']==paragraph['path'][:-1] for ref in actual[side].values()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_ENVELOPE')
+    if _MANIFEST['options']['metadata'] or _MANIFEST['options']['formatting']:
+        for side in ('before','after'):
+            if [pair[side] for pair in sections if pair.get(side)]!=facts[side]['sections']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_ORDER')
+    elif sections:raise ValueError('INVALID_COMPARISON_MANIFEST_SECTIONS')
+    if plan.get('supported') is not True or plan.get('reasons'):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY')
     if not _MANIFEST['options']['metadata']:
-        if plan!={'policy':'worklazy-story-projection-1','supported':True,'reasons':[],'pairs':[],'bindings':[]}:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
+        if plan.get('pairs')!=[] or plan.get('bindings')!=[] or plan.get('routes')!=[]:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
         return
-    a,b=facts['before'],facts['after']
+    if a['errors'] or b['errors']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY')
+    if any(not p['final'] for p in sections):
+        if not any(s['final'] for s in a['sections']) or not any(s['final'] for s in b['sections']):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTIONS')
+        if any(p.get('before',{}).get('activation')!=p.get('after',{}).get('activation') for p in sections):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_ACTIVATION')
+    if a.get('settings')!=b.get('settings'):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY_ACTIVATION')
     if any(('before' in item)!=('after' in item) for item in plan.get('bindings',[])):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY_BINDING')
-    if plan.get('supported') is not True or plan.get('reasons') or a['errors'] or b['errors']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY')
-    if (a['bindings'] or b['bindings']) and (any(not section['final'] for section in a['sections']+b['sections']) or len(a['sections'])>1 or len(b['sections'])>1):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTIONS')
     pairs=plan.get('pairs',[]);pair_ids={pair['id'] for pair in pairs}
     if len(pair_ids)!=len(pairs):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY')
-    slots=sorted({ref['kind']+':'+ref['variant'] for ref in a['bindings']+b['bindings']})
-    if len(plan.get('bindings',[]))!=len(slots):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
-    used=set()
-    for slot,binding in zip(slots,plan['bindings']):
-        old=next((ref for ref in a['bindings'] if ref['kind']+':'+ref['variant']==slot),None);new=next((ref for ref in b['bindings'] if ref['kind']+':'+ref['variant']==slot),None)
-        expected={'id':'binding:'+slot,'kind':(old or new)['kind'],'variant':(old or new)['variant'],'storyId':binding.get('storyId')}
-        if old is not None:expected['before']=old
-        if new is not None:expected['after']=new
-        pair=next((pair for pair in pairs if pair['id']==binding.get('storyId')),None)
-        if binding!=expected or pair is None or pair.get('beforePart')!=(old or {}).get('targetPart') or pair.get('afterPart')!=(new or {}).get('targetPart'):raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
-        used.add(pair['id'])
+    slots=sorted({ref['kind']+':'+ref['variant'] for ref in a['bindings']+b['bindings']});expected_bindings=[];routes=[];used=set();donors={'before':{},'after':{}}
+    for section in sections:
+        for slot in slots:
+            refs={side:next((ref for ref in facts[side]['bindings'] if section.get(side) and ref['section']==section[side]['source'] and ref['kind']+':'+ref['variant']==slot),None) for side in ('before','after')}
+            old,new=refs['before'],refs['after'];kind,variant=slot.split(':')
+            if old or new:
+                pair=next((pair for pair in pairs if pair.get('beforePart')==(old or {}).get('targetPart') and pair.get('afterPart')==(new or {}).get('targetPart')),None)
+                if pair is None:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
+                binding={'id':'binding:'+section['id']+':'+slot,'sectionId':section['id'],'kind':kind,'variant':variant,'storyId':pair['id']}
+                if old is not None:binding['before']=old
+                if new is not None:binding['after']=new
+                expected_bindings.append(binding);used.add(pair['id'])
+            for side in ('before','after'):
+                if refs[side]:donors[side][slot]={'donorSectionId':section['id'],'part':refs[side]['targetPart']}
+            before={'explicit':old is not None,**donors['before'].get(slot,{})};after={'explicit':new is not None,**donors['after'].get(slot,{})}
+            pair=next((pair for pair in pairs if pair.get('beforePart')==before.get('part') and pair.get('afterPart')==after.get('part')),None)
+            route={'sectionId':section['id'],'kind':kind,'variant':variant,'before':before,'after':after}
+            if pair:route['storyId']=pair['id']
+            if before.get('donorSectionId')!=after.get('donorSectionId') or bool(before.get('part'))!=bool(after.get('part')):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY_INHERITANCE')
+            routes.append(route)
+    if plan.get('bindings')!=expected_bindings or plan.get('routes')!=routes:raise ValueError('INVALID_COMPARISON_MANIFEST_STORY_BINDING')
     owned={'before':set(),'after':set()};covered_decisions=set()
     for pair in pairs:
         old,new=pair.get('beforePart'),pair.get('afterPart')
@@ -2128,6 +2178,8 @@ def _validate_formatting_manifest(actual, policy):
             if len(matches) > 1: raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
             if matches:
                 expect(matches[0], after, "pPr"); expect(matches[0], after, "rPr")
+        for section in _MANIFEST['storyProjection']['sections']:
+            if not section['final'] and section.get('before') and section.get('after'):expect(_manifest_key(section['before']['source']),_manifest_key(section['after']['source']),'sectPr')
     expected_exclusions = set()
     if _MANIFEST["options"]["formatting"]:
         for side in ("before", "after"):
