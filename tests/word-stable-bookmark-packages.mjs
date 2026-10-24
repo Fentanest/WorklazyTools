@@ -31,7 +31,8 @@ def mutate(source,path,change):
 def rename_ids(root):root.find('.//'+W+'bookmarkStart').set(W+'id','91');root.find('.//'+W+'bookmarkEnd').set(W+'id','91')
 renamed=mutate(case['after'],'/tmp/bookmarks/id-renamed.docx',rename_ids)
 with zipfile.ZipFile(renamed)as z:entries={n:z.read(n)for n in z.namelist()}
-entries['word/document.xml']=entries['word/document.xml'].replace(b'ns0:',b'alias:').replace(b'xmlns:ns0=',b'xmlns:alias=')
+entries['word/document.xml']=entries['word/document.xml'].replace(b'w:',b'alias:').replace(b'xmlns:w=',b'xmlns:alias=').replace(b'ns0:',b'alias:').replace(b'xmlns:ns0=',b'xmlns:alias=')
+assert b'alias:document' in entries['word/document.xml']
 with zipfile.ZipFile(renamed,'w')as z:
  for name,data in entries.items():z.writestr(name,data)
 result=project(case['before'],renamed,'/tmp/bookmarks/id-alias')
