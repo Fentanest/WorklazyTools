@@ -259,10 +259,13 @@ def _normalized_property_fact(tree, property_name, policy):
             history = True
             continue
         value = canonical(child)
+        grid_leaf = property_name!='tblGrid' or child['name']!=W+'gridCol' or (not child['children'] and not child['text'].strip() and set(child['attributes'])-noise_attributes <= {W+'w'} and (W+'w' not in child['attributes'] or re.fullmatch(r'(?:[+]?[0-9]+|[0-9]+(?:\.[0-9]+)?(?:mm|cm|in|pt|pc|pi))',child['attributes'][W+'w'])))
+        if property_name=='tblGrid' and grid_leaf and value is not None:
+            value[1]=[(name,str(int(v)) if name==W+'w' and re.fullmatch(r'[+]?[0-9]+',v) else v) for name,v in value[1]]
         if value is None:
             continue
         local = child["name"][len(W):] if child["name"].startswith(W) else child["name"]
-        target = supported if child["name"].startswith(W) and local in policy.get("enabled", {}).get(property_name, []) else unsupported
+        target = supported if child["name"].startswith(W) and local in policy.get("enabled", {}).get(property_name, []) and grid_leaf else unsupported
         target.setdefault(child["name"], []).append(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
     return {"supported": supported, "unsupported": unsupported, "history": history}
 
@@ -280,7 +283,7 @@ def _source_paths(root, part, archive=None):
         return {"name": node.tag, "attributes": dict(node.attrib), "text": node.text or "", "children": [property_tree(child) for child in node]}
     def visit(node, path, paragraph=None):
         reference = {"part": part, "path": path, "kind": node.tag.rsplit("}", 1)[-1]}
-        property_names = {"p": ("pPr",), "r": ("rPr",), "tbl": ("tblPr",), "tr": ("trPr",), "tc": ("tcPr",), "body": ("sectPr",), "style": ("pPr", "rPr")}.get(reference["kind"], ())
+        property_names = {"p": ("pPr",), "r": ("rPr",), "tbl": ("tblPr", "tblGrid"), "tr": ("trPr",), "tc": ("tcPr",), "body": ("sectPr",), "style": ("pPr", "rPr")}.get(reference["kind"], ())
         if property_names:
             reference["propertySnapshots"] = {name: property_tree(node.find(W + name)) for name in property_names}
             reference["normalizedProperties"] = {name: _normalized_property_fact(tree, name, policy) for name, tree in reference["propertySnapshots"].items()}

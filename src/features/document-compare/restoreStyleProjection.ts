@@ -62,7 +62,7 @@ export function buildRestoreStyleProjections(manifest: DocumentComparisonManifes
   const tables = (items: ComparisonDecision[]) => { for (const decision of items) {
     tables(decision.children ?? []);
     if (decision.type !== "table" || decision.before.length !== 1 || decision.after.length !== 1) continue;
-    const before = decision.before[0], after = decision.after[0]; add(before, after, "tblPr");
+    const before = decision.before[0], after = decision.after[0]; add(before, after, "tblPr"); add(before, after, "tblGrid");
     const left = children("before", before, "tr"), right = children("after", after, "tr");
     for (const row of decision.rows ?? []) if (row.beforeIndex !== null && row.afterIndex !== null) {
       const a = left[row.beforeIndex], b = right[row.afterIndex]; add(a, b, "trPr");

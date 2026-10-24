@@ -1,3 +1,4 @@
+import {buildTableGridProjections} from "./tableGridProjection.ts";
 import {buildNoteProjection,bindNoteDecisions,type NoteFacts} from "./noteProjection.ts";
 import {buildStoryProjection,bindStoryDecisions,emptyStoryBindingChanges,type StoryFacts} from "./storyProjection.ts";
 import type { DocumentCapabilities, DocumentProvenance } from "./documentCapabilities.ts";
@@ -111,7 +112,7 @@ export function compareDocumentModels(
     options: { formatting: options.formatting, tables: options.tables, metadata: options.metadata },
     preservation: { comments: "preserve-after-existing-contract", existingRevisions: "preserve-after-history" },
     formattingMask: {version: maskPolicyVersion, requested, effective, inactiveRequested: options.requestedFormattingMask ? normalizeFormattingMask(options.requestedFormattingMask) : undefined},
-    formattingPolicyVersion: "worklazy-formatting-1", formattingScopes: [], restoreStylePolicyVersion: "worklazy-restore-style-1", restorePropertyPairs: [], propertyExclusions: [], propertyActions: [], formattingExcluded: [],
+    formattingPolicyVersion: "worklazy-formatting-2", formattingScopes: [], restoreStylePolicyVersion: "worklazy-restore-style-1", restorePropertyPairs: [], propertyExclusions: [], propertyActions: [], formattingExcluded: [],
     coverage: { before: [], after: [] },
     sources: { before: before.sourceInventory ?? [], after: after.sourceInventory ?? [] },
     exclusions: {
@@ -224,6 +225,7 @@ export function compareDocumentModels(
   buildMergeProjections(manifest);
   buildRestoreStyleProjections(manifest);
   buildWordFormatting(manifest, diffCharacters);
+  buildTableGridProjections(manifest);
   projectWordFormatting(manifest, documentViews, headerFooter, note, changes, tables, language);
   const objectViews=(items:ComparisonDecision[],parentView?:ManifestFormattingView)=>{for(const decision of items){
     const view=[...documentViews,...headerFooter,...note].find(view=>view.comparisonDecisionId===decision.id)??parentView;

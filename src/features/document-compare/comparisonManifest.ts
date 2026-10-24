@@ -39,6 +39,7 @@ export interface ComparisonDecision {
   before: DocumentSourceReference[];
   after: DocumentSourceReference[];
   moved: boolean;
+  gridProjection?:import("./tableGridProjection.ts").TableGridProjection;
   mergeProjection?: {policy:"worklazy-merge-1";beforeBoundary:number;afterBoundary:number;properties:Array<{before:DocumentSourceReference;after:DocumentSourceReference;beforeFact:PropertyFact;afterFact:PropertyFact;families:string[];history:boolean}>;beforeEvents:Array<{source:DocumentSourceReference;side:number}>;afterEvents:Array<{source:DocumentSourceReference;side:number}>};
   objectEvents?: {unchangedDrawings:Array<{before:DocumentSourceReference;after:DocumentSourceReference}>;contexts:ObjectEventContext[];deletedDrawingStyles:DeletedDrawingStyleProjection[];drawingProperties:DrawingPropertyProjection[];unchangedLinks:Array<{before:DocumentSourceReference;after:DocumentSourceReference}>;propertiesSupported:boolean;policy:"worklazy-source-events-5";before:DocumentSourceReference[];after:DocumentSourceReference[];changed:boolean};
   screenFormattingFamilies?: string[];
@@ -80,7 +81,7 @@ export interface DocumentComparisonManifest {
   preservation: { comments: "preserve-after-existing-contract"; existingRevisions: "preserve-after-history" };
   decisions: ComparisonDecision[];
   formattingMask: { version: "worklazy-formatting-mask-1"; requested: FormattingMask; inactiveRequested?: FormattingMask; effective: FormattingMask };
-  formattingPolicyVersion: "worklazy-formatting-1";
+  formattingPolicyVersion: "worklazy-formatting-2";
   formattingScopes: FormattingScope[];
   restoreStylePolicyVersion: "worklazy-restore-style-1";
   restorePropertyPairs: Array<{ before: DocumentSourceReference; after: DocumentSourceReference; property: string }>;

@@ -1,9 +1,10 @@
 {
-  "version":"worklazy-formatting-1",
+  "version":"worklazy-formatting-2",
   "enabled":{
     "rPr":["b","i","u","strike","dstrike","caps","smallCaps","bCs","iCs","color","highlight","vertAlign","outline","shadow","emboss","imprint","spacing","kern","position","w","vanish","shd","sz","rFonts"],
     "pPr":["pStyle","keepNext","keepLines","pageBreakBefore","widowControl","suppressLineNumbers","pBdr","shd","tabs","spacing","ind","jc","textDirection","textAlignment","contextualSpacing","mirrorIndents"],
     "tblPr":["tblStyle","tblW","jc","tblCellSpacing","tblInd","tblBorders","shd","tblLayout","tblCellMar","tblLook","bidiVisual"],
+    "tblGrid":["gridCol"],
     "trPr":["trHeight","cantSplit","tblHeader","jc","hidden","tblCellSpacing"],
     "tcPr":["tcW","gridSpan","vMerge","tcBorders","shd","noWrap","tcMar","textDirection","tcFitText","vAlign","hideMark"],
     "sectPr":["type","pgSz","pgMar","paperSrc","pgBorders","lnNumType","pgNumType","cols","formProt","vAlign","noEndnote","titlePg","textDirection","bidi","rtlGutter","docGrid"]

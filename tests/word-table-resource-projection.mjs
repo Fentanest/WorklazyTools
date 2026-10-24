@@ -14,12 +14,16 @@ const result=JSON.parse(py.runPython(`
 import shutil
 os.makedirs('/table-projection',exist_ok=True)
 legacy_reject=reject
+source_grid_ids=set()
 def reject(node):
  # Independent native table structure semantics: rejection removes inserted
  # rows/cells; a deleted cell survives and its own deletion marker is removed.
  if node.tag==W+'tr' and any(n.get(W+'author')=='events' for n in node.findall(W+'trPr/'+W+'ins')):return []
  if node.tag==W+'tc' and any(n.get(W+'author')=='events' for n in node.findall(W+'tcPr/'+W+'cellIns')):return []
  if node.tag==W+'cellDel' and node.get(W+'author')=='events':return []
+ if node.tag==W+'tblGrid':
+  change=node.find(W+'tblGridChange')
+  if change is not None and change.get(W+'id') not in source_grid_ids:return [copy.deepcopy(change.find(W+'tblGrid'))]
  return legacy_reject(node)
 def without_notes(value):
  if isinstance(value,list):return [without_notes(v) for v in value if not isinstance(v,dict) or 'footnote' not in v]

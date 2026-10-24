@@ -21,6 +21,7 @@ PROPERTY_CHANGE_TAGS = {
     W + "rPrChange",
     W + "pPrChange",
     W + "tblPrChange",
+    W + "tblGridChange",
     W + "trPrChange",
     W + "tcPrChange",
     W + "sectPrChange",
@@ -289,6 +290,35 @@ def _local_name(tag):
 
 
 
+def _table_grid_projection(source,paired=False):
+    origin=_MANIFEST_NODE_KEYS.get(source)
+    candidates=[decision for decision in _MANIFEST_DECISIONS if decision['type']=='table' and origin and any(_manifest_key(ref)==origin[1] for ref in decision[origin[0]])]
+    if len(candidates)!=1:raise ValueError('INVALID_COMPARISON_MANIFEST_GRID_OWNER')
+    decision=candidates[0]
+    keys={(decision['id'],side) for side in ('before','after') if decision[side]} if paired else {(decision['id'],origin[0])}
+    if _MANIFEST_GRID_USED & keys:raise ValueError('INVALID_COMPARISON_MANIFEST_GRID_CONSUMPTION')
+    _MANIFEST_GRID_USED.update(keys)
+    return decision['gridProjection']
+
+
+def _revisionize_table_grid(result,before,after,writer):
+    projection=_table_grid_projection(before,True)
+    action=_property_action(before,after,W+'tblGrid') if _MANIFEST['options']['formatting'] else None
+    if not projection['changed']:return
+    current=result.find(W+'tblGrid')
+    if current is None:
+        current=ET.Element(W+'tblGrid');index=list(result).index(result.find(W+'tblPr'))+1 if result.find(W+'tblPr') is not None else 0;result.insert(index,current)
+    if current.find(W+'tblGridChange') is not None:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_GRID_HISTORY')
+    previous=ET.Element(W+'tblGrid')
+    for entry in projection['restore']:
+        if entry['implicit']:column=ET.Element(W+'gridCol')
+        else:
+            source=before if entry['side']=='before' else after
+            column=copy.deepcopy(source.find(W+'tblGrid').findall(W+'gridCol')[entry['index']])
+        previous.append(column)
+    attributes=writer.attributes();change=ET.SubElement(current,W+'tblGridChange',{W+'id':attributes[W+'id']});change.append(previous)
+
+
 def _property_revision(after_properties, before_properties, property_tag, change_tag, writer, families=(), preserve_history=False):
     if after_properties is None and not families:
         return None
@@ -313,7 +343,9 @@ def _property_revision(after_properties, before_properties, property_tag, change
     if property_tag==W+"sectPr":
         for child in list(previous):
             if child.tag in {W+"headerReference",W+"footerReference"}:previous.remove(child)
-    change = ET.SubElement(result, change_tag, writer.attributes())
+    attributes=writer.attributes()
+    if change_tag==W+"tblGridChange":attributes={W+"id":attributes[W+"id"]}
+    change = ET.SubElement(result, change_tag, attributes)
     change.append(previous)
     return result
 
@@ -345,7 +377,8 @@ def _apply_property_revision(result, before, property_tag, change_tag, writer, a
         result.remove(current)
         result.insert(index, revised)
     else:
-        result.insert(0, revised)
+        index=list(result).index(result.find(W+"tblPr"))+1 if property_tag==W+"tblGrid" and result.find(W+"tblPr") is not None else 0
+        result.insert(index, revised)
 
 
 def _accepted_copy(source, preserve_comments=False):
@@ -747,7 +780,7 @@ def _restore_whole_properties(result, source, property_name):
     after = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(pairs[0]["after"])))
     if after is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
     action = _property_action(source, after, W + property_name) if _MANIFEST["options"]["formatting"] else None
-    properties = _project_properties(source.find(W + property_name), after.find(W + property_name), property_name)
+    properties = copy.deepcopy(after.find(W+property_name)) if property_name=="tblGrid" and action and action["representation"]=="preserve-after-history" else _project_properties(source.find(W + property_name), after.find(W + property_name), property_name)
     current = result.find(W + property_name)
     if current is not None: result.remove(current)
     if properties is not None: result.insert(0, properties)
@@ -1249,14 +1282,28 @@ def _table_revision(before, after, include_formatting, writer):
     _replace_direct_children(table, W + "tr", revised_rows)
     if include_formatting:
         _apply_property_revision(table, before, W + "tblPr", W + "tblPrChange", writer, after)
+    _revisionize_table_grid(table,before,after,writer)
     return table
 
 
 def _whole_table_revision(source, kind, writer):
     _consume_manifest_subtree("after" if kind == "ins" else "before", source)
+    projection=_table_grid_projection(source)
     table = copy.deepcopy(source) if kind == "ins" else _accepted_copy(source)
     if kind=="ins":_consume_copied_objects(source)
-    if kind == "del": _restore_whole_properties(table, source, "tblPr")
+    if kind == "del":
+        _restore_whole_properties(table, source, "tblPr")
+        _restore_whole_properties(table, source, "tblGrid")
+        if projection['mode']=='paired':
+            current=table.find(W+'tblGrid');previous=ET.Element(W+'tblGrid')
+            for entry in projection['restore']:
+                if entry['implicit']:column=ET.Element(W+'gridCol')
+                else:
+                    ref=next(decision[entry['side']][0] for decision in _MANIFEST_DECISIONS if decision.get('gridProjection') is projection)
+                    root=_MANIFEST_SOURCE_NODES[(entry['side'],_manifest_key(ref))];column=copy.deepcopy(root.find(W+'tblGrid').findall(W+'gridCol')[entry['index']])
+                previous.append(column)
+            if current is not None:table.remove(current)
+            index=list(table).index(table.find(W+'tblPr'))+1 if table.find(W+'tblPr') is not None else 0;table.insert(index,previous)
     for index, row in enumerate(table.findall(W + "tr")):
         original = source.findall(W + "tr")[index]
         if kind == "del":
@@ -1338,6 +1385,7 @@ _MANIFEST_MERGE_SIDES = {}
 _MANIFEST_SYNTHETIC_TOKENS = {}
 _MANIFEST_OBJECT_EXPECTED = {}
 _MANIFEST_EVENT_OWNERS = {}
+_MANIFEST_GRID_USED = set()
 _MANIFEST_OBJECT_CONSUMED = {}
 
 
@@ -1616,6 +1664,7 @@ def _validate_manifest(before_path, after_path):
 
     _validate_restore_styles(actual)
     _validate_formatting_manifest(actual, json.loads(WORKLAZY_FORMATTING_POLICY_JSON))
+    _validate_table_grids(actual)
 
     for side in ("before", "after"):
         structural = {key: ref for key, ref in actual[side].items() if ref["kind"] in {"p", "tbl"}}
@@ -1716,7 +1765,7 @@ def _validate_restore_styles(actual):
                 raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_POLICY")
         if decision["type"] == "table" and len(decision["before"]) == len(decision["after"]) == 1:
             before, after = _manifest_key(decision["before"][0]), _manifest_key(decision["after"][0])
-            expected_pairs.add((before, after, "tblPr"))
+            expected_pairs.add((before, after, "tblPr"));expected_pairs.add((before, after, "tblGrid"))
             left, right = children("before", before, "tr"), children("after", after, "tr")
             for row in decision["rows"]:
                 if row["beforeIndex"] is None or row["afterIndex"] is None: continue
@@ -1946,6 +1995,53 @@ def _mask_enabled(property_name, name):
     return _MANIFEST["formattingMask"]["effective"][group]
 
 
+def _validate_table_grids(actual):
+    empty=json.dumps([W+'gridCol',[],'',[]],separators=(',',':'))
+    for decision in _MANIFEST_DECISIONS:
+        supplied=decision.get('gridProjection')
+        if decision['type']!='table' or decision.get('trackedRepresentation')!='revision' or not decision['before'] and not decision['after']:
+            if supplied is not None:raise ValueError('INVALID_COMPARISON_MANIFEST_GRID')
+            continue
+        refs={side:actual[side].get(_manifest_key(decision[side][0])) if decision[side] else None for side in ('before','after')}
+        def cols(side):return [child for child in ((refs[side] or {}).get('propertySnapshots',{}).get('tblGrid') or {}).get('children',[]) if child['name']==W+'gridCol']
+        def fact(side):return (refs[side] or {}).get('normalizedProperties',{}).get('tblGrid',{'supported':{},'unsupported':{},'history':False})
+        def values(side):return fact(side)['supported'].get(W+'gridCol',[])
+        counts={side:max([len(cols(side)),0]+[pair[side+'Index']+1 for pair in decision['columns'] if pair[side+'Index'] is not None]) for side in ('before','after')}
+        mode='after-unpaired' if not refs['before'] else 'before-unpaired' if not refs['after'] else 'paired';restore=[]
+        for index in range(counts['before']):
+            pair=next((pair for pair in decision['columns'] if pair['beforeIndex']==index),None)
+            side='after' if mode=='paired' and not _MANIFEST['formattingMask']['effective']['paragraph'] and pair is not None and pair['afterIndex'] is not None else 'before'
+            source_index=pair['afterIndex'] if side=='after' else index
+            restore.append({'side':side,'index':source_index,'implicit':source_index>=len(cols(side))})
+        target=[values(entry['side'])[entry['index']] if entry['index']<len(values(entry['side'])) else empty for entry in restore]
+        current=[values('after')[index] if index<len(values('after')) else empty for index in range(counts['after'])]
+        def footprint(side):
+            root=refs[side];result=[]
+            for source in actual[side].values():
+                if root and source['part']==root['part'] and source['path'][:len(root['path'])]==root['path']:
+                    result.extend((name,data) for name,data in source.get('normalizedProperties',{}).get('tcPr',{}).get('supported',{}).items() if name in {W+'gridSpan',W+'vMerge'})
+                    result.extend((name,data) for name,data in source.get('normalizedProperties',{}).get('trPr',{}).get('unsupported',{}).items() if name in {W+'gridBefore',W+'gridAfter'})
+            return result
+        structural=footprint('before')!=footprint('after') or decision['moved'] or counts['before']!=counts['after'] or any(pair['beforeIndex'] is None or pair['afterIndex'] is None or pair['beforeIndex']!=pair['afterIndex'] for pair in decision['columns'])
+        expected={'policy':'worklazy-table-grid-1','mode':mode,'beforeCount':counts['before'],'afterCount':counts['after'],'restore':restore,'changed':mode=='paired' and target!=current,'supported':True}
+        history=fact('after')['history']
+        if mode=='paired' and history and not structural:expected.update(mode='after-history',restore=[{'side':'after','index':index,'implicit':index>=len(cols('after'))} for index in range(counts['after'])],changed=False)
+        if mode=='paired' and (expected['changed'] or structural):
+            unsafe=history or not _MANIFEST['formattingMask']['effective']['paragraph'] and any(entry['side']=='before' and not any(pair['beforeIndex']==entry['index'] and pair['afterIndex'] is None for pair in decision['columns']) for entry in restore)
+            for side in ('before','after'):
+                root=refs[side]
+                unsafe=unsafe or bool(fact(side)['unsupported'])
+                for source in actual[side].values():
+                    if root and source['part']==root['part'] and source['path'][:len(root['path'])]==root['path']:
+                        for name,data in source.get('normalizedProperties',{}).get('trPr',{}).get('unsupported',{}).items():
+                            if name in {W+'gridBefore',W+'gridAfter'} and any(not any(attribute==W+'val' and value=='0' for attribute,value in json.loads(item)[1]) for item in data):unsafe=True
+                        for name,data in source.get('normalizedProperties',{}).get('tcPr',{}).get('supported',{}).items():
+                            if name==W+'vMerge' or name==W+'gridSpan' and any(not any(attribute==W+'val' and value=='1' for attribute,value in json.loads(item)[1]) for item in data):unsafe=True
+            if unsafe:expected.update(supported=False,reason='unsupported-grid-geometry-or-history')
+        if supplied!=expected:raise ValueError('INVALID_COMPARISON_MANIFEST_GRID')
+        if not expected['supported']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_GRID_GEOMETRY')
+
+
 def _validate_formatting_manifest(actual, policy):
     if _MANIFEST.get("formattingPolicyVersion") != policy["version"]:
         raise ValueError("STALE_COMPARISON_MANIFEST")
@@ -1993,6 +2089,7 @@ def _validate_formatting_manifest(actual, policy):
         scope = scope_by_id.get(action.get("scopeId"))
         if scope is None or "comparisonId" in scope or not scope["families"] or action["scopeId"] in action_scopes or action["id"] in action_ids or action["id"] in scope_by_id or any(action["id"] == decision["id"] for decision in _MANIFEST_DECISIONS):
             raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_ACTION")
+        if action['property']=='tblGrid' and action['representation']!='preserve-after-history' and any(scope[side+'Fact']['unsupported'] for side in ('before','after')):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_GRID_DEPENDENCY')
         action_scopes.add(action["scopeId"]); action_ids.add(action["id"])
         if action["families"] != scope["families"] or action["property"] != scope["property"] or any(_manifest_key(action[side]) != _manifest_key(scope[side]) for side in ("before", "after")):
             raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_ACTION")
@@ -2014,7 +2111,7 @@ def _validate_formatting_manifest(actual, policy):
             if decision["type"] != "table" or len(decision["before"]) != 1 or len(decision["after"]) != 1:
                 continue
             before, after = _manifest_key(decision["before"][0]), _manifest_key(decision["after"][0])
-            expect(before, after, "tblPr")
+            expect(before, after, "tblPr");expect(before, after, "tblGrid")
             left, right = children("before", before, "tr"), children("after", after, "tr")
             for row in decision["rows"]:
                 if row["beforeIndex"] is None or row["afterIndex"] is None: continue
@@ -2154,7 +2251,7 @@ def _install_manifest(manifest):
             _MANIFEST_DECISIONS.append(decision)
             visit(decision.get("children", []))
     visit(manifest["decisions"])
-    _MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
+    _MANIFEST_GRID_USED.clear();_MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
     for decision in _MANIFEST_DECISIONS:
         for side in ("before","after"):
             for ref in decision.get("objectEvents",{}).get(side,[]):
@@ -2805,6 +2902,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
                     if _MANIFEST_CONSUMED.get((side, _manifest_key(ref))) != 1:
                         raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
 
+        if _MANIFEST_GRID_USED!={(decision['id'],side) for decision in _MANIFEST_DECISIONS if decision['type']=='table' and decision.get('trackedRepresentation')=='revision' for side in ('before','after') if decision[side]}:raise ValueError('INVALID_COMPARISON_MANIFEST_GRID_CONSUMPTION')
         if _MANIFEST_OBJECT_CONSUMED != _MANIFEST_OBJECT_EXPECTED:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_OBJECT_CONSUMPTION")
         if _MANIFEST_PROPERTY_USED != {action["id"] for action in _MANIFEST["propertyActions"]}:
             raise ValueError("UNSUPPORTED_TRACKED_SOURCE")
@@ -2840,4 +2938,4 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _MANIFEST_PROPERTY_USED = set()
         _MANIFEST_SOURCE_NODES = {}
         _MANIFEST_ALLOWED_PROPERTIES = {}
-        _MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
+        _MANIFEST_GRID_USED.clear();_MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear()
