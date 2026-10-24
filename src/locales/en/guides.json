@@ -158,7 +158,9 @@
       {
         "title": "Results and Precautions",
         "paragraphs": [
-          "Read the original text alongside the change indicators to verify if it represents an actual meaning change. Indicators might appear due to internal structure or formatting differences. Automated handling may be difficult if similar types of content repeat."
+          "Read the original text alongside the change indicators to verify if it represents an actual meaning change. Indicators might appear due to internal structure or formatting differences. Automated handling may be difficult if similar types of content repeat.",
+          "When table comparison is on, column additions and deletions in paired tables are tracked even if column widths and layout are excluded. Remaining columns use revised widths, while restored deleted columns keep their original widths. Some merged-cell or offset-row layout changes cannot yet be exported with tracked changes.",
+          "In our checks, LibreOffice did not recognize some table revisions for Accept/Reject. Review the result beside the originals in your chosen editor."
         ]
       },
       {
