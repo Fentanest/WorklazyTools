@@ -23,6 +23,8 @@ import type {
 import { useLocalizedPath } from "../../i18n/routing";
 import { useAppLanguage } from "../../i18n/routing";
 
+import "./word-result-mobile.css";
+
 type ResultTab = "document" | "headerFooter" | "note";
 
 export interface DocumentCompareResultPair {
@@ -64,6 +66,7 @@ export function DocumentCompareResultPage({
   const pair = results.find((item) => item.pairNumber === pairNumber);
   const [resultTab, setResultTab] = useState<ResultTab>("document");
   const [showFullContent, setShowFullContent] = useState(true);
+  const [mobileSide, setMobileSide] = useState<"before" | "after">("before");
 
   const areaPages = useMemo(() => pair?.result.views?.[resultTab] ?? [], [pair, resultTab]);
   const visiblePages = useMemo(
@@ -132,10 +135,17 @@ export function DocumentCompareResultPage({
           </div>
         </div>
 
+        <div className="word-result-mobile-switch mt-3" data-testid="document-mobile-side">
+          <SegmentedControl label={L("표시할 문서", "Visible document")} value={mobileSide} onChange={setMobileSide} options={[
+            { value: "before", label: L("수정 전", "Before") },
+            { value: "after", label: L("수정 후", "After") },
+          ]} />
+        </div>
         <DiffLegend showComments={showCommentLegend} />
         <DocumentPageComparison
           beforeName={pair.result.beforeName}
           afterName={pair.result.afterName}
+          mobileSide={mobileSide}
           items={visiblePages}
           tables={pair.result.tables}
         />
@@ -193,7 +203,8 @@ function ContentToggle({ checked, onChange }: { checked: boolean; onChange: (che
   );
 }
 
-function DocumentPageComparison({ beforeName, afterName, items, tables }: {
+function DocumentPageComparison({ beforeName, afterName, items, tables, mobileSide }: {
+  mobileSide: "before" | "after";
   beforeName: string;
   afterName: string;
   items: WordDocumentViewItem[];
@@ -219,7 +230,7 @@ function DocumentPageComparison({ beforeName, afterName, items, tables }: {
         <Button variant="secondary" className="min-w-0 justify-center rounded-xl max-[820px]:whitespace-normal max-[820px]:leading-[1.3]" type="button" onClick={() => goToChange(1)} disabled={currentChange === changedIndexes.length - 1} aria-label={language === "en" ? "Next change" : "다음 변경"} title={language === "en" ? "Next change" : "다음 변경"}><span className="min-[821px]:max-[1599px]:hidden">{language === "en" ? "Next" : "다음"}</span> <ArrowRight size={14} aria-hidden="true" /></Button>
       </nav>}
       <div className="col-start-1 row-start-1 min-w-0 overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-slate-200 focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--wl-focus)] max-[820px]:col-start-1 max-[820px]:row-start-2 dark:bg-slate-800" role="region" aria-label={language === "en" ? "Side-by-side document scroll area" : "수정 전후 문서 가로 스크롤 영역"} tabIndex={0}>
-      <div className="grid min-w-[940px] grid-cols-2 gap-x-[22px] p-5 text-[#1d1d1f]" role="table" data-testid="document-page-view" aria-label={language === "en" ? "Full before-and-after document comparison" : "수정 전후 문서 전체 비교"}>
+      <div className="grid min-w-[940px] grid-cols-2 gap-x-[22px] p-5 text-[#1d1d1f]" role="table" data-testid="document-page-view" data-mobile-side={mobileSide} aria-label={language === "en" ? "Full before-and-after document comparison" : "수정 전후 문서 전체 비교"}>
         <div role="row" className="col-span-full grid grid-cols-2 gap-x-[22px]">
         <div className="sticky top-0 z-[3] flex min-w-0 items-center gap-2 rounded-t-lg border border-b-0 border-[#d5d5da] bg-white/[.97] px-9 py-3 shadow-[0_-3px_14px_rgba(35,38,45,.08)]" role="columnheader" data-document-side="before"><span className="shrink-0 rounded-md bg-[#efeff2] px-1.5 py-1 text-xs font-extrabold text-[#606066]">{language === "en" ? "Before" : "수정 전"}</span><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm">{beforeName}</strong></div>
         <div className="sticky top-0 z-[3] flex min-w-0 items-center gap-2 rounded-t-lg border border-b-0 border-[#d5d5da] bg-white/[.97] px-9 py-3 shadow-[0_-3px_14px_rgba(35,38,45,.08)]" role="columnheader" data-document-side="after"><span className="shrink-0 rounded-md bg-[#efeff2] px-1.5 py-1 text-xs font-extrabold text-[#606066]">{language === "en" ? "After" : "수정 후"}</span><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm">{afterName}</strong></div>
