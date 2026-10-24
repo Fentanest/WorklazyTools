@@ -314,6 +314,26 @@ def _simple_vml_picture(node, archive=None, part=None):
     return ids.count(type_id)==ids.count(shape_id)==1 and run is not None and run.tag==W+'r' and paragraph is not None and paragraph.tag==W+'p'
 
 
+def _stable_named_bookmark_context(root, part):
+    """Source-only shape check; correspondence is owned by existing decisions."""
+    if part!='word/document.xml':return None
+    starts=list(root.iter(W+'bookmarkStart'));ends=list(root.iter(W+'bookmarkEnd'))
+    links=[n for n in root.iter(W+'hyperlink') if n.get(W+'anchor') is not None]
+    if len(starts)!=1 or len(ends)!=1 or len(links)!=1:return None
+    start,end,link=starts[0],ends[0],links[0];name=start.get(W+'name','');ident=start.get(W+'id','')
+    if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,39}',name) or not re.fullmatch(r'[0-9]+',ident):return None
+    if start.attrib!={W+'id':ident,W+'name':name} or end.attrib!={W+'id':ident} or len(start) or len(end):return None
+    if link.attrib!={W+'anchor':name}:return None
+    parents={child:parent for parent in root.iter() for child in parent};body=root.find(W+'body');host=parents.get(start);jump=parents.get(link)
+    if host is None or jump is None or host is jump or parents.get(host) is not body or parents.get(jump) is not body:return None
+    if any((n.text or '').strip() or (n.tail or '').strip() for n in (start,end,host,jump,link)):return None
+    if host.attrib or jump.attrib or not len(host) or host[0] is not start or host[-1] is not end or list(jump)!=[link]:return None
+    def plain_runs(nodes):
+        return bool(nodes) and all(n.tag==W+'r' and not n.attrib and not (n.text or '').strip() and not (n.tail or '').strip() and len(n)>0 and all(t.tag==W+'t' and not len(t) and not (t.tail or '').strip() and not set(t.attrib)-{'{http://www.w3.org/XML/1998/namespace}space'} and t.get('{http://www.w3.org/XML/1998/namespace}space','default') in ('default','preserve') for t in n) for n in nodes)
+    if not plain_runs(list(host)[1:-1]) or not plain_runs(list(link)) or not _text(host).strip() or not _text(link).strip():return None
+    return {'name':name,'host':host,'jump':jump,'link':link,'start':start,'end':end}
+
+
 def _source_paths(root, part, archive=None):
     result = {}
     offsets = {}
@@ -405,10 +425,12 @@ def _source_paths(root, part, archive=None):
             office=('http://schemas.openxmlformats.org/','urn:schemas-microsoft-com:','http://schemas.microsoft.com/office/')
             if any(n.tag.startswith(tuple('{'+uri for uri in office)) or any(a.startswith('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}') for a in n.attrib) for n in root.iter()):return None
             return data
-        supported = node.tag!=W+"pict" or _simple_vml_picture(node,archive,part)
+        named_anchor=node.tag==W+"hyperlink" and node.get(W+"anchor") is not None
+        named_context=_stable_named_bookmark_context(root,part) if named_anchor else None
+        supported = (not named_anchor or named_context is not None and named_context["link"] is node) and (node.tag!=W+"pict" or _simple_vml_picture(node,archive,part))
         vml_picture=node.tag==W+"pict" and supported
         has_image = False
-        target = ""
+        target = node.get(W+"anchor","") if named_anchor else ""
         def canonical_event(item):
             nonlocal supported, target, has_image
             attrs = []
@@ -442,7 +464,7 @@ def _source_paths(root, part, archive=None):
         normalized = normalized_root
         for index in result[id(node)]["path"]: normalized = list(normalized)[index]
         value = canonical_event(normalized)
-        if node.tag == W + "hyperlink" and (node.get(W + "anchor") or node.find('.//' + W + 'drawing') is not None or any(child.tag!=W+"r" for child in node)): supported = False
+        if node.tag == W + "hyperlink" and (named_anchor and not supported or node.find('.//' + W + 'drawing') is not None or any(child.tag!=W+"r" for child in node)): supported = False
         if node.tag != W + "hyperlink" and not has_image:supported=False
         if node.tag!=W+'pict' and node.find('.//'+W+'pict') is not None:supported=False
         return hashlib.sha256(json.dumps(value, ensure_ascii=False).encode()).hexdigest(), supported, target

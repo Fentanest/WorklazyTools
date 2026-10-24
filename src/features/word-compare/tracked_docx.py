@@ -1056,8 +1056,44 @@ def _drawing_revision(source, kind, writer):
     return revision
 
 
+def _validate_stable_bookmark_decisions(nodes):
+    roots={side:nodes[side].get(('word/document.xml',())) for side in ('before','after')}
+    if not any(root is not None and any(n.tag in {W+'bookmarkStart',W+'bookmarkEnd'} or n.tag==W+'hyperlink' and n.get(W+'anchor') is not None for n in root.iter()) for root in roots.values()):return
+    if not any(root is not None and any(n.tag==W+'hyperlink' and n.get(W+'anchor') is not None for n in root.iter()) for root in roots.values()):
+        # Preserve existing split/merge envelope guards and their fixed codes;
+        # these non-1:1 bookmark contexts are not admitted by this feature.
+        for decision in _MANIFEST_DECISIONS:
+            if (len(decision['before']),len(decision['after'])) not in {(1,2),(2,1)}:continue
+            for side in ('before','after'):
+                for ref in decision[side]:
+                    node=nodes[side].get(_manifest_key(ref))
+                    if node is not None and any(n.tag in {W+'bookmarkStart',W+'bookmarkEnd'} for n in node.iter()):return
+    contexts={side:_stable_named_bookmark_context(root,'word/document.xml') if root is not None else None for side,root in roots.items()}
+    if any(value is None for value in contexts.values()):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE')
+    if contexts['before']['name']!=contexts['after']['name'] or _text(contexts['before']['link'])!=_text(contexts['after']['link']):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE')
+    keys={side:{role:next(key for key,node in nodes[side].items() if node is context[role]) for role in ('host','jump','link')} for side,context in contexts.items()}
+    for role in ('host','jump'):
+        owners=[d for d in _MANIFEST_DECISIONS if any(_manifest_key(ref)==keys['before'][role] for ref in d['before'])]
+        if len(owners)!=1:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE')
+        owner=owners[0]
+        if owner['type']!='paragraph' or owner.get('moved') or len(owner['before'])!=1 or len(owner['after'])!=1 or owner.get('trackedRepresentation')!='revision' or _manifest_key(owner['after'][0])!=keys['after'][role] or keys['before'][role]!=keys['after'][role]:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE')
+        if role=='jump':
+            links=owner.get('objectEvents',{}).get('unchangedLinks',[])
+            if len(links)!=1 or _manifest_key(links[0]['before'])!=keys['before']['link'] or _manifest_key(links[0]['after'])!=keys['after']['link']:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE')
+
+
 def _paragraph_revision(before,after,include_formatting,writer):
     result=_paragraph_revision_content(before,after,include_formatting,writer)
+    if before.find(W+'bookmarkStart') is not None or after.find(W+'bookmarkStart') is not None:
+        origins=(_MANIFEST_NODE_KEYS.get(before),_MANIFEST_NODE_KEYS.get(after))
+        if any(origin is None or origin[1][0]!='word/document.xml' for origin in origins):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE')
+        # The full source range and unmoved 1:1 owner are validated before
+        # rendering. Keep AFTER volatile IDs around the existing text diff.
+        start=after.find(W+'bookmarkStart');end=after.find(W+'bookmarkEnd')
+        if start is None or end is None:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_BOOKMARK_RANGE')
+        for marker in list(result):
+            if marker.tag in {W+'bookmarkStart',W+'bookmarkEnd'}:result.remove(marker)
+        result.insert(1 if result.find(W+'pPr') is not None else 0,copy.deepcopy(start));result.append(copy.deepcopy(end))
     if include_formatting and _MANIFEST is not None:
         a=before.find(W+'pPr/'+W+'sectPr');b=after.find(W+'pPr/'+W+'sectPr')
         if a is not None and b is not None:
@@ -1706,6 +1742,7 @@ def _validate_manifest(before_path, after_path):
                         visit(child, path + [index])
                 visit(root, [])
 
+    _validate_stable_bookmark_decisions(nodes)
     ids = set()
     if _MANIFEST['options']['tables']:
         for side in ('before','after'):
