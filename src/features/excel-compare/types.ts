@@ -130,8 +130,13 @@ export interface ExcelComparePairResult {
   reportName: string;
   runId?: string;
   parameters?: Array<[string, string]>;
-  originalSheets?: { left: import("../spreadsheet-core/inputAdapter.ts").SpreadsheetSheetData; right: import("../spreadsheet-core/inputAdapter.ts").SpreadsheetSheetData };
+  originalSheets?: { left: ExcelComparePreviewSheet; right: ExcelComparePreviewSheet };
 }
+
+/** A cell as the result grid shows it (address, value and display facts; no lineage). */
+export type ExcelComparePreviewCell = Pick<import("../spreadsheet-core/inputAdapter.ts").SpreadsheetCellData, "row" | "column" | "address" | "type" | "value" | "formula" | "cachedValue" | "cacheState" | "displayValue" | "numberFormat" | "style">;
+/** A compared sheet as the result grid browses it: every cell, without merges, lineage or tables. */
+export interface ExcelComparePreviewSheet { name: string; rowCount: number; columnCount: number; cells: ExcelComparePreviewCell[] }
 
 export interface ExcelCompareInspection {
   fileName: string;

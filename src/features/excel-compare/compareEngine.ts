@@ -7,10 +7,13 @@ import {
   normalizeKeyPart,
 } from "./normalization.ts";
 import { compareCellsWithStringDates,stringDatePolicy } from "./stringDates.ts";
+import { restoreRecordIdentity } from "./recordIdentity.ts";
 import { isReconcileConfigValid, type ReconcileConfig } from "./reconcileConfig.ts";
 import type {
   ExcelCompareDuplicateRecord,
   ExcelComparePairOptions,
+  ExcelComparePreviewCell,
+  ExcelComparePreviewSheet,
   ExcelCompareRecord,
   ExcelCompareStandardRecord,
   ExcelCompareSummary,
@@ -18,7 +21,7 @@ import type {
 
 export interface ExcelCompareEngineResult {
   runId?: string;
-  originalSheets?: { left: SpreadsheetSheetData; right: SpreadsheetSheetData };
+  originalSheets?: { left: ExcelComparePreviewSheet; right: ExcelComparePreviewSheet };
   records: ExcelCompareRecord[];
   summary: ExcelCompareSummary;
   warnings: string[];
@@ -70,15 +73,32 @@ export function compareSpreadsheetPair(
   if (records.some((item) => item.reason.includes("STRING_DATE_PARSE_FAILED"))) warnings.push("STRING_DATE_PARSE_FAILED");
   // randomUUID exists only in secure contexts; plain-http previews still need a run id.
   const runId = globalThis.crypto?.randomUUID?.() ?? `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  records.forEach((item, index) => { item.recordId = `${runId}:${index}`; item.matchingReason = options.mode === "reconcile" ? `RECONCILIATION:${item.reason}` : options.mode === "key" ? `KEY:${options.key?.duplicatePolicy ?? "invalid"}:${options.columnMapping?.length ? "manual-columns" : "auto-columns"}` : `POSITION:${options.columnMapping?.length ? "manual-columns" : "auto-columns"}`; });
+  restoreRecordIdentity(records, runId, options);
   return {
     runId,
-    originalSheets: structuredClone({ left: leftSheet, right: rightSheet }),
+    originalSheets: { left: previewSheet(leftSheet), right: previewSheet(rightSheet) },
     records,
     summary: summarize(records),
     warnings,
     parameters: [["runId", runId], ...comparisonParameters(leftBook, rightBook, options)],
   };
+}
+
+/** What the result grid shows of a compared sheet, built fresh (the parsed book is not shared):
+ * every cell's address, value and display facts, without lineage, merges or tables. */
+function previewSheet(sheet: SpreadsheetSheetData): ExcelComparePreviewSheet {
+  return { name: sheet.name, rowCount: sheet.rowCount, columnCount: sheet.columnCount, cells: sheet.cells.map(previewCell) };
+}
+
+function previewCell(cell: SpreadsheetCellData): ExcelComparePreviewCell {
+  const result: ExcelComparePreviewCell = { row: cell.row, column: cell.column, address: cell.address, type: cell.type, value: cell.value instanceof Date ? new Date(cell.value.getTime()) : cell.value };
+  if (cell.formula !== undefined) result.formula = cell.formula;
+  if (cell.cachedValue !== undefined) result.cachedValue = cell.cachedValue instanceof Date ? new Date(cell.cachedValue.getTime()) : cell.cachedValue;
+  if (cell.cacheState !== undefined) result.cacheState = cell.cacheState;
+  if (cell.displayValue !== undefined) result.displayValue = cell.displayValue;
+  if (cell.numberFormat !== undefined) result.numberFormat = cell.numberFormat;
+  if (cell.style !== undefined) result.style = structuredClone(cell.style);
+  return result;
 }
 
 function compareByPosition(

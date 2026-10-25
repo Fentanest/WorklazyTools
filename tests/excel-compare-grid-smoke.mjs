@@ -10,7 +10,7 @@ const testLanguage=process.env.EXCEL_GRID_LANG||"en";
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "excel-grid-smoke-"));
 await fs.writeFile(path.join(temporary, "left.csv"), "Date,Amount\n01/02/2024,5\n02/30/2024,8");
 await fs.writeFile(path.join(temporary, "right.csv"), "Amount,Date\n5,2024-01-02\n8,2024-02-29");
-const browser = await puppeteer.launch({ executablePath: "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+const browser = await puppeteer.launch({ executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 try {
   const page = await browser.newPage();
   page.setDefaultTimeout(30000);

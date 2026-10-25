@@ -1,3 +1,4 @@
+import { restoreRecordIdentity } from "./recordIdentity.ts";
 import { runModuleWorker, type ModuleWorkerProgress } from "../../utils/workerLifecycle.ts";
 import { assertReceivedXlsxReport } from "./reportIntegrity.ts";
 import type { ExcelCompareInspection, ExcelComparePairOptions, ExcelComparePairResult } from "./types.ts";
@@ -75,6 +76,7 @@ export async function runExcelComparePair(
     resultErrorMessage: messages[language].result,
   });
   assertExcelPairReportContract(result);
+  if (result.runId) restoreRecordIdentity(result.records, result.runId, options);
   return result;
 }
 

@@ -73,7 +73,7 @@ export function normalizeComparableText(value: string, options: ExcelCompareNorm
   return normalizeText(value, options);
 }
 
-export function cellText(cell: SpreadsheetCellData | undefined) {
+export function cellText(cell: Pick<SpreadsheetCellData, "formula" | "cachedValue" | "displayValue" | "value"> | undefined) {
   if (!cell) return "";
   if (cell.formula && cell.cachedValue === null) return cell.formula;
   return cell.displayValue ?? scalarText(cell.value);

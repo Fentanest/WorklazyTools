@@ -4,6 +4,10 @@ import type { ExcelCompareEngineResult } from "./compareEngine.ts";
 import { duplicateReportParameters, formatDuplicateReportRows } from "./duplicateReport.ts";
 import type { ExcelCompareRecord, ExcelCompareStandardRecord } from "./types.ts";
 
+// Per-record provenance rows (record id -> report sheet and rows) are written for at most this many
+// records; a larger comparison omits them with one marker row, keeping the report's size and
+// write time with its record sheets.
+export const RECORD_PROVENANCE_LIMIT = 10_000;
 const REPORT_SHEETS = ["Summary", "Parameters", "Matched", "Changed", "Added", "Removed", "Duplicates", "Ambiguous", "Errors"] as const;
 const RECORD_HEADERS = ["Left file", "Right file", "Left sheet", "Right sheet", "Left row", "Right row", "Left column", "Right column", "Key", "Left value", "Right value", "Change", "Reason"];
 
@@ -35,7 +39,7 @@ export async function buildExcelCompareReport(
         ["rightFile", context.rightName],
         ...result.parameters,
         ...duplicateMetadata,
-        ...reportProvenance(result.records, duplicateLayout.rows),
+        ...(result.records.length <= RECORD_PROVENANCE_LIMIT ? reportProvenance(result.records, duplicateLayout.rows) : [["recordProvenance", `omitted: ${result.records.length} records exceed ${RECORD_PROVENANCE_LIMIT}`] as [string, string]]),
         ...result.warnings.map((warning) => ["warning", warning] as [string, string]),
       ],
     },

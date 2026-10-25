@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Button } from "../../components/ui/button";
-import type { SpreadsheetCellData, SpreadsheetSheetData } from "../spreadsheet-core/inputAdapter.ts";
+import type { ExcelComparePreviewCell as SpreadsheetCellData, ExcelComparePreviewSheet as SpreadsheetSheetData } from "./types.ts";
 import { cellText } from "./normalization.ts";
 import { columnAddress, worksheetAxisWindow, worksheetRecordIndex } from "./worksheetProjection.ts";
 import type { ExcelCompareRecord, ExcelCompareStatus } from "./types.ts";

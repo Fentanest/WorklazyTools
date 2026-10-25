@@ -79,6 +79,8 @@ async function handle(request: Request) {
     };
     leftBook = undefined as unknown as typeof leftBook;
     rightBook = undefined as unknown as typeof rightBook;
+    // Ids and matching reasons follow from runId, position and options; the page restores them.
+    for (const record of compared.records) { delete record.recordId; delete record.matchingReason; }
     progress(100, "COMPLETE");
     worker.postMessage({ type: "result", result }, [reportBuffer]);
   } catch (error) {

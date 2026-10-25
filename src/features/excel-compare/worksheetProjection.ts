@@ -1,4 +1,4 @@
-import type { SpreadsheetSheetData } from "../spreadsheet-core/inputAdapter.ts";
+import type { ExcelComparePreviewSheet as SpreadsheetSheetData } from "./types.ts";
 import type { ExcelCompareRecord } from "./types.ts";
 
 export function columnAddress(column: number) {

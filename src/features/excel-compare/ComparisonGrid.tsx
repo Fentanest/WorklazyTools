@@ -8,7 +8,7 @@ import { buildExcelCompareReport } from "./report.ts";
 import { assertGeneratedXlsxReport } from "./reportIntegrity.ts";
 import { projectCompareRecords, selectCompareResult } from "./resultProjection.ts";
 import type { ExcelComparePairResult, ExcelCompareRecord, ExcelCompareStatus } from "./types.ts";
-import type { SpreadsheetCellData, SpreadsheetSheetData } from "../spreadsheet-core/inputAdapter.ts";
+import type { ExcelComparePreviewCell as SpreadsheetCellData, ExcelComparePreviewSheet as SpreadsheetSheetData } from "./types.ts";
 
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 const LAYOUTS=WORKSHEET_LAYOUTS;
