@@ -4044,13 +4044,12 @@ class _NodeRegistry:
         index = start
         while index < len(nodes):
             children = list(nodes[index])
-            first.append(len(nodes)); count.append(len(children))
-            for offset, child in enumerate(children):
-                nodes.append(child); parent.append(index); position.append(offset); owner.append(registration)
+            size = len(children)
+            first.append(len(nodes)); count.append(size)
+            if size:
+                nodes.extend(children); parent.extend([index] * size); position.extend(range(size)); owner.extend([registration] * size)
             index += 1
-        ids = self.ids
-        for index in range(start, len(nodes)):
-            ids[nodes[index]] = index
+        self.ids.update(zip(nodes[start:], range(start, len(nodes))))
         self.roots.setdefault((side, part), []).append(start)
 
     def key(self, index):
