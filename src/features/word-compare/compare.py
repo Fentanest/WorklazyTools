@@ -227,18 +227,22 @@ def _text(node):
     return _text_uncached(node)
 
 
+_TEXT_TAG, _TAB_TAG, _BREAK_TAGS = W + "t", W + "tab", (W + "br", W + "cr")
+
+
 def _text_uncached(node):
     parts = []
     stack = [node]
     while stack:
         item = stack.pop()
-        if item.tag in TEXT_SKIPPED_TAGS:
+        tag = item.tag
+        if tag in TEXT_SKIPPED_TAGS:
             continue
-        if item.tag == W + "t":
+        if tag == _TEXT_TAG:
             parts.append(item.text or "")
-        elif item.tag == W + "tab":
+        elif tag == _TAB_TAG:
             parts.append("\t")
-        elif item.tag in (W + "br", W + "cr"):
+        elif tag in _BREAK_TAGS:
             parts.append("\n")
         else:
             stack.extend(reversed(list(item)))
@@ -351,7 +355,7 @@ def _normalized_property_node_uncached(node, property_name, policy):
             continue
         local = child.tag[len(W):] if child.tag.startswith(W) else child.tag
         target = supported if child.tag.startswith(W) and local in enabled_here and grid_leaf else unsupported
-        target.setdefault(child.tag, []).append(_COMPACT_JSON.encode(value))
+        target.setdefault(child.tag, []).append(_compact_json(value))
     return {"supported": supported, "unsupported": unsupported, "history": history}
 
 
@@ -459,6 +463,28 @@ def _parsed_part(archive, part):
     root = _cached_xml(archive, part)
     return root, _source_paths(root, part, archive)
 _COMPACT_JSON = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"))
+_JSON_STRING = json.encoder.encode_basestring
+# Opaque paragraph items canonicalized by their text, and the tags the object event walk
+# distinguishes (see _source_paths).
+_TEXT_CANONICAL_TAGS = frozenset({W + "hyperlink", W + "fldSimple"})
+_PARAGRAPH_TAG = W + "p"
+_NOTE_REFERENCE_TAGS = frozenset({W + "footnoteReference", W + "endnoteReference"})
+_OBJECT_EVENT_TAGS = frozenset({W + "drawing", W + "pict", W + "hyperlink", "{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"})
+_ONE_CHARACTER_TAGS = frozenset({W + "tab", W + "br", W + "cr"})
+
+
+def _compact_json(value):
+    """`_COMPACT_JSON.encode(value)` for the nested lists and tuples of strings and None that
+    property facts hold, without the encoder set up on every call (thousands per document): the
+    same string escaping and separators. Any other value goes to the encoder."""
+    kind = type(value)
+    if kind is str:
+        return _JSON_STRING(value)
+    if kind is list or kind is tuple:
+        return "[" + ",".join([_compact_json(item) for item in value]) + "]"
+    if value is None:
+        return "null"
+    return _COMPACT_JSON.encode(value)
 
 
 def _source_paths(root, part, archive=None):
@@ -528,7 +554,7 @@ def _source_paths(root, part, archive=None):
             opaque = [item for item in node.iter() if item.tag in OPAQUE_PARAGRAPH_TAGS]
             if opaque:
                 def canonical(item):
-                    if item.tag in {W + "hyperlink", W + "fldSimple"}:
+                    if item.tag in _TEXT_CANONICAL_TAGS:
                         return (item.tag, sorted(item.attrib.items()), _text(item))
                     return (item.tag, sorted(item.attrib.items()), item.text or "", [canonical(child) for child in item])
                 payload = json.dumps([canonical(item) for item in opaque], ensure_ascii=False).encode("utf-8")
@@ -657,15 +683,15 @@ def _source_paths(root, part, archive=None):
     for paragraph in root.iter(W + "p"):
         cursor = [0]; events = []
         def event_walk(node):
-            if node is not paragraph and node.tag == W + "p": return
+            if node is not paragraph and node.tag == _PARAGRAPH_TAG: return
             # Positions count the text `_text` reads: no property elements or existing deletions.
             if node.tag in TEXT_SKIPPED_TAGS: return
-            if node.tag in {W+"footnoteReference",W+"endnoteReference"}:
+            if node.tag in _NOTE_REFERENCE_TAGS:
                 kind="footnote" if node.tag==W+"footnoteReference" else "endnote"
                 if archive is None or not any(owner['kind']==kind for owner in _note_part_owners(archive)[0]):return
                 event={"kind":"note","start":cursor[0],"end":cursor[0],"signature":kind,"supported":True,"target":node.get(W+"id",""),"paragraphPath":result[id(paragraph)]["path"],"runPath":result[id(node)]["path"][:-1]}
                 result[id(node)]["objectEvent"]=event;events.append(event);return
-            if node.tag in {W + "drawing", W + "pict", W + "hyperlink", "{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:
+            if node.tag in _OBJECT_EVENT_TAGS:
                 start = cursor[0]
                 if node.tag == W + "hyperlink":
                     for child in node: event_walk(child)
@@ -673,8 +699,8 @@ def _source_paths(root, part, archive=None):
                 event = {"kind": "hyperlink" if node.tag == W + "hyperlink" else "drawing", "start": start, "end": cursor[0], "signature": signature, "supported": supported, "target": target, "paragraphPath": result[id(paragraph)]["path"], "runPath": result[id(node)]["path"][:-1]}
                 result[id(node)]["objectEvent"] = event; events.append(event)
                 return
-            if node.tag == W + "t": cursor[0] += len(node.text or "")
-            elif node.tag in {W + "tab", W + "br", W + "cr"}: cursor[0] += 1
+            if node.tag == _TEXT_TAG: cursor[0] += len(node.text or "")
+            elif node.tag in _ONE_CHARACTER_TAGS: cursor[0] += 1
             else:
                 for child in node: event_walk(child)
         event_walk(paragraph)
