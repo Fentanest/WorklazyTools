@@ -1,11 +1,15 @@
 import {TEXT_VIEW_DEFAULTS} from "./viewDefaults.ts";
 import {rawSearchMatches,type RawSearchMatch} from "./search.ts";
 import type { TextRow, TextLine, TextMark } from "./resultTypes.ts";
+import { highlighterLoaded, highlightSpans, type SyntaxLanguage } from "./syntaxHighlight.ts";
 export type TextViewEntry = { kind: "row"; row: TextRow; search?:{left:RawSearchMatch[];right:RawSearchMatch[];truncated:boolean} } | { kind: "fold"; id: string; count: number };
-export interface TextDisplayStyle { palette:"standard"|"contrast"; bold:boolean; underline:boolean; syntax:"plain"|"json"|"javascript" }
+export interface TextDisplayStyle { palette:"standard"|"contrast"; bold:boolean; underline:boolean; syntax:"plain"|SyntaxLanguage }
 export const MAX_TEXT_RENDER_PIECES=512;
 export function syntaxSpans(text:string,syntax:TextDisplayStyle['syntax'],limit=MAX_TEXT_RENDER_PIECES) {
   if(syntax==="plain")return [];
+  // highlight.js (Diffchecker's 21 languages) once loaded; until then JSON and JavaScript use the built-in tokenizer.
+  if(highlighterLoaded())return highlightSpans(text,syntax,limit);
+  if(syntax!=="json"&&syntax!=="javascript")return [];
   const spans:Array<{start:number;end:number;kind:string}>=[];
   const words=new Set(syntax==="json"?["true","false","null"]:["const","let","var","function","return","if","else","class","new","async","await","true","false","null","undefined","import","export","from"]);
   const digit=(c:string|undefined)=>c!==undefined&&c>="0"&&c<="9";

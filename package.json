@@ -99,6 +99,7 @@
     "fabric": "7.4.0",
     "fast-xml-parser": "^5.10.1",
     "gifenc": "1.0.3",
+    "highlight.js": "11.12.0",
     "i18next": "^26.3.6",
     "jsdom": "^29.1.1",
     "jsqr": "^1.4.0",
