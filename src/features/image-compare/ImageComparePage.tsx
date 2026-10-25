@@ -69,7 +69,7 @@ export function ImageComparePage() {
     const lease=claimWork();
     try{await lease.previous;abort.signal.throwIfAborted();const proposed=await proposeAlignment(left,right,alignmentMode,String(token),retained+alignBytes.current,abort.signal,setProgress,featureRois);
       if(token!==generation.current||abort.signal.aborted)return;
-      const next=await compareImages(left,right,options,IDENTITY_TRANSFORM,abort.signal,setProgress,retained,proposed.matrix);
+      const next=await compareImages(left,right,options,IDENTITY_TRANSFORM,abort.signal,setProgress,retained+alignBytes.current,proposed.matrix);
       if(token!==generation.current||abort.signal.aborted){disposeImageResult(next);return;}
       previewRef.current=next;setPreview(next);setCandidate(proposed);setProgress(100);
     }catch(caught){if(token===generation.current)setError(failureKey(caught,'alignment.failed'));}
