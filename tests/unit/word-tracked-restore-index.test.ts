@@ -29,14 +29,18 @@ def install(pairs, decisions=()):
                        "formattingMask": {key: {group: False for group in ("fontFamily", "size", "style", "color", "paragraph", "numbering")} for key in ("requested", "effective")}})
     _RESTORE_INDEX.clear()
 source = ET.Element(W + "tc"); after = ET.Element(W + "tc"); ET.SubElement(after, W + "tcPr").set("marker", "after")
+def register():
+    # source at (0, 0) of the original, after at (0, 1) of the revision.
+    before_root = ET.Element(W + "document"); ET.SubElement(before_root, W + "body").append(source)
+    after_root = ET.Element(W + "document"); after_body = ET.SubElement(after_root, W + "body"); after_body.append(ET.Element(W + "tc")); after_body.append(after)
+    _register_manifest_root(before_root, PART, "before"); _register_manifest_root(after_root, PART, "after")
 def restore(name):
     result = ET.Element(W + "tc")
     _restore_whole_properties(result, source, name, consume=False)
     return [child.get("marker") for child in result]
 def compare(pairs, name):
     install(pairs)
-    _MANIFEST_NODE_KEYS[source] = ("before", (PART, (0, 0)))
-    _MANIFEST_SOURCE_NODES[("after", (PART, (0, 1)))] = after
+    register()
     old = outcome(lambda: len(scan_pairs(name, (PART, (0, 0)))))
     _MANIFEST_KEY_CACHE.clear(); _RESTORE_INDEX.clear()
     first = outcome(lambda: restore(name)); again = outcome(lambda: restore(name))
@@ -49,7 +53,7 @@ cases = {
     "none": compare([{"property": "trPr", "before": ref(0, 0), "after": ref(0, 1)}], "tcPr"),
     "unselected after malformed": compare([good, {"property": "tcPr", "before": ref(0, 5), "after": ref(-1)}], "tcPr"),
 }
-install([good]); _MANIFEST_NODE_KEYS.pop(source, None)
+install([good])
 cases["no origin"] = {"first": outcome(lambda: restore("tcPr"))}
 decisions = [
     {"id": "a", "before": [ref(0, 2)], "after": [ref(0, 3)], "deletedFormattingPolicy": "restore-before-unpaired", "wholeRestoreStyles": [{"before": ref(-1)}]},

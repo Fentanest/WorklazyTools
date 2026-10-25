@@ -7,6 +7,7 @@ import json
 import re
 import zipfile
 import xml.etree.ElementTree as ET
+from array import array
 
 from js import worklazyDiffJson, worklazyComparisonManifestJson
 
@@ -3988,9 +3989,10 @@ def _install_manifest(manifest):
     _MANIFEST_ACTIVE_DECISION = None
     _MANIFEST_ACTIVE_COMPARISON = None
     _MANIFEST_PROPERTY_USED = set()
-    _MANIFEST_SOURCE_NODES = {}
+    registry = _NodeRegistry()
+    _MANIFEST_SOURCE_NODES = _SourceNodes(registry)
     _MANIFEST_ALLOWED_PROPERTIES = {name: {W + family for family in families if _mask_enabled(name, family)} for name, families in json.loads(WORKLAZY_FORMATTING_POLICY_JSON)["enabled"].items()}
-    _MANIFEST_NODE_KEYS = {}
+    _MANIFEST_NODE_KEYS = _NodeKeys(registry)
     _MANIFEST_DECISIONS = []
     def visit(decisions):
         for decision in decisions:
@@ -4008,7 +4010,111 @@ def _install_manifest(manifest):
                 _MANIFEST_OBJECT_EXPECTED[key]=set(range(event["start"],event["end"])) if event["kind"]=="hyperlink" and event["end"]>event["start"] else {None}
 
 
+class _NodeRegistry:
+    """Every node of the parsed parts as registered, before any is copied or moved, in place of the two
+    maps node -> (side, (part, path)) and back that held a key tuple and two dict entries per node.
+    Nodes are numbered breadth-first per registered root, so a node's children are one contiguous run:
+    a key is rebuilt from parent links and a path resolves one step per level, both against the tree as
+    it was registered. A later registration of a node or key wins, as the maps' overwrites did."""
+    def __init__(self):
+        self.ids = {}
+        self.nodes = []
+        self.parent, self.position, self.first, self.count, self.owner = array("i"), array("i"), array("i"), array("i"), array("i")
+        self.owners = []
+        self.roots = {}
+
+    def register(self, root, part, side):
+        nodes, parent, position, first, count, owner = self.nodes, self.parent, self.position, self.first, self.count, self.owner
+        registration = len(self.owners)
+        self.owners.append((side, part))
+        start = len(nodes)
+        nodes.append(root); parent.append(-1); position.append(0); owner.append(registration)
+        index = start
+        while index < len(nodes):
+            children = list(nodes[index])
+            first.append(len(nodes)); count.append(len(children))
+            for offset, child in enumerate(children):
+                nodes.append(child); parent.append(index); position.append(offset); owner.append(registration)
+            index += 1
+        ids = self.ids
+        for index in range(start, len(nodes)):
+            ids[nodes[index]] = index
+        self.roots.setdefault((side, part), []).append(start)
+
+    def key(self, index):
+        side, part = self.owners[self.owner[index]]
+        path = []
+        while self.parent[index] >= 0:
+            path.append(self.position[index])
+            index = self.parent[index]
+        path.reverse()
+        return (side, (part, tuple(path)))
+
+    def find(self, key):
+        """The node a dict keyed by every registered key would return, else None."""
+        hash(key)  # an unhashable key fails as a dict lookup does
+        if not isinstance(key, tuple) or len(key) != 2 or not isinstance(key[1], tuple) or len(key[1]) != 2:
+            return None
+        side, (part, path) = key
+        roots = self.roots.get((side, part))
+        if roots is None or not isinstance(path, tuple):
+            return None
+        first, count = self.first, self.count
+        for index in reversed(roots):
+            for step in path:
+                # A key matches an equal path: True equals 1 and 2.0 equals 2, as in a dict.
+                if type(step) is float and step.is_integer():
+                    step = int(step)
+                elif not isinstance(step, int):
+                    break
+                if not 0 <= step < count[index]:
+                    break
+                index = first[index] + step
+            else:
+                return self.nodes[index]
+        return None
+
+
+class _NodeKeys:
+    """node -> (side, (part, path)), read like the dict it replaces."""
+    def __init__(self, registry):
+        self.registry = registry
+
+    def get(self, node, default=None):
+        index = self.registry.ids.get(node)
+        return default if index is None else self.registry.key(index)
+
+    def __getitem__(self, node):
+        return self.registry.key(self.registry.ids[node])
+
+    def __contains__(self, node):
+        return node in self.registry.ids
+
+
+class _SourceNodes:
+    """(side, (part, path)) -> node, read like the dict it replaces."""
+    def __init__(self, registry):
+        self.registry = registry
+
+    def get(self, key, default=None):
+        node = self.registry.find(key)
+        return default if node is None else node
+
+    def __getitem__(self, key):
+        node = self.registry.find(key)
+        if node is None:
+            raise KeyError(key)
+        return node
+
+    def __contains__(self, key):
+        return self.registry.find(key) is not None
+
+
 def _register_manifest_root(root, part, side):
+    if isinstance(_MANIFEST_NODE_KEYS, _NodeKeys):
+        _MANIFEST_NODE_KEYS.registry.register(root, part, side)
+        return
+    # Plain maps (no manifest installed): register every node in them.
     node_keys, source_nodes = _MANIFEST_NODE_KEYS, _MANIFEST_SOURCE_NODES
     stack = [(root, ())]
     while stack:
