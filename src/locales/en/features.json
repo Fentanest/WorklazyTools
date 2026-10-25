@@ -3162,7 +3162,8 @@
       "open": "Align on screen",
       "close": "Close on-screen alignment",
       "previewFailed": "The images could not be shown for alignment. You can still align with the number fields.",
-      "inputInvalid": "A number field is out of range, so the view keeps the last valid alignment. Apply replaces it with these values."
+      "inputInvalid": "A number field is out of range, so the view keeps the last valid alignment. Apply replaces it with these values.",
+      "loading": "Preparing the alignment previews…"
     }
   }
 }

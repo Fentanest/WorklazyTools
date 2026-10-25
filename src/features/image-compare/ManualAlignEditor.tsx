@@ -2,67 +2,33 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { Button } from "../../components/ui/button";
 import type { ImageT } from "./ImageViews.tsx";
 import { transformMatrix } from "./geometry.ts";
-import { inspectImageHeader } from "./input.ts";
-import { SNAP_SCREEN_PX, cornerSigns, imageCorners, rotateFromPointer, scaleYOf, snapMove, snapResize, tidyTransform, type Guides, type Point, type Size } from "./manualAlign.ts";
-import { IDENTITY_TRANSFORM, IMAGE_LIMITS, type Transform } from "./types.ts";
+import type { AlignPreview, AlignPreviews } from "./alignPreview.ts";
+import { SNAP_SCREEN_PX, cornerSigns, imageCorners, rotateFromPointer, scaleYOf, snapMove, snapResize, tidyTransform, type Guides, type Point } from "./manualAlign.ts";
+import { IDENTITY_TRANSFORM, type Transform } from "./types.ts";
 
 const SNAP_KEY = "worklazy.imageAlignSnapping", STAGE_MAX_HEIGHT = 440, PAD = 0.25, HANDLE = 10;
-/** Previews are reduced to this longest side; geometry stays in original pixels. */
-export const ALIGN_PREVIEW_SIDE = 1600;
-interface Preview { size: Size; canvas: HTMLCanvasElement; bytes: number }
-/** The original's header is validated (type, file size, dimensions) before any decode, the browser decode
- * (8 bytes per source pixel for decode and resize) must fit beside retained work, and only a reduced
- * canvas is kept; its bytes are reported so the page reserves them for comparison, OCR and export. */
-async function loadPreview(file: File, retainedBytes: number): Promise<Preview> {
-  const buffer = await file.arrayBuffer(), meta = inspectImageHeader(file.name, buffer);
-  const swap = meta.exifOrientation >= 5, width = swap ? meta.height : meta.width, height = swap ? meta.width : meta.height;
-  const scale = Math.min(1, ALIGN_PREVIEW_SIDE / Math.max(width, height)), previewWidth = Math.max(1, Math.round(width * scale)), previewHeight = Math.max(1, Math.round(height * scale));
-  const bytes = previewWidth * previewHeight * 4;
-  if (meta.width * meta.height * 8 + bytes + retainedBytes > IMAGE_LIMITS.memoryBytes) throw new Error("IMAGE_MEMORY_LIMIT");
-  const bitmap = await createImageBitmap(new Blob([buffer], { type: meta.mime }), { imageOrientation: "from-image", resizeWidth: previewWidth, resizeHeight: previewHeight, resizeQuality: "medium" });
-  try {
-    const canvas = document.createElement("canvas"); canvas.width = previewWidth; canvas.height = previewHeight;
-    const context = canvas.getContext("2d"); if (!context) throw new Error("IMAGE_DECODE_FAILED");
-    context.drawImage(bitmap, 0, 0); return { size: { width, height }, canvas, bytes };
-  } finally { bitmap.close(); }
-}
-const validTransform = (value: Transform) => { try { transformMatrix(1, 1, value); return true; } catch { return false; } };
-const errorKey = (error: unknown) => { const code = error instanceof Error ? error.message : ""; return code === "IMAGE_FILE_LIMIT" ? "fileLimit" : code === "IMAGE_SIZE_LIMIT" ? "dimensionLimit" : code === "IMAGE_MEMORY_LIMIT" ? "memoryLimit" : "manual.previewFailed"; };
-function PreviewCanvas({ preview, style }: { preview: Preview; style: CSSProperties }) {
-  const holder = useRef<HTMLDivElement>(null);
-  useEffect(() => { const node = holder.current; if (!node) return; const canvas = preview.canvas; canvas.style.width = "100%"; canvas.style.height = "100%"; canvas.style.display = "block"; node.appendChild(canvas); return () => { canvas.remove(); }; }, [preview]);
-  return <div ref={holder} className="pointer-events-none absolute select-none" style={style} />;
-}
 function readSnapping() { try { return globalThis.localStorage?.getItem(SNAP_KEY) !== "false"; } catch { return true; } }
 function writeSnapping(value: boolean) { try { globalThis.localStorage?.setItem(SNAP_KEY, String(value)); } catch { /* per-viewer convenience only */ } }
 const same = (a: Transform, b: Transform) => a.x === b.x && a.y === b.y && a.degrees === b.degrees && a.scale === b.scale && scaleYOf(a) === scaleYOf(b) && a.flipX === b.flipX && a.flipY === b.flipY;
 type Gesture = { kind: "move" } | { kind: "resize"; corner: { ux: number; uy: number } } | { kind: "rotate" };
+const validTransform = (value: Transform) => { try { transformMatrix(1, 1, value); return true; } catch { return false; } };
+function PreviewCanvas({ preview, style }: { preview: AlignPreview; style: CSSProperties }) {
+  const holder = useRef<HTMLDivElement>(null);
+  useEffect(() => { const node = holder.current; if (!node) return; const canvas = preview.canvas; canvas.style.width = "100%"; canvas.style.height = "100%"; canvas.style.display = "block"; node.appendChild(canvas); return () => { canvas.remove(); }; }, [preview]);
+  return <div ref={holder} className="pointer-events-none absolute select-none" style={style} />;
+}
 
 /** Diffchecker-style manual alignment: the changed image over the original at an adjustable opacity, moved by
- * dragging or arrow keys, resized from its corners, rotated by a handle. Edits stay a draft until Apply. */
-export function ManualAlignEditor({ left, right, transform, t, disabled, retainedBytes, onRetainedChange, onApply }: { left: File; right: File; transform: Transform; t: ImageT; disabled: boolean; retainedBytes: number; onRetainedChange: (bytes: number) => void; onApply: (next: Transform) => void }) {
-  const [previews, setPreviews] = useState<{ left: Preview; right: Preview }>(), [loadError, setLoadError] = useState<string>();
-  const sizes = { left: previews?.left.size, right: previews?.right.size }, retained = useRef(retainedBytes), report = useRef(onRetainedChange);
-  retained.current = retainedBytes; report.current = onRetainedChange;
-  // Sequential decode: one original is decoded at a time; the previews are released when files change or the editor closes.
-  useEffect(() => {
-    let alive = true, loaded: { left: Preview; right: Preview } | undefined;
-    setPreviews(undefined); setLoadError(undefined);
-    void (async () => {
-      try {
-        const first = await loadPreview(left, retained.current); if (!alive) { first.canvas.width = 0; return; }
-        const second = await loadPreview(right, retained.current + first.bytes); if (!alive) { first.canvas.width = second.canvas.width = 0; return; }
-        loaded = { left: first, right: second }; setPreviews(loaded); report.current(first.bytes + second.bytes);
-      } catch (error) { if (alive) setLoadError(errorKey(error)); }
-    })();
-    return () => { alive = false; if (loaded) { loaded.left.canvas.width = 0; loaded.right.canvas.width = 0; } report.current(0); };
-  }, [left, right]);
+ * dragging or arrow keys, resized from its corners, rotated by a handle. Edits stay a draft until Apply. The page
+ * loads the reduced previews under its work lease and reserves them; this view only shows them. */
+export function ManualAlignEditor({ previews, loading, error, transform, t, disabled, onApply }: { previews?: AlignPreviews; loading: boolean; error?: string; transform: Transform; t: ImageT; disabled: boolean; onApply: (next: Transform) => void }) {
+  const sizes = { left: previews?.left.size, right: previews?.right.size };
   const [draft, setDraft] = useState(() => validTransform(transform) ? transform : { ...IDENTITY_TRANSFORM }), [opacity, setOpacity] = useState(50), [snapping, setSnapping] = useState(readSnapping);
   const [locked, setLocked] = useState(() => transform.scaleY === undefined), [guides, setGuides] = useState<Guides>({}), [width, setWidth] = useState(0);
   const frame = useRef<HTMLDivElement>(null), inner = useRef<HTMLDivElement>(null), gesture = useRef<{ type: Gesture; start: Transform; from: Point } | undefined>(undefined);
   // A number field may hold an out-of-range value while typing: the draft keeps its last valid transform.
-  const inputValid = validTransform(transform);
-  useEffect(() => { if (!validTransform(transform)) return; setDraft(transform); setLocked(transform.scaleY === undefined); }, [transform]);
+  const inputValid = validTransform(transform), lastValid = useRef(inputValid ? transform : { ...IDENTITY_TRANSFORM });
+  useEffect(() => { if (!validTransform(transform)) return; lastValid.current = transform; setDraft(transform); setLocked(transform.scaleY === undefined); }, [transform]);
   useLayoutEffect(() => { const node = frame.current; if (!node) return; const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width)); observer.observe(node); return () => observer.disconnect(); }, []);
   const ready = sizes.left && sizes.right ? { left: sizes.left, right: sizes.right } : undefined;
   const maxWidth = Math.max(sizes.left?.width ?? 1, sizes.right?.width ?? 1), maxHeight = Math.max(sizes.left?.height ?? 1, sizes.right?.height ?? 1);
@@ -108,7 +74,8 @@ export function ManualAlignEditor({ left, right, transform, t, disabled, retaine
       <Button type="button" size="sm" variant={snapping ? "secondary" : "outline"} aria-pressed={snapping} data-testid="image-manual-snap" onClick={toggleSnapping}>{t(snapping ? "manual.snapOn" : "manual.snapOff")}</Button>
     </div>
     <div ref={frame} tabIndex={0} role="application" aria-label={t("manual.stage")} onKeyDown={nudge} data-testid="image-manual-stage" className="relative w-full touch-none overflow-hidden rounded border border-border bg-[repeating-conic-gradient(#ddd_0%_25%,#fff_0%_50%)] bg-[length:16px_16px] outline-none focus-visible:ring-2 focus-visible:ring-ring" style={{ height: stageHeight || 240 }}>
-      {loadError && <p role="alert" className="p-3 text-sm" data-testid="image-manual-error">{t(loadError)}</p>}
+      {error && <p role="alert" className="p-3 text-sm" data-testid="image-manual-error">{t(error)}</p>}
+      {loading && !error && <p role="status" className="p-3 text-sm" data-testid="image-manual-loading">{t("manual.loading")}</p>}
       {previews && <div ref={inner} className="absolute" style={{ left: originX, top: originY, width: sizes.left?.width, height: sizes.left?.height, transform: `scale(${em})`, transformOrigin: "0 0" }}>
         <PreviewCanvas preview={previews.left} style={imageStyle("left")} />
         <PreviewCanvas preview={previews.right} style={{ ...imageStyle("right"), opacity: opacity / 100 }} />
@@ -125,7 +92,7 @@ export function ManualAlignEditor({ left, right, transform, t, disabled, retaine
     <p className="my-2 text-xs tabular-nums" data-testid="image-manual-values">{t("manual.values", { x: draft.x, y: draft.y, degrees: draft.degrees, scaleX: draft.scale, scaleY: scaleYOf(draft) })}</p>
     <div className="flex flex-wrap gap-2">
       <Button type="button" disabled={disabled || !changed} data-testid="image-manual-apply" onClick={() => onApply(draft)}>{t("manual.apply")}</Button>
-      <Button type="button" variant="secondary" disabled={!changed} data-testid="image-manual-discard" onClick={() => { setDraft(transform); setLocked(transform.scaleY === undefined); }}>{t("manual.discard")}</Button>
+      <Button type="button" variant="secondary" disabled={!changed} data-testid="image-manual-discard" onClick={() => { const restored = lastValid.current; setDraft(restored); setLocked(restored.scaleY === undefined); }}>{t("manual.discard")}</Button>
     </div>
   </section>;
 }
