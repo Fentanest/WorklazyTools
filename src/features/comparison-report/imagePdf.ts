@@ -1,8 +1,8 @@
 import type { ImageCompareResult, Region } from '../image-compare/types.ts';
 import { createPdfDocument, embedCustomPdfFont, getPdfFontCharacterSet, rgb, type PDFDocument, type PDFFont } from '../../utils/pdfFontEmbed.ts';
 import { displayGrapheme } from './pdf.ts';
-import { assertOutput, assertReport, type ExportSnapshot } from './snapshot.ts';
-import type { ImageExportProjection } from './imageAdapter.ts';
+import { assertOutput, assertReport, REPORT_LIMITS, type ExportSnapshot } from './snapshot.ts';
+import { IMAGE_PDF_SIDES, imagePdfPages, type ImageExportProjection } from './imageAdapter.ts';
 
 /** Layout of Diffchecker 7.3.0's image PDF report (module 36826): results page with the
  * difference image, a source-images page, then detected changes three per page, numbered pages. */
@@ -21,8 +21,6 @@ export const canvasPngEncoder: PngEncoder = async (width, height, rgba) => {
   return new Uint8Array(await blob.arrayBuffer());
 };
 
-// Embedded images are reduced to this longest side; the page shows them smaller still.
-const EMBED_SIDE = 1600;
 const PAGE = { width: 595, height: 842, margin: 48 };
 
 /** Crop then downscale (nearest sample) an RGBA image to fit `maxSide`. */
@@ -39,16 +37,28 @@ export function cropScale(rgba: Uint8ClampedArray, width: number, x: number, y: 
 export async function writeImagePdfReport(input: { snapshot: ExportSnapshot; result: ImageCompareResult; regions: readonly Region[]; projection: ImageExportProjection; signal: AbortSignal; fontBytes: Uint8Array; encodePng?: PngEncoder }): Promise<Blob> {
   const { snapshot, result, regions, projection, signal, fontBytes } = input, encode = input.encodePng ?? canvasPngEncoder;
   const c = IMAGE_PDF_COPY[snapshot.language];
+  assertReport(imagePdfPages(regions.length) <= REPORT_LIMITS.pdfPages, 'REPORT_PDF_LIMIT');
   const document = await createPdfDocument(), font = await embedCustomPdfFont(document, fontBytes, { subset: true });
   signal.throwIfAborted();
-  const embed = async (rgba: Uint8ClampedArray, x = 0, y = 0, w = result.width, h = result.height, side = EMBED_SIDE) => {
+  const embed = async (rgba: Uint8ClampedArray, x = 0, y = 0, w = result.width, h = result.height, side: number = IMAGE_PDF_SIDES.full) => {
     const image = cropScale(rgba, result.width, x, y, w, h, side); signal.throwIfAborted();
     return document.embedPng(await encode(image.width, image.height, image.rgba));
   };
+  // Embedding at once drops pdf-lib's decoded pixels, so only one image is decoded at a time (imagePdfReservation).
+  const place = async (target: ReturnType<PDFDocument['addPage']>, image: Awaited<ReturnType<typeof embed>>, options: { x: number; y: number; width: number; height: number }) => { target.drawImage(image, options); await image.embed(); signal.throwIfAborted(); };
   // File names may hold characters the font lacks: they are shown as [U+XXXX] like the text report.
   const coverage = new Set(getPdfFontCharacterSet(fontBytes)), segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
   const show = (text: string) => Array.from(segmenter.segment(text), item => displayGrapheme(item.segment, coverage)).join('');
   const write = (page: ReturnType<PDFDocument['addPage']>, text: string, x: number, y: number, size: number, f: PDFFont = font, color = rgb(0.08, 0.08, 0.1)) => page.drawText(show(text), { x, y, size, font: f, color });
+  // Long file names are cut to the line width with an ellipsis (measured after glyph fallback), as the original's maxWidth.
+  const ellipsis = coverage.has(0x2026) ? '\u2026' : '...';
+  const fitLine = (text: string, size: number, maxWidth: number) => {
+    let shown = show(text); if (font.widthOfTextAtSize(shown, size) <= maxWidth) return shown;
+    const parts = Array.from(segmenter.segment(text), item => displayGrapheme(item.segment, coverage));
+    let low = 0, high = parts.length;
+    while (low < high) { const middle = Math.ceil((low + high) / 2); if (font.widthOfTextAtSize(parts.slice(0, middle).join('') + ellipsis, size) <= maxWidth) low = middle; else high = middle - 1; }
+    shown = parts.slice(0, low).join('') + ellipsis; return shown;
+  };
   const fit = (width: number, height: number, maxWidth: number, maxHeight: number) => { const s = Math.min(maxWidth / width, maxHeight / height); return { width: width * s, height: height * s }; };
   const contentWidth = PAGE.width - 2 * PAGE.margin;
   // 1. Results.
@@ -62,17 +72,17 @@ export async function writeImagePdfReport(input: { snapshot: ExportSnapshot; res
   y -= 10; write(page, c.difference, PAGE.margin, y, 13); y -= 8;
   const differencePixels = projection === 'left' ? result.left : projection === 'right' ? result.right : projection === 'subtract' ? result.subtract : result.overlay;
   const difference = await embed(differencePixels), size = fit(difference.width, difference.height, contentWidth, y - PAGE.margin - 20);
-  page.drawImage(difference, { x: PAGE.margin, y: y - size.height, width: size.width, height: size.height });
+  await place(page, difference, { x: PAGE.margin, y: y - size.height, width: size.width, height: size.height });
   // 2. Source images.
   page = document.addPage([PAGE.width, PAGE.height]); y = PAGE.height - PAGE.margin - 16;
   write(page, c.sources, PAGE.margin, y, 16); y -= 18; write(page, c.files, PAGE.margin, y, 10, font, rgb(0.35, 0.37, 0.42)); y -= 20;
   const half = (PAGE.height - 2 * PAGE.margin - 110) / 2;
   for (const side of ['left', 'right'] as const) {
     const source = result.sources[side];
-    write(page, `${side === 'left' ? c.original : c.revised}: ${source.name}`, PAGE.margin, y, 11); y -= 14;
+    page.drawText(fitLine(`${side === 'left' ? c.original : c.revised}: ${source.name}`, 11, contentWidth), { x: PAGE.margin, y, size: 11, font, color: rgb(0.08, 0.08, 0.1) }); y -= 14;
     write(page, `${source.width} x ${source.height} px`, PAGE.margin, y, 9, font, rgb(0.35, 0.37, 0.42)); y -= 6;
     const image = await embed(result[side]), box = fit(image.width, image.height, contentWidth, half - 30);
-    page.drawImage(image, { x: PAGE.margin, y: y - box.height, width: box.width, height: box.height }); y -= box.height + 24;
+    await place(page, image, { x: PAGE.margin, y: y - box.height, width: box.width, height: box.height }); y -= box.height + 24;
   }
   // 3. Detected changes, three per page: original, changed and difference crops.
   const pagesForRegions = Math.max(1, Math.ceil(regions.length / 3));
@@ -86,10 +96,10 @@ export async function writeImagePdfReport(input: { snapshot: ExportSnapshot; res
       write(page, `${c.change} ${number} · ${b.width} x ${b.height} px @ ${b.x},${b.y}`, PAGE.margin, y, 11); y -= 8;
       const cellWidth = (contentWidth - 16) / 3, cellHeight = 180;
       for (const [column, [pixels, label]] of ([[result.left, c.original], [result.right, c.revised], [result.overlay, c.difference]] as const).entries()) {
-        const crop = await embed(pixels, b.x, b.y, b.width, b.height, 600), box = fit(crop.width, crop.height, cellWidth, cellHeight - 14), x = PAGE.margin + column * (cellWidth + 8);
+        const crop = await embed(pixels, b.x, b.y, b.width, b.height, IMAGE_PDF_SIDES.crop), box = fit(crop.width, crop.height, cellWidth, cellHeight - 14), x = PAGE.margin + column * (cellWidth + 8);
         write(page, label, x, y - 10, 9, font, rgb(0.35, 0.37, 0.42));
         page.drawRectangle({ x, y: y - 14 - box.height, width: box.width, height: box.height, borderColor: rgb(0.8, 0.82, 0.86), borderWidth: 0.75 });
-        page.drawImage(crop, { x, y: y - 14 - box.height, width: box.width, height: box.height });
+        await place(page, crop, { x, y: y - 14 - box.height, width: box.width, height: box.height });
       }
       y -= cellHeight + 24;
     }

@@ -55,4 +55,12 @@ test('compact result keeps bounded previews where a lone changed pixel survives 
   assert.deepEqual([colored[0] % preview.width, Math.floor(colored[0] / preview.width)], [Math.floor(1234 * 0.4), 200]);
   // Small images keep full size.
   assert.deepEqual([imagePreview(actual()).width, imagePreview(actual()).height], [2, 1]);
+  // Astra R16: sizes that do not divide evenly still cover the last row, column and corner.
+  for (const [w, h, x, y] of [[2000, 1001, 1000, 1000], [1001, 2000, 1000, 1000], [2001, 1001, 2000, 1000]]) {
+    const a = new Uint8ClampedArray(w * h * 4).fill(255), b = a.slice(); b.set([0, 0, 0, 255], (y * w + x) * 4);
+    const v = new Uint8Array(w * h).fill(1), r = { ...compareRgba(a, b, w, h, v, v, DEFAULT_PIXEL_OPTIONS), left: a, right: b, width: w, height: h };
+    assert.equal(r.changedPixelCount, 1);
+    const p = imagePreview(r); let count = 0; for (let i = 0; i < p.highlight.length; i += 4) if (p.highlight[i + 3] === 255) count++;
+    assert.equal(count, 1, `${w}x${h} (${x},${y})`);
+  }
 });

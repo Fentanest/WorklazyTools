@@ -13,6 +13,21 @@ export function imageReportReservation(result: ImageCompareResult, retainedBytes
   const extra=pixels*32+2*1024**2,live=pixels*44+3*(result.sources.left.bytes+result.sources.right.bytes)+retainedBytes;
   assertReport(Number.isSafeInteger(retainedBytes)&&retainedBytes>=0&&live+extra<=IMAGE_LIMITS.memoryBytes,'IMAGE_MEMORY_LIMIT');return extra;
 }
+/** Image PDF report (Diffchecker layout): full images and per-region crops are reduced to these longest sides. */
+export const IMAGE_PDF_SIDES = Object.freeze({ full: 1600, crop: 600 });
+export const imagePdfPages = (regions: number) => 2 + Math.max(1, Math.ceil(regions / 3));
+export const fitPixels = (width: number, height: number, side: number) => { const scale = Math.min(1, side / Math.max(width, height)); return Math.max(1, Math.round(width * scale)) * Math.max(1, Math.round(height * scale)); };
+/** PDF reservation: each image is embedded right after drawing, so one is decoded at a time (crop, encoder,
+ * canvas, PNG and pdf-lib copies: 24 bytes per pixel), and the document keeps at most 4 bytes per embedded pixel
+ * (RGB and alpha streams), copied once more on save. Three full images plus three crops per region. */
+export function imagePdfReservation(result: ImageCompareResult, regions: readonly { bounds: { width: number; height: number } }[], retainedBytes = 0) {
+  assertReport(imagePdfPages(regions.length) <= REPORT_LIMITS.pdfPages, 'REPORT_PDF_LIMIT');
+  const full = fitPixels(result.width, result.height, IMAGE_PDF_SIDES.full);
+  let embedded = 3 * full;
+  for (const region of regions) embedded += 3 * fitPixels(region.bounds.width, region.bounds.height, IMAGE_PDF_SIDES.crop);
+  const extra = full * 24 + embedded * 4 * 2 + 8 * 1024 ** 2, live = result.width * result.height * 44 + 3 * (result.sources.left.bytes + result.sources.right.bytes) + retainedBytes;
+  assertReport(Number.isSafeInteger(retainedBytes) && retainedBytes >= 0 && Number.isSafeInteger(extra) && live + extra <= IMAGE_LIMITS.memoryBytes, 'IMAGE_MEMORY_LIMIT'); return extra;
+}
 export function imageExportSnapshot(result: ImageCompareResult, revision: number, projection: ImageExportProjection, language:'ko'|'en') {
   const quality=structuredClone(result.quality) as unknown as Json;
   return createExportSnapshot({language,tool:'image-compare',sources:(['left','right']as const).map(side=>({id:side,revision:`${revision}:${result.runId}`,label:result.sources[side].name})),

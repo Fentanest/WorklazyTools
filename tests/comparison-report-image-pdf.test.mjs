@@ -2,6 +2,8 @@ import test from 'node:test';import assert from 'node:assert/strict';import fs f
 import { compareRgba } from '../src/features/image-compare/kernel.ts';
 import { DEFAULT_PIXEL_OPTIONS } from '../src/features/image-compare/types.ts';
 import { writeImagePdfReport, cropScale } from '../src/features/comparison-report/imagePdf.ts';
+import { imagePdfReservation, imagePdfPages, IMAGE_PDF_SIDES } from '../src/features/comparison-report/imageAdapter.ts';
+import { IMAGE_LIMITS } from '../src/features/image-compare/types.ts';
 import { createExportSnapshot } from '../src/features/comparison-report/snapshot.ts';
 const font = () => fs.readFile('public/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf');
 const encodePng = async (width, height, rgba) => { const png = new PNG({ width, height }); png.data = Buffer.from(rgba); return new Uint8Array(PNG.sync.write(png)); };
@@ -29,6 +31,31 @@ test('image PDF report has results, sources and changes three per page with page
   // Without regions a single page says so.
   const empty = await text(await writeImagePdfReport({ snapshot, result, regions: [], projection: 'left', signal: new AbortController().signal, fontBytes: new Uint8Array(await font()), encodePng }));
   assert.equal(empty.length, 3); assert.ok(empty[2].includes('찾은 영역이 없습니다'));
+});
+test('PDF reservation grows with regions and the page count is capped (Astra R17)', () => {
+  const result = fixture(), none = imagePdfReservation(result, []), one = imagePdfReservation(result, [regions[0]]);
+  // Each region adds three 60x40 crops kept as RGB+alpha streams and copied once on save.
+  assert.equal(one - none, 3 * 60 * 40 * 4 * 2);
+  const big = { bounds: { width: 4000, height: 3000 } };
+  assert.equal(imagePdfReservation(result, [big]) - none, 3 * IMAGE_PDF_SIDES.crop * 450 * 4 * 2);
+  assert.equal(imagePdfPages(0), 3); assert.equal(imagePdfPages(3), 3); assert.equal(imagePdfPages(4), 4);
+  const limit = (2000 - 2) * 3;
+  assert.doesNotThrow(() => imagePdfReservation(result, Array.from({ length: limit }, () => regions[3])));
+  assert.throws(() => imagePdfReservation(result, Array.from({ length: limit + 1 }, () => regions[3])), /REPORT_PDF_LIMIT/u);
+  assert.throws(() => imagePdfReservation(result, [], IMAGE_LIMITS.memoryBytes), /IMAGE_MEMORY_LIMIT/u);
+  const many = Array.from({ length: 5000 }, () => big);
+  assert.throws(() => imagePdfReservation(result, many), /IMAGE_MEMORY_LIMIT/u);
+});
+test('long file names are cut to the page width with an ellipsis (Astra R19)', async () => {
+  const result = fixture(); result.sources.left = { ...result.sources.left, name: `${'가'.repeat(100)}.png` };
+  const snapshot = createExportSnapshot({ language: 'ko', tool: 'image-compare', sources: [{ id: 'left', revision: '1', label: '원본 화면 😀.png' }, { id: 'right', revision: '1', label: 'after.png' }], appliedOptions: {}, coordinates: {}, completion: 'complete', warnings: [], rows: [] });
+  const blob = await writeImagePdfReport({ snapshot, result, regions: [], projection: 'left', signal: new AbortController().signal, fontBytes: new Uint8Array(await font()), encodePng });
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs'), job = pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), disableFontFace: true });
+  try {
+    const page = await (await job.promise).getPage(2), items = (await page.getTextContent()).items.filter(item => item.str.includes('가'));
+    assert.equal(items.length, 1); assert.ok(items[0].str.endsWith('…'), items[0].str);
+    assert.ok(items[0].transform[4] + items[0].width <= 595 - 48 + 0.5, `${items[0].transform[4] + items[0].width}`);
+  } finally { await job.destroy(); }
 });
 test('crop and scale keeps the crop and bounds the longest side', () => {
   const width = 10, rgba = new Uint8ClampedArray(width * 10 * 4); for (let i = 0; i < 100; i++) rgba[i * 4] = i;
