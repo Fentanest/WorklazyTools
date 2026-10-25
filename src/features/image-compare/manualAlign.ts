@@ -33,19 +33,14 @@ function nearest(values: number[], targets: number[], threshold: number) {
   return best;
 }
 
-/** Snaps a moved image: centre to the original's centre at any angle, edges to its edges only when axis-aligned. */
+/** Snaps a moved image per axis: centre to the original's centre first (any angle), otherwise, when axis-aligned,
+ * an edge to an edge. Centres never snap to edges (Diffchecker's order). */
 export function snapMove(left: Size, right: Size, transform: Transform, threshold: number): { transform: Transform; guides: Guides } {
   const box = bounds(imageCorners(right, transform)), edges = axisAligned(transform.degrees), guides: Guides = {};
-  const x = nearest([(box.minX + box.maxX) / 2, ...(edges ? [box.minX, box.maxX] : [])], [left.width / 2, ...(edges ? [0, left.width] : [])], threshold);
-  const y = nearest([(box.minY + box.maxY) / 2, ...(edges ? [box.minY, box.maxY] : [])], [left.height / 2, ...(edges ? [0, left.height] : [])], threshold);
+  const axis = (min: number, max: number, size: number) => nearest([(min + max) / 2], [size / 2], threshold) ?? (edges ? nearest([min, max], [0, size], threshold) : undefined);
+  const x = axis(box.minX, box.maxX, left.width), y = axis(box.minY, box.maxY, left.height);
   if (x) guides.x = x.target; if (y) guides.y = y.target;
   return { transform: { ...transform, x: transform.x + (x?.delta ?? 0), y: transform.y + (y?.delta ?? 0) }, guides };
-}
-/** Snaps a dragged corner to the original's edges (axis-aligned images only). */
-export function snapPoint(left: Size, point: Point, degrees: number, threshold: number): { point: Point; guides: Guides } {
-  if (!axisAligned(degrees)) return { point, guides: {} };
-  const x = nearest([point.x], [0, left.width], threshold), y = nearest([point.y], [0, left.height], threshold);
-  return { point: { x: x?.target ?? point.x, y: y?.target ?? point.y }, guides: { ...(x ? { x: x.target } : {}), ...(y ? { y: y.target } : {}) } };
 }
 
 const rotate = (angle: number, v: Point): Point => ({ x: Math.cos(angle) * v.x - Math.sin(angle) * v.y, y: Math.sin(angle) * v.x + Math.cos(angle) * v.y });
@@ -65,6 +60,31 @@ export function resizeFromCorner(right: Size, start: Transform, corner: { ux: nu
   const offset = rotate(angle, { x: corner.ux * right.width * scaleX / 2, y: corner.uy * right.height * scaleY / 2 });
   const { scaleY: _previous, ...rest } = start;
   return { ...rest, scale: scaleX, ...(scaleY === scaleX ? {} : { scaleY }), x: anchor.x + offset.x - right.width / 2, y: anchor.y + offset.y - right.height / 2 };
+}
+/** Corner resize with snapping on the corner where it really lands: an unlocked axis moves the corner one-to-one;
+ * a locked ratio picks the single scale whose corner reaches the nearest edge. Guides show only edges it touches. */
+export function snapResize(left: Size, right: Size, start: Transform, corner: { ux: number; uy: number }, pointer: Point, locked: boolean, threshold: number): { transform: Transform; guides: Guides } {
+  const free = resizeFromCorner(right, start, corner, pointer, locked);
+  if (!axisAligned(start.degrees)) return { transform: free, guides: {} };
+  const index = cornerSigns(start).findIndex(sign => sign.ux === corner.ux && sign.uy === corner.uy), anchor = imageCorners(right, start)[(index + 2) % 4];
+  const landed = imageCorners(right, free)[index], x = nearest([landed.x], [0, left.width], threshold), y = nearest([landed.y], [0, left.height], threshold);
+  let next = free;
+  if (!locked) next = resizeFromCorner(right, start, corner, { x: pointer.x + (x?.delta ?? 0), y: pointer.y + (y?.delta ?? 0) }, false);
+  else if (threshold >= 0) {
+    // The locked corner moves along the anchor diagonal. Like Diffchecker, a ratio that brings it onto an edge is
+    // taken when the corner moves at most four snap distances (32 screen pixels) along that diagonal; the closest wins.
+    const span = Math.hypot(landed.x - anchor.x, landed.y - anchor.y);
+    let best: number | undefined;
+    for (const [from, origin, targets] of [[landed.x, anchor.x, [0, left.width]], [landed.y, anchor.y, [0, left.height]]] as const) {
+      if (Math.abs(from - origin) < 1e-9) continue;
+      for (const target of targets) { const ratio = (target - origin) / (from - origin); if (ratio > 0 && Math.abs(ratio - 1) * span <= 4 * threshold && (best === undefined || Math.abs(ratio - 1) < Math.abs(best - 1))) best = ratio; }
+    }
+    if (best !== undefined) next = resizeFromCorner(right, start, corner, { x: anchor.x + (landed.x - anchor.x) * best, y: anchor.y + (landed.y - anchor.y) * best }, true);
+  }
+  const final = imageCorners(right, next)[index], guides: Guides = {};
+  for (const target of [0, left.width]) if (Math.abs(final.x - target) < 1e-6) guides.x = target;
+  for (const target of [0, left.height]) if (Math.abs(final.y - target) < 1e-6) guides.y = target;
+  return { transform: next, guides };
 }
 /** Rotation by handle: the pointer's angle change around the image centre; Shift snaps to 5°. */
 export function rotateFromPointer(right: Size, start: Transform, from: Point, to: Point, snap: boolean): Transform {

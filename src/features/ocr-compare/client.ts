@@ -16,8 +16,9 @@ const matrix3=([a,b,c,d,x,y]:Matrix):Matrix3=>[a,c,x,b,d,y,0,0,1];
  * mutate/detach arrays while mounted or busy. The client copies and owns only its transfers.
  */
 export interface RasterOcrPairInput {runId:string;width:number;height:number;left:Uint8ClampedArray;right:Uint8ClampedArray;leftTransform:Matrix3;rightTransform:Matrix3;encodedBytes:number;retainedRegionPasses:number;retainedCallerBytes:number}
-export function imageOcrRasterInput(result:ImageCompareResult,retainedRegionPasses=0):RasterOcrPairInput{
- return {runId:result.runId,width:result.width,height:result.height,left:result.left,right:result.right,leftTransform:invertProjective(matrix3(result.geometry.leftMatrix)),rightTransform:invertProjective(result.geometry.rightProjective??matrix3(result.geometry.rightMatrix)),encodedBytes:result.sources.left.bytes+result.sources.right.bytes,retainedRegionPasses,retainedCallerBytes:0};
+/** `retainedCallerBytes`: other page-held buffers (the alignment editor's previews) reserved beside OCR. */
+export function imageOcrRasterInput(result:ImageCompareResult,retainedRegionPasses=0,retainedCallerBytes=0):RasterOcrPairInput{
+ return {runId:result.runId,width:result.width,height:result.height,left:result.left,right:result.right,leftTransform:invertProjective(matrix3(result.geometry.leftMatrix)),rightTransform:invertProjective(result.geometry.rightProjective??matrix3(result.geometry.rightMatrix)),encodedBytes:result.sources.left.bytes+result.sources.right.bytes,retainedRegionPasses,retainedCallerBytes};
 }
 export function recognizeOcrPair(result:ImageCompareResult,language:OcrLanguage,layout:'paragraphs'|'sparse',signal:AbortSignal,onProgress:(value:number)=>void,retainedRegionPasses=0){
  return recognizeRasterOcrPair(imageOcrRasterInput(result,retainedRegionPasses),language,layout,signal,onProgress);
