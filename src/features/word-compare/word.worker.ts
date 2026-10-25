@@ -43,6 +43,9 @@ worker.onmessage = async (event: MessageEvent) => {
   let trackedFunction: { (...args: unknown[]): number; destroy?: () => void } | undefined;
   let acceptFunction: { (...args: unknown[]): number; destroy?: () => void } | undefined;
   let rewriteCommentsFunction: { (...args: unknown[]): number; destroy?: () => void } | undefined;
+  let saveFactsFunction: { (...args: unknown[]): ModelBytes; destroy?: () => void } | undefined;
+  let restoreFactsFunction: { (...args: unknown[]): boolean; destroy?: () => void } | undefined;
+  let keepFactsFunction: { (): void; destroy?: () => void } | undefined;
   let activePair = 0;
   const en = event.data.language === "en";
   const L = (ko: string, english: string) => en ? english : ko;
@@ -90,12 +93,17 @@ worker.onmessage = async (event: MessageEvent) => {
       trackedFunction = generateTracked;
       acceptFunction = loadedPyodide.globals.get("accept_tracked_document") as { (...args: unknown[]): number; destroy?: () => void };
       rewriteCommentsFunction = loadedPyodide.globals.get("rewrite_new_comment_authors") as { (...args: unknown[]): number; destroy?: () => void };
+      saveFactsFunction = loadedPyodide.globals.get("tracked_source_facts") as { (...args: unknown[]): ModelBytes; destroy?: () => void };
+      restoreFactsFunction = loadedPyodide.globals.get("restore_tracked_source_facts") as { (...args: unknown[]): boolean; destroy?: () => void };
+      keepFactsFunction = loadedPyodide.globals.get("keep_tracked_source_facts") as { (): void; destroy?: () => void };
     } else {
       progress(42, L("DOC 문서 비교 준비를 완료했습니다.", "DOC comparison is ready."));
     }
     // Screen results go out first, pair by pair; tracked DOCX files follow in a second pass. Until
-    // then each pair keeps only its compact tracked manifest and its files in the Pyodide file system.
-    const trackedJobs: Array<{ index: number; beforePath: string; afterPath: string; trackedPath: string; temporaryPaths: string[]; manifest: Uint8Array; mask: string; label: string }> = [];
+    // then each pair keeps only its compact tracked manifest and its files in the Pyodide file system,
+    // and in a batch the compressed model fields the generator reads: the extraction cache holds one
+    // pair, so the generator would otherwise extract every document again.
+    const trackedJobs: Array<{ index: number; beforePath: string; afterPath: string; trackedPath: string; temporaryPaths: string[]; manifest: Uint8Array; mask: string; label: string; facts?: [Uint8Array, Uint8Array] }> = [];
     const removeFiles = (paths: string[]) => {
       for (const path of paths) {
         try {
@@ -174,7 +182,9 @@ worker.onmessage = async (event: MessageEvent) => {
             pyodide.FS.writeFile(beforePath, new Uint8Array(pair.beforeBuffer));
             pyodide.FS.writeFile(afterPath, new Uint8Array(pair.afterBuffer));
           }
-          trackedJobs.push({ index, beforePath: trackedBeforePath, afterPath: trackedAfterPath, trackedPath, temporaryPaths, manifest: compactManifestBytes(serializeManifestForTracked(result.manifest)), mask: JSON.stringify(result.manifest.formattingMask.requested), label: `[${activePair}/${pairs.length}]` });
+          const savedFacts = (buffer: ArrayBuffer) => modelBytes(saveFactsFunction!(new Uint8Array(buffer), true, true, en ? "en" : "ko"));
+          const facts: [Uint8Array, Uint8Array] | undefined = pairs.length > 1 && saveFactsFunction ? [savedFacts(beforeBuffer), savedFacts(afterBuffer)] : undefined;
+          trackedJobs.push({ index, beforePath: trackedBeforePath, afterPath: trackedAfterPath, trackedPath, temporaryPaths, manifest: compactManifestBytes(serializeManifestForTracked(result.manifest)), mask: JSON.stringify(result.manifest.formattingMask.requested), label: `[${activePair}/${pairs.length}]`, facts });
           keepFiles = true;
         }
         worker.postMessage({ type: "screen", index, result: screenResult(result) });
@@ -184,12 +194,19 @@ worker.onmessage = async (event: MessageEvent) => {
       progress(endProgress, L(`[${activePair}/${pairs.length}] 비교 결과 정리 완료`, `[${activePair}/${pairs.length}] Comparison result ready`));
     }
 
+    // Every screen result is out: cached models keep only what the generator reads.
+    if (trackedJobs.length) keepFactsFunction?.();
     for (const [position, job] of trackedJobs.entries()) {
       activePair = job.index + 1;
       progress(70 + Math.round((position / trackedJobs.length) * 29), L(`${job.label} Word 변경 추적 파일 생성 중…`, `${job.label} Creating tracked-changes Word file…`));
       let trackedBuffer: ArrayBuffer | undefined;
       const warnings: string[] = [];
       try {
+        if (job.facts && restoreFactsFunction) {
+          restoreFactsFunction(job.beforePath, true, true, en ? "en" : "ko", job.facts[0]);
+          restoreFactsFunction(job.afterPath, true, true, en ? "en" : "ko", job.facts[1]);
+          job.facts = undefined;
+        }
         generateTracked!(
           job.beforePath,
           job.afterPath,
@@ -239,6 +256,9 @@ worker.onmessage = async (event: MessageEvent) => {
     trackedFunction?.destroy?.();
     acceptFunction?.destroy?.();
     rewriteCommentsFunction?.destroy?.();
+    saveFactsFunction?.destroy?.();
+    restoreFactsFunction?.destroy?.();
+    keepFactsFunction?.destroy?.();
   }
 };
 
@@ -255,10 +275,13 @@ function isWordFormat(format: DocumentFormat): format is "doc" | "docx" {
 // never holds unescaped (compare.py MODEL_NAMESPACE_TOKEN, tracked_docx.py _manifest_text).
 const WORD_NAMESPACE = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}";
 type ModelBytes = { toJs(): Uint8Array; destroy?: () => void };
-function restoreModelJson(bytes: ModelBytes) {
+function modelBytes(bytes: ModelBytes) {
   const view = bytes.toJs();
   bytes.destroy?.();
-  return new TextDecoder().decode(view).replaceAll("\u0001", WORD_NAMESPACE);
+  return view;
+}
+function restoreModelJson(bytes: ModelBytes) {
+  return new TextDecoder().decode(modelBytes(bytes)).replaceAll("\u0001", WORD_NAMESPACE);
 }
 function compactManifestBytes(json: string) {
   return new TextEncoder().encode(json.replaceAll(WORD_NAMESPACE, "\u0001"));

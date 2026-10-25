@@ -1213,6 +1213,11 @@ def extract_document_model_compact(document_bytes, include_tables, include_metad
     properties share one memoized fact), and any other occurrence of an inventory entry is
     `{"$src":index}`."""
     model = _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)[1]
+    return json.dumps(_model_transport(model), ensure_ascii=False).replace(W, MODEL_NAMESPACE_TOKEN).encode("utf-8")
+
+
+def _model_transport(model, keys=None):
+    """The model (or its `keys`) with shared objects written once, as described above."""
     inventory = model["sourceInventory"]
     positions = {id(ref): index for index, ref in enumerate(inventory)}
     facts, fact_positions = [], {}
@@ -1236,10 +1241,88 @@ def extract_document_model_compact(document_bytes, include_tables, include_metad
         if kind is list:
             return [strip(item) for item in value]
         return value
-    transport = {key: strip(value) for key, value in model.items() if key != "sourceInventory"}
+    transport = {key: strip(value) for key, value in model.items() if key != "sourceInventory" and (keys is None or key in keys)}
     transport["sourceInventory"] = entries
     transport["$facts"] = facts
-    return json.dumps(transport, ensure_ascii=False).replace(W, MODEL_NAMESPACE_TOKEN).encode("utf-8")
+    return transport
+
+
+def _restore_model_transport(transport):
+    """Undo `_model_transport`, sharing the same objects again (restoreModelTransport in modelTransport.ts)."""
+    facts = transport.pop("$facts", None)
+    if not isinstance(facts, list):
+        return transport
+    inventory = transport.get("sourceInventory", [])
+    def fact(stub):
+        index = stub.get("$f") if type(stub) is dict else None
+        if type(index) is not int or not 0 <= index < len(facts):
+            raise ValueError("INVALID_MODEL_TRANSPORT")
+        return facts[index]
+    for entry in inventory:
+        properties = entry.get("normalizedProperties")
+        if properties:
+            for name in list(properties):
+                properties[name] = fact(properties[name])
+    def visit(value):
+        kind = type(value)
+        if kind is list:
+            for index, item in enumerate(value):
+                value[index] = visit(item)
+        elif kind is dict:
+            if "$src" in value:
+                index = value["$src"]
+                if type(index) is not int or not 0 <= index < len(inventory) or len(value) != 1:
+                    raise ValueError("INVALID_MODEL_TRANSPORT")
+                return inventory[index]
+            for key in value:
+                value[key] = visit(value[key])
+        return value
+    for key in transport:
+        if key != "sourceInventory":
+            transport[key] = visit(transport[key])
+    return transport
+
+
+# What creating the tracked DOCX reads from a model (tracked_docx.py _attach_source_inventory and
+# _validate_manifest); nothing else of it is needed once the screen result is out.
+TRACKED_MODEL_FIELDS = ("fields", "sourceRevision", "storyFacts", "noteFacts", "sourceInventory")
+
+
+def tracked_source_facts(document_bytes, include_tables, include_metadata, language="ko"):
+    """The tracked fields of the (memoized) model, compressed, so a batch can put them back after the
+    two-model cache has moved on (restore_tracked_source_facts) instead of extracting again."""
+    import zlib
+    entry = _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)
+    saved = {"key": list(entry[0]), "model": _model_transport(entry[1], TRACKED_MODEL_FIELDS)}
+    return zlib.compress(json.dumps(saved, ensure_ascii=False).encode("utf-8"), 1)
+
+
+def restore_tracked_source_facts(path, include_tables, include_metadata, language, packed):
+    """Cache the tracked fields saved by tracked_source_facts for the document at `path`, unless the
+    cache already holds its model or they were saved for other bytes or options. Only the tracked
+    generator reads such an entry; without one it extracts the document again."""
+    import zlib
+    with open(path, "rb") as source:
+        key = _extract_cache_key(source.read(), include_tables, include_metadata, language)
+    if any(entry[0] == key for entry in _EXTRACT_CACHE):
+        return False
+    if hasattr(packed, "to_py"):
+        packed = packed.to_py()
+    saved = json.loads(zlib.decompress(bytes(packed)).decode("utf-8"))
+    if tuple(saved["key"]) != key:
+        return False
+    _EXTRACT_CACHE.append([key, _restore_model_transport(saved["model"]), None, "tracked"])
+    del _EXTRACT_CACHE[:-2]
+    return True
+
+
+def keep_tracked_source_facts():
+    """Once every screen result is out, cached models keep only what the tracked generator reads (the
+    same objects, so the manifest's sources stay shared). The worker is not reused after its run."""
+    for entry in _EXTRACT_CACHE:
+        entry[1] = {key: entry[1][key] for key in TRACKED_MODEL_FIELDS if key in entry[1]}
+        entry[2] = None
+        entry[3] = "tracked"
 
 
 def extract_document_model(document_bytes, include_tables, include_metadata, language="ko"):
@@ -1253,19 +1336,24 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
 
 def extract_document_model_parsed(document_bytes, include_tables, include_metadata, language="ko"):
     """The memoized model object (read-only: shared by every caller). It holds only JSON types,
-    so it equals its own JSON round trip."""
-    return _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)[1]
+    so it equals its own JSON round trip. Used by the tracked generator only, so an entry holding
+    just the tracked fields also serves it."""
+    return _extract_document_model_entry(document_bytes, include_tables, include_metadata, language, tracked=True)[1]
 
 
-def _extract_document_model_entry(document_bytes, include_tables, include_metadata, language):
+def _extract_cache_key(data, include_tables, include_metadata, language):
+    return (hashlib.sha256(data).hexdigest(), bool(include_tables), bool(include_metadata), "en" if language == "en" else "ko")
+
+
+def _extract_document_model_entry(document_bytes, include_tables, include_metadata, language, tracked=False):
     data = bytes(document_bytes)
-    key = (hashlib.sha256(data).hexdigest(), bool(include_tables), bool(include_metadata), "en" if language == "en" else "ko")
+    key = _extract_cache_key(data, include_tables, include_metadata, language)
     for entry in _EXTRACT_CACHE:
-        if entry[0] == key:
+        if entry[0] == key and (tracked or entry[3] == "full"):
             global LANGUAGE
             LANGUAGE = key[3]
             return entry
-    entry = [key, _extract_document_model_object(data, include_tables, include_metadata, language), None]
+    entry = [key, _extract_document_model_object(data, include_tables, include_metadata, language), None, "full"]
     _EXTRACT_CACHE.append(entry)
     del _EXTRACT_CACHE[:-2]
     return entry
