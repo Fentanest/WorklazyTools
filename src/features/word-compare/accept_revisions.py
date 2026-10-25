@@ -12,6 +12,7 @@ WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WORD_2010_NS = "http://schemas.microsoft.com/office/word/2010/wordml"
 WORD_2012_NS = "http://schemas.microsoft.com/office/word/2012/wordml"
 W = "{" + WORD_NS + "}"
+MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
 W14 = "{" + WORD_2010_NS + "}"
 W15 = "{" + WORD_2012_NS + "}"
 
@@ -68,8 +69,10 @@ def _attribute_by_local_name(element, name, default=None):
 
 
 def _parse_xml(data):
+    declared = {}
     for _, namespace in ET.iterparse(io.BytesIO(data), events=("start-ns",)):
         prefix, uri = namespace
+        declared.setdefault(prefix, uri)
         try:
             ET.register_namespace(prefix or "", uri)
         except ValueError:
@@ -82,6 +85,11 @@ def _parse_xml(data):
         for attribute_name in list(element.attrib):
             if attribute_name.endswith("}Ignorable"):
                 element.attrib.pop(attribute_name, None)
+        # A Choice's Requires names prefixes too and cannot be dropped: declare them on it.
+        if element.tag == MC + "Choice":
+            for prefix in element.get("Requires", "").split():
+                if prefix in declared:
+                    element.set("xmlns:" + prefix, declared[prefix])
     return root
 
 
@@ -117,16 +125,20 @@ def _fully_deleted_supported_paragraph(paragraph):
         for item in run:
             if any(node.tag in protected for node in item.iter()):return False
             if item.tag==W+"rPr":continue
-            if item.tag in {W+"delText",W+"footnoteReference",W+"endnoteReference",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:saw_payload=True
+            if item.tag in {W+"delText",W+"delInstrText",W+"fldChar",W+"tab",W+"br",W+"cr",W+"sym",W+"softHyphen",W+"noBreakHyphen",W+"lastRenderedPageBreak",W+"footnoteReference",W+"endnoteReference",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:saw_payload=True
             else:return False
         return True
     for child in paragraph:
         if child.tag==W+"pPr":
-            if any(node.tag in PROPERTY_CHANGE_TAGS or node.tag==W+"sectPr" for node in child.iter()):return False
+            # Paragraph property history is accepted with the paragraph; a section break is not.
+            if any(node.tag==W+"sectPr" for node in child.iter()):return False
         elif child.tag==W+"hyperlink":
             if not len(child) or any(part.tag!=W+"del" or not len(part) or not all(run_payload(run) for run in part) for part in child):return False
         elif child.tag!=W+"del" or not len(child) or not all(run_payload(run) for run in child):return False
     return saw_payload
+
+
+BETWEEN_BLOCK_MARKERS = {W + name for name in ("bookmarkStart", "bookmarkEnd", "commentRangeStart", "commentRangeEnd", "permStart", "permEnd", "proofErr", "moveFromRangeStart", "moveFromRangeEnd", "moveToRangeStart", "moveToRangeEnd")}
 
 
 def _merge_deleted_paragraph_marks(parent):
@@ -140,17 +152,36 @@ def _merge_deleted_paragraph_marks(parent):
             index += 1
             continue
 
-        next_paragraph = parent[index + 1] if index + 1 < len(parent) else None
+        # Range markers between paragraphs (bookmarks, comment ranges) do not stop the join.
+        following = index + 1
+        while following < len(parent) and parent[following].tag in BETWEEN_BLOCK_MARKERS:
+            following += 1
+        next_paragraph = parent[following] if following < len(parent) else None
         if next_paragraph is None or next_paragraph.tag != W + "p":
             # OfficeDev RevisionProcessor terminal paragraph rule: no following
             # block (body sectPr is not a block), or the following block is a table.
             terminal = next_paragraph is None or next_paragraph.tag in {W + "tbl", W + "sectPr"}
-            if parent.tag == W + "body" and terminal and _fully_deleted_supported_paragraph(paragraph):
+            # Also at the end of a block content control that keeps another block.
+            container = parent.tag == W + "body" or (parent.tag == W + "sdtContent" and any(child is not paragraph and child.tag in {W + "p", W + "tbl", W + "sdt"} for child in parent))
+            if container and terminal and _fully_deleted_supported_paragraph(paragraph):
                 parent.remove(paragraph)
                 continue
             # An empty paragraph whose mark was inserted and then deleted (the separator kept
             # between a replaced table's two versions) never existed in either version.
             if _has_paragraph_mark(paragraph, "ins") and all(child.tag == W + "pPr" for child in paragraph):
+                parent.remove(paragraph)
+                continue
+            # The deleted last mark of a block content control: its remaining content (a field's
+            # end character, say) joins the previous paragraph, as Word does.
+            previous = index - 1
+            while previous >= 0 and parent[previous].tag in BETWEEN_BLOCK_MARKERS:
+                previous -= 1
+            if parent.tag == W + "sdtContent" and next_paragraph is None and previous >= 0 and parent[previous].tag == W + "p":
+                target = parent[previous]
+                for child in list(paragraph):
+                    if child.tag != W + "pPr":
+                        paragraph.remove(child)
+                        target.append(child)
                 parent.remove(paragraph)
                 continue
             _remove_paragraph_mark(paragraph, "del")
@@ -251,8 +282,40 @@ def _accept_tree(parent):
         index += 1
 
 
+def _remove_deleted_field_results(root):
+    """Like Word, accepting the deletion of a field's begin, separator and end characters also
+    removes its displayed result, even where the result runs themselves are not marked deleted."""
+    fields, orphans, parents = [], [], {}
+    def visit(node, deleted):
+        for child in node:
+            parents[child] = node
+            inside = deleted or child.tag in DELETED_WRAPPERS
+            if child.tag == W + "r":
+                kinds = [item.get(W + "fldCharType") for item in child if item.tag == W + "fldChar"]
+                if not kinds and fields and fields[-1]["separated"] and not inside:
+                    fields[-1]["result"].append(child)
+                for kind in kinds:
+                    if kind == "begin":
+                        fields.append({"deleted": inside, "separated": False, "result": []})
+                    elif kind == "separate" and fields:
+                        fields[-1]["separated"] = True
+                        fields[-1]["deleted"] = fields[-1]["deleted"] and inside
+                    elif kind == "end" and fields:
+                        field = fields.pop()
+                        if field["deleted"] and inside and field["separated"]:
+                            orphans.extend(field["result"])
+                continue
+            visit(child, inside)
+    visit(root, False)
+    for run in orphans:
+        parent = parents.get(run)
+        if parent is not None and run in list(parent):
+            parent.remove(run)
+
+
 def _accept_xml(data, is_settings=False):
     root = _parse_xml(data)
+    _remove_deleted_field_results(root)
     _merge_deleted_paragraph_marks(root)
     _accept_tree(root)
     if is_settings:

@@ -3938,6 +3938,36 @@ def _field_regions(before_blocks, after_blocks, alignment):
     return regions
 
 
+def _untracked_blocks(after_blocks, after_indexes, decision, writer, include_formatting):
+    """Revised empty lines the comparison left out: kept as they are, or marked inserted."""
+    blocks = []
+    for index in after_indexes:
+        kept = copy.deepcopy(after_blocks[index])
+        if include_formatting:
+            _revise_blank_section_break(kept, after_blocks[index], writer)
+        if decision.get("insertedBlank"):
+            if kept.find(W + "r") is not None:
+                _wrap_runs(kept, "ins", writer)
+            _mark_paragraph_end(kept, "ins", writer)
+        blocks.append(kept)
+    return blocks
+
+
+def _split_gap_blanks(alignment):
+    """Inserted empty lines that sit between the two revised paragraphs of a split: emitted
+    between them, they keep revised order (both disappear on Reject All). Returns
+    ({split group: [gap groups]}, {gap groups})."""
+    interleaved, members = {}, set()
+    for group, (xs, ys, _) in enumerate(alignment):
+        if len(xs) != 1 or len(ys) != 2 or ys[1] <= ys[0] + 1:
+            continue
+        gap = [other for other, (xs2, ys2, _) in enumerate(alignment) if other != group and ys2 and ys[0] < ys2[0] < ys[1]]
+        if gap and all(not alignment[other][0] and len(alignment[other][1]) == 1 and alignment[other][2].get("insertedBlank") for other in gap):
+            interleaved[group] = sorted(gap, key=lambda other: alignment[other][1][0])
+            members.update(gap)
+    return interleaved, members
+
+
 def _fused_one_sided(before_blocks, after_blocks, alignment, regions, original_after_blocks):
     """Adjacent one-paragraph deletion and insertion that whole-paragraph marks cannot carry: a
     field (its deleted copy would stand beside the revised one), a paragraph inside a content
@@ -4040,6 +4070,7 @@ def _revision_blocks_impl(before_blocks, after_blocks, include_formatting, write
     alignment = _manifest_block_groups(before_blocks, after_blocks, include_tables)
     regions = _field_regions(before_blocks, after_blocks, alignment)
     fused = _fused_one_sided(before_blocks, after_blocks, alignment, regions, original_after_blocks)
+    interleaved, interleaved_groups = _split_gap_blanks(alignment)
     for group_index, (before_indexes, after_indexes, decision) in enumerate(alignment):
         _MANIFEST_ACTIVE_DECISION = decision
         _MANIFEST_ACTIVE_COMPARISON = decision.get("comparisons", [None])[0]
@@ -4062,16 +4093,10 @@ def _revision_blocks_impl(before_blocks, after_blocks, include_formatting, write
                 # tracked field inside the other makes Word drop both.
                 revised.extend(_field_region_revision([before_blocks[index] for index in region["before"]], [after_blocks[index] for index in region["after"]], writer, include_formatting))
             continue
+        if group_index in interleaved_groups:
+            continue
         if decision.get("untracked"):
-            for index in after_indexes:
-                kept = copy.deepcopy(after_blocks[index])
-                if include_formatting:
-                    _revise_blank_section_break(kept, after_blocks[index], writer)
-                if decision.get("insertedBlank"):
-                    if kept.find(W + "r") is not None:
-                        _wrap_runs(kept, "ins", writer)
-                    _mark_paragraph_end(kept, "ins", writer)
-                revised.append(kept)
+            revised.extend(_untracked_blocks(after_blocks, after_indexes, decision, writer, include_formatting))
             continue
         group_before = [before_blocks[index] for index in before_indexes]
         group_after = [after_blocks[index] for index in after_indexes]
@@ -4082,14 +4107,28 @@ def _revision_blocks_impl(before_blocks, after_blocks, include_formatting, write
             if not _STABLE_BOOKMARK["validated"] and any(_has_bookmark_markers(node) for node in paragraphs) and not (len(group_before) == len(group_after) == 1 and not decision.get("moved")):
                 _replace_decision(decision, "bookmark-context")
             if _is_replaced(decision):
-                revised.extend(_replacement_pair(group_before, group_after, writer, include_formatting))
+                output = _replacement_pair(group_before, group_after, writer, include_formatting)
+                if group_index in interleaved:
+                    # Blank lines new between the two revised paragraphs stand between them.
+                    gap = [block for gap_index in interleaved[group_index] for block in _untracked_blocks(after_blocks, alignment[gap_index][1], alignment[gap_index][2], writer, include_formatting)]
+                    output[-1:-1] = gap
+                revised.extend(output)
                 continue
         if len(before_indexes) == 1 and len(after_indexes) == 2:
             before = before_blocks[before_indexes[0]]
             first_after = after_blocks[after_indexes[0]]
             second_after = after_blocks[after_indexes[1]]
             if before.tag == first_after.tag == second_after.tag == W + "p":
-                revised.extend(_paragraph_split_revision(before, first_after, second_after, include_formatting, writer))
+                output = _paragraph_split_revision(before, first_after, second_after, include_formatting, writer)
+                if group_index in interleaved and len(output) == 2:
+                    gap = [block for gap_index in interleaved[group_index] for block in _untracked_blocks(after_blocks, alignment[gap_index][1], alignment[gap_index][2], writer, include_formatting)]
+                    output[1:1] = gap
+                elif group_index in interleaved:
+                    revised.extend(output)
+                    for gap_index in interleaved[group_index]:
+                        revised.extend(_untracked_blocks(after_blocks, alignment[gap_index][1], alignment[gap_index][2], writer, include_formatting))
+                    continue
+                revised.extend(output)
                 continue
         if len(before_indexes) == 2 and len(after_indexes) == 1:
             first_before = before_blocks[before_indexes[0]]

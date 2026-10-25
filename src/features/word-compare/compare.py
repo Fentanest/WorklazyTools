@@ -356,19 +356,19 @@ def _simple_vml_picture(node, archive=None, part=None):
     import posixpath
     rel_path=posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
     if rel_path not in archive.namelist() or '[Content_Types].xml' not in archive.namelist():return False
-    relationships=[n for n in ET.fromstring(archive.read(rel_path)) if n.get('Id')==image.get(r+'id')]
+    relationships=[n for n in _cached_xml(archive, rel_path) if n.get('Id')==image.get(r+'id')]
     if len(relationships)!=1:return False
     rel=relationships[0];target=rel.get('Target','')
     if rel.get('Type')!=r[1:-1]+'/image' or rel.get('TargetMode','') not in ('','Internal') or not target or any(c in target for c in "\\:#?%"):return False
     path=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
     if path.startswith('../') or archive.namelist().count(path)!=1 or posixpath.join(posixpath.dirname(path),'_rels',posixpath.basename(path)+'.rels') in archive.namelist():return False
-    ct='{http://schemas.openxmlformats.org/package/2006/content-types}';types=ET.fromstring(archive.read('[Content_Types].xml'))
+    ct='{http://schemas.openxmlformats.org/package/2006/content-types}';types=_cached_xml(archive, '[Content_Types].xml')
     overrides=[n.get('ContentType') for n in types if n.tag==ct+'Override' and n.get('PartName')=='/'+path]
     defaults=[n.get('ContentType') for n in types if n.tag==ct+'Default' and n.get('Extension','').lower()==posixpath.splitext(path)[1].lstrip('.').lower()]
     if (overrides or defaults)!=['image/png']:return False
     data=archive.read(path)
     if len(data)<24 or data[:8]!=b'\x89PNG\r\n\x1a\n' or data[12:16]!=b'IHDR' or int.from_bytes(data[16:20],'big')==0 or int.from_bytes(data[20:24],'big')==0:return False
-    root=ET.fromstring(archive.read(part));ids=[n.get('id') for n in root.iter() if n.tag in {v+'shape',v+'shapetype'}]
+    root=_cached_xml(archive, part);ids=[n.get('id') for n in root.iter() if n.tag in {v+'shape',v+'shapetype'}]
     pictures=[p for p in root.iter(W+'pict') if any(n.tag==v+'shape' and n.get('id')==shape_id for n in p)]
     if len(pictures)!=1:return False
     parents={child:parent for parent in root.iter() for child in parent};run=parents.get(pictures[0]);paragraph=parents.get(run)
@@ -402,7 +402,19 @@ PROPERTY_CONTAINER_TAGS = {W + name for name in ("pPr", "rPr", "tblPr", "trPr", 
 
 
 _SOURCE_FACTS = {"cache": None}
-_PARSED_PARTS = {"parts": None}
+_PARSED_PARTS = {"parts": None, "xml": None}
+
+
+def _cached_xml(archive, name):
+    """Parsed `name`, shared within one extraction (the extractor only reads these trees)."""
+    cache = _PARSED_PARTS["xml"]
+    if cache is None:
+        return ET.fromstring(archive.read(name))
+    key = (id(archive), name)
+    root = cache.get(key)
+    if root is None:
+        root = cache[key] = ET.fromstring(archive.read(name))
+    return root
 
 
 def _parsed_part(archive, part):
@@ -411,7 +423,7 @@ def _parsed_part(archive, part):
     parsed = _PARSED_PARTS["parts"]
     if parsed is not None and part in parsed:
         return parsed[part]
-    root = ET.fromstring(archive.read(part))
+    root = _cached_xml(archive, part)
     return root, _source_paths(root, part, archive)
 _COMPACT_JSON = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"))
 
@@ -485,7 +497,7 @@ def _source_paths(root, part, archive=None):
                     import posixpath
                     relationship_path = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
                     if relationship_path in archive.namelist():
-                        relationship_root = ET.fromstring(archive.read(relationship_path))
+                        relationship_root = _cached_xml(archive, relationship_path)
                         relationships = {item.get("Id"): item for item in relationship_root}
                         for item in opaque:
                             for descendant in item.iter():
@@ -508,20 +520,24 @@ def _source_paths(root, part, archive=None):
             visit(child, path + [index], paragraph)
     visit(root, [])
     # XML positions and relationship identities are extraction facts, not pairs.
+    part_relationships = []
     def event_identity(node):
         import posixpath
         relationship_base="http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
         rels = {}
         if archive is not None:
             rel_path = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
-            if rel_path in archive.namelist(): rels = {item.get("Id"): item for item in ET.fromstring(archive.read(rel_path))}
+            # The part's relationships, parsed once for all of its events.
+            if not part_relationships:
+                part_relationships.append(list(_cached_xml(archive, rel_path)) if rel_path in archive.namelist() else [])
+            rels = {item.get("Id"): item for item in part_relationships[0]}
         def leaf_hyperlink(destination):
             if not destination or any(c in destination for c in "\\:#?%") or archive is None:return None
             path=destination.lstrip('/') if destination.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),destination))
             if path.startswith('../') or archive.namelist().count(path)!=1:return None
             if posixpath.join(posixpath.dirname(path),'_rels',posixpath.basename(path)+'.rels') in archive.namelist():return None
             if '[Content_Types].xml' not in archive.namelist():return None
-            types=ET.fromstring(archive.read('[Content_Types].xml'));ct='{http://schemas.openxmlformats.org/package/2006/content-types}'
+            types=_cached_xml(archive, '[Content_Types].xml');ct='{http://schemas.openxmlformats.org/package/2006/content-types}'
             overrides=[n.get('ContentType') for n in types if n.tag==ct+'Override' and n.get('PartName')=='/'+path]
             defaults=[n.get('ContentType') for n in types if n.tag==ct+'Default' and n.get('Extension','').lower()==posixpath.splitext(path)[1].lstrip('.').lower()]
             if (overrides or defaults)!=['application/xml']:return None
@@ -560,7 +576,7 @@ def _source_paths(root, part, archive=None):
                         else:
                             path = destination.lstrip("/") if destination.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), destination))
                             if kind==relationship_base+"hyperlink":
-                                unique=sum(1 for rel in ET.fromstring(archive.read(rel_path)) if rel.get('Id')==value)==1
+                                unique=sum(1 for rel in part_relationships[0] if rel.get('Id')==value)==1
                                 data=leaf_hyperlink(destination) if mode in ('','Internal') and unique else None
                                 if data is None:supported=False
                                 else:value=json.dumps([kind,hashlib.sha256(data).hexdigest(),'application/xml'])
@@ -799,8 +815,8 @@ def _iter_story_blocks(container):
 def _note_part_owners(archive):
     import posixpath
     owners=[];errors=[];names=archive.namelist();base='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
-    rels=list(ET.fromstring(archive.read('word/_rels/document.xml.rels'))) if 'word/_rels/document.xml.rels' in names else []
-    types=list(ET.fromstring(archive.read('[Content_Types].xml'))) if '[Content_Types].xml' in names else []
+    rels=list(_cached_xml(archive, 'word/_rels/document.xml.rels')) if 'word/_rels/document.xml.rels' in names else []
+    types=list(_cached_xml(archive, '[Content_Types].xml')) if '[Content_Types].xml' in names else []
     for kind in ('footnote','endnote'):
         refs=[rel for rel in rels if rel.get('Type')==base+kind+'s'];fallback='word/'+kind+'s.xml'
         if not refs:
@@ -812,18 +828,18 @@ def _note_part_owners(archive):
         declarations=[n.get('ContentType') for n in types if n.get('PartName')=='/'+part]
         if not rel.get('Id') or not target or not target.isascii() or any(c.isspace() for c in target) or any(c in target for c in '\\:#?%') or rel.get('TargetMode','') not in ('','Internal') or not part.startswith('word/') or names.count(part)!=1 or declarations!=[mime] or sum(r.get('Id')==rel.get('Id') for r in rels)!=1:
             errors.append('unsupported-note-part-path');continue
-        if ET.fromstring(archive.read(part)).tag!=W+kind+'s':errors.append('unsupported-note-part-path');continue
+        if _cached_xml(archive, part).tag!=W+kind+'s':errors.append('unsupported-note-part-path');continue
         owners.append({'kind':kind,'part':part,'rId':rel.get('Id'),'rawTarget':target})
     if len({owner['part'] for owner in owners})!=len(owners):errors.append('unsupported-note-part-path')
     return owners,errors
 
 def _note_package_facts(archive,inventory):
     containers=[];owners,errors=_note_part_owners(archive)
-    main='word/_rels/document.xml.rels';relationships=ET.fromstring(archive.read(main)) if main in archive.namelist() else []
+    main='word/_rels/document.xml.rels';relationships=_cached_xml(archive, main) if main in archive.namelist() else []
     def content_signature(node,part):
         import posixpath
         relpath=posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
-        rels={rel.get('Id'):rel for rel in ET.fromstring(archive.read(relpath))} if relpath in archive.namelist() else {}
+        rels={rel.get('Id'):rel for rel in _cached_xml(archive, relpath)} if relpath in archive.namelist() else {}
         def canonical(item,root=False):
             attrs=[]
             for name,value in sorted(item.attrib.items()):
@@ -839,7 +855,7 @@ def _note_package_facts(archive,inventory):
     for owner in owners:
         kind,part=owner['kind'],owner['part']
         ids=set()
-        for index,node in enumerate(ET.fromstring(archive.read(part))):
+        for index,node in enumerate(_cached_xml(archive, part)):
             if node.tag!=W+kind:continue
             identity=node.get(W+'id','');type_name=node.get(W+'type','normal')
             if type_name=='normal' and (identity in ids or not identity.lstrip('-').isdigit()):errors.append('invalid-note-id')
@@ -876,11 +892,11 @@ def _story_package_facts(archive):
     names=set(archive.namelist());errors=[];relationships={}
     path='word/_rels/document.xml.rels'
     if path in names:
-        for node in ET.fromstring(archive.read(path)):
+        for node in _cached_xml(archive, path):
             rid=node.get('Id','')
             if rid in relationships:errors.append('duplicate-main-relationship')
             relationships[rid]=node
-    types=ET.fromstring(archive.read('[Content_Types].xml')) if '[Content_Types].xml' in names else []
+    types=_cached_xml(archive, '[Content_Types].xml') if '[Content_Types].xml' in names else []
     def content_type(part):
         return next((node.get('ContentType') for node in types if node.tag==ct+'Override' and node.get('PartName')=='/'+part),None)
     parts={}
@@ -889,7 +905,7 @@ def _story_package_facts(archive):
         if node.get('Type')!=relns+kind or kind not in ('header','footer'):continue
         target=node.get('Target','');resolved=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
         if node.get('TargetMode')=='External' or resolved not in names:errors.append('unresolved-story-target');continue
-        root=ET.fromstring(archive.read(resolved))
+        root=_cached_xml(archive, resolved)
         if root.tag!=W+('hdr' if kind=='header' else 'ftr'):errors.append('invalid-story-root')
         expected='application/vnd.openxmlformats-officedocument.wordprocessingml.'+kind+'+xml'
         mime=content_type(resolved)
@@ -901,7 +917,7 @@ def _story_package_facts(archive):
         match=re.fullmatch(r'word/(header|footer)\d+\.xml',name)
         if match and name not in parts:parts[name]={'part':name,'kind':match.group(1),'sha256':hashlib.sha256(archive.read(name)).hexdigest(),'contentType':content_type(name),'active':False}
     sections=[];bindings=[]
-    root=ET.fromstring(archive.read('word/document.xml'))
+    root=_cached_xml(archive, 'word/document.xml')
     def visit(node,path,ancestors):
         if node.tag==W+'sectPr' and not any(parent.tag in (W+'sectPrChange',W+'pPrChange') for parent in ancestors):
             section={'part':'word/document.xml','path':path};sections.append({'source':section,'final':bool(ancestors and ancestors[-1].tag==W+'body'),'history':node.find(W+'sectPrChange') is not None,'activation':{'type':node.find(W+'type').get(W+'val','nextPage') if node.find(W+'type') is not None else 'nextPage','titlePage':node.find(W+'titlePg') is not None and node.find(W+'titlePg').get(W+'val','true').lower() not in ('false','off','0')}})
@@ -920,7 +936,7 @@ def _story_package_facts(archive):
                 bindings.append({'section':section,'reference':{'part':'word/document.xml','path':path+[index]},'kind':kind,'variant':variant,'ownerPart':'word/document.xml','rId':rid,'type':rel.get('Type'),'rawTarget':target,'targetMode':rel.get('TargetMode',''),'targetPart':part})
         for index,child in enumerate(node):visit(child,path+[index],ancestors+[node])
     visit(root,[],[])
-    settings=ET.fromstring(archive.read('word/settings.xml')) if 'word/settings.xml' in names else ET.Element(W+'settings')
+    settings=_cached_xml(archive, 'word/settings.xml') if 'word/settings.xml' in names else ET.Element(W+'settings')
     even=settings.find(W+'evenAndOddHeaders')
     return {'policy':'worklazy-story-facts-1','parts':sorted(parts.values(),key=lambda item:item['part']),'sections':sections,'bindings':bindings,'settings':{'evenAndOddHeaders':even is not None and even.get(W+'val','true').lower() not in ('false','off','0')},'errors':sorted(set(errors))}
 
@@ -942,7 +958,7 @@ def _parse_document(data, include_tables, include_metadata):
         note_parts={owner['part'] for owner in _note_part_owners(archive)[0]}
         for part in archive.namelist():
             if part in note_parts or part in story_kinds or re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments|styles)\.xml", part):
-                part_root = ET.fromstring(archive.read(part))
+                part_root = _cached_xml(archive, part)
                 part_sources = _source_paths(part_root, part, archive)
                 if _PARSED_PARTS["parts"] is not None:
                     _PARSED_PARTS["parts"][part] = (part_root, part_sources)
@@ -1165,12 +1181,14 @@ def _extract_document_model(document_bytes, include_tables, include_metadata, la
     LANGUAGE = "en" if language == "en" else "ko"
     _SOURCE_FACTS["cache"] = {}
     _PARSED_PARTS["parts"] = {}
+    _PARSED_PARTS["xml"] = {}
     _FACT_MEMO["facts"] = {}
     try:
         records = _parse_document(bytes(document_bytes), include_tables, include_metadata)
     finally:
         _SOURCE_FACTS["cache"] = None
         _PARSED_PARTS["parts"] = None
+        _PARSED_PARTS["xml"] = None
         _FACT_MEMO["facts"] = None
 
     def comments_of(record):
