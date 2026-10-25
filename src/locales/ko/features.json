@@ -2999,7 +2999,30 @@
         "title": "기준 모음",
         "tiny": "작은 점",
         "words": "글자·문장",
-        "graphics": "그래픽·큰 덩어리"
+        "graphics": "그래픽·큰 덩어리",
+        "save": "현재 값 저장",
+        "name": "이름",
+        "namePlaceholder": "예: 영수증 숫자",
+        "confirmSave": "저장",
+        "cancel": "취소",
+        "manage": "기준 관리",
+        "done": "관리 닫기",
+        "builtIn": "기본 제공",
+        "saved": "저장함",
+        "currentDefault": "새 비교의 기본값",
+        "makeDefault": "기본값으로",
+        "clearDefault": "기본값 해제",
+        "rename": "이름 바꾸기",
+        "confirmRename": "바꾸기",
+        "update": "현재 값으로 바꾸기",
+        "delete": "삭제",
+        "storedHere": "저장한 기준은 이 브라우저에만 보관됩니다. 기본값은 새 파일 쌍을 비교할 때 한 번 적용되며, 기본 제공 기준은 이미지 크기에 맞춰 바뀝니다.",
+        "errors": {
+          "empty": "이름을 입력하세요.",
+          "tooLong": "이름은 {{length}}자까지 쓸 수 있습니다.",
+          "taken": "같은 이름의 기준이 이미 있습니다.",
+          "full": "기준은 {{count}}개까지 저장할 수 있습니다."
+        }
       }
     },
     "metadata": {

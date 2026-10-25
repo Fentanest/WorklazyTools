@@ -3005,7 +3005,30 @@
         "title": "Presets",
         "tiny": "Tiny specks",
         "words": "Words and sentences",
-        "graphics": "Graphics and large blocks"
+        "graphics": "Graphics and large blocks",
+        "save": "Save current values",
+        "name": "Name",
+        "namePlaceholder": "e.g. Receipt numbers",
+        "confirmSave": "Save",
+        "cancel": "Cancel",
+        "manage": "Manage presets",
+        "done": "Done",
+        "builtIn": "Built-in",
+        "saved": "Saved",
+        "currentDefault": "Default for new comparisons",
+        "makeDefault": "Make default",
+        "clearDefault": "Clear default",
+        "rename": "Rename",
+        "confirmRename": "Rename",
+        "update": "Replace with current values",
+        "delete": "Delete",
+        "storedHere": "Saved presets stay in this browser only. The default applies once when a new file pair is compared; built-in presets scale with the image size.",
+        "errors": {
+          "empty": "Enter a name.",
+          "tooLong": "Names can be up to {{length}} characters.",
+          "taken": "A preset with this name already exists.",
+          "full": "Up to {{count}} presets can be saved."
+        }
       }
     },
     "metadata": {
