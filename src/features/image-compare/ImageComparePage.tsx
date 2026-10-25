@@ -36,6 +36,7 @@ export function ImageComparePage() {
   const [ocrBusy,setOcrBusy]=useState(false),[ocrRetainedBytes,setOcrRetainedBytes]=useState(0);
   // The on-screen alignment editor is opened on request; its reduced previews are reserved like other kept views.
   const [alignOpen,setAlignOpen]=useState(false),[alignPreviewBytes,setAlignPreviewBytes]=useState(0),[alignPreviews,setAlignPreviews]=useState<AlignPreviews>(),[alignLoading,setAlignLoading]=useState(false),[alignError,setAlignError]=useState<string>();
+  const alignBytes=useRef(0);const reportAlignBytes=(bytes:number)=>{alignBytes.current=bytes;setAlignPreviewBytes(bytes);};
   const [busy, setBusy] = useState(false), [progress, setProgress] = useState(0), [error, setError] = useState("");
   const [exportBusy,setExportBusy]=useState(()=>sharedImageReportOwner.busy);const reportOwner=useRef(sharedImageReportOwner),mounted=useRef(true),operations=useRef({busy:false,ocrBusy:false});operations.current={busy,ocrBusy};
   const onOcrBusy=useCallback((value:boolean)=>{operations.current.ocrBusy=value;setOcrBusy(value);},[]);
@@ -47,10 +48,10 @@ export function ImageComparePage() {
   const run = async (override?:Readonly<ImageWorkingState>) => {
     const a=override?catalog.current.get(override.left):left,b=override?catalog.current.get(override.right):right;
     if (!a || !b || (!override&&busy) || ocrBusy || reportOwner.current.busy) return;
-    const previousViewBytes = pendingViewBytes.current + (resultRef.current ? resultRef.current.width * resultRef.current.height * 16 : 0) + (previewRef.current ? previewRef.current.width * previewRef.current.height * 16 : 0) + ocrRetainedBytes + alignPreviewBytes;
+    const previousViewBytes = pendingViewBytes.current + (resultRef.current ? resultRef.current.width * resultRef.current.height * 16 : 0) + (previewRef.current ? previewRef.current.width * previewRef.current.height * 16 : 0) + ocrRetainedBytes;
     pendingViewBytes.current=0;invalidate(); const token = generation.current, abort = new AbortController(); controller.current = abort; operations.current.busy=true;setBusy(true); setProgress(0);
     const lease=claimWork();
-    try { await lease.previous;abort.signal.throwIfAborted();const compared = await compareImages(a, b, override?.options??options, override?.transform ?? transform, abort.signal, setProgress, previousViewBytes, override ? override.matrix : autoMatrix); if (token === generation.current && !abort.signal.aborted) { resultRef.current = compared; setResult(compared); setProgress(100); } else disposeImageResult(compared); }
+    try { await lease.previous;abort.signal.throwIfAborted();const compared = await compareImages(a, b, override?.options??options, override?.transform ?? transform, abort.signal, setProgress, previousViewBytes + alignBytes.current, override ? override.matrix : autoMatrix); if (token === generation.current && !abort.signal.aborted) { resultRef.current = compared; setResult(compared); setProgress(100); } else disposeImageResult(compared); }
     catch (caught) { if (token === generation.current) setError(failureKey(caught, "failed")); }
     finally {lease.release(); if (token === generation.current) { operations.current.busy=false;setBusy(false); controller.current = undefined; } }
   };
@@ -58,15 +59,15 @@ export function ImageComparePage() {
   const transact=(patch:Partial<ImageWorkingState>,gesture?:string)=>{const state=history.current.commit({...history.current.current,...patch},gesture);restore(state);return state;};
   const selectFile=(side:'left'|'right',file?:File)=>{if(!file)return;const id=catalog.current.add(file),state=history.current.reset({...history.current.current,[side]:id,transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined});catalog.current.retain([state.left,state.right]);restore(state);};
   const changeOption=<K extends keyof typeof options>(key:K,value:typeof options[K],gesture?:string)=>transact({options:{...history.current.current.options,[key]:value}},gesture);
-  const moveHistory=(direction:'undo'|'redo')=>{if(reportOwner.current.busy||ocrBusy)return;const state=history.current[direction]();restore(state);void run(state);};
+  const moveHistory=(direction:'undo'|'redo')=>{if(reportOwner.current.busy||ocrBusy||alignLoading)return;const state=history.current[direction]();restore(state);void run(state);};
   const suggest = async () => {
     if(!left||!right||!result||busy||ocrBusy||reportOwner.current.busy)return;
     const previousPreviewBytes=previewRef.current?previewRef.current.width*previewRef.current.height*16:0;
     disposeImageResult(previewRef.current);previewRef.current=undefined;setPreview(undefined);setCandidate(undefined);
     const token=generation.current,abort=new AbortController();controller.current=abort;operations.current.busy=true;setBusy(true);setError('');setProgress(0);
-    const retained=result.width*result.height*44+passes.length*8*1024*1024+previousPreviewBytes+ocrRetainedBytes+alignPreviewBytes;
+    const retained=result.width*result.height*44+passes.length*8*1024*1024+previousPreviewBytes+ocrRetainedBytes;
     const lease=claimWork();
-    try{await lease.previous;abort.signal.throwIfAborted();const proposed=await proposeAlignment(left,right,alignmentMode,String(token),retained,abort.signal,setProgress,featureRois);
+    try{await lease.previous;abort.signal.throwIfAborted();const proposed=await proposeAlignment(left,right,alignmentMode,String(token),retained+alignBytes.current,abort.signal,setProgress,featureRois);
       if(token!==generation.current||abort.signal.aborted)return;
       const next=await compareImages(left,right,options,IDENTITY_TRANSFORM,abort.signal,setProgress,retained,proposed.matrix);
       if(token!==generation.current||abort.signal.aborted){disposeImageResult(next);return;}
@@ -83,13 +84,13 @@ export function ImageComparePage() {
   const scan = async () => {
     if (!result || busy || ocrBusy || reportOwner.current.busy || preview || passes.length >= MAX_REGION_PASSES) return; const token = generation.current, abort = new AbortController(); controller.current = abort; operations.current.busy=true;setBusy(true); setProgress(0); setError("");
     const lease=claimWork();
-    try { await lease.previous;abort.signal.throwIfAborted();const pass = await scanRegions(result, regionOptions, abort.signal, setProgress, ocrRetainedBytes + alignPreviewBytes); if (token === generation.current && !abort.signal.aborted) { setProgress(100); setPasses((current) => [...current, pass]); setActivePass(pass.id); setFocusId(undefined); } }
+    try { await lease.previous;abort.signal.throwIfAborted();const pass = await scanRegions(result, regionOptions, abort.signal, setProgress, ocrRetainedBytes + alignBytes.current); if (token === generation.current && !abort.signal.aborted) { setProgress(100); setPasses((current) => [...current, pass]); setActivePass(pass.id); setFocusId(undefined); } }
     catch (caught) { if (token === generation.current) setError(failureKey(caught, "scanFailed")); }
     finally {lease.release(); if (token === generation.current) { operations.current.busy=false;setBusy(false); controller.current = undefined; } }
   };
   // Horizontal and vertical scale are separate fields: editing one keeps the other axis.
   const alignGeneration=useRef(0),alignActive=useRef(0),alignKept=useRef<AlignPreviews|undefined>(undefined),alignRetained=useRef(0);
-  alignRetained.current=(result?result.width*result.height*44:0)+passes.length*8*1024*1024+ocrRetainedBytes;
+  alignRetained.current=(result?result.width*result.height*44:0)+(preview?preview.width*preview.height*44:0)+passes.length*8*1024*1024+ocrRetainedBytes;
   useEffect(()=>{
     if(!alignOpen||!left||!right)return;
     const token=++alignGeneration.current,lease=claimWork(),partial:AlignPreview[]=[];
@@ -98,13 +99,13 @@ export function ImageComparePage() {
       try{
         await lease.previous;if(token!==alignGeneration.current)return;
         const first=await loadAlignPreview(left,alignRetained.current);partial.push(first);if(token!==alignGeneration.current)return;
-        setAlignPreviewBytes(first.bytes);
+        reportAlignBytes(first.bytes);
         const second=await loadAlignPreview(right,alignRetained.current+first.bytes);partial.push(second);if(token!==alignGeneration.current)return;
-        alignKept.current={left:first,right:second};partial.length=0;setAlignPreviews(alignKept.current);setAlignPreviewBytes(first.bytes+second.bytes);
-      }catch(error){if(token===alignGeneration.current){setAlignError(alignPreviewErrorKey(error));setAlignPreviewBytes(0);}}
+        alignKept.current={left:first,right:second};partial.length=0;setAlignPreviews(alignKept.current);reportAlignBytes(first.bytes+second.bytes);
+      }catch(error){if(token===alignGeneration.current){setAlignError(alignPreviewErrorKey(error));reportAlignBytes(0);}}
       finally{for(const item of partial)releaseAlignPreview(item);lease.release();if(--alignActive.current===0&&mounted.current)setAlignLoading(false);}
     })();
-    return()=>{alignGeneration.current++;const kept=alignKept.current;alignKept.current=undefined;releaseAlignPreview(kept?.left);releaseAlignPreview(kept?.right);setAlignPreviews(undefined);setAlignPreviewBytes(0);};
+    return()=>{alignGeneration.current++;const kept=alignKept.current;alignKept.current=undefined;releaseAlignPreview(kept?.left);releaseAlignPreview(kept?.right);setAlignPreviews(undefined);reportAlignBytes(0);};
   },[alignOpen,left,right]);
   const applyRegionOptions=(next:RegionOptions,gesture:string)=>{history.current.commit({...history.current.current,regionOptions:next},gesture);history.current.endGesture();refreshHistory(v=>v+1);setRegionOptions(next);};
   // A saved default preset (Diffchecker's) applies once per new file pair (only a new result triggers it); without one the values stay as they are.
@@ -116,7 +117,7 @@ export function ImageComparePage() {
   const reportRevision=generation.current;
   return <UtilityPage toolId="image-compare"><PageHeader eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
     <UtilitySectionCard title={t("files")} description={t("filesDescription")} step={1}><div className="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">{(["left", "right"] as const).map((side) => <FileDropZone key={side} label={t(side)} hint={t("formats")} accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" files={(side === "left" ? left : right) ? [side === "left" ? left! : right!] : []} onFiles={(files) => selectFile(side,files[0])} disabled={busy||ocrBusy||exportBusy||alignLoading} />)}</div></UtilitySectionCard>
-    <div className="my-3 flex flex-wrap gap-2" data-testid="image-history"><Button variant="secondary" data-testid="image-undo" disabled={!history.current.canUndo||ocrBusy||exportBusy} onClick={()=>moveHistory('undo')}>{ko?'실행 취소':'Undo'}</Button><Button variant="secondary" data-testid="image-redo" disabled={!history.current.canRedo||ocrBusy||exportBusy} onClick={()=>moveHistory('redo')}>{ko?'다시 실행':'Redo'}</Button><Button variant="secondary" data-testid="image-swap" disabled={!left||!right||busy||ocrBusy||exportBusy||alignLoading} onClick={()=>transact({left:history.current.current.right,right:history.current.current.left,transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined})}>{ko?'원본·비교 바꾸기':'Swap images'}</Button><Button variant="secondary" data-testid="image-settings-reset" disabled={ocrBusy||exportBusy} onClick={()=>transact({options:{...DEFAULT_PIXEL_OPTIONS},transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined,regionOptions:{...DEFAULT_REGION_OPTIONS},alignmentMode:"affine"})}>{ko?'설정 초기화':'Reset settings'}</Button><p className="text-xs text-muted-foreground">{ko?'최근 20단계까지 되돌립니다. 파일을 새로 선택하면 기록을 새로 시작합니다.':'Undo up to 20 recent steps. Choosing a new file starts a new history.'}</p></div>
+    <div className="my-3 flex flex-wrap gap-2" data-testid="image-history"><Button variant="secondary" data-testid="image-undo" disabled={!history.current.canUndo||ocrBusy||exportBusy||alignLoading} onClick={()=>moveHistory('undo')}>{ko?'실행 취소':'Undo'}</Button><Button variant="secondary" data-testid="image-redo" disabled={!history.current.canRedo||ocrBusy||exportBusy||alignLoading} onClick={()=>moveHistory('redo')}>{ko?'다시 실행':'Redo'}</Button><Button variant="secondary" data-testid="image-swap" disabled={!left||!right||busy||ocrBusy||exportBusy||alignLoading} onClick={()=>transact({left:history.current.current.right,right:history.current.current.left,transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined})}>{ko?'원본·비교 바꾸기':'Swap images'}</Button><Button variant="secondary" data-testid="image-settings-reset" disabled={ocrBusy||exportBusy} onClick={()=>transact({options:{...DEFAULT_PIXEL_OPTIONS},transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined,regionOptions:{...DEFAULT_REGION_OPTIONS},alignmentMode:"affine"})}>{ko?'설정 초기화':'Reset settings'}</Button><p className="text-xs text-muted-foreground">{ko?'최근 20단계까지 되돌립니다. 파일을 새로 선택하면 기록을 새로 시작합니다.':'Undo up to 20 recent steps. Choosing a new file starts a new history.'}</p></div>
     <UtilitySectionCard title={t("settings")} description={t("settingsDescription")} step={2}><div className="grid grid-cols-3 gap-3 max-[620px]:grid-cols-1">
       <UtilityField><span>{t("threshold")}</span><UtilityInput type="number" min={0} max={1} step={0.01} value={options.threshold} onBlur={()=>history.current.endGesture()} onChange={(event) => changeOption("threshold",Number(event.target.value),"threshold")} /></UtilityField>
       <UtilityField><span>{t("alphaThreshold")}</span><UtilityInput type="number" min={0} max={255} disabled={options.background !== "transparent"} value={options.alphaThreshold} onBlur={()=>history.current.endGesture()} onChange={(event) => changeOption("alphaThreshold",Number(event.target.value),"alphaThreshold")} /></UtilityField>
