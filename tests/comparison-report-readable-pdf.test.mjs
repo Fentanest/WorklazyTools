@@ -27,3 +27,12 @@ test('embedded font holds only the drawn glyphs and 3,000 rows produce one compl
  const model=createExportSnapshot({...input('ko'),rows});const pdf=await open(await writeSnapshotPdf(model,new AbortController().signal,await font()));
  try{assert(pdf.document.numPages>100);const last=(await(await pdf.document.getPage(pdf.document.numPages)).getTextContent()).items.filter(x=>'str'in x).map(x=>x.str).join('');assert(last.includes('수정 2999'),last);}finally{await pdf.close();}
 });
+test('report summary counts each status, shows the creation time and names files after both sources',async()=>{
+ const{reportFileName,statusCounts}=await import('../src/features/comparison-report/snapshot.ts');
+ const model=createExportSnapshot({...input('ko'),rows:[{id:'a',status:'changed',left:'1',right:'2'},{id:'b',status:'added',left:'',right:'3'},{id:'c',status:'changed',left:'4',right:'5'}]});
+ assert.deepEqual(statusCounts(model),{changed:2,added:1});const fields=readablePdfFields(model);
+ assert(fields.includes('결과 요약: 변경 2 · 추가 1'),fields.join('|'));assert(fields.some(x=>/^만든 시각: \d{4}-\d{2}-\d{2} \d{2}:\d{2} \(UTC[+-]\d{2}:\d{2}\)$/u.test(x)));
+ assert.equal(reportFileName(model,'pdf'),'원본-vs-revised.pdf');
+ const unsafe=createExportSnapshot({...input('en'),sources:[{id:'a',revision:'1',label:'C:\dir\a:b?.xlsx'},{id:'b',revision:'1',label:'con'}]});assert.match(reportFileName(unsafe,'xlsx'),/^[^\/:*?"<>|]+\.xlsx$/u);
+ const single=createExportSnapshot({...input('en'),sources:[{id:'a',revision:'1',label:'only.txt'}]});assert.equal(reportFileName(single,'txt'),'comparison-report.txt');
+});

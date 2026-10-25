@@ -1,3 +1,4 @@
+import { createSafeFileName } from '../../utils/fileNameSafety.ts';
 export type Json = null | boolean | number | string | readonly Json[] | { readonly [key: string]: Json };
 export interface ReportRow { readonly id: string; readonly status: string; readonly left: string; readonly right: string; readonly coordinates?: Json; readonly metadata?: Json }
 export interface ReportView { readonly width: number; readonly height: number; readonly alpha: 'preserved' | 'flattened'; readonly background?: string; readonly renderOptions: Json }
@@ -62,6 +63,20 @@ export function createExportSnapshot(input: Omit<ExportSnapshot, 'schema' | 'id'
   assertReport(encoder.encode(JSON.stringify(reportMetadata(snapshot))).length <= REPORT_LIMITS.metadataBytes, 'REPORT_LIMIT');
   if(snapshot.view)assertReport(['preserved','flattened'].includes(snapshot.view.alpha)&&Number.isSafeInteger(snapshot.view.width)&&Number.isSafeInteger(snapshot.view.height)&&snapshot.view.width>0&&snapshot.view.height>0,'REPORT_INVALID_SNAPSHOT');
   ownedSnapshots.add(snapshot);return freeze(snapshot);
+}
+/** Row count per status in first-seen order; the report summary and XLSX metadata share it. */
+export function statusCounts(snapshot: ExportSnapshot): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const row of snapshot.rows) counts[row.status] = (counts[row.status] ?? 0) + 1;
+  return counts;
+}
+const fileStem = (label: string) => (label.split(/[\\/]/u).at(-1) ?? label).replace(/\.[^.]{1,8}$/u, '').slice(0, 60);
+/** `<original>-vs-<revised>.<ext>` from the compared names; the generic name when they are unusable. */
+export function reportFileName(snapshot: ExportSnapshot, extension: string): string {
+  const fallback = `comparison-report.${extension}`;
+  const [left, right] = snapshot.sources;
+  if (!left || !right) return fallback;
+  try { return createSafeFileName(`${fileStem(left.label)}-vs-${fileStem(right.label)}.${extension}`, fallback); } catch { return fallback; }
 }
 export function rawReportText(snapshot: ExportSnapshot): string { assertSnapshot(snapshot); return JSON.stringify(snapshot, null, 2); }
 export function assertOutput(blob: Blob) { assertReport(blob.size > 0 && blob.size <= REPORT_LIMITS.outputBytes, 'REPORT_OUTPUT_LIMIT'); return blob; }

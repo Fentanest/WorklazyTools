@@ -5,10 +5,10 @@ import { assertGeneratedXlsxReport, assertReceivedXlsxReport } from '../excel-co
 import { createIncrementalZipArchiveWriter } from '../../utils/zipArchive.ts';
 import { createSafeFileName } from '../../utils/fileNameSafety.ts';
 import { BlobWriter } from '@zip.js/zip.js';
-import { assertSnapshot, assertOutput, assertReport, rawReportText, reportMetadata, REPORT_LIMITS, type ExportSnapshot } from './snapshot.ts';
+import { assertSnapshot, assertOutput, assertReport, rawReportText, reportMetadata, statusCounts, REPORT_LIMITS, type ExportSnapshot } from './snapshot.ts';
 export async function writeSnapshotXlsx(snapshot: ExportSnapshot, signal: AbortSignal): Promise<Blob> {
   assertSnapshot(snapshot);signal.throwIfAborted(); assertReport(snapshot.rows.length <= REPORT_LIMITS.xlsxRows, 'REPORT_XLSX_LIMIT');
-  const metadata = Object.entries(reportMetadata(snapshot)).map(([key, value]) => [key, JSON.stringify(value)]);
+  const metadata = Object.entries({ ...reportMetadata(snapshot), statusCounts: statusCounts(snapshot) }).map(([key, value]) => [key, JSON.stringify(value)]);
   const rows = snapshot.rows.map(row => [row.id, row.status, row.left, row.right, JSON.stringify(row.coordinates ?? null), JSON.stringify(row.metadata ?? null)]);
   const labels=REPORT_LABELS[snapshot.language];
   const raw = await writeXlsxReport({ creator: 'Worklazy Tools', sheets: [{ name: labels.metadata, headers: [labels.field, labels.value], rows: metadata }, { name: labels.results, headers: [labels.id, labels.status, labels.left, labels.right, labels.coordinates, labels.metadata], rows }].map(encodeReportXlsxSheet) });
