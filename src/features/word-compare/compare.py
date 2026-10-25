@@ -1213,11 +1213,6 @@ def extract_document_model_compact(document_bytes, include_tables, include_metad
     properties share one memoized fact), and any other occurrence of an inventory entry is
     `{"$src":index}`."""
     model = _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)[1]
-    return json.dumps(_model_transport(model), ensure_ascii=False).replace(W, MODEL_NAMESPACE_TOKEN).encode("utf-8")
-
-
-def _model_transport(model, keys=None):
-    """The model (or its `keys`) with shared objects written once, as described above."""
     inventory = model["sourceInventory"]
     positions = {id(ref): index for index, ref in enumerate(inventory)}
     facts, fact_positions = [], {}
@@ -1241,46 +1236,10 @@ def _model_transport(model, keys=None):
         if kind is list:
             return [strip(item) for item in value]
         return value
-    transport = {key: strip(value) for key, value in model.items() if key != "sourceInventory" and (keys is None or key in keys)}
+    transport = {key: strip(value) for key, value in model.items() if key != "sourceInventory"}
     transport["sourceInventory"] = entries
     transport["$facts"] = facts
-    return transport
-
-
-def _restore_model_transport(transport):
-    """Undo `_model_transport`, sharing the same objects again (restoreModelTransport in modelTransport.ts)."""
-    facts = transport.pop("$facts", None)
-    if not isinstance(facts, list):
-        return transport
-    inventory = transport.get("sourceInventory", [])
-    def fact(stub):
-        index = stub.get("$f") if type(stub) is dict else None
-        if type(index) is not int or not 0 <= index < len(facts):
-            raise ValueError("INVALID_MODEL_TRANSPORT")
-        return facts[index]
-    for entry in inventory:
-        properties = entry.get("normalizedProperties")
-        if properties:
-            for name in list(properties):
-                properties[name] = fact(properties[name])
-    def visit(value):
-        kind = type(value)
-        if kind is list:
-            for index, item in enumerate(value):
-                value[index] = visit(item)
-        elif kind is dict:
-            if "$src" in value:
-                index = value["$src"]
-                if type(index) is not int or not 0 <= index < len(inventory) or len(value) != 1:
-                    raise ValueError("INVALID_MODEL_TRANSPORT")
-                return inventory[index]
-            for key in value:
-                value[key] = visit(value[key])
-        return value
-    for key in transport:
-        if key != "sourceInventory":
-            transport[key] = visit(transport[key])
-    return transport
+    return json.dumps(transport, ensure_ascii=False).replace(W, MODEL_NAMESPACE_TOKEN).encode("utf-8")
 
 
 # What creating the tracked DOCX reads from a model (tracked_docx.py _attach_source_inventory and
@@ -1290,28 +1249,30 @@ TRACKED_MODEL_FIELDS = ("fields", "sourceRevision", "storyFacts", "noteFacts", "
 
 def tracked_source_facts(document_bytes, include_tables, include_metadata, language="ko"):
     """The tracked fields of the (memoized) model, compressed, so a batch can put them back after the
-    two-model cache has moved on (restore_tracked_source_facts) instead of extracting again."""
-    import zlib
+    two-model cache has moved on (restore_tracked_source_facts) instead of extracting again. Pickle
+    keeps the shared objects shared and is several times faster than JSON here; the bytes never leave
+    this worker and are only read back by restore_tracked_source_facts."""
+    import pickle, zlib
     entry = _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)
-    saved = {"key": list(entry[0]), "model": _model_transport(entry[1], TRACKED_MODEL_FIELDS)}
-    return zlib.compress(json.dumps(saved, ensure_ascii=False).encode("utf-8"), 1)
+    model = {key: entry[1][key] for key in TRACKED_MODEL_FIELDS if key in entry[1]}
+    return zlib.compress(pickle.dumps({"key": entry[0], "model": model}, protocol=pickle.HIGHEST_PROTOCOL), 1)
 
 
 def restore_tracked_source_facts(path, include_tables, include_metadata, language, packed):
     """Cache the tracked fields saved by tracked_source_facts for the document at `path`, unless the
     cache already holds its model or they were saved for other bytes or options. Only the tracked
     generator reads such an entry; without one it extracts the document again."""
-    import zlib
+    import pickle, zlib
     with open(path, "rb") as source:
         key = _extract_cache_key(source.read(), include_tables, include_metadata, language)
     if any(entry[0] == key for entry in _EXTRACT_CACHE):
         return False
     if hasattr(packed, "to_py"):
         packed = packed.to_py()
-    saved = json.loads(zlib.decompress(bytes(packed)).decode("utf-8"))
-    if tuple(saved["key"]) != key:
+    saved = pickle.loads(zlib.decompress(bytes(packed)))
+    if saved["key"] != key:
         return False
-    _EXTRACT_CACHE.append([key, _restore_model_transport(saved["model"]), None, "tracked"])
+    _EXTRACT_CACHE.append([key, saved["model"], None, "tracked"])
     del _EXTRACT_CACHE[:-2]
     return True
 
