@@ -6,7 +6,7 @@
 1. 로컬 오케스트레이터가 수집·판정·조립·평가·공개 관문을 끝내고, 관문을 통과한 JSON만 **`Fentanest/foliotrace-site-data`(비공개, main)** 의 `v1/manifest.json`·`v1/snapshots/<버전>.json`에 커밋·push한다(`deliver.py`, 데이터 저장소 전용 클론, `delivery.target_subpath = v1`). 구조 확정은 생산자(P2) 쪽 담당이며, 이 저장소의 워크플로는 `v1/manifest.json`과 `v1/snapshots/`가 없으면 중단한다.
 2. WorklazyTools의 `.github/workflows/deploy-site.yml`이 읽기 전용 키로 데이터 저장소를 체크아웃해 `public/data/foliotrace/v1/`로 복사하고(저장소에는 이 경로를 커밋하지 않는다), 검증·빌드·테스트·배포만 한다. DART 호출·DART 키·상태 저장·가격 수집은 워크플로에 없다.
 3. 화면 코드 push(main)는 데이터 저장소의 **그 시점 main**으로 배포되므로 로컬 장비가 꺼져 있어도 배포된다.
-4. 데이터가 바뀌었다는 알림(repository_dispatch)은 아래 "갱신 알림 방식" 참조.
+4. 데이터 갱신 감지는 알림이 아니라 WorklazyTools의 30분 주기 확인이다(아래 "갱신 알림 방식").
 
 ## 키 규정 (문서만 — 키 생성·등록·비밀값 설정은 사용자가 한다)
 | 키 | 위치 | 권한 | 용도 |
@@ -23,7 +23,7 @@
 - 유출 대응: 즉시 해당 Deploy key 삭제(쓰기 키: 전달만 멈추고 사이트는 마지막 값 유지; 읽기 키: 다음 배포부터 체크아웃 실패로 중단, 사이트는 마지막 값 유지) → 새 키 → 데이터 저장소 최근 커밋 점검.
 - 서명자: 커밋 저자는 `delivery.commit_author`(고정 이름), 메시지 `FolioTrace data <날짜> <버전12자리>`.
 
-## 갱신 알림 방식 (repository_dispatch `foliotrace-data-updated`)
+## 갱신 감지 방식 (알림 대안 비교와 채택안)
 워크플로는 이 이벤트로도 실행되도록 준비돼 있다(`FOLIOTRACE_DEPLOY_V2=true`일 때만 배포). 누가 보내느냐가 문제이며, repository_dispatch는 대상 저장소(WorklazyTools)에 **Contents 쓰기 권한 토큰**이 있어야 보낼 수 있다.
 
 | 방식 | 장점 | 단점 |
@@ -32,17 +32,23 @@
 | B. 로컬 오케스트레이터가 push 후 직접 `gh api` dispatch | 데이터 저장소에 워크플로 불필요 | 같은 토큰이 로컬 호스트에 상주(쓰기 키와 같은 위험 + 더 큼), 토큰 만료 관리 |
 | C. WorklazyTools에서 주기 확인(예: 30분마다 `ls-remote`로 데이터 저장소 HEAD와 배포된 값의 출처 리비전을 비교, 다르면 배포) | 추가 쓰기 토큰 0, 원칙 유지 | 최대 지연 약 30분, 비교용 출처 리비전을 배포물에 싣는 작은 구현 필요(아직 없음), 빈 실행 소모 |
 
-**권고: C** (일일 1회 갱신이라 지연이 문제 아니고, 쓰기 토큰을 만들지 않는다). C를 택하면 이 저장소에서 `schedule` 트리거와 리비전 비교 단계를 추가하는 후속 작업이 필요하다(사용자 승인 후). 즉시성이 꼭 필요하면 A를 세분화 PAT(WorklazyTools 단일 저장소, Contents 쓰기만, 만료 90일)로 하되 위험을 수용한다. 어느 쪽이든 알림이 없어도 다음 main push나 수동 실행 때 최신 데이터로 배포된다. 이 결정 전에는 이벤트를 보내는 쪽이 없다.
+**결정(총괄, 2026-10-25): C 채택.** 쓰기 토큰을 만들지 않는다. 구현:
+- `deploy-site.yml`에 `schedule`(매시 7분·37분, 30분 간격) 추가. 예약 실행은 `check` 잡에서 (1) 읽기 키로 데이터 저장소 main을 얕게 체크아웃해 HEAD 커밋을 얻고, (2) 현재 사이트의 `https://worklazy.net/data/foliotrace-source.json`을 가져와 `revision`과 비교한다(`scripts/foliotrace-source-meta.mjs decide`). 같으면 `changed=false`로 여기서 끝나고 빌드·배포 잡은 건너뛴다(짧은 실행). 다르면 빌드·배포한다.
+- 출처 리비전 표지: 빌드가 체크아웃한 데이터 저장소 커밋을 `dist/data/foliotrace-source.json`(`{schemaVersion:1, revision:<40자리>, datasetVersion}`)으로 기록한다. 계약 폴더(`data/foliotrace/v1/`) **밖**이라 데이터 루트 잡파일 거절 규칙과 충돌하지 않는다. 데이터 저장소 이름은 싣지 않는다.
+- 안전 쪽 판정: 표지가 없거나(404·첫 배포 전)·형식이 틀리거나·가져오기 실패면 `changed=true`(재배포는 멱등). 비밀값이 없으면 예약 실행은 키 확인 단계에서 실패한다.
+- `FOLIOTRACE_DEPLOY_V2=='true'` 게이트는 예약 실행에도 적용된다(변수 전에는 `check` 잡이 건너뜀). main push·수동 실행은 비교 없이 항상 빌드한다.
+- `repository_dispatch`(`foliotrace-data-updated`) 트리거는 남겨 두었고 보내는 쪽은 없다(비교 없이 항상 빌드).
+- 최대 지연 약 30분(GitHub 예약 실행은 부하 때 더 늦을 수 있음). 시험: `tests/unit/foliotrace-source-meta.test.ts`(같음/다름/표지 없음·불량·형식 엄격).
 
 ## 워크플로 전환 (P3-3)
-새 `deploy-site.yml`을 추가했고 기존 `deploy-pages.yml`(cron·self-hosted `Ubuntu24-Git`·DART 수집)은 **아직 손대지 않았다**. 새 워크플로는 main push·repository_dispatch 때 저장소 변수 `FOLIOTRACE_DEPLOY_V2 == 'true'`일 때만 돈다(그전엔 건너뜀). 수동 실행은 항상 가능하고 기본값이 "검증만(Pages 미변경)"이다.
+새 `deploy-site.yml`을 추가했고 기존 `deploy-pages.yml`(cron·self-hosted `Ubuntu24-Git`·DART 수집)은 **아직 손대지 않았다**. 새 워크플로는 main push·예약·repository_dispatch 때 저장소 변수 `FOLIOTRACE_DEPLOY_V2 == 'true'`일 때만 돈다(그전엔 건너뜀). 수동 실행은 항상 가능하고 기본값이 "검증만(Pages 미변경)"이다.
 
 사전 준비(사용자): 데이터 저장소 생성, 두 Deploy key 등록, `FOLIOTRACE_SITE_DATA_READ_KEY` 비밀값 설정, (권고) 데이터 저장소 main 보호.
 1. 코드·워크플로가 main에 들어간다. 비밀값·데이터가 아직 없으면 새 워크플로는 수동 실행 때 키 확인 또는 체크아웃/검증에서 실패한다 = 정상(배포 안 함). 옛 cron은 계속 사이트를 갱신한다(이 변경은 옛 검증기도 공개 개정 1 실데이터로 통과 확인).
 2. 오케스트레이터 첫 전달로 데이터 저장소에 `v1/`이 생긴다.
 3. `Deploy site`를 `validate_only=true`로 수동 실행해 키·체크아웃·검증·빌드·테스트 통과를 확인한다(GitHub 호스팅 러너).
 4. 옛 워크플로를 비활성(`gh workflow disable "Deploy GitHub Pages"`)한 뒤 같은 워크플로를 `validate_only=false`로 수동 1회 실배포 → 사이트 값·날짜 확인.
-5. 전환: 저장소 변수 `FOLIOTRACE_DEPLOY_V2=true`. 이후 main push마다(그리고 알림이 구성되면 그 이벤트로) 배포된다.
+5. 전환: 저장소 변수 `FOLIOTRACE_DEPLOY_V2=true`. 이후 main push마다와 30분 주기 확인에서 데이터 변경이 감지될 때 배포된다.
 6. 안정 확인(예: 연속 정상 배포 3일) 뒤 P4: `deploy-pages.yml`·`foliotrace-*.yml`·`foliotrace-data` 브랜치 정리, `Ubuntu24-Git` 러너 해제(사용자 결정), DART 시크릿 삭제.
 
 **되돌리기**: 변수를 지우거나 false로 하고 `gh workflow enable "Deploy GitHub Pages"` 후 수동 실행(옛 `foliotrace-data` 브랜치와 상태는 P4 전까지 보존).

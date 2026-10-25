@@ -6,6 +6,8 @@ run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.validate_only 
 # Fentanest/foliotrace-site-data (main, v1/manifest.json + v1/snapshots/, delivered by the local orchestrator) with a READ-ONLY deploy
 # key (secret FOLIOTRACE_SITE_DATA_READ_KEY), places it at public/data/foliotrace/v1, validates, builds, tests and deploys.
 # Missing secret or failed checkout stops the run before any deploy: the site keeps its previous data.
+# Scheduled runs (every 30 min) compare the data repository head with the revision carried by the live site
+# (/data/foliotrace-source.json) and deploy only when it differs.
 # Cutover steps: docs/foliotrace-delivery-and-deploy.md.
 #
 # Inert until cutover: main push and repository_dispatch runs deploy only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true'.
@@ -13,8 +15,10 @@ run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.validate_only 
 on:
   push:
     branches: [main]
+  schedule:
+    - cron: '7,37 * * * *' # data change check every 30 minutes; deploys only when the data repository head is new
   repository_dispatch:
-    types: [foliotrace-data-updated] # optional notification that the data repository changed (see the delivery doc)
+    types: [foliotrace-data-updated] # kept for a future sender; nothing sends it today (see the delivery doc)
   workflow_dispatch:
     inputs:
       validate_only:
@@ -31,8 +35,54 @@ permissions:
   contents: read
 
 jobs:
-  build:
+  check:
+    # Scheduled runs end here when the data repository head is already on the live site (short run, no build).
     if: github.event_name == 'workflow_dispatch' || vars.FOLIOTRACE_DEPLOY_V2 == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.decide.outputs.changed || steps.decide-scheduled.outputs.changed }}
+    steps:
+      - name: Decide
+        id: decide
+        if: github.event_name != 'schedule'
+        run: echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout (scripts only)
+        if: github.event_name == 'schedule'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Require the data repository read key
+        if: github.event_name == 'schedule'
+        env:
+          KEY_PRESENT: ${{ secrets.FOLIOTRACE_SITE_DATA_READ_KEY != '' }}
+        run: |
+          if [ "$KEY_PRESENT" != "true" ]; then echo "::error::FOLIOTRACE_SITE_DATA_READ_KEY is not set"; exit 1; fi
+
+      - name: Checkout FolioTrace public data repository head (read-only key)
+        if: github.event_name == 'schedule'
+        uses: actions/checkout@v4
+        with:
+          repository: Fentanest/foliotrace-site-data
+          ref: main
+          ssh-key: ${{ secrets.FOLIOTRACE_SITE_DATA_READ_KEY }}
+          path: foliotrace-site-data
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Compare with the revision carried by the live site
+        id: decide-scheduled
+        if: github.event_name == 'schedule'
+        run: |
+          rev=$(git -C foliotrace-site-data rev-parse HEAD)
+          result=$(node scripts/foliotrace-source-meta.mjs decide "$rev" https://worklazy.net/data/foliotrace-source.json | tail -1)
+          echo "data head $rev -> $result"
+          echo "$result" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -66,6 +116,10 @@ jobs:
           cp -r foliotrace-site-data/v1/. public/data/foliotrace/v1/
           echo "data repository revision: $(git -C foliotrace-site-data rev-parse HEAD)"
 
+      - name: Record data repository revision
+        id: data-revision
+        run: echo "sha=$(git -C foliotrace-site-data rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -95,6 +149,9 @@ jobs:
 
       - name: Validate deployed FolioTrace data and static summary
         run: node --experimental-strip-types scripts/validate-foliotrace-snapshot.mjs dist
+
+      - name: Carry the data source revision on the site (outside the contract folder)
+        run: node scripts/foliotrace-source-meta.mjs write dist ${{ steps.data-revision.outputs.sha }}
 
       - name: Checkout published market calendar
         id: market-calendar
