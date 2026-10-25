@@ -1,3 +1,4 @@
+import type { MoveSide } from "./moves.ts";
 export interface TextOptions {
   mode: "smart" | "word" | "character";
   ignoreCase: boolean;
@@ -17,6 +18,8 @@ export interface TextRow {
   kind: "equal" | "ignored" | "changed" | "added" | "deleted";
   left?: TextLine; right?: TextLine;
   leftMarks: TextMark[]; rightMarks: TextMark[];
+  /** Set when this side's line belongs to a moved block; the range is the block on the other side. */
+  leftMove?: MoveSide; rightMove?: MoveSide;
 }
 export interface TextSourceMapping {
   rawLength:number; normalizedLength:number;
@@ -28,6 +31,8 @@ export interface TextResult {
   options: TextOptions;
   rows: TextRow[];
   counts: { changed: number; added: number; deleted: number; ignored: number; equal: number };
+  /** Number of moved line blocks among the deleted and added lines. */
+  moves: number;
   quality: "full" | "line-coarse";
   reasons: string[];
 }

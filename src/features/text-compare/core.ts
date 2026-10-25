@@ -3,12 +3,15 @@ import { diffText } from "../document-compare/documentComparison.ts";
 import { alignSequenceWithBudget, type SequenceAlignmentPair } from "../../utils/sequenceAlignment.ts";
 import { myersAlign } from "../../utils/myersDiff.ts";
 import { mapText } from "./ignore.ts";
+import { annotateMoves } from "./moves.ts";
 import type { MappedText, TextLine, TextMark, TextOptions, TextResult, TextRow } from "./resultTypes.ts";
 
 type Segment = { type: "equal" | "deleted" | "added"; text: string };
 const CELL_BUDGET = 1_500_000;
 // Myers' cost grows with (N+M)*D; differences past this bound use the cell-budgeted alignment.
 const editLimit = (items: number) => Math.max(64, Math.floor(CELL_BUDGET * 8 / (items + 1)));
+// Lines compare as integer hashes first, so the line pass affords four times the distance.
+const lineEditLimit = (items: number) => Math.max(64, Math.floor(CELL_BUDGET * 32 / (items + 1)));
 // A line's content without its terminator: appending after a last line without one is an added line.
 const lineContent = (line: TextLine) => line.key.endsWith("\n") ? line.key.slice(0, -1) : line.key;
 // Lines longer than this (both sides together) are diffed between their common prefix and suffix.
@@ -19,15 +22,26 @@ const graphemeSegmenter = () => sharedSegmenter ??= new Intl.Segmenter(undefined
 // grapheme cluster except a CR LF pair.
 const simpleGraphemes = (text: string) => /^[\u0000-\u02ff]*$/u.test(text) && !text.includes("\r\n");
 const graphemes = (text: string) => simpleGraphemes(text) ? text.split("") : Array.from(graphemeSegmenter().segment(text), item => item.segment);
-/** Whether `index` is a grapheme cluster boundary of `text`, judged within a local window. */
+// Code units below U+0300 and precomposed Hangul syllables never join each other (UAX #29: a
+// syllable joins only following conjoining jamo), except CR LF: between two of them is always a
+// boundary, and segmentation may start there without losing context.
+const plainUnit = (code: number) => code < 0x300 || code >= 0xac00 && code <= 0xd7a3;
+const safeBoundary = (text: string, index: number) => {
+  const before = text.charCodeAt(index - 1), after = text.charCodeAt(index);
+  return plainUnit(before) && plainUnit(after) && !(before === 13 && after === 10);
+};
+let boundaryCache: { text: string; start: number; end: number; starts: Set<number> }[] = [];
+/** Whether `index` is a grapheme cluster boundary of `text`. A break depends only on what precedes
+ * it and the next code unit, so segmentation from the nearest safe boundary before is exact. */
 function graphemeBoundary(text: string, index: number) {
-  if (index <= 0 || index >= text.length) return true;
-  const start = Math.max(0, index - 64);
-  for (const item of graphemeSegmenter().segment(text.slice(start, index + 64))) {
-    if (start + item.index === index) return true;
-    if (start + item.index > index) return false;
-  }
-  return false;
+  if (index <= 0 || index >= text.length || safeBoundary(text, index)) return true;
+  for (const cached of boundaryCache) if (cached.text === text && cached.start <= index && index < cached.end) return cached.starts.has(index);
+  let start = index - 1;
+  while (start > 0 && !safeBoundary(text, start)) start--;
+  const end = Math.min(text.length, index + 256), starts = new Set<number>();
+  for (const item of graphemeSegmenter().segment(text.slice(start, end))) starts.add(start + item.index);
+  boundaryCache = [{ text, start, end, starts }, ...boundaryCache.slice(0, 3)];
+  return starts.has(index);
 }
 const wordCharacter = (character: string | undefined) => character !== undefined && /[\p{L}\p{N}_]/u.test(character);
 /** Common prefix and suffix lengths of two lines, cut on grapheme boundaries of both and, for word
@@ -130,17 +144,22 @@ function alignLines(a: TextLine[], b: TextLine[], check: () => void): { pairs: S
   // Inside a run, a line whose content differs only by indentation or trailing space pairs first.
   const score = (x: TextLine, y: TextLine) => lineContent(x) === lineContent(y) ? 5 : lineContent(x).trim() === lineContent(y).trim() ? 4 : 0;
   const options = { signature: (x: TextLine) => lineContent(x), equals: (x: TextLine, y: TextLine) => lineContent(x) === lineContent(y), score, acceptsPair: () => true, cellBudget: CELL_BUDGET, checkCanceled: check };
-  // The budgeted alignment is exact unless it reports a fallback (long repetitive input); only
-  // then are equal lines anchored by Myers first.
-  const direct = alignSequenceWithBudget(a, b, options);
-  if (!direct.budgetFallback) return direct;
-  // The anchor pass compares lines O((N+M)·D) times: each distinct content becomes one integer.
-  const ids = new Map<string, number>(), intern = (line: TextLine) => { const key = lineContent(line); let id = ids.get(key); if (id === undefined) ids.set(key, id = ids.size); return id; };
-  const anchors = myersAlign(a.map(intern), b.map(intern), (x, y) => x === y, editLimit(a.length + b.length), check);
-  if (!anchors) return direct;
+  // Equal lines are anchored by Myers (a longest common subsequence, unlike patience anchors), which
+  // compares lines O((N+M)·D) times: a hash of each line's content is compared before the content.
+  const hash = (line: TextLine) => {
+    let value = 0x811c9dc5;
+    for (let i = 0, end = line.key.length - (line.key.endsWith("\n") ? 1 : 0); i < end; i++) value = Math.imul(value ^ line.key.charCodeAt(i), 0x01000193);
+    return value;
+  };
+  const ha = Int32Array.from(a, hash), hb = Int32Array.from(b, hash);
+  const sameLine = (x: number, y: number) => ha[x] === hb[y] && lineContent(a[x]) === lineContent(b[y]);
+  const anchors = myersAlign(Array.from(a, (_, i) => i), Array.from(b, (_, i) => i), sameLine, lineEditLimit(a.length + b.length), check);
+  if (!anchors) return alignSequenceWithBudget(a, b, options);
   const pairs: SequenceAlignmentPair[] = []; let budgetFallback = false, gapA: number[] = [], gapB: number[] = [];
   const flush = () => {
-    if (gapA.length && gapB.length) {
+    // One line against one line always pairs (as the budgeted alignment does), without its setup.
+    if (gapA.length === 1 && gapB.length === 1) pairs.push({ beforeIndex: gapA[0], afterIndex: gapB[0] });
+    else if (gapA.length && gapB.length) {
       const gap = alignSequenceWithBudget(gapA.map(i => a[i]), gapB.map(i => b[i]), options);
       budgetFallback ||= gap.budgetFallback;
       for (const pair of gap.pairs) pairs.push({ beforeIndex: pair.beforeIndex === null ? null : gapA[pair.beforeIndex], afterIndex: pair.afterIndex === null ? null : gapB[pair.afterIndex] });
@@ -158,6 +177,7 @@ function alignLines(a: TextLine[], b: TextLine[], check: () => void): { pairs: S
   return { pairs, budgetFallback };
 }
 export function compareTexts(left: string, right: string, options: TextOptions, revision=0, deadlineMs=5000): TextResult {
+  boundaryCache = [];
   if (left.length+right.length>4_000_000) throw new Error("TEXT_TOO_LARGE");
   for(const text of [left,right]){let breaks=0;for(let i=0;i<text.length;i++)if(text.charCodeAt(i)===10&&++breaks>200_000)throw new Error("TEXT_LINE_LIMIT");if(breaks+(text.endsWith("\n")?0:1)>200_000)throw new Error("TEXT_LINE_LIMIT");}
   const deadline=performance.now()+deadlineMs, check=()=>{if(performance.now()>deadline) throw new Error("TEXT_TIMEOUT");};
@@ -213,7 +233,8 @@ export function compareTexts(left: string, right: string, options: TextOptions, 
     }
     return segments;
   }
+  const moves=annotateMoves(rows);
   const mapping=(value:MappedText)=>({rawLength:value.raw.length,normalizedLength:value.value.length,starts:Uint32Array.from(value.starts),ends:Uint32Array.from(value.ends),removedSpans:value.removed.map(span=>({...span,rules:[...span.rules]}))});
   const provenance={policyVersion:TEXT_NORMALIZATION_POLICY.version,rules:options.ignoreRules.map((literal,id)=>({id,literal})),left:mapping(lm),right:mapping(rm)};
-  return {revision,provenance,options:structuredClone(options),rows,counts,quality:coarse?"line-coarse":"full",reasons:coarse?["COMPARISON_BUDGET"]:[]};
+  return {revision,provenance,options:structuredClone(options),rows,counts,moves,quality:coarse?"line-coarse":"full",reasons:coarse?["COMPARISON_BUDGET"]:[]};
 }

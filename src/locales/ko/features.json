@@ -2805,6 +2805,10 @@
     }
   },
   "textCompare": {
+    "movedTo": "{{line}}행으로 이동",
+    "movedFrom": "{{line}}행에서 이동",
+    "movesSummary": "이동한 묶음 {{count}}개",
+    "moveSimilarity": "유사도 {{percent}}%",
     "eyebrow": "텍스트 비교",
     "title": "텍스트 비교",
     "description": "두 글의 차이를 줄·단어·글자 단위로 확인하고, 필요한 변경만 옮겨 저장하세요.",

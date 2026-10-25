@@ -81,7 +81,7 @@ export function TextComparePage() {
     </UtilitySectionCard>
     {busy&&<UtilityNotice kind="progress" role="status">{tr("comparing")}</UtilityNotice>}
     {result&&<UtilitySectionCard title={tr("result")}>
-      <p aria-live="polite" data-testid="text-compare-summary">{tr("summary",result.counts)}</p>
+      <p aria-live="polite" data-testid="text-compare-summary">{tr("summary",result.counts)}{result.moves?` · ${tr("movesSummary",{count:result.moves})}`:""}</p>
       {result.revision!==state.revision&&<UtilityNotice kind="warning">{tr("stale")}</UtilityNotice>}
       {result.quality!=="full"&&<UtilityNotice kind="warning">{tr("coarse")}</UtilityNotice>}
       <div className="mb-3 flex flex-wrap gap-3">{[["unified",unified,setUnified],["wrap",wrap,setWrap],["fold",fold,setFold]].map(([key,value,setter])=><label key={key as string} className="flex items-center gap-2"><input type="checkbox" checked={value as boolean} onChange={e=>(setter as (value:boolean)=>void)(e.target.checked)}/>{tr(key as string)}</label>)}<UtilityInput data-testid="text-compare-search" className="max-w-xs" value={search} onChange={e=>setSearch(e.target.value)} aria-label={tr("search")} placeholder={tr("search")}/></div>

@@ -2811,6 +2811,10 @@
     }
   },
   "textCompare": {
+    "movedTo": "Moved to line {{line}}",
+    "movedFrom": "Moved from line {{line}}",
+    "movesSummary": "{{count}} moved blocks",
+    "moveSimilarity": "{{percent}}% similarity",
     "eyebrow": "TEXT COMPARISON",
     "title": "Compare text",
     "description": "Find line, word and character changes between two texts, copy selected changes and save your result.",

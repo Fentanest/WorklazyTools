@@ -223,3 +223,54 @@ test("a final line terminator present on one side only is a mergeable change", (
   const appended = compareTexts("a\nb", "a\nb\nc", defaults);
   assert.deepEqual(appended.rows.map(row => row.kind), ["equal", "equal", "added"]);
 });
+
+test("long-line cuts and word edges never split a long combining or ZWJ cluster", () => {
+  const cluster = (last: string) => "👩" + "́".repeat(80) + "‍" + last;
+  const left = "a".repeat(6000) + cluster("👩"), right = "a".repeat(6000) + cluster("👨");
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const starts = (text: string) => new Set([...segmenter.segment(text)].map(item => item.index).concat(text.length));
+  for (const mode of ["smart", "word", "character"] as const) {
+    const row = compareTexts(left, right, { ...defaults, mode }).rows[0];
+    for (const [marks, text] of [[row.leftMarks, left], [row.rightMarks, right]] as const) {
+      const bounds = starts(text);
+      for (const mark of marks.filter(item => item.kind === "changed")) assert.ok(bounds.has(mark.start) && bounds.has(mark.end), `${mode} ${mark.start}-${mark.end}`);
+      assert.ok(marks.some(mark => mark.kind === "changed" && mark.start === 6000), mode);
+    }
+  }
+  // A long line made only of emoji clusters is still cut quickly and on cluster edges.
+  const emoji = "👍🏽".repeat(100_000), started = performance.now();
+  const row = compareTexts(emoji + "x" + emoji, emoji + "y" + emoji, { ...defaults, mode: "character" }).rows[0];
+  assert.deepEqual(row.rightMarks.map(mark => [mark.start, mark.end]), [[emoji.length, emoji.length + 1]]);
+  assert.ok(performance.now() - started < 5_000);
+});
+
+// Behaviour checked against Diffchecker 7.3.0's own worker on the same inputs (48 of 51 cases equal;
+// the rest differ only because a text ending in a newline has no extra empty last line here).
+test("moved blocks of three or more lines are linked on both sides like Diffchecker", () => {
+  const lines = (from: number, to: number, edit?: (line: string, i: number) => string) => Array.from({ length: to - from }, (_, i) => { const line = `line ${from + i} alpha beta gamma`; return edit ? edit(line, i) : line; });
+  const movesOf = (left: string, right: string) => {
+    const result = compareTexts(left, right, defaults), groups = new Map<number, number[]>();
+    for (const row of result.rows) if (row.left && row.leftMove) {
+      const g = groups.get(row.leftMove.group) ?? [Infinity, -Infinity, row.leftMove.start, row.leftMove.end, row.leftMove.score];
+      g[0] = Math.min(g[0], row.left.number); g[1] = Math.max(g[1], row.left.number + 1); groups.set(row.leftMove.group, g);
+    }
+    return { result, moves: [...groups.values()].map(g => [g[0], g[1], g[2], g[3], Math.round(g[4] * 1e4) / 1e4]) };
+  };
+  // A four-line block moved up.
+  const up = movesOf([...lines(0, 10)].join("\n"), [...lines(5, 9), ...lines(0, 5), ...lines(9, 10)].join("\n"));
+  assert.deepEqual(up.moves, [[6, 10, 1, 5, 1]]);
+  assert.ok(up.result.rows.every(row => !row.rightMove || row.right!.number >= 1 && row.right!.number < 5));
+  assert.equal(up.result.moves, 1);
+  // Moved and partly edited: similarity 0.93 like the original.
+  const edited = movesOf(lines(0, 10).join("\n"), [...lines(0, 2), ...lines(6, 9, (line, i) => i === 1 ? line.replace("alpha", "ALPHA") : line), ...lines(2, 6), ...lines(9, 10)].join("\n"));
+  assert.deepEqual(edited.moves, [[7, 10, 3, 6, 0.9306]]);
+  // One or two moved lines, or every line edited, are not moves.
+  assert.deepEqual(movesOf(lines(0, 8).join("\n"), [...lines(7, 8), ...lines(0, 7)].join("\n")).moves, []);
+  assert.deepEqual(movesOf(lines(0, 8).join("\n"), [...lines(0, 2), ...lines(6, 8), ...lines(2, 6)].join("\n")).moves, []);
+  assert.deepEqual(movesOf(lines(0, 10).join("\n"), [...lines(0, 2), ...lines(6, 9, line => `${line} edited`), ...lines(2, 6), ...lines(9, 10)].join("\n")).moves, []);
+  // Short lines and a blank line inside a block still move.
+  assert.deepEqual(movesOf("}\na\nb\nc\nx\ny\nz\n{", "x\ny\nz\n}\na\nb\nc\n{").moves, [[5, 8, 1, 4, 1]]);
+  assert.deepEqual(movesOf("head\nm1 moved text\n\nm2 moved text\nmid one\nmid two\nmid three\ntail", "head\nmid one\nmid two\nmid three\nm1 moved text\n\nm2 moved text\ntail").moves, [[2, 5, 5, 8, 1]]);
+  // Row kinds and counts are those of the comparison without moves.
+  assert.deepEqual(up.result.counts, { changed: 0, added: 4, deleted: 4, ignored: 0, equal: 6 });
+});
