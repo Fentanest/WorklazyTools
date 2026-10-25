@@ -49,7 +49,7 @@ test('latest export queue is serial and cannot deliver stale or canceled output'
  await assert.rejects(skipped,{name:'AbortError'});assert.deepEqual(events,['old']);release();await assert.rejects(old);await latest;assert.deepEqual(events,['old','latest']);assert.equal(await delivered[0].text(),'latest');
  let finish;const stale=owner.run(model,()=>current,async()=>{await new Promise(r=>{finish=r;});return new Blob(['late']);},()=>assert.fail('stale delivery'));current=false;finish();await assert.rejects(stale,/REPORT_STALE/);await owner.dispose();
 });
-test('PDF reuses CJK/CFF font, paginates every Korean/ligature marker and rejects missing emoji without truncation',async t=>{
+test('PDF reuses CJK/CFF font, paginates every Korean/ligature marker and marks missing emoji without truncation',async t=>{
  const font=await fs.readFile('public/vendor/qr-label-font/noto-cjk-sans-2.004/NotoSansKR-Regular.otf');
  assert(fontkit.create(font).layout('office ffi').glyphs.some(g=>g.codePoints.length>1),'fixture must exercise shaped ligatures');
  const rows=Array.from({length:30},(_,i)=>({id:`row${i}`,status:'changed',left:`한글 비교 office ffi 원문${i}`,right:`수정 내용 한글${i}`}));
@@ -58,8 +58,11 @@ test('PDF reuses CJK/CFF font, paginates every Korean/ligature marker and reject
  try{assert(document.numPages>1);let text='';for(let i=1;i<=document.numPages;i++){const page=await document.getPage(i);text+=(await page.getTextContent()).items.filter(x=>'str'in x).map(x=>x.str).join('');page.cleanup();}
  for(let i=0;i<30;i++){assert(text.includes(`원문${i}`));assert(text.includes(`한글${i}`));}assert(text.includes('office ffi'));assert(text.includes('부분 비교 경고'));
  }finally{await loading.destroy();}
- const emoji=createExportSnapshot({...input(),rows:[{...input().rows[0],left:'unsupported 😀'}]});await assert.rejects(writeSnapshotPdf(emoji,signal(),font),/UNSUPPORTED_GLYPH/);assert(JSON.parse(await writeSnapshotTxt(emoji).text()).rows[0].left.includes('😀'));
- const ligature=createExportSnapshot({...input(),rows:[{...input().rows[0],left:'ﬃ'}]});await assert.rejects(writeSnapshotPdf(ligature,signal(),font),/UNSUPPORTED_GLYPH/);assert(JSON.parse(await writeSnapshotTxt(ligature).text()).rows[0].left==='ﬃ');
+ // A character missing from the font is marked in place; the attachment keeps the original.
+ const pdfText=async blob=>{const loading=pdfjs.getDocument({data:new Uint8Array(await blob.arrayBuffer()),disableFontFace:true}),pdf=await loading.promise;try{let text='';for(let i=1;i<=pdf.numPages;i++)text+=(await(await pdf.getPage(i)).getTextContent()).items.filter(x=>'str'in x).map(x=>x.str).join('');return{text,data:Buffer.from(await pdf.getAttachmentContent('comparison-data.json')).toString()};}finally{await loading.destroy();}};
+ const emoji=createExportSnapshot({...input(),rows:[{...input().rows[0],left:'unsupported 😀'}]});const shown=await pdfText(await writeSnapshotPdf(emoji,signal(),font));assert(shown.text.includes('unsupported [U+1F600]'));assert(shown.text.includes('[U+code]'));assert(JSON.parse(shown.data).rows[0].left.includes('😀'));assert(JSON.parse(await writeSnapshotTxt(emoji).text()).rows[0].left.includes('😀'));
+ // Presentation-form ligatures are drawn as their letters.
+ const ligature=createExportSnapshot({...input(),rows:[{...input().rows[0],left:'ﬃ'}]});const ligatureShown=await pdfText(await writeSnapshotPdf(ligature,signal(),font));assert(ligatureShown.text.includes('ffi'));assert(!ligatureShown.text.includes('[U+'));assert(JSON.parse(await writeSnapshotTxt(ligature).text()).rows[0].left==='ﬃ');
  const output=process.env.REPORT_TEST_PDF;if(output)await fs.writeFile(output,new Uint8Array(await blob.arrayBuffer()));
  t.diagnostic(JSON.stringify({bytes:blob.size}));
 });

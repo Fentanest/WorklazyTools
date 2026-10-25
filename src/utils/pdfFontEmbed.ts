@@ -1,4 +1,5 @@
 import fontkit, { type Font, type Glyph, type TypeFeatures } from "@pdf-lib/fontkit";
+import { subsetCidCff } from "./cffSubset.ts";
 import {
   CustomFontEmbedder,
   PDFDocument,
@@ -29,7 +30,12 @@ export function embedHelvetica(document: PDFDocument) {
   return document.embedFont(StandardFonts.Helvetica);
 }
 
-export function embedCustomPdfFont(document: PDFDocument, bytes: ArrayBuffer | Uint8Array): Promise<PDFFont> {
+export interface CustomPdfFontOptions {
+  /** Embed only the outlines of the glyphs drawn into the document instead of the whole font program. */
+  subset?: boolean;
+}
+
+export function embedCustomPdfFont(document: PDFDocument, bytes: ArrayBuffer | Uint8Array, options: CustomPdfFontOptions = {}): Promise<PDFFont> {
   const source = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   const font = fontkit.create(source) as CidCffFont;
   const cff = font["CFF "];
@@ -37,14 +43,15 @@ export function embedCustomPdfFont(document: PDFDocument, bytes: ArrayBuffer | U
   if (!cff?.isCIDFont || !cffRecord || cffRecord.offset < 0 || cffRecord.length <= 0
       || cffRecord.offset + cffRecord.length > source.length) {
     document.registerFontkit(fontkit);
-    return document.embedFont(source, { subset: false });
+    // fontkit's CFF subset writer is not used: its output is not loadable by PDFium.
+    return document.embedFont(source, { subset: options.subset === true && !cff });
   }
 
   // pdf-lib's full embedder writes glyph IDs as Identity-H character codes.
   // CID-keyed CFF fonts instead need an explicit character-code-to-CID map,
   // and the embedded FontFile3 stream must contain raw CFF rather than OTTO.
   const cffBytes = source.slice(cffRecord.offset, cffRecord.offset + cffRecord.length);
-  const embedded = createCidCffPdfFont(document, font, cff, cffBytes);
+  const embedded = createCidCffPdfFont(document, font, cff, cffBytes, options.subset === true);
   document.registerFontkit(fontkit);
   return embedded;
 }
@@ -85,11 +92,27 @@ class CidCffFontEmbedder extends CustomFontEmbedder {
   private readonly glyphMappings = new Map<string, GlyphMapping>();
   private readonly cidWidths = new Map<number, number>();
   private nextCode = 1;
+  private readonly subset: boolean;
 
-  constructor(font: Font, cffBytes: Uint8Array, cff: CidCffTable, fontFeatures?: TypeFeatures) {
+  constructor(font: Font, cffBytes: Uint8Array, cff: CidCffTable, subset: boolean, fontFeatures?: TypeFeatures) {
     super(font, cffBytes, undefined, fontFeatures);
     this.cff = cff;
+    this.subset = subset;
+    // A subset font program is tagged per PDF 32000-1 9.6.4; glyph IDs and CIDs are unchanged.
+    if (subset) this.baseFontName = `WLZSUB+${this.baseFontName}`;
   }
+
+  protected override async serializeFont(): Promise<Uint8Array> {
+    if (!this.subset) return this.fontData;
+    const uses = [...this.drawnGlyphs].map((id) => {
+      const glyph = this.font.getGlyph(id) as Glyph & { _usedSubrs?: object; _usedGsubrs?: object };
+      void glyph.path; // parsing the outline records the subroutines it calls
+      return { glyph: id, localSubrs: Object.keys(glyph._usedSubrs ?? {}).map(Number), globalSubrs: Object.keys(glyph._usedGsubrs ?? {}).map(Number) };
+    });
+    return subsetCidCff(this.fontData, uses);
+  }
+
+  private readonly drawnGlyphs = new Set<number>();
 
   override encodeText(text: string) {
     const glyphs = this.font.layout(text, this.fontFeatures).glyphs;
@@ -165,6 +188,7 @@ class CidCffFontEmbedder extends CustomFontEmbedder {
     if (cid === undefined || cid < 0 || cid > 0xffff) {
       throw new Error(`Unsupported CID mapping for glyph ${glyph.id}.`);
     }
+    this.drawnGlyphs.add(glyph.id);
     const key = `${cid}:${unicode.join(",")}`;
     const existing = this.glyphMappings.get(key);
     if (existing) return existing;
@@ -195,11 +219,11 @@ class CidCffFontEmbedder extends CustomFontEmbedder {
   }
 }
 
-function createCidCffPdfFont(document: PDFDocument, font: CidCffFont, cff: CidCffTable, cffBytes: Uint8Array) {
+function createCidCffPdfFont(document: PDFDocument, font: CidCffFont, cff: CidCffTable, cffBytes: Uint8Array, subset: boolean) {
   const localFontkit = { create: () => font };
   document.registerFontkit(localFontkit);
   return document.embedFont(cffBytes, { subset: false }).then((embedded) => {
-    const replacement = new CidCffFontEmbedder(font, cffBytes, cff);
+    const replacement = new CidCffFontEmbedder(font, cffBytes, cff, subset);
     const internal = embedded as unknown as { embedder: CustomFontEmbedder };
     if (!(internal.embedder instanceof CustomFontEmbedder)) {
       throw new Error("The installed pdf-lib custom font embedder is incompatible.");

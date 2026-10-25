@@ -9,7 +9,7 @@ export interface ExportSnapshot {
   readonly scope: { readonly kind: 'all' | 'selected'; readonly ids?: readonly string[]; readonly label?: string };
   readonly rows: readonly ReportRow[]; readonly rawSources?: { readonly left: string; readonly right: string }; readonly view?: ReportView;
 }
-export const REPORT_LIMITS = Object.freeze({ rows: 50000, textBytes: 16 * 1024 ** 2, metadataBytes: 1024 ** 2, outputBytes: 64 * 1024 ** 2, xlsxRows: 10000, xlsxCellUnits: 32767, pdfPages: 500, pngPixels: 8_000_000 });
+export const REPORT_LIMITS = Object.freeze({ rows: 50000, textBytes: 16 * 1024 ** 2, metadataBytes: 1024 ** 2, outputBytes: 64 * 1024 ** 2, xlsxRows: 10000, xlsxCellUnits: 32767, pdfPages: 2000, pngPixels: 8_000_000 });
 const ownedSnapshots = new WeakSet<object>();
 export function assertSnapshot(snapshot: ExportSnapshot) { assertReport(ownedSnapshots.has(snapshot), 'REPORT_INVALID_SNAPSHOT'); }
 export class ReportError extends Error { constructor(code: string) { super(code); this.name = 'ReportError'; } }
