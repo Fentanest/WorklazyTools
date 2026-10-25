@@ -36,3 +36,9 @@ test('report summary counts each status, shows the creation time and names files
  const unsafe=createExportSnapshot({...input('en'),sources:[{id:'a',revision:'1',label:'C:\dir\a:b?.xlsx'},{id:'b',revision:'1',label:'con'}]});assert.match(reportFileName(unsafe,'xlsx'),/^[^\/:*?"<>|]+\.xlsx$/u);
  const single=createExportSnapshot({...input('en'),sources:[{id:'a',revision:'1',label:'only.txt'}]});assert.equal(reportFileName(single,'txt'),'comparison-report.txt');
 });
+test('XLSX report lists each row\'s source line numbers after the original columns',async()=>{
+ const{writeSnapshotXlsx}=await import('../src/features/comparison-report/writers.ts');const ExcelJS=(await import('exceljs')).default;
+ const model=createExportSnapshot({...input('en'),rows:[{id:'a',status:'changed',left:'x',right:'y',coordinates:{left:{firstLine:2,lastLine:4},right:{firstLine:3,lastLine:3}}},{id:'b',status:'added',left:'',right:'z',coordinates:{left:null,right:{firstLine:5,lastLine:5}}}]});
+ const wb=new ExcelJS.Workbook();await wb.xlsx.load(await(await writeSnapshotXlsx(model,new AbortController().signal)).arrayBuffer());const sheet=wb.getWorksheet('Results');
+ assert.deepEqual([sheet.getCell('G2').value,sheet.getCell('H2').value,sheet.getCell('G3').value,sheet.getCell('H3').value],['2–4','3','','5']);
+});

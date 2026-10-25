@@ -9,9 +9,13 @@ import { assertSnapshot, assertOutput, assertReport, rawReportText, reportMetada
 export async function writeSnapshotXlsx(snapshot: ExportSnapshot, signal: AbortSignal): Promise<Blob> {
   assertSnapshot(snapshot);signal.throwIfAborted(); assertReport(snapshot.rows.length <= REPORT_LIMITS.xlsxRows, 'REPORT_XLSX_LIMIT');
   const metadata = Object.entries({ ...reportMetadata(snapshot), statusCounts: statusCounts(snapshot) }).map(([key, value]) => [key, JSON.stringify(value)]);
-  const rows = snapshot.rows.map(row => [row.id, row.status, row.left, row.right, JSON.stringify(row.coordinates ?? null), JSON.stringify(row.metadata ?? null)]);
+  // Line numbers (as Diffchecker's text Excel shows them) come after the existing columns, which keep their positions.
+  const lines = (value: unknown) => { const range = value && typeof value === 'object' ? value as { firstLine?: unknown; lastLine?: unknown } : undefined; const first = range?.firstLine, last = range?.lastLine;
+    return typeof first === 'number' && Number.isSafeInteger(first) && first > 0 ? typeof last === 'number' && Number.isSafeInteger(last) && last > first ? `${first}–${last}` : String(first) : ''; };
+  const side = (row: ExportSnapshot['rows'][number], key: 'left' | 'right') => row.coordinates && typeof row.coordinates === 'object' && !Array.isArray(row.coordinates) ? lines((row.coordinates as Record<string, unknown>)[key]) : '';
+  const rows = snapshot.rows.map(row => [row.id, row.status, row.left, row.right, JSON.stringify(row.coordinates ?? null), JSON.stringify(row.metadata ?? null), side(row, 'left'), side(row, 'right')]);
   const labels=REPORT_LABELS[snapshot.language];
-  const raw = await writeXlsxReport({ creator: 'Worklazy Tools', sheets: [{ name: labels.metadata, headers: [labels.field, labels.value], rows: metadata }, { name: labels.results, headers: [labels.id, labels.status, labels.left, labels.right, labels.coordinates, labels.metadata], rows }].map(encodeReportXlsxSheet) });
+  const raw = await writeXlsxReport({ creator: 'Worklazy Tools', sheets: [{ name: labels.metadata, headers: [labels.field, labels.value], rows: metadata }, { name: labels.results, headers: [labels.id, labels.status, labels.left, labels.right, labels.coordinates, labels.metadata, labels.leftLine, labels.rightLine], rows }].map(encodeReportXlsxSheet) });
   signal.throwIfAborted(); const buffer = new Uint8Array(raw).slice().buffer;
   await assertGeneratedXlsxReport(buffer); assertReceivedXlsxReport(buffer, buffer.byteLength); signal.throwIfAborted();
   return assertOutput(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));

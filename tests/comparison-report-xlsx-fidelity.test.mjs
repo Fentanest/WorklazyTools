@@ -8,7 +8,8 @@ const signal=()=>new AbortController().signal;
 function snapshot(){return createExportSnapshot({language:'en',tool:'_x0041_\r\ntool',sources:[{id:'_x005F_',revision:'_x000D_',label:'source_x0041_\rname'}],appliedOptions:{'_x0041_':'_x005F_x0041_',line:'a\r\nb'},coordinates:{unit:'_x0041_',label:'row\rcolumn'},warnings:['_x000D_\rwarning'],completion:'partial',rows:cases.map((left,i)=>({id:`id_x0041_${i}`,status:'_x000D_',left,right:left,coordinates:{token:'_x0041_',index:i},metadata:{ocr:{raw:'_x005F_x0041_',corrected:'_x000D_'}}}))});}
 test('actual report XLSX readback preserves every raw string, metadata and formula-like cell exactly',async t=>{
  const model=snapshot(),blob=await writeSnapshotXlsx(model,signal()),bytes=await blob.arrayBuffer(),wb=new ExcelJS.Workbook();await wb.xlsx.load(bytes);const sheet=wb.getWorksheet('Results');
- assert.deepEqual(sheet.getRow(1).values.slice(1),['ID','Status','Original','Revised','Coordinates','Metadata']);
+ // Line-number columns follow the original six, whose positions are unchanged.
+ assert.deepEqual(sheet.getRow(1).values.slice(1),['ID','Status','Original','Revised','Coordinates','Metadata','Original line','Revised line']);
  model.rows.forEach((row,i)=>{const expected=[row.id,row.status,row.left,row.right,JSON.stringify(row.coordinates),JSON.stringify(row.metadata)];for(let column=0;column<expected.length;column++){const cell=sheet.getCell(i+2,column+1);assert.equal(cell.value,expected[column],`row${i},column${column}`);assert.equal(cell.type,ExcelJS.ValueType.String);}});
  const meta=wb.getWorksheet('Metadata');const fields=new Map();meta.eachRow((r,i)=>{if(i>1)fields.set(r.getCell(1).value,r.getCell(2).value);});
  for(const[key,value]of Object.entries(reportMetadata(model)))assert.equal(fields.get(key),JSON.stringify(value),key);
