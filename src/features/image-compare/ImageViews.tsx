@@ -50,7 +50,8 @@ function PixelCanvas({ roiOverlays,side,result, pixels, view, amount, flickerRig
     const imageData = new ImageData(Uint8ClampedArray.from(workingPixels), result.width, result.height);
     context.putImageData(imageData, -bounds.x, -bounds.y); discardOwnedBuffer(imageData.data.buffer);
     if (view === "fade" || view === "slider") discardOwnedBuffer(workingPixels.buffer);
-    if (darken) { context.fillStyle = "#0006"; context.fillRect(0, 0, canvas.width, canvas.height); }
+    // Darken everything outside the changed regions (their boxes stay at full brightness).
+    if (darken) { context.fillStyle = "#0006"; context.beginPath(); context.rect(0, 0, canvas.width, canvas.height); for (const region of regions) { const b = region.bounds; context.rect(b.x - bounds.x, b.y - bounds.y, b.width, b.height); } context.fill("evenodd"); }
     if (boxes) { context.strokeStyle = "#f43f5e"; context.lineWidth = 2; for (const region of regions) { const b = region.bounds; context.strokeRect(b.x - bounds.x, b.y - bounds.y, b.width, b.height); } }
     for(const sourceSide of side?[side]:['left','right'] as const){const overlay=roiOverlays[sourceSide];if(overlay.status!=="projected")continue;const points=overlay.points;context.strokeStyle=sourceSide==='left'?'#0284c7':'#a855f7';context.lineWidth=3;context.setLineDash([8,4]);context.beginPath();points.forEach((p,i)=>i?context.lineTo(p.x-bounds.x,p.y-bounds.y):context.moveTo(p.x-bounds.x,p.y-bounds.y));context.closePath();context.stroke();context.setLineDash([]);}
     return () => { canvas.width = 1; canvas.height = 1; };

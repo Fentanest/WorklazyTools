@@ -20,4 +20,6 @@ export interface ImageCompareResult {
   optionMeaning?: ReturnType<typeof import("./optionMeaning.ts").pixelOptionMeaning>;
   geometry: { originX: number; originY: number; leftMatrix: Matrix; rightMatrix: Matrix; rightTransform: Transform; /** Authoritative when present; rightMatrix remains the legacy affine-only field. */ rightProjective?: import("./alignmentTypes.ts").Matrix3 };
 }
-export const IMAGE_LIMITS = { fileBytes: 32 * 1024 * 1024, sourcePixels: 12_000_000, outputPixels: 16_000_000, dimension: 8000, memoryBytes: 256 * 1024 * 1024 };
+// memoryBytes is a conservative reservation (24 bytes per decoded source pixel), not measured RSS;
+// it admits a pair of 24-megapixel photos at full working resolution.
+export const IMAGE_LIMITS = { fileBytes: 32 * 1024 * 1024, sourcePixels: 24_000_000, outputPixels: 16_000_000, dimension: 8000, memoryBytes: 1536 * 1024 * 1024 };

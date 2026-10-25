@@ -15,8 +15,9 @@ export function compareRgba(left: Uint8ClampedArray, right: Uint8ClampedArray, w
       const background = options.background === "white" ? 255 : 0;
       for (const image of [a, b]) { for (let c = 0; c < 3; c++) image[i + c] = Math.round(image[i + c] * image[i + 3] / 255 + background * (1 - image[i + 3] / 255)); image[i + 3] = 255; }
     } else {
-      if (!a[i + 3] && !b[i + 3]) { a.fill(0, i, i + 3); b.fill(0, i, i + 3); }
-      a[i + 3] = 255; b[i + 3] = 255;
+      // Colors weighted by their opacity (premultiplied): a nearly transparent red and blue look
+      // alike; an opacity difference itself is judged by alphaThreshold below.
+      for (const image of [a, b]) { for (let c = 0; c < 3; c++) image[i + c] = Math.round(image[i + c] * image[i + 3] / 255); image[i + 3] = 255; }
     }
   }
   pixelmatch(a, b, diff, width, height, { threshold: options.threshold, includeAA: options.includeAA, diffMask: true, diffColor: [255, 59, 48] });

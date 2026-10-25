@@ -1,3 +1,4 @@
+import { IMAGE_LIMITS } from "../image-compare/types.ts";
 import {projectPoint} from '../image-compare/projective.ts';
 import type {Matrix3} from '../image-compare/alignmentTypes.ts';
 import type {OcrPage,OcrNormalization,OcrLanguage,OcrWord} from './types.ts';
@@ -18,12 +19,15 @@ export function adaptTesseract(data:unknown,context:{width:number;height:number;
  if(page.text.length&&!words.length)warnings.push('OCR_BOXES_UNAVAILABLE');
  return {rawText:page.text,comparisonText:page.text,words,confidence:confidence(page.confidence),status:page.text.trim().length||words.some(word=>word.rawText.trim().length)?'complete':'empty',warnings,background:'white',coordinateSpace:'comparison-working',provider:'tesseract.js',providerVersion:'7.0.0',modelVersion:'4.0.0_best_int',language:context.language,confidenceScale:'0–100 provider score, not probability',sourceTransform:context.sourceTransform,sourceRunId:context.sourceRunId,width:context.width,height:context.height,nativeHeapPeakBytes:page.__nativeHeapPeakBytes!};
 }
+// OCR shares the image tools' conservative reservation: fixed provider/model/arena bytes plus 80 per
+// working pixel, with at most OCR_MAX_PIXELS working pixels (an 8-megapixel capture or page).
+export const OCR_MEMORY_BYTES=IMAGE_LIMITS.memoryBytes,OCR_FIXED_BYTES=(128+64+32)*1024*1024,OCR_BYTES_PER_PIXEL=80,OCR_MAX_PIXELS=8_000_000,OCR_REGION_PASS_BYTES=8*1024*1024;
 /** Admission before caller raster allocation. Retained caller bytes exclude resources already in80*N. */
 export function ocrWorkingPixelLimit(retainedCallerBytes:number,encodedBytes=0,retainedRegionPasses=0){
  if(!Number.isSafeInteger(retainedCallerBytes)||retainedCallerBytes<0||!Number.isSafeInteger(encodedBytes)||encodedBytes<0||!Number.isSafeInteger(retainedRegionPasses)||retainedRegionPasses<0||retainedRegionPasses>3)throw new Error('OCR_MEMORY_LIMIT');
- return Math.max(0,Math.min(400000,Math.floor((256*1024*1024-(128+64+32)*1024*1024-encodedBytes-retainedRegionPasses*8*1024*1024-retainedCallerBytes)/80)));
+ return Math.max(0,Math.min(OCR_MAX_PIXELS,Math.floor((OCR_MEMORY_BYTES-OCR_FIXED_BYTES-encodedBytes-retainedRegionPasses*OCR_REGION_PASS_BYTES-retainedCallerBytes)/OCR_BYTES_PER_PIXEL)));
 }
-export function ocrMemoryEstimate(pixels:number,encodedBytes=0,retainedRegionPasses=0,retainedCallerBytes=0){if(!Number.isSafeInteger(pixels)||pixels<1||pixels>ocrWorkingPixelLimit(retainedCallerBytes,encodedBytes,retainedRegionPasses))throw new Error('OCR_MEMORY_LIMIT');return (128+64+32)*1024*1024+80*pixels+encodedBytes+retainedRegionPasses*8*1024*1024+retainedCallerBytes;}
+export function ocrMemoryEstimate(pixels:number,encodedBytes=0,retainedRegionPasses=0,retainedCallerBytes=0){if(!Number.isSafeInteger(pixels)||pixels<1||pixels>ocrWorkingPixelLimit(retainedCallerBytes,encodedBytes,retainedRegionPasses))throw new Error('OCR_MEMORY_LIMIT');return OCR_FIXED_BYTES+OCR_BYTES_PER_PIXEL*pixels+encodedBytes+retainedRegionPasses*OCR_REGION_PASS_BYTES+retainedCallerBytes;}
 
 export function rasterOcrAdmission(input:{width:number;height:number;encodedBytes:number;retainedRegionPasses:number;retainedCallerBytes:number}){
  if(!Number.isSafeInteger(input.retainedCallerBytes)||input.retainedCallerBytes<0||!Number.isSafeInteger(input.encodedBytes)||!Number.isSafeInteger(input.retainedRegionPasses)||!Number.isSafeInteger(input.width)||input.width<1||!Number.isSafeInteger(input.height)||input.height<1)throw new Error('OCR_MEMORY_LIMIT');

@@ -8,6 +8,7 @@ import {alignWithCv} from '../../src/features/image-compare/alignment.ts';
 import {validateAlignment} from '../../src/features/image-compare/alignmentPolicy.ts';
 import {projectiveGeometry,projectPoint,invertProjective,warpRgba,IDENTITY_PROJECTIVE} from '../../src/features/image-compare/projective.ts';
 import {assertAlignmentBudget} from '../../src/features/image-compare/memory.ts';
+import {IMAGE_LIMITS} from '../../src/features/image-compare/types.ts';
 import type {Matrix3,AlignmentMatch} from '../../src/features/image-compare/alignmentTypes.ts';
 function texture(seed:number,width=640,height=400){let value=seed;const rgba=new Uint8ClampedArray(width*height*4);for(let i=0;i<width*height;i++){value=(Math.imul(value,1664525)+1013904223)>>>0;const c=value>>>24;rgba.set([c,c,c,255],i*4);}return {rgba,width,height};}
 const points:AlignmentMatch[]=Array.from({length:16},(_,i)=>({source:{x:40+(i%4)*150,y:40+Math.floor(i/4)*90},target:{x:40+(i%4)*150,y:40+Math.floor(i/4)*90}}));
@@ -16,7 +17,7 @@ test('independent gates reject holdout false matches, concentrated features, fol
   assert.throws(()=>validateAlignment(IDENTITY_PROJECTIVE,points,points.slice(0,4).map(p=>({...p,target:{x:p.target.x+20,y:p.target.y}})),{lw:640,lh:400,rw:640,rh:400}),/HOLDOUT/);
   assert.throws(()=>validateAlignment(IDENTITY_PROJECTIVE,points.slice(0,4),points.slice(0,4),{lw:640,lh:400,rw:640,rh:400}),/DISTRIBUTION/);
   assert.throws(()=>projectiveGeometry(640,400,640,400,[-1,0,640,0,1,0,0,0,1]),/GEOMETRY/);
-  assert.throws(()=>assertAlignmentBudget(2_000_000,0,100*1024*1024),/MEMORY_LIMIT/);
+  assert.throws(()=>assertAlignmentBudget(2_000_000,0,IMAGE_LIMITS.memoryBytes),/MEMORY_LIMIT/);
 });
 test('CPU projective rendering samples original RGBA, keeps coverage distinct and inverse coordinates',()=>{
   const m:Matrix3=[1,0,1,0,1,0,0,0,1],source=new Uint8ClampedArray([255,0,0,128,0,255,0,255]);

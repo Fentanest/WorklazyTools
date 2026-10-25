@@ -107,5 +107,5 @@ export function ImageComparePage() {
 function failureKey(error: unknown, fallback: string) {
   if (error instanceof DOMException && error.name === "AbortError") return "canceled";
   const code = error && typeof error === "object" && "code" in error ? String(error.code) : error instanceof Error ? error.message : "";
-  return code === "ALIGNMENT_ROI" ? "alignment.roi.invalid" : code === "WORKER_TIMEOUT" || code === "WORKER_HARD_TIMEOUT" ? "timedOut" : code === "IMAGE_FILE_LIMIT" ? "fileLimit" : code === "IMAGE_MEMORY_LIMIT" || code === "REGION_MEMORY_LIMIT" ? "memoryLimit" : code === "IMAGE_SIZE_LIMIT" ? "dimensionLimit" : fallback;
+  return code === "ALIGNMENT_ROI" ? "alignment.roi.invalid" : code === "WORKER_TIMEOUT" || code === "WORKER_DEADLINE" ? "timedOut" : code === "IMAGE_FILE_LIMIT" ? "fileLimit" : code === "IMAGE_MEMORY_LIMIT" || code === "REGION_MEMORY_LIMIT" ? "memoryLimit" : code === "IMAGE_SIZE_LIMIT" ? "dimensionLimit" : fallback;
 }

@@ -17,8 +17,8 @@ test("both file sizes are validated before either arrayBuffer reader runs", asyn
   } } finally { globalThis.Worker=OriginalWorker; }
 
 });
-test("256 MiB reservations include native source decode, RGBA copies, views and actual CV arena", () => {
-  assert.equal(IMAGE_LIMITS.memoryBytes,256*1024*1024);
+test("1.5 GiB reservations include native source decode, RGBA copies, views and actual CV arena", () => {
+  assert.equal(IMAGE_LIMITS.memoryBytes,1536*1024*1024);
   assert.equal(CV_INITIAL_MEMORY_BYTES,128*1024*1024);
   assert.equal(MAX_REGION_PASSES,3);
   const result=imageMemoryEstimate(2_000_000,1_000_000,2_000_000);
@@ -26,14 +26,16 @@ test("256 MiB reservations include native source decode, RGBA copies, views and 
   assert.equal(result.cvHeapBytes,CV_INITIAL_MEMORY_BYTES);
   assert.ok(result.stages.regions>result.cvHeapBytes+46*1_000_000);
   assert.ok(assertImageBudget(640*400*2,640*400,10000).estimatedPeakBytes<=IMAGE_LIMITS.memoryBytes);
-  assert.throws(()=>assertImageBudget(2*4000*4000,4000*4000,0),/IMAGE_MEMORY_LIMIT/);
-  assert.throws(()=>assertImageBudget(12_000_000,10000,0),/IMAGE_MEMORY_LIMIT/); // Small working view cannot hide a huge decoded source.
-  assert.throws(()=>assertImageBudget(100,100,2*IMAGE_LIMITS.fileBytes),/IMAGE_MEMORY_LIMIT/);
+  // A pair of 12-megapixel photos fits at full working resolution.
+  assert.ok(assertImageBudget(2*4032*3024,4032*3024,2*IMAGE_LIMITS.fileBytes).estimatedPeakBytes<=IMAGE_LIMITS.memoryBytes);
+  assert.throws(()=>assertImageBudget(2*4800*4800,16_000_000,0),/IMAGE_MEMORY_LIMIT/);
+  assert.throws(()=>assertImageBudget(70_000_000,10000,0),/IMAGE_MEMORY_LIMIT/); // Small working view cannot hide a huge decoded source.
+  assert.throws(()=>assertImageBudget(100,100,IMAGE_LIMITS.memoryBytes),/IMAGE_MEMORY_LIMIT/);
   assert.throws(()=>imageMemoryEstimate(Number.NaN,1,1),/INVALID_RESOURCE_ESTIMATE/);
 });
 test("transformed outputs reduce while original decode overflow rejects before allocation", () => {
-  assert.ok(workingGeometry(1000,1000,1000,1000,{...IDENTITY_TRANSFORM,scale:4}).scale<1);
-  assert.ok(workingGeometry(3000,3000,10,10,IDENTITY_TRANSFORM).scale<1);
+  assert.ok(workingGeometry(2000,2000,2000,2000,{...IDENTITY_TRANSFORM,scale:4}).scale<1);
+  assert.ok(workingGeometry(6000,4000,10,10,IDENTITY_TRANSFORM).scale<1);
   assert.equal(workingGeometry(64,48,64,48,IDENTITY_TRANSFORM,1000).width,64);
 });
 
@@ -43,9 +45,11 @@ test("CV allocator cannot grow beyond its reservation", () => {
   assert.throws(()=>memory.grow(1),/REGION_MEMORY_LIMIT/);assert.equal(memory.buffer.byteLength,2*65536);
 });
 
-test("known encoded-only overflow is rejected before reading either otherwise size-valid file", async () => {
+test("two maximum-size files fit the reservation by encoded size alone and are read", async () => {
+  // Encoded bytes alone (three copies of two 32 MiB files) stay far below the reservation.
+  assert.ok(3*2*IMAGE_LIMITS.fileBytes<IMAGE_LIMITS.memoryBytes);
   let reads=0;const file={name:"image.png",size:IMAGE_LIMITS.fileBytes,arrayBuffer:async()=>{reads++;return new ArrayBuffer(1);}} as unknown as File;
-  await assert.rejects(compareImages(file,file,DEFAULT_PIXEL_OPTIONS,IDENTITY_TRANSFORM,new AbortController().signal,()=>{}),/IMAGE_MEMORY_LIMIT/);assert.equal(reads,0);
+  await assert.rejects(compareImages(file,file,DEFAULT_PIXEL_OPTIONS,IDENTITY_TRANSFORM,new AbortController().signal,()=>{}));assert.equal(reads,2);
 });
 
 test("disposed previous results detach every owned working buffer without changing source bytes", () => {

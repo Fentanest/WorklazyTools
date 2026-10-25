@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {compareTexts}from'../src/features/text-compare/core.ts';import{DEFAULT_TEXT_OPTIONS}from'../src/features/text-compare/resultTypes.ts';
-import{compareRgba}from'../src/features/image-compare/kernel.ts';import{DEFAULT_PIXEL_OPTIONS,IDENTITY_TRANSFORM}from'../src/features/image-compare/types.ts';import{imageMemoryEstimate,disposeImageResult}from'../src/features/image-compare/memory.ts';
+import{compareRgba}from'../src/features/image-compare/kernel.ts';import{DEFAULT_PIXEL_OPTIONS,IDENTITY_TRANSFORM,IMAGE_LIMITS}from'../src/features/image-compare/types.ts';import{imageMemoryEstimate,disposeImageResult}from'../src/features/image-compare/memory.ts';
 import{textExportSnapshot}from'../src/features/comparison-report/textAdapter.ts';import{imageExportSnapshot,imageReportReservation,captureImageReport}from'../src/features/comparison-report/imageAdapter.ts';import{ImageReportOwner}from'../src/features/comparison-report/ImageReportOwner.ts';
 const state=()=>({left:'ONE\r\nanchor\r\n',right:'one\r\nchanged\r\n',options:{...DEFAULT_TEXT_OPTIONS,ignoreCase:true},revision:7});
 function image(){const left=new Uint8ClampedArray([0,0,0,255,0,0,0,0]),right=new Uint8ClampedArray([0,0,0,255,255,0,0,255]),leftValid=new Uint8Array([1,0]),rightValid=new Uint8Array([1,1]);const source={bytes:8,mime:'image/png',width:8,height:4,decodedWidth:8,decodedHeight:4,bitDepth:8,exifOrientation:1,decodeOrientation:'from-image',workingColorSpace:'8-bit sRGB'};
@@ -25,7 +25,7 @@ test('Image snapshot retains working/source dimensions, projective authority, sc
  assert.equal(snapshot.rows[0].status,'working-pixel-metrics');assert.equal(snapshot.view.alpha,'preserved');assert.throws(()=>captureImageReport(snapshot,result,'highlight',new AbortController().signal),/REPORT_STALE_CAPTURE/);
 });
 test('Image export admits extra memory before capture and rejects over-budget work',()=>{
- const result=image();assert(imageReportReservation(result)>0);assert.throws(()=>imageReportReservation(result,256*1024**2),/IMAGE_MEMORY_LIMIT/);assert.throws(()=>imageReportReservation({...result,width:9000,height:9000}),/REPORT_CAPTURE_LIMIT/);disposeImageResult(result);
+ const result=image();assert(imageReportReservation(result)>0);assert.throws(()=>imageReportReservation(result,IMAGE_LIMITS.memoryBytes),/IMAGE_MEMORY_LIMIT/);assert.throws(()=>imageReportReservation({...result,width:9000,height:9000}),/REPORT_CAPTURE_LIMIT/);disposeImageResult(result);
 });
 test('Image lease blocks a second heavy job through writer and URL lifetime; cancel/drain releases it',async()=>{
  const result=image(),snapshot=imageExportSnapshot(result,4,'left','en'),owner=new ImageReportOwner(),events=[];let finishWriter,finishLease;
