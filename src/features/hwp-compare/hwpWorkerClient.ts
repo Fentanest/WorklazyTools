@@ -1,5 +1,5 @@
 import type { WordCompareResult } from "../excel-merger/types";
-import { isOutOfMemory, outOfMemoryMessage } from "../document-compare/memoryFailure";
+import { isOutOfMemory, outOfMemoryMessage } from "../document-compare/memoryFailure.ts";
 
 export interface HwpCompareOptions {
   formatting: boolean;

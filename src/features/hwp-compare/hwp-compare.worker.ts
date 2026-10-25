@@ -347,8 +347,11 @@ function normalizeError(error: unknown) {
   if (/password|decrypt|encrypted|암호/i.test(message)) {
     return L("암호를 확인하거나 암호를 해제한 HWP 사본으로 다시 시도해 주세요.", "Check the password or retry with an unlocked HWP copy.");
   }
-  if (isOutOfMemory(error) || /memory|allocation|out of bounds|too large/i.test(message)) {
+  if (isOutOfMemory(error)) {
     return outOfMemoryMessage(currentLanguage === "en" ? "en" : "ko");
+  }
+  if (/memory|allocation|out of bounds|too large/i.test(message)) {
+    return L("문서가 너무 커서 현재 브라우저에서 비교하지 못했습니다. 다른 탭을 닫고 다시 시도해 주세요.", "The document is too large for this browser session. Close other tabs and try again.");
   }
   return L("HWP 문서를 읽지 못했습니다. 올바른 HWP·HWPX 파일인지, 파일이 손상되지 않았는지 확인해 주세요.", "Could not read the HWP document. Check that it is a valid, undamaged HWP or HWPX file.");
 }

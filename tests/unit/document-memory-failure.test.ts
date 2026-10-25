@@ -10,9 +10,17 @@ test("out-of-memory failures are recognised from Pyodide, WebAssembly and alloca
     "Uncaught RangeError: Out of memory",
     "Aborted(OOM). Build with -sASSERTIONS for more info.",
     "Cannot enlarge memory, requested 2147483648 bytes",
-    new Error("RuntimeError: memory access out of bounds"),
   ]) assert.equal(isOutOfMemory(failure), true, String(failure));
-  for (const other of [new Error("BadZipFile: File is not a zip file"), new Error("Password-protected Word files cannot be opened."), "fetch failed", undefined]) assert.equal(isOutOfMemory(other), false, String(other));
+  for (const other of [
+    new Error("BadZipFile: File is not a zip file"),
+    new Error("Password-protected Word files cannot be opened."),
+    // A wasm reader reading past its memory, with memory to spare (Astra R37).
+    new Error("RuntimeError: memory access out of bounds"),
+    new Error("invalid sector allocation table"),
+    new Error("record too large"),
+    "fetch failed",
+    undefined,
+  ]) assert.equal(isOutOfMemory(other), false, String(other));
 });
 
 test("memory messages tell the user to compare less at a time", () => {

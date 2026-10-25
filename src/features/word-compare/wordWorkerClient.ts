@@ -1,6 +1,6 @@
 import type { FormattingMask } from "../document-compare/formattingMask";
 import type { WordCompareResult } from "../excel-merger/types";
-import { isOutOfMemory, outOfMemoryMessage } from "../document-compare/memoryFailure";
+import { isOutOfMemory, outOfMemoryMessage } from "../document-compare/memoryFailure.ts";
 
 export interface WordCompareOptions {
   requestedFormattingMask?: Partial<FormattingMask>;

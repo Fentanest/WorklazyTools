@@ -1,7 +1,7 @@
 /** Failures that mean the browser ran out of memory while a document was processed: Python's
- * MemoryError in Pyodide, WebAssembly memory that could not grow, typed-array allocation and the
- * out-of-bounds trap a failed allocation leaves behind in compiled readers. */
-export const OUT_OF_MEMORY = /MemoryError|out of memory|Cannot enlarge memory|could not allocate memory|Array buffer allocation failed|Aborted\(OOM\)|memory access out of bounds/i;
+ * MemoryError in Pyodide, WebAssembly memory that could not grow and typed-array allocation.
+ * An out-of-bounds memory access is not one: a reader can trap that way with memory to spare. */
+export const OUT_OF_MEMORY = /MemoryError|out of memory|Cannot enlarge memory|could not allocate memory|Array buffer allocation failed|Aborted\(OOM\)/i;
 
 export function isOutOfMemory(value: unknown) {
   const text = value instanceof Error ? `${value.name}: ${value.message}` : String(value ?? "");
