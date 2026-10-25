@@ -516,40 +516,44 @@ def _qname_rewriter(data, root):
 
 def _qname_safe_parse_unscoped(data, register_namespaces):
     """`_qname_safe_parse` without a scope per element, for XML where no prefix is bound to two
-    namespaces: the root's declarations are then in scope everywhere, and a value using only those
-    resolves as with the full scope. Declarations, registrations, rewrites and errors follow the same
-    events in the same order (iterparse delivers them in the same chunks); only end events and the
-    per-element contexts are left out. None when a prefix is rebound, a value uses a prefix declared
-    below the root (in scope only there), or the XML does not parse: the event-by-event path then
+    namespaces: the root's declarations are then in scope everywhere, as are an element's own, and a
+    value using only those resolves as with the full scope (accepted parts carry the wltq declarations
+    their values use on the element itself). Declarations, registrations, rewrites and errors follow
+    the same events in the same order (iterparse delivers them in the same chunks); only end events
+    and the per-element contexts are left out. None when a prefix is rebound, a value uses a prefix
+    declared on an ancestor below the root, or the XML does not parse: the event-by-event path then
     decides, repeating registrations made so far, which leaves them as they were."""
     iterator = ET.iterparse(io.BytesIO(data), events=("start-ns", "start"))
-    context = None; declared = {}
+    context = None; declared = {}; own = {}
     try:
         for event, value in iterator:
             if event == "start-ns":
                 prefix, uri = value
                 if declared.setdefault(prefix or "", uri) != uri:
                     return None
+                own[prefix or ""] = uri
                 if register_namespaces and prefix and not prefix.startswith("wltq"):
                     try: ET.register_namespace(prefix or "", uri)
                     except ValueError: pass
                 continue
             if context is None:
                 context = dict(declared)
+            element_own, own = own, {}
             if value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice" and not value.get("Requires", "").split():raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
             if _QNAME_ATTRIBUTES.isdisjoint(value.attrib):
                 continue
-            if _rewrite_qname_attributes(value, context, declared, register_namespaces) is None:
+            if _rewrite_qname_attributes(value, context, element_own, declared, register_namespaces) is None:
                 return None
     except ET.ParseError:
         return None
     return iterator.root
 
 
-def _rewrite_qname_attributes(value, context, declared, register_namespaces):
+def _rewrite_qname_attributes(value, context, own, declared, register_namespaces):
     """The QName attribute rewrite of one element (as in `_qname_safe_parse_events`) against the
-    root's declarations. None when a value uses a prefix declared only below the root; a prefix
-    declared nowhere yet is out of scope with the full scope too, so that error is raised here."""
+    root's and the element's own declarations. None when a value uses a prefix declared only on an
+    ancestor below the root; a prefix declared nowhere yet is out of scope with the full scope too,
+    so that error is raised here."""
     for name, raw in list(value.attrib.items()):
         prefixes = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable", "{http://schemas.openxmlformats.org/markup-compatibility/2006}MustUnderstand"} or (name == "Requires" and value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice")
         typed = name == "{http://www.w3.org/2001/XMLSchema-instance}type"
@@ -560,6 +564,8 @@ def _rewrite_qname_attributes(value, context, declared, register_namespaces):
         for word in raw.split():
             prefix, local = (word, "") if prefixes else word.split(":", 1) if ":" in word else ("", word)
             uri = context.get(prefix)
+            if uri is None:
+                uri = own.get(prefix)
             if uri is None:
                 if prefix in declared:
                     return None

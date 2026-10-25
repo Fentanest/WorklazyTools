@@ -21,7 +21,9 @@ samples = {
     "root declared": '<w:document' + decl("w", "mc", "w14", "wp14", "xsi") + ' mc:Ignorable="w14 wp14">' + body + '</w:document>',
     "nested declaration": '<w:document' + decl("w", "mc", "w14") + ' mc:Ignorable="w14"><w:body><w:p' + decl("wp14") + '><mc:AlternateContent><mc:Choice Requires="wp14"/></mc:AlternateContent></w:p></w:body></w:document>',
     "nested unused declaration": '<w:document' + decl("w", "mc", "w14", "wp14") + ' mc:Ignorable="w14"><w:body><w:p' + decl("v") + ' mc:Ignorable="wp14"><v:shape/></w:p><w:p' + decl("w14") + '/></w:body></w:document>',
-    "nested before use elsewhere": '<w:document' + decl("w", "mc") + '><w:body><w:p' + decl("w14") + '/><w:p mc:Ignorable="w14"/></w:body></w:document>',
+    "own declaration": '<w:document' + decl("w", "mc") + '><w:body><mc:AlternateContent><mc:Choice' + decl("wp14") + ' Requires="wp14"><w:p/></mc:Choice></mc:AlternateContent></w:body></w:document>',
+    "ancestor declaration": '<w:document' + decl("w", "mc") + '><w:body' + decl("wp14") + '><mc:AlternateContent><mc:Choice Requires="wp14"/></mc:AlternateContent></w:body></w:document>',
+    "nested before use elsewhere":'<w:document' + decl("w", "mc") + '><w:body><w:p' + decl("w14") + '/><w:p mc:Ignorable="w14"/></w:body></w:document>',
     "nested rebinding":'<w:document' + decl("w", "mc", "w14") + ' mc:Ignorable="w14"><w:body xmlns:w14="urn:other"><w:p mc:Ignorable="w14"/></w:body></w:document>',
     "undeclared prefix": '<w:document' + decl("w", "mc") + ' mc:Ignorable="w14"/>',
     "empty Requires": '<w:document' + decl("w", "mc") + '><mc:AlternateContent><mc:Choice Requires=" "/></mc:AlternateContent></w:document>',
@@ -49,14 +51,14 @@ for name, text in samples.items():
         fast, slow = run(_qname_safe_parse, data, register), run(_qname_safe_parse_events, data, register)
         if fast != slow: mismatch.append([name, register])
         kinds[name] = fast[0][0] if fast[0][0] == "ok" else fast[0][1] + ":" + fast[0][2]
-fast_taken = {name: _qname_safe_parse_unscoped(samples[name].encode("utf-8"), False) is not None for name in ("root declared", "nested unused declaration", "nested declaration", "nested before use elsewhere", "nested rebinding", "malformed")}
+fast_taken = {name: _qname_safe_parse_unscoped(samples[name].encode("utf-8"), False) is not None for name in ("root declared", "nested unused declaration", "own declaration", "ancestor declaration", "nested declaration", "nested before use elsewhere", "nested rebinding", "malformed")}
 ET._namespace_map.clear(); ET._namespace_map.update(initial)
 json.dumps({"mismatch": mismatch, "kinds": kinds, "fast": fast_taken})
 `) as string;
   const outcome = JSON.parse(result);
   assert.deepEqual(outcome.mismatch, []);
-  // A declaration below the root leaves the fast path only when a value uses it or rebinds a prefix.
-  assert.deepEqual(outcome.fast, { "root declared": true, "nested unused declaration": true, "nested declaration": false, "nested before use elsewhere": false, "nested rebinding": false, malformed: false });
+  // A declaration below the root leaves the fast path only when an ancestor's is used or a prefix is rebound.
+  assert.deepEqual(outcome.fast, { "root declared": true, "nested unused declaration": true, "own declaration": true, "ancestor declaration": false, "nested declaration": false, "nested before use elsewhere": false, "nested rebinding": false, malformed: false });
   assert.equal(outcome.kinds["nested before use elsewhere"], "ValueError:UNSUPPORTED_TRACKED_SOURCE_QNAME", "a prefix declared only in an earlier sibling is out of scope");
   assert.equal(outcome.kinds["root declared"], "ok");
   assert.equal(outcome.kinds["undeclared prefix"], "ValueError:UNSUPPORTED_TRACKED_SOURCE_QNAME");
