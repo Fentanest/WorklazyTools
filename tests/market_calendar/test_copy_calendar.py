@@ -114,6 +114,8 @@ class CopyCalendarTest(unittest.TestCase):
         self.assertIn("github.event.pull_request.head.repo.full_name != github.repository", banner)
         self.assertEqual(banner.count('"self-hosted","Linux","X64","235"'), 1)
         self.assertNotIn('runs-on: ubuntu-latest', deploy + banner)
+        self.assertNotIn('pull_request', deploy)
+        self.assertNotIn('gh api', deploy)
 
     def test_interrupted_published_download_records_unavailable_without_failing_site(self):
         self.source = self.root / 'absent-checkout'

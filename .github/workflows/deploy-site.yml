@@ -10,7 +10,7 @@ run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'deplo
 # fine-grained token limited to this repository's Actions. The site carries the data revision at /data/foliotrace-source.json (tracking only).
 # Runner (user decision 2026-10-25): build and deploy run on the self-hosted runner Ubuntu24-Git (labels self-hosted, Linux, X64, 235). The
 # `runner` dispatch input is a manual github-hosted fallback; the orchestrator sends only mode/data_revision and gets the default. This
-# workflow has no pull_request trigger, so untrusted fork code never reaches that machine. Artifacts and logs are kept 1 day.
+# workflow has no pull-request trigger, so untrusted fork code never reaches that machine. Artifacts and logs are kept 1 day.
 # Cutover steps: docs/foliotrace-delivery-and-deploy.md.
 #
 # Inert until cutover: a main push deploys only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true' (otherwise skipped).
@@ -198,7 +198,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # A newer main push queues its own run, which then deploys; never publish an older build over it.
-          latest=$(gh api "repos/${GH_REPO}/commits/main" --jq .sha)
+          # No gh CLI: the self-hosted machine is only known to have python3/node. curl -f / pipefail make a failed request fail the step (no deploy).
+          set -o pipefail
+          latest=$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GH_REPO}/commits/main" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')
+          test -n "$latest"
           if [ "$latest" = "$EXPECTED_SOURCE" ]; then echo "current=true" >> "$GITHUB_OUTPUT"; else echo "current=false" >> "$GITHUB_OUTPUT"; echo "::notice::main moved to $latest; the newer run deploys"; fi
       - name: Deploy
         id: deployment

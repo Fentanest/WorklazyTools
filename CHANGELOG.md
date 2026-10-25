@@ -1,6 +1,6 @@
 # CHANGELOG
 
-- `deploy-site.yml`(build·deploy)과 `product-banner-tests.yml`을 자체 러너 `Ubuntu24-Git`으로 옮겼다(사용자 결정 2026-10-25). 수동 `runner=github-hosted` 우회로를 두고, 포크 PR은 자체 러너에서 제외했으며, 읽기 키 `if: always()` 삭제·이전 실행 잔재 정리·아티팩트 보존 1일을 넣었다(미배포). — Claude(Sonnet)
+- `deploy-site.yml`(build·deploy)과 `product-banner-tests.yml`을 자체 러너 `Ubuntu24-Git`으로 옮겼다(사용자 결정 2026-10-25). 수동 `runner=github-hosted` 우회로를 두고, 포크 PR은 자체 러너에서 제외했으며, 읽기 키 `if: always()` 보조 삭제·이전 실행 잔재 정리를 넣고 아티팩트 `retention-days: 1`은 유지했다. 최신 main 확인은 gh 대신 curl로 바꿨다(미배포). — Claude(Sonnet)
 - 비활성이던 옛 `deploy-pages.yml` 워크플로를 삭제하고(사용자 결정 2026-10-25) 거래 달력 워크플로 검사·게시 체크리스트·FolioTrace 배포 문서를 `deploy-site.yml` 기준으로 정리했다. 러너 `Ubuntu24-Git` 해제·DART 시크릿·`foliotrace-data` 브랜치 정리는 남은 사용자 결정이다(미배포). — Claude(Sonnet)
 
 - 거래 달력 업데이트 시각: ICU 언어 데이터 차이로 한국어의 오전/오후가 AM/PM으로 표시되는 문제를 수정했다. 한국 시간의 숫자 부분만 읽고 한영 표기를 직접 조립한다(미배포). — Sol

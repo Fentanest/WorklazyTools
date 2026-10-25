@@ -10,8 +10,10 @@ permissions:
 jobs:
   banner:
     # Self-hosted Ubuntu24-Git (user decision 2026-10-25) for push, workflow_dispatch and same-repository pull requests only.
-    # SECURITY: this repository is public; a pull request from a fork (head repo != this repo) runs untrusted code and must never reach
-    # the self-hosted machine, so it stays on GitHub's ubuntu-latest. Same-repo PRs need write access, so they are trusted.
+    # SECURITY: public repository. The expression below is only a convenience and NOT a security boundary: a fork pull request runs its
+    # own (possibly modified) copy of this workflow file. The real boundary is the repository setting "Require approval for all external
+    # contributors" (approval_policy=all_external_contributors, set 2026-10-25), which must stay on. The approver must read the fork PR's
+    # `.github/workflows` changes before approving. Ubuntu24-Git has passwordless sudo, so approving a fork PR = its code runs as root there.
     runs-on: ${{ fromJSON(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","235"]') }}
     timeout-minutes: 25
     env:
