@@ -11,7 +11,7 @@ export class ImageFileCatalog {
 }
 function copy(value:ImageWorkingState):Readonly<ImageWorkingState>{
   // Explicit projection forbids accidental future result/model/buffer retention.
-  const state:ImageWorkingState={left:value.left,right:value.right,options:{threshold:value.options.threshold,includeAA:value.options.includeAA,alphaThreshold:value.options.alphaThreshold,background:value.options.background},transform:{x:value.transform.x,y:value.transform.y,degrees:value.transform.degrees,scale:value.transform.scale,flipX:value.transform.flipX,flipY:value.transform.flipY}};
+  const state:ImageWorkingState={left:value.left,right:value.right,options:{threshold:value.options.threshold,includeAA:value.options.includeAA,alphaThreshold:value.options.alphaThreshold,background:value.options.background},transform:{x:value.transform.x,y:value.transform.y,degrees:value.transform.degrees,scale:value.transform.scale,...(value.transform.scaleY===undefined?{}:{scaleY:value.transform.scaleY}),flipX:value.transform.flipX,flipY:value.transform.flipY}};
   if(value.regionOptions){const r=value.regionOptions;state.regionOptions={diffThreshold:r.diffThreshold,groupingRadius:r.groupingRadius,minArea:r.minArea,maxAreaFraction:r.maxAreaFraction};}if(value.alignmentMode)state.alignmentMode=value.alignmentMode;
   if(value.matrix){if(value.matrix.length!==9)throw new Error('IMAGE_HISTORY_INVALID');state.matrix=[...value.matrix];}
   if(value.featureRois){state.featureRois={};for(const side of ['left','right']as const){const b=value.featureRois[side];if(b)state.featureRois[side]={x:b.x,y:b.y,width:b.width,height:b.height};}}

@@ -5,9 +5,10 @@ export function validateDimensions(width: number, height: number, output = false
   if (![width, height].every((v) => Number.isInteger(v) && v > 0 && v <= IMAGE_LIMITS.dimension) || width * height > (output ? IMAGE_LIMITS.outputPixels : IMAGE_LIMITS.sourcePixels)) throw new Error("IMAGE_SIZE_LIMIT");
 }
 export function transformMatrix(width: number, height: number, transform: Transform): Matrix {
-  if (![transform.x, transform.y, transform.degrees, transform.scale].every(Number.isFinite) || transform.scale < 0.05 || transform.scale > 20) throw new Error("INVALID_TRANSFORM");
+  const scaleY = transform.scaleY ?? transform.scale;
+  if (![transform.x, transform.y, transform.degrees, transform.scale, scaleY].every(Number.isFinite) || [transform.scale, scaleY].some(value => value < 0.05 || value > 20)) throw new Error("INVALID_TRANSFORM");
   const angle = transform.degrees * Math.PI / 180;
-  const sx = transform.scale * (transform.flipX ? -1 : 1), sy = transform.scale * (transform.flipY ? -1 : 1);
+  const sx = transform.scale * (transform.flipX ? -1 : 1), sy = scaleY * (transform.flipY ? -1 : 1);
   const a = Math.cos(angle) * sx, b = Math.sin(angle) * sx, c = -Math.sin(angle) * sy, d = Math.cos(angle) * sy;
   return [a, b, c, d, transform.x + width / 2 - a * width / 2 - c * height / 2, transform.y + height / 2 - b * width / 2 - d * height / 2].map((value) => Math.abs(value - Math.round(value)) < 1e-10 ? Math.round(value) || 0 : value) as Matrix;
 }

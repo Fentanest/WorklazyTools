@@ -1,6 +1,7 @@
 export interface Bounds { x: number; y: number; width: number; height: number }
 export type Matrix = [number, number, number, number, number, number];
-export interface Transform { x: number; y: number; degrees: number; scale: number; flipX: boolean; flipY: boolean }
+/** `scale` is horizontal; `scaleY` (vertical) is present only when it differs, so older states stay uniform. */
+export interface Transform { x: number; y: number; degrees: number; scale: number; scaleY?: number; flipX: boolean; flipY: boolean }
 export const IDENTITY_TRANSFORM: Transform = { x: 0, y: 0, degrees: 0, scale: 1, flipX: false, flipY: false };
 export interface PixelOptions { threshold: number; includeAA: boolean; alphaThreshold: number; background: "transparent" | "white" | "black" }
 export const DEFAULT_PIXEL_OPTIONS: PixelOptions = { threshold: 0.1, includeAA: true, alphaThreshold: 0, background: "transparent" };

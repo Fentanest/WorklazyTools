@@ -2934,9 +2934,10 @@
       "x": "Horizontal offset (pixels)",
       "y": "Vertical offset (pixels)",
       "degrees": "Rotation (degrees)",
-      "scale": "Scale (0.05–20)",
+      "scale": "Horizontal scale (0.05–20)",
       "flipX": "Flip horizontally",
-      "flipY": "Flip vertically"
+      "flipY": "Flip vertically",
+      "scaleY": "Vertical scale (0.05–20)"
     },
     "reset": "Reset alignment",
     "run": "Compare images",
@@ -3121,6 +3122,20 @@
     "resetSettings": "Reset settings",
     "historyHint": "Undo up to 20 recent steps. Choosing a new file starts a new history.",
     "alphaInactive": "Alpha threshold is inactive on white or black backgrounds. Its saved value applies again with a transparent background.",
-    "resultAlphaInactive": "Alpha threshold was not used for this result."
+    "resultAlphaInactive": "Alpha threshold was not used for this result.",
+    "manual": {
+      "title": "Align on screen",
+      "hint": "Drag the changed image to move it, a corner to resize and the round handle above it to rotate (Shift for 5° steps). Arrow keys move 1 pixel, 10 with Shift. Snapping sticks to the original's centre and edges and is off while Ctrl (⌘) is held. Press Apply to compare with it.",
+      "opacity": "Changed image opacity",
+      "locked": "Aspect ratio locked",
+      "unlocked": "Aspect ratio free",
+      "snapOn": "Snapping on",
+      "snapOff": "Snapping off",
+      "stage": "Alignment view: arrow keys move the changed image",
+      "rotateHint": "Drag to rotate, Shift for 5° steps",
+      "values": "Offset {{x}}, {{y}} · rotation {{degrees}}° · scale {{scaleX}} × {{scaleY}}",
+      "apply": "Apply alignment",
+      "discard": "Discard"
+    }
   }
 }
