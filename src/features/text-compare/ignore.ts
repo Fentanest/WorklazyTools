@@ -11,8 +11,11 @@ export function literalSpans(raw: string, rules: string[]): RemovedSpan[] {
     if(seen.has(rule))return;seen.add(rule);
     let offset = raw.indexOf(rule);
     while (offset >= 0) {
-      found.push({ start: offset, end: offset + rule.length, rules: [id] });
-      if (found.length > 100_000) throw new Error("IGNORE_MATCH_LIMIT");
+      // A match touching this rule's previous one extends it (a run of matches is one span).
+      const last = found.at(-1);
+      if (last && last.rules[0] === id && offset <= last.end) last.end = Math.max(last.end, offset + rule.length);
+      else found.push({ start: offset, end: offset + rule.length, rules: [id] });
+      if (found.length > 2_000_000) throw new Error("IGNORE_MATCH_LIMIT");
       offset = raw.indexOf(rule, offset + 1);
     }
   });

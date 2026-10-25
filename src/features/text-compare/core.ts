@@ -1,11 +1,16 @@
 import {TEXT_NORMALIZATION_POLICY} from "./normalizationPolicy.ts";
 import { diffText } from "../document-compare/documentComparison.ts";
-import { alignSequenceWithBudget } from "../../utils/sequenceAlignment.ts";
+import { alignSequenceWithBudget, type SequenceAlignmentPair } from "../../utils/sequenceAlignment.ts";
+import { myersAlign } from "../../utils/myersDiff.ts";
 import { mapText } from "./ignore.ts";
 import type { MappedText, TextLine, TextMark, TextOptions, TextResult, TextRow } from "./resultTypes.ts";
 
 type Segment = { type: "equal" | "deleted" | "added"; text: string };
 const CELL_BUDGET = 1_500_000;
+// Myers' cost grows with (N+M)*D; differences past this bound use the cell-budgeted alignment.
+const editLimit = (items: number) => Math.max(64, Math.floor(CELL_BUDGET * 8 / (items + 1)));
+// A line's content without its terminator: appending after a last line without one is an added line.
+const lineContent = (line: TextLine) => line.key.endsWith("\n") ? line.key.slice(0, -1) : line.key;
 export function mappedLines(mapped: MappedText): TextLine[] {
   const lines: TextLine[] = []; let rawStart = 0, number = 1;
   const matches = [...mapped.value.matchAll(/[^\n]*\n|[^\n]+$/g)];
@@ -24,7 +29,8 @@ function graphemeDiff(left: string, right: string, check: () => void): { segment
   if (!Intl.Segmenter) throw new Error("GRAPHEME_UNAVAILABLE");
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   const a = Array.from(segmenter.segment(left), item => item.segment), b = Array.from(segmenter.segment(right), item => item.segment);
-  const aligned = alignSequenceWithBudget(a, b, { signature: x => x, equals: (x,y) => x===y, score: (x,y) => x===y?3:-3, acceptsPair: (x,y)=>x===y, cellBudget: CELL_BUDGET, checkCanceled: check });
+  const exact = myersAlign(a, b, (x, y) => x === y, editLimit(a.length + b.length), check);
+  const aligned = exact ? { pairs: exact, budgetFallback: false } : alignSequenceWithBudget(a, b, { signature: x => x, equals: (x,y) => x===y, score: (x,y) => x===y?3:-3, acceptsPair: (x,y)=>x===y, cellBudget: CELL_BUDGET, checkCanceled: check });
   const segments: Segment[] = [];
   const push = (type: Segment['type'], text: string) => { if (!text) return; const previous=segments.at(-1); if(previous?.type===type) previous.text+=text; else segments.push({type,text}); };
   for (const pair of aligned.pairs) {
@@ -49,6 +55,61 @@ function marks(mapped: MappedText, line: TextLine | undefined, segments: Segment
   for (const removed of mapped.removed) if(removed.start<line.end && removed.end>line.start) result.push({start:Math.max(removed.start,line.start),end:Math.min(removed.end,line.end),kind:"ignored",ruleIds:[...removed.rules]});
   return result;
 }
+/** Word-level segments with every boundary on a grapheme cluster boundary of both texts: an emoji
+ * sequence or a letter with combining marks is never split between equal and changed text. */
+function snapToGraphemes(segments: Segment[]): Segment[] {
+  if (!Intl.Segmenter) return segments;
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const boundaries = (text: string) => { const set = new Set<number>([text.length]); for (const item of segmenter.segment(text)) set.add(item.index); return set; };
+  const left = segments.filter(s => s.type !== "added").map(s => s.text).join(""), right = segments.filter(s => s.type !== "deleted").map(s => s.text).join("");
+  const leftBounds = boundaries(left), rightBounds = boundaries(right);
+  const result: Segment[] = [];
+  const push = (type: Segment["type"], text: string) => { if (!text) return; const previous = result.at(-1); if (previous?.type === type) previous.text += text; else result.push({ type, text }); };
+  // Changed text gathered since the last equal run: [deleted, added].
+  let deleted = "", added = "", l = 0, r = 0;
+  const flush = () => { push("deleted", deleted); push("added", added); deleted = added = ""; };
+  for (const segment of segments) {
+    if (segment.type === "deleted") { deleted += segment.text; l += segment.text.length; continue; }
+    if (segment.type === "added") { added += segment.text; r += segment.text.length; continue; }
+    // Trim the equal run to positions that are cluster boundaries on both sides.
+    let start = 0, end = segment.text.length;
+    while (start < end && (!leftBounds.has(l + start) || !rightBounds.has(r + start))) start++;
+    while (end > start && (!leftBounds.has(l + end) || !rightBounds.has(r + end))) end--;
+    if (start > 0) { deleted += segment.text.slice(0, start); added += segment.text.slice(0, start); }
+    if (end > start) { flush(); push("equal", segment.text.slice(start, end)); }
+    if (end < segment.text.length) { deleted += segment.text.slice(Math.max(start, end)); added += segment.text.slice(Math.max(start, end)); }
+    l += segment.text.length; r += segment.text.length;
+  }
+  flush();
+  return result;
+}
+/** Lines paired exactly where they are equal (Myers), and each run between equal lines aligned
+ * by the cell-budgeted alignment so a modified line still pairs with its counterpart. */
+function alignLines(a: TextLine[], b: TextLine[], check: () => void): { pairs: SequenceAlignmentPair[]; budgetFallback: boolean } {
+  // Inside a run, a line whose content differs only by indentation or trailing space pairs first.
+  const score = (x: TextLine, y: TextLine) => lineContent(x) === lineContent(y) ? 5 : lineContent(x).trim() === lineContent(y).trim() ? 4 : 0;
+  const options = { signature: (x: TextLine) => lineContent(x), equals: (x: TextLine, y: TextLine) => lineContent(x) === lineContent(y), score, acceptsPair: () => true, cellBudget: CELL_BUDGET, checkCanceled: check };
+  const anchors = myersAlign(a, b, options.equals, editLimit(a.length + b.length), check);
+  if (!anchors) return alignSequenceWithBudget(a, b, options);
+  const pairs: SequenceAlignmentPair[] = []; let budgetFallback = false, gapA: number[] = [], gapB: number[] = [];
+  const flush = () => {
+    if (gapA.length && gapB.length) {
+      const gap = alignSequenceWithBudget(gapA.map(i => a[i]), gapB.map(i => b[i]), options);
+      budgetFallback ||= gap.budgetFallback;
+      for (const pair of gap.pairs) pairs.push({ beforeIndex: pair.beforeIndex === null ? null : gapA[pair.beforeIndex], afterIndex: pair.afterIndex === null ? null : gapB[pair.afterIndex] });
+    } else {
+      for (const index of gapA) pairs.push({ beforeIndex: index, afterIndex: null });
+      for (const index of gapB) pairs.push({ beforeIndex: null, afterIndex: index });
+    }
+    gapA = []; gapB = [];
+  };
+  for (const pair of anchors) {
+    if (pair.beforeIndex !== null && pair.afterIndex !== null) { flush(); pairs.push(pair); }
+    else if (pair.beforeIndex !== null) gapA.push(pair.beforeIndex); else gapB.push(pair.afterIndex!);
+  }
+  flush();
+  return { pairs, budgetFallback };
+}
 export function compareTexts(left: string, right: string, options: TextOptions, revision=0, deadlineMs=5000): TextResult {
   if (left.length+right.length>4_000_000) throw new Error("TEXT_TOO_LARGE");
   for(const text of [left,right]){let breaks=0;for(let i=0;i<text.length;i++)if(text.charCodeAt(i)===10&&++breaks>200_000)throw new Error("TEXT_LINE_LIMIT");if(breaks+(text.endsWith("\n")?0:1)>200_000)throw new Error("TEXT_LINE_LIMIT");}
@@ -59,12 +120,12 @@ export function compareTexts(left: string, right: string, options: TextOptions, 
     const empty:TextLine={raw:"",key:"",start:0,end:0,number:1,lastNumber:1,normalizedStart:0};
     if(!a.length)a.push(empty);if(!b.length)b.push(empty);
   }
-  const aligned=alignSequenceWithBudget(a,b,{signature:x=>x.key,equals:(x,y)=>x.key===y.key,score:(x,y)=>x.key===y.key?5:0,acceptsPair:()=>true,cellBudget:CELL_BUDGET,checkCanceled:check});
+  const aligned=alignLines(a,b,check);
   let coarse=aligned.budgetFallback;
   const counts={changed:0,added:0,deleted:0,ignored:0,equal:0};
   const rows=aligned.pairs.map<TextRow>((pair,index)=>{
     check(); const l=pair.beforeIndex===null?undefined:a[pair.beforeIndex],r=pair.afterIndex===null?undefined:b[pair.afterIndex];
-    const kind=!l?"added":!r?"deleted":l.key===r.key?(l.raw===r.raw?"equal":"ignored"):"changed";
+    const kind=!l?"added":!r?"deleted":lineContent(l)===lineContent(r)?(l.raw.replace(/\n$/u,"")===r.raw.replace(/\n$/u,"")?"equal":"ignored"):"changed";
     counts[kind]++;
     let segments:Segment[];
     if (kind==="equal"||kind==="ignored") segments=[{type:"equal",text:l?.key??r?.key??""}];
@@ -73,7 +134,7 @@ export function compareTexts(left: string, right: string, options: TextOptions, 
       const lv=l?.key??"",rv=r?.key??"";
       const tokens=(text:string)=>(text.match(/\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu)??[]).length;
       if ((tokens(lv)+1)*(tokens(rv)+1)>CELL_BUDGET) coarse=true;
-      segments=diffText(lv,rv);
+      segments=snapToGraphemes(diffText(lv,rv));
       if(options.mode==="smart") {
         const refined:Segment[]=[];
         for(let i=0;i<segments.length;) {

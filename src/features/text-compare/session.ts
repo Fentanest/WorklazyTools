@@ -25,6 +25,19 @@ export function mergeRow(snapshot:TextSnapshot,result:TextResult,rowId:string,ta
   const rowIndex=result.rows.findIndex(row=>row.id===rowId);if(rowIndex<0)throw new Error("UNKNOWN_CHANGE");
   const row=result.rows[rowIndex],source=row[target==="left"?"right":"left"],current=row[target];
   const next=result.rows.slice(rowIndex+1).find(item=>item[target])?.[target];
-  const start=current?.start??next?.start??snapshot[target].length,end=current?.end??start;
-  return {...snapshot,[target]:snapshot[target].slice(0,start)+(source?.raw??"")+snapshot[target].slice(end),revision:snapshot.revision+1};
+  const text=snapshot[target];
+  let start=current?.start??next?.start??text.length,end=current?.end??start;
+  // The merged lines take the target's line ending; the target keeps its own terminator at the end.
+  const eol=/\r\n/u.test(text)?"\r\n":"\n",ending=/\r?\n$/u;
+  let insertion="";
+  if(source){
+    const body=source.raw.replace(ending,"").replace(/\r?\n/gu,eol);
+    const terminated=current?ending.test(current.raw):start<text.length||ending.test(source.raw);
+    insertion=body+(terminated?eol:"");
+    if(start===text.length&&text&&!ending.test(text))insertion=eol+insertion;
+  }else if(current&&end===text.length&&!ending.test(current.raw)){
+    // Removing a last line without a terminator also removes the break before it.
+    start=Math.max(0,start-(text.slice(0,start).match(/\r?\n$/u)?.[0].length??0));
+  }
+  return {...snapshot,[target]:text.slice(0,start)+insertion+text.slice(end),revision:snapshot.revision+1};
 }

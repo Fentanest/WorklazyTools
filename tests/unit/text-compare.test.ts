@@ -55,10 +55,13 @@ test("large common files isolate one changed line without whole-file replacement
   const result=compareTexts(left,right,defaults);
   assert.equal(result.counts.changed,1);assert.equal(result.counts.equal,9999);assert.equal(result.quality,"full");
 });
-test("repeated lines use bounded fallback and retain every source byte",()=>{
+test("repeated lines align exactly and retain every source byte",()=>{
   const left="repeat\n".repeat(4000),right="repeat\n".repeat(4001);
   const result=compareTexts(left,right,defaults);
-  assert.equal(result.quality,"line-coarse");assert.equal(result.counts.added,1);
+  assert.equal(result.quality,"full");assert.equal(result.counts.added,1);assert.equal(result.counts.changed,0);
+  // One line inserted into the middle of 3,000 alternating lines is one added line.
+  const braces=Array.from({length:3000},(_,i)=>i%2?"}":"{"),inserted=[...braces.slice(0,1500),"inserted",...braces.slice(1500)];
+  assert.deepEqual(compareTexts(braces.join("\n"),inserted.join("\n"),defaults).counts,{changed:0,added:1,deleted:0,ignored:0,equal:3000});
   assert.equal(result.rows.map(r=>r.left?.raw??"").join(""),left);
   assert.equal(result.rows.map(r=>r.right?.raw??"").join(""),right);
 });
@@ -150,4 +153,37 @@ test("combined trim preset preserves LF/CRLF in one transformation",()=>{
 test("history clearing and option-string reservation bound both undo and redo",()=>{
  const history=new TextHistory(20,1024),source={left:"a",right:"b",options:defaults,revision:1};history.record(source);history.undo(source);assert.equal(history.canRedo,true);history.clear();assert.equal(history.canUndo,false);assert.equal(history.canRedo,false);
  history.record({...source,options:{...defaults,ignoreRules:['x'.repeat(500)]}});assert.equal(history.canUndo,false);
+});
+
+test("a line appended after a last line without a terminator is one added line, and merges cleanly", () => {
+  const result = compareTexts("a\nb", "a\nb\nc", defaults);
+  assert.deepEqual(result.rows.map((row) => row.kind), ["equal", "equal", "added"]);
+  const merged = mergeRow({ left: "a\nb", right: "a\nb\nc", options: defaults, revision: 0 }, result, result.rows[2].id, "left");
+  assert.equal(merged.left, "a\nb\nc");
+  const removed = mergeRow({ left: "a\nb", right: "a\nb\nc", options: defaults, revision: 0 }, result, result.rows[2].id, "right");
+  assert.equal(removed.right, "a\nb");
+});
+
+test("a merged line takes the target's line ending", () => {
+  const options = { ...defaults, normalizeLineEndings: true };
+  const snapshot = { left: "a\r\nb\r\nc\r\n", right: "a\nB\nc\n", options, revision: 0 };
+  const result = compareTexts(snapshot.left, snapshot.right, options);
+  const row = result.rows.find((item) => item.kind === "changed")!;
+  assert.equal(mergeRow(snapshot, result, row.id, "left").left, "a\r\nB\r\nc\r\n");
+});
+
+test("word mode keeps grapheme clusters whole and pairs re-indented lines", () => {
+  const word = { ...defaults, mode: "word" as const };
+  const emoji = compareTexts("family \u{1F468}‍\u{1F469}‍\u{1F467} end", "family \u{1F468}‍\u{1F469}‍\u{1F466} end", word);
+  assert.deepEqual(emoji.rows[0].leftMarks.map((mark) => [mark.start, mark.end]), [[7, 15]]);
+  const accent = compareTexts("café x", "cafè x", word);
+  assert.deepEqual(accent.rows[0].leftMarks.map((mark) => [mark.start, mark.end]), [[3, 5]]);
+  const indented = compareTexts("if (a) {\n  call();\n}\nother\n", "if (a) {\n    call();\n}\nanother\n", { ...defaults, mode: "smart" });
+  assert.deepEqual(indented.rows.map((row) => [row.kind, row.left?.raw.trim(), row.right?.raw.trim()]), [["equal", "if (a) {", "if (a) {"], ["changed", "call();", "call();"], ["equal", "}", "}"], ["changed", "other", "another"]]);
+});
+
+test("ignore rules with many matches stay within limits", () => {
+  const result = compareTexts("x ".repeat(150_000), "y ".repeat(150_000), { ...defaults, ignoreRules: ["x", "y"] });
+  assert.equal(result.counts.ignored, 1);
+  assert.equal(literalSpans("aaaa", ["a"]).length, 1);
 });

@@ -11,8 +11,10 @@ test('literal attribution and normalized positions survive the result boundary w
  assert.deepEqual(result.rows.flatMap(row=>row.leftMarks).filter(mark=>mark.kind==='ignored').map(mark=>mark.ruleIds),[[0,1]]);
  const cloned=structuredClone(result,{transfer:[p.left.starts.buffer,p.left.ends.buffer,p.right.starts.buffer,p.right.ends.buffer]});assert.equal(p.left.starts.byteLength,0);assert.deepEqual([...cloned.provenance.left.starts],original.starts);
 });
-test('versioned quote dash and whitespace policy preserves the previous character set exactly',()=>{
+test('versioned quote dash and whitespace policy: v2 also ignores the Unicode space separators',()=>{
  const options={...DEFAULT_TEXT_OPTIONS,ignoreQuotes:true,ignoreDashes:true,ignoreWhitespace:true};
- assert.equal(mapText('‘’‚‛“”„‟‐‑‒–—―−\t \v\f\u00a0',options).value,"''''\"\"\"\"-------\u00a0");
+ assert.equal(mapText('‘’‚‛“”„‟‐‑‒–—―−\t \v\f\u00a0\u3000\u2002\u202f',options).value,"''''\"\"\"\"-------");
+ // Line breaks and zero-width characters are not whitespace to ignore.
+ assert.equal(mapText('a\nb\u200bc',options).value,'a\nb\u200bc');
  const removed=mapText('abc',[options][0]);assert.deepEqual(removed.removed,[]);
 });
