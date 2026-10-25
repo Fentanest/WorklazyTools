@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import {chromium} from 'playwright';
-const base=process.env.TEST_BASE_URL||'http://127.0.0.1:5273',browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});
+const base=process.env.TEST_BASE_URL||'http://127.0.0.1:5273',browser=await chromium.launch({executablePath:process.env.CHROME_PATH||'/usr/bin/google-chrome',args:['--no-sandbox']});
 try{for(const language of ['ko','en']){
  const copy=JSON.parse(await fs.readFile(`src/locales/${language}/features.json`,'utf8')).textCompare;
  const context=await browser.newContext({serviceWorkers:'block',viewport:{width:language==='ko'?390:1360,height:900}});await context.addInitScript(lang=>{window.__WORKLAZY_MOCK_PROVIDERS__=true;localStorage.setItem('worklazy-theme',lang==='ko'?'dark-coral':'light-coral');},language);
