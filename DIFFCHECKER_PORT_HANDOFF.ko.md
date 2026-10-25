@@ -110,13 +110,28 @@ npm run test:analytics
 npm run test:analytics-base
 ```
 
+이식으로 기존 기능이 퇴보하지 않았는지 보는 브라우저 검사도 재개 목록에 반드시 넣는다. 2026-10-25 감사에서 재발 N5·D1은 이 검사로만 드러났다. 빌드 결과를 띄운 미리보기 서버(`npx vite preview --port 4173`)에 실행한다.
+
+```bash
+TEST_BASE_URL=http://127.0.0.1:4173 TEST_SCOPE=word npm run test:browser
+TEST_BASE_URL=http://127.0.0.1:4173 npm run test:excel-compare
+TEST_BASE_URL=http://127.0.0.1:4173 node tests/excel-compare-grid-smoke.mjs
+```
+
+다음 두 검사는 `/src` 모듈을 직접 불러오므로 개발 서버(`npx vite --port 5273`)에 실행한다. 이미지 검사는 gitignored 하네스 `docs/jobs/todo/diffchecker-port-20261023/image-harness.html`이 있어야 한다. Windows에서는 `CHROME_PATH`로 Chrome 경로를 준다.
+
+```bash
+TEST_BASE_URL=http://127.0.0.1:5273 node tests/text-search-provenance-smoke.mjs
+TEST_BASE_URL=http://127.0.0.1:5273 node tests/image-working-scale-smoke.mjs
+```
+
 Text/Images·실제 OCR/PDF/Folder·보고서의 영향 범위 검사 선택자는 `final-validation-plan.json`에 있다. 최종 소스/입력에 그대로 적용되는 기존 근거만 재사용한다. 광고/분석 QA는 실제 공급자 통신을 막으며, 알려지지 않은 원격 모델·엔진·사용자 데이터 요청은 실패로 처리한다.
 
 광고 검사는 자체 4182 서버를, 브라우저 분석 정책 검사는 자체 4186 서버를 시작합니다. 위의 5274/5275 서버를 자동으로 검사하는 명령이 아닙니다. `test:analytics-base`는 JSDOM에서 루트/하위 경로의 직접 진입·SPA 이동·재방문 시 GA/네이버 이벤트를 확인하는 컴포넌트 검사이며 실제 브라우저 검사가 아닙니다. 실제 하위 경로 산출물에서의 브라우저 이동·자산·정책 확인은 별도로 남아 있습니다.
 
 최종 KO/EN·명암·화면 크기·인쇄 열람, 전체 후보 Astra 검수, 실제 정식 감사도 이번 사용자 요청으로 미실행이다. Fable 가용성 프로브는 실제 감사가 아니며, 소규모 체크포인트 통과를 전체 승인으로 확대하지 않는다.
 
-이미지 처리의 256MiB는 필요한 작업 공간을 계산해 작업을 허용하거나 거절하는 예산입니다. 브라우저 전체 메모리가 그보다 적게 쓰인다는 보장은 아닙니다. 기존 측정에서도 작업 버퍼·JS/WASM 관측값·브라우저 관련 프로세스 메모리를 구분했으며, 다른 기기나 장시간 작업의 보장값으로 사용하지 않습니다.
+이미지 처리의 1,536MiB(2026-10-25 수리 전 256MiB)는 필요한 작업 공간을 계산해 작업을 허용하거나 거절하는 예산입니다. 브라우저 전체 메모리가 그보다 적게 쓰인다는 보장은 아닙니다. 기존 측정에서도 작업 버퍼·JS/WASM 관측값·브라우저 관련 프로세스 메모리를 구분했으며, 다른 기기나 장시간 작업의 보장값으로 사용하지 않습니다.
 
 ## 별도로 남긴 호환성 확인과 선택적 후속
 
