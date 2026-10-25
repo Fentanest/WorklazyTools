@@ -42,10 +42,10 @@
 | 만료 | 발급일로부터 **1년** |
 | 갱신 | 만료 2주 전(달력에 표시)에 새 토큰 발급(같은 대상·권한) → 파일 교체 → dispatch 1회 성공(mode=validate로 시험) 확인 → 옛 토큰 삭제. 호스트 교체·유출 의심 시 즉시 삭제 후 재발급 |
 | 사용 주체 | 로컬 오케스트레이터 전달 단계 하나(사람·다른 도구는 쓰지 않음) |
-| 유출 시 영향 | 코드는 바꿀 수 없다. 다만 Actions 쓰기로 이 저장소의 `workflow_dispatch` 워크플로를 실행·취소할 수 있다. 보호: `deploy-site.yml`은 검증 통과 데이터만 배포하고 DART 키를 쓰지 않는다. **실제로 dispatch 가능한 다른 워크플로가 있다: `deploy-pages.yml`(`workflow_dispatch`, `validate_only` 기본 false, DART_API_KEY 사용, Pages 배포 — 전환 후 비활성·삭제 예정)와 `product-banner-tests.yml`.** 옛 FolioTrace 수집·백필 워크플로(`foliotrace-*.yml`)는 origin/main에서 이미 삭제됐다. `deploy-pages.yml`은 전환 4단계에서 비활성하고 P4에서 삭제한다 |
+| 유출 시 영향 | 코드는 바꿀 수 없다. 다만 Actions 쓰기로 이 저장소의 `workflow_dispatch` 워크플로를 실행·취소할 수 있다. 보호: `deploy-site.yml`은 검증 통과 데이터만 배포하고 DART 키를 쓰지 않는다. 옛 `deploy-pages.yml`(DART_API_KEY 사용, Pages 배포)은 2026-10-25 사용자 결정으로 삭제됐다. 현재 dispatch 가능한 워크플로는 `deploy-site.yml`과 `product-banner-tests.yml` 둘뿐이다.** 옛 FolioTrace 수집·백필 워크플로(`foliotrace-*.yml`)는 origin/main에서 이미 삭제됐다 |
 
 ## 워크플로 전환 (P3-3)
-새 `deploy-site.yml`을 추가했고 기존 `deploy-pages.yml`(cron·self-hosted `Ubuntu24-Git`·DART 수집)은 **아직 손대지 않았다**. 새 워크플로는 main push 때 저장소 변수 `FOLIOTRACE_DEPLOY_V2 == 'true'`일 때만 돈다(그전엔 건너뜀). dispatch는 항상 가능하고 기본값이 `mode=validate`(Pages 미변경)이다.
+새 `deploy-site.yml`로 전환했고 기존 `deploy-pages.yml`(cron·self-hosted `Ubuntu24-Git`·DART 수집)은 2026-10-25 사용자 결정으로 **삭제됐다**(이하 전환 절차는 이력). 새 워크플로는 main push 때 저장소 변수 `FOLIOTRACE_DEPLOY_V2 == 'true'`일 때만 돈다(그전엔 건너뜀). dispatch는 항상 가능하고 기본값이 `mode=validate`(Pages 미변경)이다.
 
 사전 준비(사용자): 데이터 저장소 생성, 두 Deploy key 등록, `FOLIOTRACE_SITE_DATA_READ_KEY` 비밀값 설정, 시작용 세분화 토큰 발급·호스트 보관, (권고) 데이터 저장소 main 보호.
 1. 코드·워크플로가 main에 들어간다. 비밀값·데이터가 아직 없으면 새 워크플로는 수동 실행 때 키 확인 또는 체크아웃/검증에서 실패한다 = 정상(배포 안 함). 옛 cron은 계속 사이트를 갱신한다(이 변경은 옛 검증기도 공개 개정 1 실데이터로 통과 확인).
@@ -53,9 +53,9 @@
 3. `Deploy site`를 `mode=validate`로 수동 실행해 키·체크아웃·검증·빌드·테스트 통과를 확인한다(GitHub 호스팅 러너).
 4. 옛 워크플로를 비활성(`gh workflow disable "Deploy GitHub Pages"`)한 뒤 같은 워크플로를 `mode=deploy`로 수동 1회 실배포 → 사이트 값·날짜 확인.
 5. 전환: 저장소 변수 `FOLIOTRACE_DEPLOY_V2=true`(main push 자동 배포 켬), 시작용 토큰을 호스트에 두고 오케스트레이터 dispatch를 켠다. 이후 main push와 오케스트레이터의 dispatch(mode=deploy)로 배포된다.
-6. 안정 확인(예: 연속 정상 배포 3일) 뒤 P4: `deploy-pages.yml`·`foliotrace-*.yml`·`foliotrace-data` 브랜치 정리, `Ubuntu24-Git` 러너 해제(사용자 결정), DART 시크릿 삭제.
+6. 안정 확인(예: 연속 정상 배포 3일) 뒤 P4: `foliotrace-data` 브랜치 정리와 DART 시크릿 삭제는 남아 있다(`deploy-pages.yml`·`foliotrace-*.yml` 파일은 삭제 완료). `Ubuntu24-Git` 러너 등록 해제는 별도 사용자 결정 대기.
 
-**되돌리기**: 변수를 지우거나 false로 하고 `gh workflow enable "Deploy GitHub Pages"` 후 수동 실행(옛 `foliotrace-data` 브랜치와 상태는 P4 전까지 보존).
+**되돌리기**: 변수를 지우거나 false로 하고 `gh workflow enable "Deploy GitHub Pages"` 후 수동 실행(옛 `foliotrace-data` 브랜치와 상태는 P4 전까지 보존). 단 `deploy-pages.yml`이 삭제됐으므로 현재는 git 이력에서 복원해야 하며 되돌리기 경로로 쓰지 않는다.
 
 **수동 실행 주의**: `workflow_dispatch` 실배포(`mode=deploy`)는 "최신 main" 가드를 일부러 우회한다(선택한 ref를 그대로 배포). 옛 워크플로가 비활성인지 확인하고, main이 아닌 ref로 실배포하지 않는다.
 

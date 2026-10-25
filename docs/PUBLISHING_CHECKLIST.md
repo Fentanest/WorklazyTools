@@ -24,7 +24,7 @@
 
 비디오 편집기가 비공개인 동안 Pages 작업에서 비디오 전용 FFmpeg 준비와 `test:video-hybrid`는 실행하지 않는다. 공통 `test:unit`도 비디오 전용 `video-*.test.ts` 파일을 제외한다. `VIDEO_STUDIO_PUBLIC`을 다시 켤 때 단위검사는 자동으로 재포함되며 FFmpeg·하이브리드 단계도 복구하고 비디오 편집기 기능·공개 경로를 검증한다. 다른 도구가 사용하는 미디어 자산과 검사는 유지한다.
 
-도구·안내 화면만 수동 게시할 때는 `deploy-pages.yml`의 `pages_only=true`, `validate_only=false`를 사용한다. 이 경로는 DART 수집·시세 조회·포트폴리오 데이터 브랜치 쓰기·게시 이력 기록을 건너뛰고, 마지막으로 게시된 스냅샷을 검증해 그대로 재사용한다. 현재 공개 스냅샷과 기록된 게시 버전이 다르면 임의로 새 값을 만들지 않고 배포를 실패시킨다.
+수동 게시와 사전 검증은 `deploy-site.yml`의 `workflow_dispatch`로 한다(옛 `deploy-pages.yml`은 2026-10-25 삭제). `mode=validate`(기본)는 비공개 데이터 저장소의 FolioTrace 공개 데이터를 읽기 전용 키로 받아 검증·빌드·테스트만 하고 Pages는 건드리지 않는다. `mode=deploy`는 같은 검증을 통과한 뒤 선택한 ref를 그대로 게시한다(최신 main 가드 우회, main이 아닌 ref로 실배포 금지). 이 워크플로는 DART 수집·시세 조회·데이터 저장소 쓰기를 하지 않으며 읽기 키가 없거나 체크아웃·검증이 실패하면 배포 전에 멈춰 기존 사이트 값을 유지한다.
 
 ## 4. Search Console·공유 정보
 

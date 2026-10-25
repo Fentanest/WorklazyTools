@@ -65,7 +65,7 @@
 - **완료 — pdf-finish 준비 상태 안내 허용목록** — `3568b42`. alert 0건 기대를 의도된 안내 2건(`pdf-finish-link-preservation`, `pdf-finish-preview-disclaimer`) 명시 허용으로 바꿨다(`cea060b`, 09-08). 그 외 alert는 여전히 실패하고 허용목록 2건이 없어도 실패한다. 관문 통과 후 **약 50개 단언이 실제로 실행·통과**했다. — Muse 구현 / Claude 판정
 - **남음 — excel-compare `assertB4Affordance`(`:243`)** — 검사가 `hover:bg-green-500/10!`를 요구하나 제품은 `eea9b1e`(액센트 정리, main 포함)의 `hover:bg-primary/10!`다. `origin/main`에서도 동일 실패. 제품이 맞고 검사가 낡았다. — Muse 보고 / Claude
 - **남음 — pdf-finish `testFinishWorkflow`(`:663`)** — `[role='alert'].last()`가 글꼴 오류 대신 미리보기 고지를 잡는다. `6fd7c8a`(warning 기본 role=alert, main 포함) 이후 페이지 전역 `.last()` 선택자가 낡았다. `origin/main`에서도 동일 실패. lifecycle·golden 4종은 아직 미실행. — Muse 보고 / Claude
-- **판정 — 배포를 막지 않는다** — 두 스모크는 CI 게이트가 아니며(`deploy-pages.yml`은 build·unit·ads·static·video-hybrid만 강제) `origin/main`에서도 동일하게 실패한다. 즉 현재 운영도 이 검사를 통과한 적이 없다. 검증된 제품 수정을 기존 검사 부패 때문에 붙잡지 않는다. 복구는 별도 작업으로 이어간다. — Claude 판정(Opus)
+- **판정 — 배포를 막지 않는다** — 두 스모크는 CI 게이트가 아니며(옛 `deploy-pages.yml`[2026-10-25 삭제, 현재는 `deploy-site.yml`]은 build·unit·ads·static·video-hybrid만 강제) `origin/main`에서도 동일하게 실패한다. 즉 현재 운영도 이 검사를 통과한 적이 없다. 검증된 제품 수정을 기존 검사 부패 때문에 붙잡지 않는다. 복구는 별도 작업으로 이어간다. — Claude 판정(Opus)
 
 ## 화면 결함·기술 부채 묶음 (2026-09-22)
 
