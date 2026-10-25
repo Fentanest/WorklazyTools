@@ -57,7 +57,8 @@ test('static standalone Folder UI runs actual worker, filters, options, replacem
     await page.locator('summary').filter({ hasText: 'a.txt — Equal bytes' }).click();
     await page.getByRole('button', { name: 'Inspect this pair', exact: true }).click();
     await page.getByRole('button', { name: 'Compare selected pair', exact: true }).click();
-    await page.locator('table').filter({ hasText: 'one' }).waitFor();
+    // The selected text pair opens in the text tool's own diff view.
+    await page.locator('[data-testid=folder-deep-text] [data-row-id]').filter({ hasText: 'one' }).first().waitFor();
     const loadPair = async (name, a, b) => {
       await page.getByLabel('Original Choose ZIP', { exact: true }).setInputFiles({ name: 'left.zip', mimeType: 'application/zip', buffer: await makeZip(name, a) });
       await page.getByLabel('Revised Choose ZIP', { exact: true }).setInputFiles({ name: 'right.zip', mimeType: 'application/zip', buffer: await makeZip(name, b) });
@@ -67,7 +68,7 @@ test('static standalone Folder UI runs actual worker, filters, options, replacem
     };
     await loadPair('unicode.txt', Buffer.from('same'), Buffer.from('\ufeffsame'));
     await page.getByRole('button', { name: 'Compare selected pair', exact: true }).click();
-    await page.locator('table').filter({ hasText: 'Equal decoded text' }).waitFor();
+    await page.locator('[data-testid=folder-deep-text]').getByText('Equal decoded text', { exact: true }).waitFor();
     assert.equal(await page.locator('[data-testid=folder-tree] summary').filter({ hasText: 'Different bytes' }).count(), 1);
     if (process.env.FOLDER_UI_SCREENSHOT) await page.screenshot({ path: process.env.FOLDER_UI_SCREENSHOT.replace(/\.png$/, '-deep.png'), fullPage: true });
     const workbook = async value => { const wb = new ExcelJS.Workbook(); wb.addWorksheet('First').addRows([['key', 'value'], ['a', value]]); wb.addWorksheet('Other').addRows([['ignored'], ['unselected']]); return Buffer.from(await wb.xlsx.writeBuffer()); };
@@ -114,7 +115,7 @@ test('static standalone Folder UI runs actual worker, filters, options, replacem
     await page.locator('summary').filter({ hasText: '1 ↔ 1' }).click();
     await page.getByRole('button', { name: 'Compare a candidate pair', exact: true }).click();
     await page.getByRole('button', { name: 'Compare selected pair', exact: true }).click();
-    await page.locator('table').filter({ hasText: 'same contents' }).waitFor();
+    await page.locator('[data-testid=folder-deep-text] [data-row-id]').filter({ hasText: 'same contents' }).first().waitFor();
     assert.equal(await page.locator('[data-testid=folder-tree] summary').filter({ hasText: 'Original only' }).count(), 1);
     assert.equal(await page.locator('[data-testid=folder-tree] summary').filter({ hasText: 'Revised only' }).count(), 1);
     await page.getByRole('textbox', { name: 'Filter paths' }).fill('missing'); assert.equal(await page.locator('[data-testid=folder-tree] summary').count(), 0);

@@ -1,6 +1,6 @@
 export const FOLDER_COPY = {
   en: { title: 'Folder comparison', eyebrow: 'Local file tools', description: 'Compare folders or ZIP archives by path and exact file bytes.',
-    left: 'Original', right: 'Revised', files: 'Choose folder', zip: 'Choose ZIP', directory: 'Open folder with read permission', none: 'No source selected',
+    left: 'Original', right: 'Revised', imageHighlight: 'Difference highlight', files: 'Choose folder', zip: 'Choose ZIP', directory: 'Open folder with read permission', none: 'No source selected',
     compare: 'Compare', cancel: 'Cancel', options: 'Path matching', nfc: 'Normalize Unicode to NFC for matching', ignoreCase: 'Ignore letter case for matching', stripRoot: 'Omit the first ZIP path component',
     result: 'Comparison results', search: 'Filter paths', all: 'All statuses', previous: 'Previous', next: 'Next', page: 'Page',
     loading: 'Reading folder entries…', comparing: 'Comparing file bytes…', done: 'Comparison finished', canceled: 'Canceled; completed rows are preserved.', error: 'Could not read these sources. Check access, archive integrity and size limits.',
@@ -10,7 +10,7 @@ export const FOLDER_COPY = {
     pending: 'Pending', equal: 'Equal bytes', different: 'Different bytes', unreadable: 'Unreadable', unknown: 'Not compared', ambiguous: 'Ambiguous paths', 'left-only': 'Original only', 'right-only': 'Revised only',
     verified: 'Integrity verified', failed: 'Integrity failed', unchecked: 'Integrity unchecked', entries: 'entries', completed: 'processed', details: 'Original paths and entry details', workerError: 'The comparison could not continue. Please start a new comparison.', pickerError: 'The folder could not be opened. Use folder upload if this browser does not support directory access.' },
   ko: { title: '폴더 비교', eyebrow: '로컬 파일 도구', description: '폴더나 ZIP의 파일 내용을 확인하고, 필요한 파일 쌍을 상세 비교합니다.',
-    left: '원본', right: '수정본', files: '폴더 선택', zip: 'ZIP 선택', directory: '읽기 권한으로 폴더 열기', none: '선택한 폴더·ZIP 없음',
+    left: '원본', right: '수정본', imageHighlight: '차이 강조', files: '폴더 선택', zip: 'ZIP 선택', directory: '읽기 권한으로 폴더 열기', none: '선택한 폴더·ZIP 없음',
     compare: '비교', cancel: '취소', options: '경로 대응 옵션', nfc: '대응 경로에 Unicode NFC 적용', ignoreCase: '대응 경로의 대소문자 무시', stripRoot: 'ZIP 경로의 첫 구성 요소 제외',
     result: '비교 결과', search: '경로 필터', all: '모든 상태', previous: '이전', next: '다음', page: '페이지',
     loading: '폴더 항목을 읽는 중…', comparing: '파일 내용을 끝까지 확인하는 중…', done: '비교 완료', canceled: '취소되었습니다. 완료한 행은 유지됩니다.', error: '파일 목록을 읽지 못했습니다. 접근 권한, ZIP 손상 여부와 크기 제한을 확인하세요.',

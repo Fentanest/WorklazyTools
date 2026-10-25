@@ -41,3 +41,18 @@ test('reverse unequal coverage preserves removed pixels instead of treating zero
   assert.equal(projected.changedPixelCount,0);assert.equal(projected.comparablePixelCount,1);assert.equal(projected.addedBoundaryPixelCount,0);assert.equal(projected.removedBoundaryPixelCount,1);
   assert.equal(projected.sources.left.width,2);assert.equal(projected.sources.right.width,1);assert(owned.every(b=>b.byteLength===0));
 });
+test('compact result keeps bounded previews where a lone changed pixel survives downscaling', async () => {
+  const { imagePreview, IMAGE_PREVIEW_SIDE } = await import('../src/features/folder-compare/imageProjection.ts');
+  const width = 2000, height = 1000, left = new Uint8ClampedArray(width * height * 4).fill(255), right = left.slice();
+  right.set([0, 0, 0, 255], (500 * width + 1234) * 4);
+  const valid = new Uint8Array(width * height).fill(1);
+  const result = { ...compareRgba(left, right, width, height, valid, valid, DEFAULT_PIXEL_OPTIONS), left, right, width, height };
+  const preview = imagePreview(result);
+  assert.deepEqual([preview.width, preview.height], [IMAGE_PREVIEW_SIDE, 400]);
+  assert.equal(preview.highlight.length, preview.width * preview.height * 4);
+  const colored = []; for (let i = 0; i < preview.highlight.length; i += 4) if (preview.highlight[i + 3] === 255) colored.push(i / 4);
+  assert.equal(colored.length, 1);
+  assert.deepEqual([colored[0] % preview.width, Math.floor(colored[0] / preview.width)], [Math.floor(1234 * 0.4), 200]);
+  // Small images keep full size.
+  assert.deepEqual([imagePreview(actual()).width, imagePreview(actual()).height], [2, 1]);
+});
