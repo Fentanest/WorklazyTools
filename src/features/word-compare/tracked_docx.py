@@ -4927,8 +4927,13 @@ def _next_revision_id(*archives):
         for name in archive.namelist():
             if not name.startswith("word/") or not name.endswith(".xml"):
                 continue
+            data = archive.read(name)
+            # accept_revisions.py's check: certainly UTF-8 and no element named like a revision (its
+            # names include every TRACK_CHANGE_TAGS name), so parsing would add nothing.
+            if _without_revision_markup(data):
+                continue
             try:
-                root = ET.fromstring(archive.read(name))
+                root = ET.fromstring(data)
             except ET.ParseError:
                 continue
             for element in root.iter():
