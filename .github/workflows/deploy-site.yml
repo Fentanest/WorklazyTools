@@ -195,13 +195,12 @@ jobs:
         env:
           EXPECTED_SOURCE: ${{ github.sha }}
           GH_REPO: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           # A newer main push queues its own run, which then deploys; never publish an older build over it.
-          # No gh CLI: the self-hosted machine is only known to have python3/node. curl -f / pipefail make a failed request fail the step (no deploy).
+          # git ls-remote on the public repository: no token, no gh CLI. A failed request or a non-sha answer fails the step (no deploy).
           set -o pipefail
-          latest=$(curl -fsS -H "Authorization: Bearer ${GH_TOKEN}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${GH_REPO}/commits/main" | python3 -c 'import json,sys; print(json.load(sys.stdin)["sha"])')
-          test -n "$latest"
+          latest=$(git ls-remote "https://github.com/${GH_REPO}.git" refs/heads/main | cut -f1)
+          printf '%s' "$latest" | grep -qE '^[0-9a-f]{40}$'
           if [ "$latest" = "$EXPECTED_SOURCE" ]; then echo "current=true" >> "$GITHUB_OUTPUT"; else echo "current=false" >> "$GITHUB_OUTPUT"; echo "::notice::main moved to $latest; the newer run deploys"; fi
       - name: Deploy
         id: deployment

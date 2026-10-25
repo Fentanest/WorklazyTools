@@ -70,6 +70,6 @@
 ## 러너 규정 (사용자 결정 2026-10-25)
 - `deploy-site.yml`의 build·deploy 두 잡과 `product-banner-tests.yml`은 자체 러너 `Ubuntu24-Git`(라벨 self-hosted, Linux, X64, 235)에서 돈다. 수동 실행의 `runner=github-hosted` 입력은 이 장비가 꺼졌을 때의 우회로이며 두 잡이 같은 선택을 따른다(오케스트레이터는 mode/data_revision만 보내 기본값을 쓴다).
 - 공개 저장소이므로 포크 PR 보호의 실제 경계는 저장소 설정 "Require approval for all external contributors"(approval_policy=all_external_contributors, 2026-10-25 설정)이며 반드시 유지한다. `product-banner-tests.yml`의 head 저장소 비교 식(포크면 ubuntu-latest)은 편의 장치일 뿐 보안 경계가 아니다(포크 PR은 수정한 워크플로 파일을 실행한다). 승인자는 포크 PR의 `.github/workflows` 변경을 읽고 나서 승인한다. `Ubuntu24-Git`은 비밀번호 없는 sudo가 있어 포크 PR 승인 = 그 코드를 이 장비에서 root로 실행하는 것이다. `deploy-site.yml`에는 pull_request 트리거를 추가하지 않는다.
-- 읽기 키는 `persist-credentials: false`인 actions/checkout이 첫 fetch 직후 키·known_hosts·sshCommand 설정을 지우고 post 단계에서 다시 지운다. `if: always()` 단계는 `RUNNER_TEMP`에 한정한 세 번째 안전장치다. 매 실행 시작에 이전 실행 잔재(`foliotrace-site-data`, `public/data/foliotrace`, `dist` 등)를 지운다. 배포 잡의 최신 main 확인은 gh CLI 대신 curl+python3를 쓴다(Ubuntu24-Git의 gh는 미확인).
+- 읽기 키는 `persist-credentials: false`인 actions/checkout이 첫 fetch 직후 키·known_hosts·sshCommand 설정을 지우고 post 단계에서 다시 지운다. `if: always()` 단계는 `RUNNER_TEMP`에 한정한 세 번째 안전장치다. 매 실행 시작에 이전 실행 잔재(`foliotrace-site-data`, `public/data/foliotrace`, `dist` 등)를 지운다. 배포 잡의 최신 main 확인은 gh CLI 대신 토큰 없는 `git ls-remote`를 쓴다(Ubuntu24-Git의 gh는 미확인).
 - 아티팩트는 `retention-days: 1`, 저장소 설정의 보존 기간도 1일이다.
 - 위험: 러너가 꺼져 있으면 배포가 대기열에 머문다(우회: `runner=github-hosted`). 러너가 하나라 `pages` 동시성 그룹과 함께 순차 실행된다.
