@@ -55,7 +55,7 @@
 5. 전환: 저장소 변수 `FOLIOTRACE_DEPLOY_V2=true`(main push 자동 배포 켬), 시작용 토큰을 호스트에 두고 오케스트레이터 dispatch를 켠다. 이후 main push와 오케스트레이터의 dispatch(mode=deploy)로 배포된다.
 6. 안정 확인(예: 연속 정상 배포 3일) 뒤 P4: `foliotrace-data` 브랜치 정리와 DART 시크릿 삭제는 남아 있다(`deploy-pages.yml`·`foliotrace-*.yml` 파일은 삭제 완료). `Ubuntu24-Git` 러너 등록 해제는 별도 사용자 결정 대기.
 
-**되돌리기**: 변수를 지우거나 false로 하고 `gh workflow enable "Deploy GitHub Pages"` 후 수동 실행(옛 `foliotrace-data` 브랜치와 상태는 P4 전까지 보존). 단 `deploy-pages.yml`이 삭제됐으므로 현재는 git 이력에서 복원해야 하며 되돌리기 경로로 쓰지 않는다.
+**되돌리기**: 옛 `deploy-pages.yml` 삭제(2026-10-25)로 옛 워크플로 재활성 경로는 없다. 문제가 생기면 변수를 지우거나 false로 해 main push 자동 배포를 끄고 `deploy-site.yml`을 `mode=validate`로 확인한다(옛 `foliotrace-data` 브랜치와 상태는 P4 전까지 보존).
 
 **수동 실행 주의**: `workflow_dispatch` 실배포(`mode=deploy`)는 "최신 main" 가드를 일부러 우회한다(선택한 ref를 그대로 배포). 옛 워크플로가 비활성인지 확인하고, main이 아닌 ref로 실배포하지 않는다.
 
