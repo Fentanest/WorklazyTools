@@ -102,6 +102,7 @@ export function DocumentComparePage() {
     // their download buttons (the session keeps that work alive across the results pages).
     let shown = false;
     const pairCount = session.beforeFiles.length;
+    let showing: Promise<void> | undefined;
     try {
       const pairs = session.beforeFiles.map((beforeFile, index) => ({
         beforeFile,
@@ -156,7 +157,6 @@ export function DocumentComparePage() {
             ? L(`${results.length}개 문서 쌍의 비교 결과를 만들었습니다. Word 변경 추적 파일은 이어서 만듭니다.`, `Created comparison results for ${results.length} document pairs. Tracked-changes Word files follow.`)
             : L(`${results.length}개 문서 쌍의 결과를 모두 만들었습니다.`, `Created results for all ${results.length} document pairs.`));
       };
-      let showing: Promise<void> | undefined;
       const workerResults = await compareDocumentFilePairs(pairs, {
         formatting: session.formatting,
         formattingMask: session.formattingMask,
@@ -177,6 +177,16 @@ export function DocumentComparePage() {
       // Pairs that never had a tracked file (not DOCX on both sides) stop showing it as pending.
       pairs.forEach((_, index) => { if (!arrived.has(index)) session.updateResult(index + 1, (current) => current.trackedStatus === "pending" ? { ...current, trackedStatus: undefined } : current); });
     } catch (reason) {
+      // Every screen result arrived and the results are being shown (the Excel report may still run):
+      // a later worker failure keeps them and only the tracked files become unavailable.
+      if (!shown && showing && !controller.signal.aborted) {
+        try { await showing; } catch { /* not shown: reported below */ }
+      }
+      if (!shown) {
+        // Nothing may be published after this run ended.
+        controller.abort();
+        await showing?.catch(() => undefined);
+      }
       if (shown) {
         // Results are on screen: only the tracked files are missing (a newer comparison or leaving the tool aborts quietly).
         if (!controller.signal.aborted) for (let pairNumber = 1; pairNumber <= pairCount; pairNumber++) session.updateResult(pairNumber, (current) => current.trackedStatus === "pending" ? { ...current, trackedStatus: "unavailable" } : current);

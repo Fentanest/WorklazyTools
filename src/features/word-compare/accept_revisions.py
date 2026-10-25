@@ -326,14 +326,32 @@ def _accept_xml(data, is_settings=False):
     return _serialize_xml(root)
 
 
-# Element names `_accept_xml` acts on (any prefix). A part without one of them only round-trips
-# through parse and serialization, so it is kept byte for byte (no tracked revision to accept).
+# Element names `_accept_xml` acts on, with any prefix (Unicode names included). A part without one
+# of them only round-trips through parse and serialization, so it is kept byte for byte.
 _REVISION_MARKUP = re.compile(
-    rb"<(?:[A-Za-z_][\w.-]*:)?(?:ins|del|moveFrom|moveTo|cellIns|cellDel|cellMerge|numberingChange|trackRevisions"
-    rb"|rPrChange|pPrChange|tblPrChange|tblPrExChange|tblGridChange|trPrChange|tcPrChange|sectPrChange"
-    rb"|moveFromRangeStart|moveFromRangeEnd|moveToRangeStart|moveToRangeEnd"
-    rb"|customXmlInsRangeStart|customXmlInsRangeEnd|customXmlDelRangeStart|customXmlDelRangeEnd)[\s/>]"
+    r"<(?:[^\s<>/:!?\"'=]+:)?(?:ins|del|moveFrom|moveTo|cellIns|cellDel|cellMerge|numberingChange|trackRevisions"
+    r"|rPrChange|pPrChange|tblPrChange|tblPrExChange|tblGridChange|trPrChange|tcPrChange|sectPrChange"
+    r"|moveFromRangeStart|moveFromRangeEnd|moveToRangeStart|moveToRangeEnd"
+    r"|customXmlInsRangeStart|customXmlInsRangeEnd|customXmlDelRangeStart|customXmlDelRangeEnd)[\s/>]"
 )
+_XML_DECLARED_ENCODING = re.compile(rb"^\s*<\?xml[^>]*encoding\s*=\s*[\"']([A-Za-z0-9._-]+)[\"']")
+
+
+def _without_revision_markup(data):
+    """True only when the part is certainly UTF-8 (no BOM other than UTF-8's, a UTF-8 or absent
+    encoding declaration, valid UTF-8 without NUL) and has no revision element. Anything else (UTF-16,
+    other encodings, undecodable bytes) goes through the full accept path."""
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data:
+        return False
+    body = data[3:] if data.startswith(b"\xef\xbb\xbf") else data
+    declared = _XML_DECLARED_ENCODING.match(body)
+    if declared and declared.group(1).decode("ascii").lower().replace("_", "-") not in ("utf-8", "utf8"):
+        return False
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return not _REVISION_MARKUP.search(text)
 
 
 def _is_accept_part(name):
@@ -363,7 +381,7 @@ def accept_tracked_document(input_path, output_path):
         for info in archive.infolist():
             if _is_accept_part(info.filename) or info.filename in stories:
                 data = archive.read(info.filename)
-                if not _REVISION_MARKUP.search(data):
+                if _without_revision_markup(data):
                     continue
                 replacements[info.filename] = _accept_xml(
                     data,
