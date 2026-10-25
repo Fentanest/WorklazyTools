@@ -1,0 +1,192 @@
+{
+ "schemaVersion": 1,
+ "datasetVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+ "portfolio": {
+  "id": "nps",
+  "entityId": "nps",
+  "market": "KRX",
+  "currency": "KRW",
+  "scopeKo": "예시 범위(픽스처)",
+  "scopeEn": "Fixture scope",
+  "methodologyVersion": "fixture",
+  "legacyCoverage": "verified"
+ },
+ "entity": {
+  "id": "nps",
+  "kind": "institution",
+  "nameKo": "국민연금(픽스처)",
+  "nameEn": "NPS (fixture)",
+  "officialId": null,
+  "source": "fixture"
+ },
+ "valuationTradeDate": "2026-10-23",
+ "filingsCheckedAt": "2026-10-26T00:00:00Z",
+ "generatedAt": "2026-10-26T00:00:00Z",
+ "publishedAt": "2026-10-26T00:00:00Z",
+ "latestReceiptDate": "2026-10-20",
+ "trackedCount": 3,
+ "pricedCount": 2,
+ "unresolvedCount": 0,
+ "estimatedValue": "60000000000",
+ "valuationCoverage": "partial",
+ "filingCoverage": "complete",
+ "holdings": [
+  {
+   "corpCode": "00100001",
+   "stockCode": "100001",
+   "name": "조정 예시 주식",
+   "securityKind": "common",
+   "quantity": "5000000",
+   "companyOwnershipPercent": "6.10",
+   "receiptNo": "20260920000001",
+   "receiptDate": "2026-10-20",
+   "holdingDate": "2026-10-15",
+   "sourceKind": "nps-filing",
+   "evidence": "dart-structured",
+   "latestUnresolvedReceiptNo": null,
+   "latestUnresolvedReason": null,
+   "tracking": "active",
+   "quote": {
+    "close": "10000",
+    "currency": "KRW",
+    "market": "KRX",
+    "session": "regular",
+    "tradeDate": "2026-10-23",
+    "adjusted": false,
+    "provider": "naver",
+    "observedAt": "2026-10-24T00:00:00Z",
+    "verified": true
+   },
+   "estimatedValue": "50000000000",
+   "portfolioWeightPercent": "83.3",
+   "valuationExclusionReason": null,
+   "filingUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260920000001",
+   "quantityAdjustment": {
+    "reportedQuantity": "1000000",
+    "ratioNumerator": "5",
+    "ratioDenominator": "1",
+    "events": [
+     {
+      "receiptNo": "20260915000123",
+      "kind": "stock-split",
+      "priceChangeDate": "2026-10-12",
+      "quantityChangeDate": "2026-10-14"
+     },
+     {
+      "receiptNo": "20260801000456",
+      "kind": "bonus-issue",
+      "priceChangeDate": "2026-09-01",
+      "quantityChangeDate": null
+     }
+    ]
+   }
+  },
+  {
+   "corpCode": "00100002",
+   "stockCode": "100002",
+   "name": "일반 예시 주식",
+   "securityKind": "common",
+   "quantity": "1000000",
+   "companyOwnershipPercent": "6.10",
+   "receiptNo": "20260920000002",
+   "receiptDate": "2026-10-20",
+   "holdingDate": "2026-10-15",
+   "sourceKind": "nps-filing",
+   "evidence": "dart-structured",
+   "latestUnresolvedReceiptNo": null,
+   "latestUnresolvedReason": null,
+   "tracking": "active",
+   "quote": {
+    "close": "10000",
+    "currency": "KRW",
+    "market": "KRX",
+    "session": "regular",
+    "tradeDate": "2026-10-23",
+    "adjusted": false,
+    "provider": "naver",
+    "observedAt": "2026-10-24T00:00:00Z",
+    "verified": true
+   },
+   "estimatedValue": "10000000000",
+   "portfolioWeightPercent": "16.7",
+   "valuationExclusionReason": null,
+   "filingUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260920000002"
+  },
+  {
+   "corpCode": "00100003",
+   "stockCode": "100003",
+   "name": "정지 구간 예시",
+   "securityKind": "common",
+   "quantity": "300000",
+   "companyOwnershipPercent": "6.10",
+   "receiptNo": "20260920000003",
+   "receiptDate": "2026-10-20",
+   "holdingDate": "2026-10-15",
+   "sourceKind": "nps-filing",
+   "evidence": "dart-structured",
+   "latestUnresolvedReceiptNo": null,
+   "latestUnresolvedReason": null,
+   "tracking": "active",
+   "quote": null,
+   "estimatedValue": null,
+   "portfolioWeightPercent": null,
+   "valuationExclusionReason": "corporate_action_pending",
+   "filingUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260920000003"
+  }
+ ],
+ "events": [
+  {
+   "receiptNo": "20260920900001",
+   "receiptDate": "2026-09-01",
+   "corpCode": "00100001",
+   "stockCode": "100001",
+   "kind": "increase",
+   "correctionOf": null,
+   "isCorrectionOrWithdrawal": false,
+   "quantity": "900000",
+   "companyOwnershipPercent": "6.10",
+   "source": "dart-structured",
+   "filingUrl": null
+  },
+  {
+   "receiptNo": "20260920900002",
+   "receiptDate": "2026-09-01",
+   "corpCode": "00100002",
+   "stockCode": "100002",
+   "kind": "increase",
+   "correctionOf": null,
+   "isCorrectionOrWithdrawal": false,
+   "quantity": "900000",
+   "companyOwnershipPercent": "6.10",
+   "source": "dart-structured",
+   "filingUrl": null
+  },
+  {
+   "receiptNo": "20260920000001",
+   "receiptDate": "2026-10-20",
+   "corpCode": "00100001",
+   "stockCode": "100001",
+   "kind": "increase",
+   "correctionOf": null,
+   "isCorrectionOrWithdrawal": false,
+   "quantity": "1000000",
+   "companyOwnershipPercent": "6.10",
+   "source": "dart-structured",
+   "filingUrl": null
+  },
+  {
+   "receiptNo": "20260920000002",
+   "receiptDate": "2026-10-20",
+   "corpCode": "00100002",
+   "stockCode": "100002",
+   "kind": "increase",
+   "correctionOf": null,
+   "isCorrectionOrWithdrawal": false,
+   "quantity": "1000000",
+   "companyOwnershipPercent": "6.10",
+   "source": "dart-structured",
+   "filingUrl": null
+  }
+ ],
+ "history": []
+}

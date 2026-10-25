@@ -20,6 +20,20 @@
 
 **하위 호환**: 개정 1 스냅샷(접수번호 항상 있음, `sourceKind` 없음)은 개정 2 검증기를 그대로 통과한다. 근거: 2026-10-25 실제 공개본(`worklazy.net/data/foliotrace/v1`, 2.13 MB, holdings 451, events 5,108)을 파일 검증기와 `validSnapshot`에 넣어 통과했고, 같은 공개본의 축약 표본과 실측 수치가 `tests/fixtures/foliotrace/live-revision1-*.json`·`tests/unit/foliotrace-public-data.test.ts`로 고정돼 있다(전체 파일은 용량 때문에 저장소에 넣지 않았다). 반대로 개정 2 스냅샷을 옛 검증기에 넣으면 `receiptNo: null` 행이 거절되므로, 생산자는 전달 전에 이 저장소의 검증기(또는 그 사본)로 확인한다.
 
+## quantityAdjustment (개정 2.1, 선택 필드 — 기업행위 비율 보정)
+`holdings[].quantityAdjustment`는 **없거나 null이면 보정 없음**(기존 스냅샷 그대로 통과). 있으면 아래 모양을 엄격히 검증한다.
+
+| 필드 | 형식 |
+|---|---|
+| `reportedQuantity` | 보고 수량, 정수 문자열(0 이상) |
+| `ratioNumerator` / `ratioDenominator` | 비율 분자·분모, 양의 정수 문자열. 보정 수량 = `reportedQuantity × ratioNumerator ÷ ratioDenominator`(소수점 버림) |
+| `events[]` (1~20개) | `receiptNo` 14자리, `kind` ∈ `bonus-issue`·`stock-split`·`reverse-split`·`capital-reduction`·`spin-off`·`stock-dividend`, `priceChangeDate` YYYY-MM-DD, `quantityChangeDate` YYYY-MM-DD 또는 null |
+
+- 이때 `holdings[].quantity`는 **보정 후 수량**(평가에 쓴 값)이다. `evidence`·`sourceKind`는 바꾸지 않는다.
+- 화면: 표의 수량 아래 "비율 보정" 표시, 상세에 보고 수량·적용 비율·근거 공시(DART 링크)·가격/수량 변경일. 변화 색(↑/↓)은 보정 종목에서 쓰지 않는다. 안내 섹션에 "일부 수량은 공시된 기업행위 비율로 보정한 추정값" 한 줄.
+- 새 `valuationExclusionReason` 값: `corporate_action_pending`(시행 중 거래 정지 구간), `corporate_action_ratio_unverified`(비율 미확인). 이 값 외 알 수 없는 사유는 일반 문구로 표시된다.
+- 생산자 사본(`foliotrace-pipeline`의 `contract_v1/contracts.ts`·`loadSnapshot.ts`)은 R2 구현자가 이 파일들로 동기화한다.
+
 ## sourceKind (D4: 상세 화면에만, 일반 표현)
 허용 값과 화면 문구(상세 패널 "자료 출처" 한 줄, 표에는 노출하지 않음. 단 연말 목록 행의 근거 한 줄만 "연말 기준 보유 목록"으로 표시):
 

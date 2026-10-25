@@ -113,3 +113,10 @@ test('revision-1 live data stays readable: measured full file and a reduced real
   assert.equal(validSnapshot({ ...sample, events }, measured.datasetVersion), true)
   assert.equal(validSnapshot({ ...sample, events: Array.from({ length: SNAPSHOT_LIMITS.maxEvents + 1 }, () => sample.events[0]) }, measured.datasetVersion), false)
 })
+
+test('quantityAdjustment field names and values pass the private-content check', async () => {
+  const { readFileSync } = await import('node:fs')
+  const text = readFileSync(new URL('../fixtures/foliotrace/quantity-adjustment-sample.json', import.meta.url), 'utf8')
+  assert.ok(text.includes('quantityAdjustment'))
+  assert.deepEqual(privateContentFindings(text), [])
+})

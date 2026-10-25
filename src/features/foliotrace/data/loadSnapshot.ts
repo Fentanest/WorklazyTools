@@ -1,4 +1,4 @@
-import type { FolioTraceView, Snapshot, SourceKind } from '../contracts'
+import type { FolioTraceView, QuantityAdjustmentKind, Snapshot, SourceKind } from '../contracts'
 
 const DATA_ROOT = '/data/foliotrace/v1/'
 const VERSION = /^[a-f0-9]{64}$/
@@ -113,6 +113,20 @@ function validHistoricalObservation(value: unknown): boolean {
     (value.denominatorQuantity === undefined || nullable(value.denominatorQuantity, decimal)) &&
     (value.denominatorDate === undefined || nullable(value.denominatorDate, isoDate)) && filingUrl(value.filingUrl)
 }
+/** Keep in step with QuantityAdjustmentKind. */
+export const QUANTITY_ADJUSTMENT_KINDS: readonly QuantityAdjustmentKind[] =
+  ['bonus-issue', 'stock-split', 'reverse-split', 'capital-reduction', 'spin-off', 'stock-dividend']
+const POSITIVE_INTEGER = /^[1-9]\d*$/
+const NONNEGATIVE_INTEGER = /^(?:0|[1-9]\d*)$/
+function validQuantityAdjustment(value: unknown): boolean {
+  return isRecord(value) && str(value.reportedQuantity) && NONNEGATIVE_INTEGER.test(value.reportedQuantity) &&
+    str(value.ratioNumerator) && POSITIVE_INTEGER.test(value.ratioNumerator) &&
+    str(value.ratioDenominator) && POSITIVE_INTEGER.test(value.ratioDenominator) &&
+    Array.isArray(value.events) && value.events.length >= 1 && value.events.length <= 20 &&
+    value.events.every((event: unknown) => isRecord(event) && str(event.receiptNo) && RECEIPT.test(event.receiptNo) &&
+      str(event.kind) && (QUANTITY_ADJUSTMENT_KINDS as readonly string[]).includes(event.kind) &&
+      isoDate(event.priceChangeDate) && nullable(event.quantityChangeDate, isoDate))
+}
 function validQuote(value: unknown): boolean {
   return isRecord(value) && decimal(value.close) && value.currency === 'KRW' && value.market === 'KRX' &&
     value.session === 'regular' && isoDate(value.tradeDate) && value.adjusted === false &&
@@ -130,6 +144,7 @@ function validHolding(value: unknown): boolean {
     nullable(value.holdingDate, isoDate) &&
     (value.sourceKind === undefined || (str(value.sourceKind) && (SOURCE_KINDS as readonly string[]).includes(value.sourceKind))) &&
     ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest', 'indirect-observation', 'issuer-scope-observation'].includes(String(value.evidence)) &&
+    (value.quantityAdjustment === undefined || nullable(value.quantityAdjustment, validQuantityAdjustment)) &&
     (value.indirectSource === undefined || nullable(value.indirectSource, validIndirectSource)) &&
     (value.issuerScopeSource === undefined || nullable(value.issuerScopeSource, validIssuerScopeSource)) &&
     (value.directBaseline === undefined || nullable(value.directBaseline, validDirectBaseline)) &&

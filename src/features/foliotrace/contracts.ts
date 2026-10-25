@@ -42,6 +42,25 @@ export interface Quote {
 /** General source wording only. Internal tool, model and runtime names must never be added here. */
 export type SourceKind = 'year-end-list' | 'nps-filing' | 'issuer-report' | 'disclosure-text-read'
 
+/** Corporate-action kinds a quantity ratio adjustment may cite. */
+export type QuantityAdjustmentKind = 'bonus-issue' | 'stock-split' | 'reverse-split' | 'capital-reduction' | 'spin-off' | 'stock-dividend'
+
+/**
+ * Optional ratio adjustment: `holding.quantity` (used for valuation) = reportedQuantity x ratioNumerator / ratioDenominator, floored.
+ * Integer strings only. Estimates from filings, not reported figures.
+ */
+export interface QuantityAdjustment {
+  reportedQuantity: string
+  ratioNumerator: string
+  ratioDenominator: string
+  events: Array<{
+    receiptNo: string
+    kind: QuantityAdjustmentKind
+    priceChangeDate: IsoDate
+    quantityChangeDate: IsoDate | null
+  }>
+}
+
 export interface Holding {
   corpCode: string
   stockCode: string
@@ -57,6 +76,8 @@ export interface Holding {
   holdingDate: IsoDate | null
   /** Absent in revision-1 snapshots. Shown in the row details only. */
   sourceKind?: SourceKind
+  /** Absent or null when the quantity is the reported one. */
+  quantityAdjustment?: QuantityAdjustment | null
   evidence: 'legacy-import' | 'dart-structured' | 'dart-document' | 'unresolved-latest' | 'indirect-observation' | 'issuer-scope-observation'
   indirectSource?: {
     documentNo: string | null

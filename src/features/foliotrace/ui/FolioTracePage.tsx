@@ -21,6 +21,7 @@ import type { FolioTracePageProps } from "../contracts";
 export type { FolioTracePageProps } from "../contracts";
 
 import "./foliotrace.css";
+import { dartFilingUrl } from "../data/dartLink";
 import {
   approxNumber,
   eventRangeOf,
@@ -155,6 +156,22 @@ const STR = {
     noFilingUrl: "원문 링크 없음",
     noReceiptNo: "접수번호 없음",
     detailOrigin: "자료 출처",
+    ratioMarker: "비율 보정",
+    ratioMarkerTitle: "공시에서 확인한 기업행위 비율로 보정한 수량(추정)입니다",
+    detailReportedQuantity: "보고 수량",
+    detailRatio: "적용 비율",
+    detailRatioNote: "보고 수량 × {n} ÷ {d} (소수점 이하 버림)",
+    detailRatioEvents: "근거 공시",
+    ratioEventPrice: "가격 변경일",
+    ratioEventQuantity: "수량 변경일",
+    ratioEventPending: "미정",
+    ratioKind_bonus_issue: "무상증자",
+    ratioKind_stock_split: "액면분할",
+    ratioKind_reverse_split: "주식병합",
+    ratioKind_capital_reduction: "감자",
+    ratioKind_spin_off: "분할",
+    ratioKind_stock_dividend: "주식배당",
+    ratioGuide: "일부 수량은 무상증자·분할·병합·감자 등 공시된 기업행위 비율로 보정한 추정값이며, 표에 '비율 보정'으로 표시합니다. 보고된 수량과 다를 수 있습니다.",
     rowYearEnd: "연말 기준 보유 목록",
     sourceYearEnd: "연말 기준 보유 목록",
     sourceNps: "국민연금 대량보유 공시",
@@ -317,6 +334,22 @@ const STR = {
     noFilingUrl: "No source link",
     noReceiptNo: "No receipt number",
     detailOrigin: "Data source",
+    ratioMarker: "Ratio-adjusted",
+    ratioMarkerTitle: "Quantity adjusted by corporate-action ratios from filings (estimate)",
+    detailReportedQuantity: "Reported quantity",
+    detailRatio: "Ratio applied",
+    detailRatioNote: "reported quantity × {n} ÷ {d}, rounded down",
+    detailRatioEvents: "Source filings",
+    ratioEventPrice: "Price change date",
+    ratioEventQuantity: "Quantity change date",
+    ratioEventPending: "not set",
+    ratioKind_bonus_issue: "Bonus issue",
+    ratioKind_stock_split: "Stock split",
+    ratioKind_reverse_split: "Reverse split",
+    ratioKind_capital_reduction: "Capital reduction",
+    ratioKind_spin_off: "Spin-off",
+    ratioKind_stock_dividend: "Stock dividend",
+    ratioGuide: "Some quantities are estimates adjusted by corporate-action ratios from filings (bonus issues, splits, reverse splits, capital reductions) and are marked 'Ratio-adjusted' in the table. They may differ from the reported quantity.",
     rowYearEnd: "Year-end holdings list",
     sourceYearEnd: "Year-end holdings list",
     sourceNps: "NPS large-holding filing",
@@ -856,6 +889,9 @@ function ReadyView({
                         <td className="foliotrace-num">
                           <FilingChangeValue value={formatQty(h.quantity)} direction={filingChanges.get(h)?.quantity ?? null}
                             upLabel={t.changeUp} downLabel={t.changeDown} />
+                          {h.quantityAdjustment && (
+                            <small className="foliotrace-row-reason" title={t.ratioMarkerTitle}>{t.ratioMarker}</small>
+                          )}
                         </td>
                         <td className="foliotrace-num">
                           <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}
@@ -887,6 +923,7 @@ function ReadyView({
         <ul className="foliotrace-guide">
           <li>{t.description}</li>
           <li>{t.scopeNote}</li>
+          <li>{t.ratioGuide}</li>
           <li>
             {t.priceBasis}
             {snapshot.valuationTradeDate ? ` · ${snapshot.valuationTradeDate}` : ""}
@@ -945,6 +982,38 @@ function ReadyView({
                 <dt>{t.colQuantity}</dt>
                 <dd className="foliotrace-num">{formatQty(selected.quantity)}</dd>
               </div>
+              {selected.quantityAdjustment && (
+                <>
+                  <div>
+                    <dt>{t.detailReportedQuantity}</dt>
+                    <dd className="foliotrace-num">{formatQty(selected.quantityAdjustment.reportedQuantity)}</dd>
+                  </div>
+                  <div>
+                    <dt>{t.detailRatio}</dt>
+                    <dd className="foliotrace-num" title={t.ratioMarkerTitle}>
+                      {selected.quantityAdjustment.ratioDenominator} → {selected.quantityAdjustment.ratioNumerator}
+                      <small className="foliotrace-row-reason">
+                        {t.detailRatioNote.replace("{n}", selected.quantityAdjustment.ratioNumerator).replace("{d}", selected.quantityAdjustment.ratioDenominator)}
+                      </small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>{t.detailRatioEvents}</dt>
+                    <dd>
+                      {selected.quantityAdjustment.events.map((event) => (
+                        <div key={event.receiptNo}>
+                          <a href={dartFilingUrl(event.receiptNo)} target="_blank" rel="noreferrer">
+                            {t[`ratioKind_${event.kind.replace(/-/g, "_")}` as keyof typeof t]} · <code className="foliotrace-code">{event.receiptNo}</code>
+                          </a>
+                          <small className="foliotrace-row-reason">
+                            {t.ratioEventPrice}: {event.priceChangeDate} · {t.ratioEventQuantity}: {event.quantityChangeDate ?? t.ratioEventPending}
+                          </small>
+                        </div>
+                      ))}
+                    </dd>
+                  </div>
+                </>
+              )}
               <div>
                 <dt>{t.colOwnership}</dt>
                 <dd className="foliotrace-num">{observedPercent(selected.companyOwnershipPercent, selected.ownershipNumericKind)}</dd>

@@ -21,6 +21,7 @@ import {
   sortHoldings,
   topHoldings,
 } from "../../src/features/foliotrace/ui/holdings.ts";
+import { dartFilingUrl } from "../../src/features/foliotrace/data/dartLink.ts";
 import { getFaqsForPath } from "../../src/i18n/guideData.ts";
 
 test("publication timestamps use the same Seoul instant in both languages", () => {
@@ -428,4 +429,33 @@ test("receipt-less year-end rows and the below-5% filter", () => {
   assert.equal(isBelowFivePercent(row(null)), false);
   const rows = [row("0.61"), row("7.25"), row("3", "below-5-percent")];
   assert.equal(filterHoldings(rows, "", "below-5").length, 2);
+});
+
+test("ratio-adjusted holdings get the new exclusion labels and stay neutral in filing changes", () => {
+  assert.match(exclusionReasonLabel("corporate_action_pending", "ko") ?? "", /거래 정지/);
+  assert.match(exclusionReasonLabel("corporate_action_pending", "en") ?? "", /corporate action/);
+  assert.match(exclusionReasonLabel("corporate_action_ratio_unverified", "ko") ?? "", /비율/);
+  assert.match(exclusionReasonLabel("corporate_action_ratio_unverified", "en") ?? "", /ratio/);
+  assert.doesNotMatch(exclusionReasonLabel("corporate_action_pending", "ko") ?? "", /corporate_action/);
+
+  const previous = event({ receiptNo: "20260101000001", receiptDate: "2026-01-05", quantity: "1000" });
+  const current = event({ receiptNo: "20260201000001", receiptDate: "2026-02-05", quantity: "2000" });
+  const plain = holding({ stockCode: "005930", quantity: "2000", receiptNo: current.receiptNo });
+  assert.deepEqual(filingChangesForHoldings([plain], [previous, current]).get(plain),
+    { quantity: "up", ownership: null });
+  // Same stored quantity as the filing would colour; with an adjustment it must not.
+  const adjusted = holding({
+    stockCode: "005930", quantity: "2000", receiptNo: current.receiptNo,
+    quantityAdjustment: {
+      reportedQuantity: "400", ratioNumerator: "5", ratioDenominator: "1",
+      events: [{ receiptNo: "20260115000001", kind: "bonus-issue", priceChangeDate: "2026-01-20", quantityChangeDate: null }],
+    },
+  });
+  assert.equal(filingChangesForHoldings([adjusted], [previous, current]).has(adjusted), false);
+  const differs = { ...adjusted, quantity: "2000", receiptNo: current.receiptNo };
+  assert.equal(filingChangesForHoldings([differs], [previous, { ...current, quantity: "400" }]).has(differs), false);
+});
+
+test("DART filing links use the public viewer shape the snapshot validator accepts", () => {
+  assert.equal(dartFilingUrl("20260915000123"), "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260915000123");
 });

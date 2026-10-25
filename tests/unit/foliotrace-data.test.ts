@@ -125,3 +125,42 @@ test('contract revision 2: year-end rows carry a null receipt number and a gener
   const many = Array.from({ length: SNAPSHOT_LIMITS.maxHistory + 1 }, () => base.history[0])
   assert.equal(validSnapshot({ ...base, history: many }, version), false)
 })
+
+// R0 (ca-ratio plan 2026-10-26): optional holding.quantityAdjustment.
+const adjustment = {
+  reportedQuantity: '1000', ratioNumerator: '5', ratioDenominator: '1',
+  events: [{ receiptNo: '20260915000123', kind: 'stock-split', priceChangeDate: '2026-10-12', quantityChangeDate: '2026-10-14' }],
+}
+const withAdjustment = (value: unknown) => ({ ...base, holdings: [{ ...base.holdings[0], quantityAdjustment: value }] })
+
+test('quantityAdjustment is optional and strict when present', () => {
+  assert.equal(validSnapshot(base, version), true) // absent
+  assert.equal(validSnapshot(withAdjustment(undefined), version), true)
+  assert.equal(validSnapshot(withAdjustment(null), version), true)
+  assert.equal(validSnapshot(withAdjustment(adjustment), version), true)
+  const nullDate = { ...adjustment, events: [{ ...adjustment.events[0], quantityChangeDate: null }] }
+  assert.equal(validSnapshot(withAdjustment(nullDate), version), true)
+  for (const kind of ['bonus-issue', 'stock-split', 'reverse-split', 'capital-reduction', 'spin-off', 'stock-dividend']) {
+    assert.equal(validSnapshot(withAdjustment({ ...adjustment, events: [{ ...adjustment.events[0], kind }] }), version), true, kind)
+  }
+  const bad: unknown[] = [
+    'x', [], {},
+    { ...adjustment, reportedQuantity: '1.5' }, { ...adjustment, reportedQuantity: 1000 },
+    { ...adjustment, ratioNumerator: '0' }, { ...adjustment, ratioDenominator: '0' },
+    { ...adjustment, ratioNumerator: '2.5' }, { ...adjustment, ratioDenominator: '' },
+    { ...adjustment, events: [] }, { ...adjustment, events: 'x' },
+    { ...adjustment, events: [{ ...adjustment.events[0], receiptNo: '123' }] },
+    { ...adjustment, events: [{ ...adjustment.events[0], kind: 'merger' }] },
+    { ...adjustment, events: [{ ...adjustment.events[0], priceChangeDate: '2026/10/12' }] },
+    { ...adjustment, events: [{ ...adjustment.events[0], quantityChangeDate: undefined }] },
+    { ...adjustment, events: [{ ...adjustment.events[0], quantityChangeDate: 'soon' }] },
+  ]
+  for (const value of bad) assert.equal(validSnapshot(withAdjustment(value), version), false, JSON.stringify(value))
+})
+
+test('the committed adjusted-holding fixture validates', async () => {
+  const fs = await import('node:fs')
+  const snapshot = JSON.parse(fs.readFileSync(new URL('../fixtures/foliotrace/quantity-adjustment-sample.json', import.meta.url), 'utf8'))
+  assert.equal(validSnapshot(snapshot, snapshot.datasetVersion), true)
+  assert.ok(snapshot.holdings.some((row: { quantityAdjustment?: unknown }) => row.quantityAdjustment))
+})

@@ -156,6 +156,8 @@ export function filingChangesForHoldings(
     if (!filings || filings.length < 2) continue;
     const currentIndex = filings.findIndex((event) => event.receiptNo === holding.receiptNo);
     if (currentIndex < 1 || currentIndex !== filings.length - 1) continue;
+    // Ratio-adjusted quantities are estimates, not reported figures: never colour them as a trade.
+    if (holding.quantityAdjustment) continue;
     const current = filings[currentIndex];
     const previous = filings[currentIndex - 1];
     // A first/re-entry report establishes a position. Missing receipt flags
@@ -245,6 +247,14 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
   filing_after_quote_date: {
     ko: "공시 접수일이 종가 기준일보다 늦어 평가에서 제외",
     en: "Excluded: filing arrived after the closing-price date",
+  },
+  corporate_action_pending: {
+    ko: "기업행위 시행 중(거래 정지 구간)이라 평가에서 잠시 제외",
+    en: "Temporarily excluded: a corporate action is in progress (trading suspended)",
+  },
+  corporate_action_ratio_unverified: {
+    ko: "기업행위 비율을 확인하지 못해 평가에서 제외",
+    en: "Excluded: the corporate-action ratio could not be confirmed",
   },
   corporate_action_unverified: {
     ko: "공시 후 주식 변동 여부가 확인되지 않아 평가에서 제외",
