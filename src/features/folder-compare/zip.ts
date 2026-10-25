@@ -11,9 +11,18 @@ export class BoundedZipReader extends BlobReader {
     const bytes = await super.readUint8Array(index, length); checkAbort(this.signal); return bytes;
   }
 }
+/** Names stored without the UTF-8 flag: valid UTF-8 as such, else CP949 (Korean Windows), else the
+ * library's default (CP437). */
+export function decodeLegacyName(value: Uint8Array, _encoding: string, type: "filename" | "comment") {
+  if (type !== "filename") return undefined;
+  for (const label of ["utf-8", "euc-kr"]) {
+    try { return new TextDecoder(label, { fatal: true }).decode(value); } catch { /* next */ }
+  }
+  return undefined;
+}
 export async function zipSource(blob: Blob, revision: string, admission: Admission, signal: AbortSignal): Promise<FolderSource> {
   if (!validSize(blob.size) || blob.size > LIMITS.archive) throw new Error('archive-limit');
-  const reader = new ZipReader(new BoundedZipReader(blob, signal), { strictness: 'balanced', filenameValidation: 'strict',
+  const reader = new ZipReader(new BoundedZipReader(blob, signal), { strictness: 'balanced', filenameValidation: 'strict', decodeText: decodeLegacyName,
     checkCrc32: true, checkAuthenticationCode: true, checkLocalDirectory: true, checkOverlappingEntry: true, useWebWorkers: false });
   const pending = new Set<Promise<void>>();
   const entries: FolderEntry[] = []; const openedEntries = new Set<OpenedBytes>();

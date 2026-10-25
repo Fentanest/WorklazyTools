@@ -1,6 +1,7 @@
 /** Read-only snapshots. Matching never mutates identity or raw paths. */
 export const LIMITS = Object.freeze({ entries: 50_000, logical: 1024 ** 3, entry: 256 * 1024 ** 2,
-  archive: 1024 ** 3, allocation: 2 * 1024 ** 2, chunk: 1024 ** 2 });
+  // allocation bounds one read: a ZIP central directory of the 50,000-entry limit with long names fits.
+  archive: 1024 ** 3, allocation: 16 * 1024 ** 2, chunk: 1024 ** 2 });
 export type ContentState = 'pending' | 'equal' | 'different' | 'unreadable' | 'canceled' | 'unknown';
 export type Integrity = 'pending' | 'verified' | 'failed' | 'unchecked';
 export interface OpenedBytes { reader: ReadableStreamDefaultReader<Uint8Array>; done: Promise<void>; close(): Promise<void> }
@@ -94,6 +95,8 @@ export function pairEntries(left: readonly FolderEntry[], right: readonly Folder
 /** Reads independent chunk boundaries and drains both inputs before declaring integrity verified. */
 export async function compareBytes(left: FolderEntry, right: FolderEntry, signal: AbortSignal): Promise<{ equal: boolean; integrity: Integrity }> {
   checkAbort(signal);
+  // Different declared sizes are different content: nothing is read (integrity is not checked).
+  if (left.size !== right.size) return { equal: false, integrity: 'unchecked' };
   const a = left.open(signal); a.done.catch(() => {}); let b: OpenedBytes | undefined;
   try {
     b = right.open(signal);
@@ -110,6 +113,8 @@ export async function compareBytes(left: FolderEntry, right: FolderEntry, signal
       if (an > left.size || bn > right.size || an > LIMITS.entry || bn > LIMITS.entry) throw new Error('expanded-size-mismatch');
       const length = Math.min(ac.length - ai, bc.length - bi);
       for (let i = 0; i < length; i++) if (ac[ai + i] !== bc[bi + i]) equal = false;
+      // The first differing byte settles the row; the rest is not read (integrity is not checked).
+      if (!equal) return { equal: false, integrity: 'unchecked' };
       ai += length; bi += length;
       if (ae && ai === ac.length) { if (bi < bc.length) equal = false; bi = bc.length; }
       if (be && bi === bc.length) { if (ai < ac.length) equal = false; ai = ac.length; }

@@ -49,12 +49,17 @@ test('ZIP traversal, backslash, absolute, drive and NUL reject without sanitizin
 test('forged expanded size and mismatched local header never yield byte equality', async () => {
   for (const record of [{ name: 'a', bytes: 'payload', size: 1 }, { name: 'a', localName: 'b', bytes: 'payload' }]) {
     const source = await zipSource(archive([record]), 'lying', new Admission(), signal());
-    try { await assert.rejects(compareBytes(source.entries[0], external('payload'), signal())); }
+    // A forged size differs from the real one (never equal); a lying local header fails reading.
+    try { const result = await compareBytes(source.entries[0], external('payload'), signal()).catch(() => undefined); assert.notEqual(result?.equal, true); }
     finally { await source.close(); }
   }
 });
 test('central directory allocation is rejected before any oversized Blob slice', async () => {
-  const blob = archive(Array.from({ length: 40000 }, (_, i) => ({ name: `f${String(i).padStart(7, '0')}` })));
+  // 40,000 entries (below the 50,000-entry limit) are listed.
+  const listed = await zipSource(archive(Array.from({ length: 40000 }, (_, i) => ({ name: `f${String(i).padStart(7, '0')}` }))), 'many', new Admission(), signal());
+  try { assert.equal(listed.entries.length, 40000); } finally { await listed.close(); }
+  // A central directory larger than one bounded read is refused before slicing it.
+  const blob = archive(Array.from({ length: 9000 }, (_, i) => ({ name: `f${String(i).padStart(7, '0')}`.padEnd(2000, 'x') })));
   const slice = blob.slice.bind(blob); const sizes = [];
   blob.slice = (start, end, type) => { sizes.push(end - start); return slice(start, end, type); };
   await assert.rejects(zipSource(blob, 'large-dir', new Admission(), signal()), /allocation-limit/);

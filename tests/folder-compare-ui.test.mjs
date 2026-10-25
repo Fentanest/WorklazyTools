@@ -40,7 +40,8 @@ test('static standalone Folder UI runs actual worker, filters, options, replacem
     await page.getByLabel('Revised Choose ZIP', { exact: true }).setInputFiles({ name: 'right.zip', mimeType: 'application/zip', buffer: await makeZip('root/a.txt', 'two') });
     await page.getByRole('button', { name: 'Compare', exact: true }).click();
     await page.getByRole('status').filter({ hasText: 'Comparison finished' }).waitFor();
-    await page.locator('summary').filter({ hasText: 'root/' }).click();
+    // Both archives keep everything under one top-level folder, which is matched without it by default.
+    assert.equal(await page.locator('summary').filter({ hasText: 'root/' }).count(), 0);
     await page.locator('summary').filter({ hasText: 'a.txt — Different bytes' }).waitFor();
     await page.getByRole('combobox', { name: 'All statuses' }).selectOption('equal'); assert.equal(await page.locator('[data-testid=folder-tree] summary').count(), 0);
     await page.getByRole('combobox', { name: 'All statuses' }).selectOption('all');

@@ -18,7 +18,8 @@ test('owner emits cloneable snapshots with raw paths and separate path/content/i
     await owner.compare(1, fileInput(file('a', 'x'), file('left', 'x')), fileInput(file('a', 'y'), file('right', 'x')), {}, v => views.push(structuredClone(v)));
     const result = views.at(-1); assert.equal(result.phase, 'done');
     assert.equal(result.rows.find(r => r.key === 'a').content, 'different');
-    assert.equal(result.rows.find(r => r.key === 'a').integrity, 'verified');
+    // The first differing byte settles the row without draining (and verifying) the rest.
+    assert.equal(result.rows.find(r => r.key === 'a').integrity, 'unchecked');
     assert.equal(result.rows.find(r => r.key === 'left').pairing, 'left-only');
     assert.equal(result.rows[0].left[0].id, '1:left:files:0');
     assert.equal(JSON.stringify(result).includes('open'), false);
@@ -32,6 +33,17 @@ test('explicit ZIP root view does not strip FileList subdirectories or alter ori
     assert.equal(result.rows.length, 1); assert.equal(result.rows[0].key, 'sub/a.txt'); assert.equal(result.rows[0].content, 'equal');
     assert.equal(result.rows[0].right[0].path, 'archive/sub/a.txt'); assert.equal(result.rows[0].left[0].path, 'sub/a.txt');
   } finally { await owner.clear(2); }
+});
+test('a ZIP whose entries share one top-level folder is matched without it by default', async () => {
+  const original = file('a.txt', 'same'); Object.defineProperty(original, 'webkitRelativePath', { value: 'chosen/sub/a.txt' });
+  const owner = new FolderOwner(); let result;
+  try {
+    await owner.compare(1, fileInput(original), await zipInput('archive/sub/a.txt', 'same'), {}, v => { result = v; });
+    assert.equal(result.rows.length, 1); assert.equal(result.rows[0].key, 'sub/a.txt'); assert.equal(result.rows[0].content, 'equal');
+    // Two archives with different single roots match by their contents.
+    await owner.compare(2, await zipInput('v1/sub/a.txt', 'same'), await zipInput('v2/sub/a.txt', 'same'), {}, v => { result = v; });
+    assert.equal(result.rows.length, 1); assert.equal(result.rows[0].content, 'equal');
+  } finally { await owner.clear(3); }
 });
 test('omitted ZIP root directory cannot collide with its same-named child file', async () => {
   const writer=new ZipWriter(new BlobWriter(),{useWebWorkers:false});
