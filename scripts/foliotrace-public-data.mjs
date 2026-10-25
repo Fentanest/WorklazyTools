@@ -37,6 +37,8 @@ export async function validatePublicData(siteRoot) {
   if (!/^[a-f0-9]{64}$/.test(manifest.datasetVersion)) fail('manifest datasetVersion invalid')
   if (manifest.snapshotPath !== `snapshots/${manifest.datasetVersion}.json`) fail('manifest snapshotPath mismatch')
   if (!/^[a-f0-9]{64}$/.test(manifest.snapshotSha256)) fail('manifest snapshotSha256 invalid')
+  const rootEntries = (await fs.readdir(root)).sort()
+  if (rootEntries.join('|') !== 'manifest.json|snapshots') fail('data root must hold only manifest.json and snapshots/')
   const present = (await fs.readdir(path.join(root, 'snapshots'))).sort()
   if (present.length !== 1 || `snapshots/${present[0]}` !== manifest.snapshotPath) fail('snapshots folder must hold only the manifest snapshot (latest only)')
   const bytes = await fs.readFile(path.join(root, manifest.snapshotPath))

@@ -104,7 +104,7 @@ const socialImageSlugByPath: Record<string, string> = {
 export const seoByPath: Record<string, SeoDefinition> = {
   "/tools/market-calendar": { title: "주식시장 휴장일·거래시간 | KRX·NYSE·Nasdaq 달력 | Worklazy Tools", description: "KRX·NXT·NYSE·Nasdaq의 2026·2027년 휴장일과 조기폐장, 개장·마감 시간을 날짜별로 확인하세요. 미국 시장은 한국 시간도 함께 보여줍니다." },
   "/tools/product-banner": { title: "알리익스프레스 광고 배너 만들기 - Excel·CSV로 HTML·iframe 생성 | Worklazy Tools", description: "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 HTML·iframe 광고 배너를 만들거나, 배너 주소를 iframe 코드로 변환하세요. 파일과 주소는 브라우저에서 처리합니다.", application: { name: "알리익스프레스 광고 배너 만들기", featureList: ["Excel·CSV 입력", "5종 디자인", "HTML·iframe 코드", "편집용 JSON"] } },
-  "/tools/foliotrace": { title: "FolioTrace | 국민연금 공개 공시 추적", description: "국민연금의 국내주식 DART 대량보유 공시를 근거로 공개 추적 범위를 살펴봅니다. 실제 계좌 잔고나 전체 자산을 뜻하지 않습니다." },
+  "/tools/foliotrace": { title: "FolioTrace | 국민연금 공개 공시 추적", description: "국민연금의 국내주식 연말 보유 목록과 이후 DART 공시를 근거로 공개 추적 범위를 살펴봅니다. 실제 계좌 잔고나 전체 자산을 뜻하지 않습니다." },
   "/tools/document-redactor": {title: "PDF·이미지 개인정보 가리기 - 직접 영역 선택 | Worklazy Tools", description: "PDF와 이미지 파일에서 민감한 개인정보 영역을 검정색으로 가리고 안전하게 사본을 저장하세요.", application: {name: "개인정보 가리기", featureList: ["직접 영역 선택", "검정 픽셀 마스킹", "모든 PDF 페이지 재생성", "PNG 이미지 저장", "결과 확인"]}},
   "/": {
     title: "무료 문서·PDF·이미지·오디오 업무 도구 | Worklazy Tools",
@@ -399,7 +399,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
 
 const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/market-calendar": { title: "Stock Market Holidays & Trading Hours | NYSE, Nasdaq & KRX | Worklazy Tools", description: "Check 2026–2027 market holidays, early closes and trading hours for KRX, NXT, NYSE and Nasdaq. View U.S. hours in New York and Korea time." },
-  "/tools/foliotrace": { title: "FolioTrace | NPS Disclosed Holdings", description: "Explore an estimate based on Korea National Pension Service DART large-shareholding filings. It does not represent actual account balances or total assets." },
+  "/tools/foliotrace": { title: "FolioTrace | NPS Disclosed Holdings", description: "Explore an estimate based on the Korea National Pension Service year-end domestic equity holdings list and later DART filings. It does not represent actual account balances or total assets." },
   "/tools/document-redactor": {title: "Document Redaction | Mask PDF and Image Areas", description: "Cover selected PDF, JPG, PNG and WebP areas with black masks and save a new copy. Original files remain unchanged; every PDF page is rasterized.", application: {name: "Document Redaction", featureList: ["Manual area selection", "Solid black pixel masks", "Rasterize every PDF page", "PNG image output", "Review results"]}},
   "/": { title: "Free Browser Tools for Documents, Media & Work | Worklazy Tools", description: "Edit documents and media, convert text and data, plan work across time zones, and use practical privacy tools without installing software." },
   "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },

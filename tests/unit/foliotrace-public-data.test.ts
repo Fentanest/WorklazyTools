@@ -50,6 +50,10 @@ test('public data validator accepts a revision-2 snapshot and rejects broken or 
   await fs.writeFile(path.join(extra.dir, 'snapshots', `${'d'.repeat(64)}.json`), '{}')
   await assert.rejects(validatePublicData(extra.root), /latest only/)
 
+  const stray = await site()
+  await fs.writeFile(path.join(stray.dir, 'README.md'), 'x')
+  await assert.rejects(validatePublicData(stray.root), /only manifest\.json/)
+
   const tampered = await site()
   await fs.appendFile(path.join(tampered.dir, `snapshots/${tampered.version}.json`), ' ')
   await assert.rejects(validatePublicData(tampered.root), /hash/)
@@ -91,4 +95,21 @@ test('static summary is injected idempotently into both language pages', async (
   const html = await fs.readFile(path.join(ok.root, 'ko/tools/foliotrace/index.html'), 'utf8')
   assert.equal(html.split('data-foliotrace-dataset').length - 1, 1)
   assert.ok(html.includes(snapshot.estimatedValue) && html.includes('종목000020'))
+})
+
+test('revision-1 live data stays readable: measured full file and a reduced real sample', async () => {
+  const { SNAPSHOT_LIMITS, validSnapshot } = await import('../../src/features/foliotrace/data/loadSnapshot.ts')
+  const dir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../fixtures/foliotrace')
+  const measured = JSON.parse(await fs.readFile(path.join(dir, 'live-revision1-measured.json'), 'utf8'))
+  const sample = JSON.parse(await fs.readFile(path.join(dir, 'live-revision1-sample.json'), 'utf8'))
+  assert.equal(validSnapshot(sample, measured.datasetVersion), true)
+  // The measured live file (2026-10-25) must sit well inside every limit, at least 3x for the growing ones.
+  assert.ok(measured.snapshotBytes * 3 <= SNAPSHOT_LIMITS.maxSnapshotBytes)
+  assert.ok(measured.events * 3 <= SNAPSHOT_LIMITS.maxEvents)
+  assert.ok(measured.holdings * 3 <= SNAPSHOT_LIMITS.maxHoldings)
+  assert.ok(measured.history * 3 <= SNAPSHOT_LIMITS.maxHistory)
+  // Scale the real sample's events to the measured live count: still valid.
+  const events = Array.from({ length: measured.events }, (_, i) => sample.events[i % sample.events.length])
+  assert.equal(validSnapshot({ ...sample, events }, measured.datasetVersion), true)
+  assert.equal(validSnapshot({ ...sample, events: Array.from({ length: SNAPSHOT_LIMITS.maxEvents + 1 }, () => sample.events[0]) }, measured.datasetVersion), false)
 })

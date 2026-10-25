@@ -6,13 +6,18 @@ const VERSION = /^[a-f0-9]{64}$/
 /** The only accepted source wording; keep in step with the SourceKind type. */
 export const SOURCE_KINDS: readonly SourceKind[] = ['year-end-list', 'nps-filing', 'issuer-report', 'disclosure-text-read']
 
-/** Public size limits (docs/foliotrace-public-snapshot-contract.md). The publishing gate on the producing side is stricter. */
+/**
+ * Public size limits (docs/foliotrace-public-snapshot-contract.md). Basis, measured 2026-10-25:
+ * live revision-1 data = 2.13 MB, 451 holdings, 5,108 events (back to 2009, about 500 per year recently), 8 history rows;
+ * producer dry-run = 0.89 MB, 1,192 holdings, 727 events. Each limit leaves at least ~3x room over the larger live value.
+ * The producing side's publication gate is stricter (6 MB, 2,000 events by default).
+ */
 export const SNAPSHOT_LIMITS = {
-  maxSnapshotBytes: 8 * 1024 * 1024,
+  maxSnapshotBytes: 16 * 1024 * 1024,
   maxManifestBytes: 4096,
-  maxHoldings: 5000,
-  maxEvents: 5000,
-  maxHistory: 400,
+  maxHoldings: 10000,
+  maxEvents: 20000,
+  maxHistory: 1000,
 } as const
 
 interface Manifest {

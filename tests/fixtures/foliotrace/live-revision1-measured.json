@@ -1,0 +1,11 @@
+{
+ "source": "https://worklazy.net/data/foliotrace/v1/ (public, read-only)",
+ "measuredOn": "2026-10-25",
+ "datasetVersion": "713e200b59b4f90ef4c5906975efb80dee74c39047525edd47e7652771b0eadf",
+ "snapshotBytes": 2133059,
+ "snapshotSha256": "a521ab485be5d79a7a3f1d818b4793b44f9d440fc539f924f122db1121d94619",
+ "holdings": 451,
+ "events": 5108,
+ "history": 8,
+ "note": "tests/fixtures/foliotrace/live-revision1-sample.json is a reduced sample of that snapshot (same fields and shapes); the counts here are of the full file"
+}

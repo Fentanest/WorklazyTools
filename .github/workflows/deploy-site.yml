@@ -130,5 +130,6 @@ jobs:
           if [ "$latest" = "$EXPECTED_SOURCE" ]; then echo "current=true" >> "$GITHUB_OUTPUT"; else echo "current=false" >> "$GITHUB_OUTPUT"; echo "::notice::main moved to $latest; the newer run deploys"; fi
       - name: Deploy
         id: deployment
+        # Manual runs deliberately skip the newest-main guard (they deploy the chosen ref); see docs/foliotrace-delivery-and-deploy.md.
         if: steps.fresh.outputs.current == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/deploy-pages@v4
