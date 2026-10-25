@@ -102,8 +102,8 @@ function snapToGraphemes(segments: Segment[]): Segment[] {
   if (!Intl.Segmenter) return segments;
   const left = segments.filter(s => s.type !== "added").map(s => s.text).join(""), right = segments.filter(s => s.type !== "deleted").map(s => s.text).join("");
   if (simpleGraphemes(left) && simpleGraphemes(right)) return segments;
-  const boundaries = (text: string) => { const set = new Set<number>([text.length]); for (const item of graphemeSegmenter().segment(text)) set.add(item.index); return set; };
-  const leftBounds = boundaries(left), rightBounds = boundaries(right);
+  // Boundaries are checked only where equal runs start and end.
+  const both = (l: number, r: number) => graphemeBoundary(left, l) && graphemeBoundary(right, r);
   const result: Segment[] = [];
   const push = (type: Segment["type"], text: string) => { if (!text) return; const previous = result.at(-1); if (previous?.type === type) previous.text += text; else result.push({ type, text }); };
   // Changed text gathered since the last equal run: [deleted, added].
@@ -114,8 +114,8 @@ function snapToGraphemes(segments: Segment[]): Segment[] {
     if (segment.type === "added") { added += segment.text; r += segment.text.length; continue; }
     // Trim the equal run to positions that are cluster boundaries on both sides.
     let start = 0, end = segment.text.length;
-    while (start < end && (!leftBounds.has(l + start) || !rightBounds.has(r + start))) start++;
-    while (end > start && (!leftBounds.has(l + end) || !rightBounds.has(r + end))) end--;
+    while (start < end && !both(l + start, r + start)) start++;
+    while (end > start && !both(l + end, r + end)) end--;
     if (start > 0) { deleted += segment.text.slice(0, start); added += segment.text.slice(0, start); }
     if (end > start) { flush(); push("equal", segment.text.slice(start, end)); }
     if (end < segment.text.length) { deleted += segment.text.slice(Math.max(start, end)); added += segment.text.slice(Math.max(start, end)); }
@@ -130,10 +130,14 @@ function alignLines(a: TextLine[], b: TextLine[], check: () => void): { pairs: S
   // Inside a run, a line whose content differs only by indentation or trailing space pairs first.
   const score = (x: TextLine, y: TextLine) => lineContent(x) === lineContent(y) ? 5 : lineContent(x).trim() === lineContent(y).trim() ? 4 : 0;
   const options = { signature: (x: TextLine) => lineContent(x), equals: (x: TextLine, y: TextLine) => lineContent(x) === lineContent(y), score, acceptsPair: () => true, cellBudget: CELL_BUDGET, checkCanceled: check };
+  // The budgeted alignment is exact unless it reports a fallback (long repetitive input); only
+  // then are equal lines anchored by Myers first.
+  const direct = alignSequenceWithBudget(a, b, options);
+  if (!direct.budgetFallback) return direct;
   // The anchor pass compares lines O((N+M)·D) times: each distinct content becomes one integer.
   const ids = new Map<string, number>(), intern = (line: TextLine) => { const key = lineContent(line); let id = ids.get(key); if (id === undefined) ids.set(key, id = ids.size); return id; };
   const anchors = myersAlign(a.map(intern), b.map(intern), (x, y) => x === y, editLimit(a.length + b.length), check);
-  if (!anchors) return alignSequenceWithBudget(a, b, options);
+  if (!anchors) return direct;
   const pairs: SequenceAlignmentPair[] = []; let budgetFallback = false, gapA: number[] = [], gapB: number[] = [];
   const flush = () => {
     if (gapA.length && gapB.length) {

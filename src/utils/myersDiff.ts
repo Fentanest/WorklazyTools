@@ -38,6 +38,43 @@ export function myersAlign<T>(before: readonly T[], after: readonly T[], equals:
     }
     return null;
   };
+  // Up to this distance the forward pass keeps its frontier per step (at most ~4M integers) and
+  // backtracks, which is about half the work of the linear-space recursion below.
+  const TRACE_DISTANCE = 2_000;
+  const greedy = (a0: number, a1: number, b0: number, b1: number, limit: number): SequenceAlignmentPair[] | null => {
+    const n = a1 - a0, m = b1 - b0, offset = limit + 1, trace: Int32Array[] = [];
+    let frontier = new Int32Array(2 * limit + 3);
+    for (let d = 0; d <= limit; d++) {
+      const next = frontier.slice();
+      for (let k = -d; k <= d; k += 2) {
+        tick();
+        let x = k === -d || (k !== d && frontier[offset + k - 1] < frontier[offset + k + 1]) ? frontier[offset + k + 1] : frontier[offset + k - 1] + 1;
+        let y = x - k;
+        while (x < n && y < m && equals(before[a0 + x], after[b0 + y])) { x++; y++; }
+        next[offset + k] = x;
+        if (x >= n && y >= m) {
+          trace.push(next);
+          const result: SequenceAlignmentPair[] = [];
+          let cx = n, cy = m;
+          for (let step = d; step > 0; step--) {
+            const previous = trace[step - 1], kk = cx - cy;
+            const down = kk === -step || (kk !== step && previous[offset + kk - 1] < previous[offset + kk + 1]);
+            const pk = down ? kk + 1 : kk - 1, px = previous[offset + pk], py = px - pk;
+            while (cx > (down ? px : px + 1) && cy > (down ? py + 1 : py)) result.push({ beforeIndex: a0 + --cx, afterIndex: b0 + --cy });
+            if (down) result.push({ beforeIndex: null, afterIndex: b0 + --cy }); else result.push({ beforeIndex: a0 + --cx, afterIndex: null });
+          }
+          while (cx > 0 && cy > 0) result.push({ beforeIndex: a0 + --cx, afterIndex: b0 + --cy });
+          return result.reverse();
+        }
+      }
+      trace.push(next); frontier = next;
+    }
+    return null;
+  };
+  if (Math.min(maxDistance, TRACE_DISTANCE) >= 0) {
+    const small = greedy(0, before.length, 0, after.length, Math.min(maxDistance, TRACE_DISTANCE, before.length + after.length));
+    if (small || maxDistance <= TRACE_DISTANCE) return small;
+  }
   // Recursion is on an explicit stack: the halves are processed in order, left first.
   const stack: Array<[number, number, number, number] | SequenceAlignmentPair[]> = [[0, before.length, 0, after.length]];
   while (stack.length) {
