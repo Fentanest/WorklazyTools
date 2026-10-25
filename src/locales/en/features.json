@@ -2962,7 +2962,23 @@
       "amount": "Original/changed balance",
       "play": "Start flicker",
       "pause": "Pause",
-      "reducedMotion": "Stopped by reduced-motion preference"
+      "reducedMotion": "Stopped by reduced-motion preference",
+      "highlightMode": "Highlight mode",
+      "fullContext": "Full context",
+      "changesOnly": "Changes only",
+      "flickerSpeed": "Flicker speed",
+      "faster": "Faster",
+      "slower": "Slower",
+      "holdOriginal": "Hold original",
+      "holdRevised": "Hold revised",
+      "zoom": "Zoom",
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "fit": "Fit",
+      "rotate": "Rotation angle",
+      "rotateLeft": "Rotate 90° left",
+      "rotateRight": "Rotate 90° right",
+      "resetView": "Reset view"
     },
     "regions": {
       "title": "Find changed regions",
@@ -2983,7 +2999,13 @@
       "oversize": "Area target exceeded",
       "applied": "Applied: channel {{diffThreshold}}, radius {{groupingRadius}}px, minimum {{minArea}}px², maximum fraction {{maxAreaFraction}}",
       "sourceCorners": "Source coordinates (four corners after stored orientation)",
-      "passLimit": "Keep up to {{count}} scans. Delete an existing scan to add another."
+      "passLimit": "Keep up to {{count}} scans. Delete an existing scan to add another.",
+      "presets": {
+        "title": "Presets",
+        "tiny": "Tiny specks",
+        "words": "Words and sentences",
+        "graphics": "Graphics and large blocks"
+      }
     },
     "metadata": {
       "name": "Original filename",

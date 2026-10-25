@@ -2956,7 +2956,23 @@
       "amount": "원본/변경본 비율",
       "play": "번갈아 보기 시작",
       "pause": "정지",
-      "reducedMotion": "동작 줄이기 설정으로 정지됨"
+      "reducedMotion": "동작 줄이기 설정으로 정지됨",
+      "highlightMode": "강조 방식",
+      "fullContext": "원본과 함께",
+      "changesOnly": "변경만",
+      "flickerSpeed": "번갈아 보기 속도",
+      "faster": "빠르게",
+      "slower": "느리게",
+      "holdOriginal": "원본 고정",
+      "holdRevised": "변경본 고정",
+      "zoom": "확대",
+      "zoomIn": "확대",
+      "zoomOut": "축소",
+      "fit": "맞춤",
+      "rotate": "회전 각도",
+      "rotateLeft": "왼쪽으로 90° 회전",
+      "rotateRight": "오른쪽으로 90° 회전",
+      "resetView": "보기 초기화"
     },
     "regions": {
       "title": "변경 영역 찾기",
@@ -2977,7 +2993,13 @@
       "oversize": "면적 목표 초과",
       "applied": "적용값: 채널 {{diffThreshold}}, 반경 {{groupingRadius}}px, 최소 {{minArea}}px², 최대 비율 {{maxAreaFraction}}",
       "sourceCorners": "원본 좌표 (저장된 방향 적용 후 네 모서리)",
-      "passLimit": "검사는 최대 {{count}}개까지 보관합니다. 새 검사를 추가하려면 기존 검사를 삭제하세요."
+      "passLimit": "검사는 최대 {{count}}개까지 보관합니다. 새 검사를 추가하려면 기존 검사를 삭제하세요.",
+      "presets": {
+        "title": "기준 모음",
+        "tiny": "작은 점",
+        "words": "글자·문장",
+        "graphics": "그래픽·큰 덩어리"
+      }
     },
     "metadata": {
       "name": "원본 이름",
