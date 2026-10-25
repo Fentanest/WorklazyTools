@@ -103,7 +103,10 @@ worker.onmessage = async (event: MessageEvent) => {
     // then each pair keeps only its compact tracked manifest and its files in the Pyodide file system,
     // and in a batch the compressed model fields the generator reads: the extraction cache holds one
     // pair, so the generator would otherwise extract every document again.
+    // Saving them is an optimization only: past the budget, or when saving or restoring fails, the
+    // generator extracts the documents again as it would without them.
     const trackedJobs: Array<{ index: number; beforePath: string; afterPath: string; trackedPath: string; temporaryPaths: string[]; manifest: Uint8Array; mask: string; label: string; facts?: [Uint8Array, Uint8Array] }> = [];
+    let savedFactsBytes = 0;
     const removeFiles = (paths: string[]) => {
       for (const path of paths) {
         try {
@@ -182,8 +185,20 @@ worker.onmessage = async (event: MessageEvent) => {
             pyodide.FS.writeFile(beforePath, new Uint8Array(pair.beforeBuffer));
             pyodide.FS.writeFile(afterPath, new Uint8Array(pair.afterBuffer));
           }
-          const savedFacts = (buffer: ArrayBuffer) => modelBytes(saveFactsFunction!(new Uint8Array(buffer), true, true, en ? "en" : "ko"));
-          const facts: [Uint8Array, Uint8Array] | undefined = pairs.length > 1 && saveFactsFunction ? [savedFacts(beforeBuffer), savedFacts(afterBuffer)] : undefined;
+          let facts: [Uint8Array, Uint8Array] | undefined;
+          if (pairs.length > 1 && saveFactsFunction && savedFactsBytes < TRACKED_FACTS_BUDGET) {
+            try {
+              const saved = (buffer: ArrayBuffer) => modelBytes(saveFactsFunction!(new Uint8Array(buffer), true, true, en ? "en" : "ko"));
+              const pairFacts: [Uint8Array, Uint8Array] = [saved(beforeBuffer), saved(afterBuffer)];
+              const size = pairFacts[0].byteLength + pairFacts[1].byteLength;
+              if (savedFactsBytes + size <= TRACKED_FACTS_BUDGET) {
+                facts = pairFacts;
+                savedFactsBytes += size;
+              }
+            } catch {
+              facts = undefined;
+            }
+          }
           trackedJobs.push({ index, beforePath: trackedBeforePath, afterPath: trackedAfterPath, trackedPath, temporaryPaths, manifest: compactManifestBytes(serializeManifestForTracked(result.manifest)), mask: JSON.stringify(result.manifest.formattingMask.requested), label: `[${activePair}/${pairs.length}]`, facts });
           keepFiles = true;
         }
@@ -194,18 +209,30 @@ worker.onmessage = async (event: MessageEvent) => {
       progress(endProgress, L(`[${activePair}/${pairs.length}] 비교 결과 정리 완료`, `[${activePair}/${pairs.length}] Comparison result ready`));
     }
 
-    // Every screen result is out: cached models keep only what the generator reads.
-    if (trackedJobs.length) keepFactsFunction?.();
+    // Every screen result is out: cached models keep only what the generator reads. If that fails
+    // they stay as extracted, which the generator reads just as well.
+    if (trackedJobs.length) {
+      try {
+        keepFactsFunction?.();
+      } catch {
+        // Nothing to undo: an entry is either kept whole or reduced to the same objects.
+      }
+    }
     for (const [position, job] of trackedJobs.entries()) {
       activePair = job.index + 1;
       progress(70 + Math.round((position / trackedJobs.length) * 29), L(`${job.label} Word 변경 추적 파일 생성 중…`, `${job.label} Creating tracked-changes Word file…`));
       let trackedBuffer: ArrayBuffer | undefined;
       const warnings: string[] = [];
+      const facts = job.facts;
+      job.facts = undefined;
       try {
-        if (job.facts && restoreFactsFunction) {
-          restoreFactsFunction(job.beforePath, true, true, en ? "en" : "ko", job.facts[0]);
-          restoreFactsFunction(job.afterPath, true, true, en ? "en" : "ko", job.facts[1]);
-          job.facts = undefined;
+        if (facts && restoreFactsFunction) {
+          try {
+            restoreFactsFunction(job.beforePath, true, true, en ? "en" : "ko", facts[0]);
+            restoreFactsFunction(job.afterPath, true, true, en ? "en" : "ko", facts[1]);
+          } catch {
+            // The generator extracts whatever was not restored.
+          }
         }
         generateTracked!(
           job.beforePath,
@@ -274,6 +301,8 @@ function isWordFormat(format: DocumentFormat): format is "doc" | "docx" {
 // strings) with the WordprocessingML namespace written as one control character, which JSON text
 // never holds unescaped (compare.py MODEL_NAMESPACE_TOKEN, tracked_docx.py _manifest_text).
 const WORD_NAMESPACE = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}";
+// Compressed tracked model fields a batch keeps until generation (about 0.2–1MB per document).
+const TRACKED_FACTS_BUDGET = 64 * 1024 * 1024;
 type ModelBytes = { toJs(): Uint8Array; destroy?: () => void };
 function modelBytes(bytes: ModelBytes) {
   const view = bytes.toJs();
