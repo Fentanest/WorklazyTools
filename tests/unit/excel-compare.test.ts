@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 import JSZip from "jszip";
 
 import { compareSpreadsheetPair } from "../../src/features/excel-compare/compareEngine.ts";
+import { initialColumnMapping } from "../../src/features/excel-compare/headerColumns.ts";
 import { compareSpreadsheetCells } from "../../src/features/excel-compare/normalization.ts";
 import { buildExcelCompareReport } from "../../src/features/excel-compare/report.ts";
 import {
@@ -744,4 +745,26 @@ test('reconcile preserves requested date-string options but reports them inactiv
  const left=book([["Amount","Date"],[30,"2026-09-01"]]),right=book([["Amount","Date"],[10,"2026-09-01"],[20,"2026-09-01"]]);const options=baseOptions();options.mode='reconcile';options.reconcile={leftAmountColumn:1,rightAmountColumn:1,leftDateColumn:2,rightDateColumn:2,dateToleranceDays:1,allowGroupedMatches:true,roundingUnit:.01};
  const baseline=compareSpreadsheetPair(left,right,options);const decisions=(records:typeof baseline.records)=>records.map(({recordId:_id,matchingReason:_matching,...record})=>record);
  for(const mode of ['US','EU'] as const){const requested={...options,stringDates:{mode,leftColumns:[2],rightColumns:[2]}};const result=compareSpreadsheetPair(left,right,requested),parameters=Object.fromEntries(result.parameters);assert.deepEqual(decisions(result.records),decisions(baseline.records));assert.deepEqual(result.summary,baseline.summary);assert.equal(parameters.stringDateRequestedMode,mode);assert.equal(parameters.stringDateMode,mode);assert.equal(parameters.stringDateAppliedMode,'off');assert.equal(parameters.stringDatePolicyActive,'false');assert.equal(parameters.stringDateInactiveReason,'reconcile');assert.ok(parameters.stringDateScope.startsWith('INACTIVE:'));assert.equal(requested.stringDates.mode,mode);const report=await buildExcelCompareReport(result,{leftName:'left.csv',rightName:'right.csv',leftSheet:'Data',rightSheet:'Data'});const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(report);const rows:Record<string,string>={};workbook.getWorksheet('Parameters')!.eachRow(row=>{rows[String(row.getCell(1).value)]=String(row.getCell(2).value);});assert.equal(rows.stringDateRequestedMode,mode);assert.equal(rows.stringDateAppliedMode,'off');assert.equal(rows.stringDateInactiveReason,'reconcile');}
+});
+
+test("parsed string dates in a different format are not a display change", () => {
+  const options: ExcelComparePairOptions = { ...baseOptions(), stringDates: { mode: "EU", leftColumns: [1], rightColumns: [1] } };
+  const result = compareSpreadsheetPair(book([["Date"], ["31/01/2024"], ["01/02/2024"]]), book([["Date"], ["2024-01-31"], ["2024-02-02"]]), options);
+  assert.deepEqual(result.records.filter((record) => record.leftRow !== 1).map((record) => [record.status, record.change]), [["matched", ""], ["changed", "VALUE"]]);
+});
+
+test("columns that moved pair by their unique header names", () => {
+  const before = book([["ID", "Name", "Amount"], ["1", "a", "10"], ["2", "b", "20"]]);
+  const moved = compareSpreadsheetPair(before, book([["Amount", "ID", "Name"], ["10", "1", "a"], ["25", "2", "b"]]), baseOptions());
+  const kept = compareSpreadsheetPair(before, book([["ID", "Name", "Amount"], ["1", "a", "10"], ["2", "b", "25"]]), baseOptions());
+  assert.deepEqual(moved.summary, kept.summary);
+  assert.equal(moved.summary.changed, 1);
+  assert.equal(moved.records.find((record) => record.status === "changed")?.rightColumn, 1);
+});
+
+test("manual column mapping starts from same-header pairs", () => {
+  assert.deepEqual(initialColumnMapping(["ID", "Name", "Amount", "X"], ["Amount", "ID", "Y", "Name"]), [
+    { leftColumn: 1, rightColumn: 2 }, { leftColumn: 2, rightColumn: 4 }, { leftColumn: 3, rightColumn: 1 }, { leftColumn: 4, rightColumn: 3 },
+  ]);
+  assert.deepEqual(initialColumnMapping(["A", "A"], ["A", "B"]), [{ leftColumn: 1, rightColumn: 1 }, { leftColumn: 2, rightColumn: 2 }]);
 });

@@ -22,7 +22,12 @@ test("only selected non-formula string pairs normalize VALUE while retaining raw
   assert.equal(compareCellsWithStringDates(left, cell("2024-01-02", 1), options(), true).equal, false);
   const independent = options(); independent.normalization.compareDisplayValues = true;
   left.style = { numFmt: "@" }; right.style = { numFmt: "General" };
-  assert.deepEqual(compareCellsWithStringDates(left, right, independent, true).changes, ["DISPLAY_VALUE", "FORMATTING"]);
+  // A parsed date's text is its display: another date format is not a display change while date
+  // display formats are ignored (the default); formatting stays independent.
+  independent.normalization.ignoreDateDisplayFormat = true;
+  assert.deepEqual(compareCellsWithStringDates(left, right, independent, true).changes, ["FORMATTING"]);
+  const displayed = options(); displayed.normalization.compareDisplayValues = true; displayed.normalization.ignoreDateDisplayFormat = false;
+  assert.deepEqual(compareCellsWithStringDates(left, right, displayed, true).changes, ["DISPLAY_VALUE", "FORMATTING"]);
   delete left.style; delete right.style;
   assert.deepEqual({ left, right }, original);
   assert.equal(compareCellsWithStringDates(left, cell(new Date("2024-01-02T00:00:00Z"), 4), options(), true).equal, false);

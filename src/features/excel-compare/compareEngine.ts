@@ -7,6 +7,7 @@ import {
   normalizeKeyPart,
 } from "./normalization.ts";
 import { compareCellsWithStringDates,stringDatePolicy } from "./stringDates.ts";
+import { headerPairsReordered, uniqueHeaderPairs } from "./headerColumns.ts";
 import { restoreRecordIdentity } from "./recordIdentity.ts";
 import { isReconcileConfigValid, type ReconcileConfig } from "./reconcileConfig.ts";
 import type {
@@ -384,6 +385,18 @@ function alignColumns(left: SheetIndex, right: SheetIndex, options: ExcelCompare
     }
     return { budgetFallback: false, pairs: [
       ...mapping.map((pair) => ({ beforeIndex: pair.leftColumn - 1, afterIndex: pair.rightColumn - 1 })),
+      ...Array.from({ length: left.sheet.columnCount }, (_, i) => i + 1).filter((i) => !leftUsed.has(i)).map((i) => ({ beforeIndex: i - 1, afterIndex: null })),
+      ...Array.from({ length: right.sheet.columnCount }, (_, i) => i + 1).filter((i) => !rightUsed.has(i)).map((i) => ({ beforeIndex: null, afterIndex: i - 1 })),
+    ] };
+  }
+  // Moved columns: an order-keeping alignment cannot pair crossing columns, so headers that appear
+  // once on each side pair by name when they cross; the other columns are added or removed.
+  const headers = (index: SheetIndex, headerRow: number) => Array.from({ length: index.sheet.columnCount }, (_, column) => headerRow >= 1 ? cellText(getCell(index, headerRow, column + 1)) : "");
+  const named = uniqueHeaderPairs(headers(left, options.left.headerRow), headers(right, options.right.headerRow));
+  if (headerPairsReordered(named)) {
+    const leftUsed = new Set(named.map((pair) => pair.leftColumn)), rightUsed = new Set(named.map((pair) => pair.rightColumn));
+    return { budgetFallback: false, pairs: [
+      ...named.map((pair) => ({ beforeIndex: pair.leftColumn - 1, afterIndex: pair.rightColumn - 1 })),
       ...Array.from({ length: left.sheet.columnCount }, (_, i) => i + 1).filter((i) => !leftUsed.has(i)).map((i) => ({ beforeIndex: i - 1, afterIndex: null })),
       ...Array.from({ length: right.sheet.columnCount }, (_, i) => i + 1).filter((i) => !rightUsed.has(i)).map((i) => ({ beforeIndex: null, afterIndex: i - 1 })),
     ] };

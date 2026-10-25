@@ -42,7 +42,9 @@ export function compareCellsWithStringDates(left: SpreadsheetCellData | undefine
   if (dateNormalization.left.parseStatus !== "parsed" || dateNormalization.right.parseStatus !== "parsed") {
     return { ...compared, notes: [...compared.notes, "STRING_DATE_PARSE_FAILED"], dateNormalization };
   }
-  const changes = compared.changes.filter((change) => change !== "VALUE");
+  // Parsed dates compare as calendar values; their text is their display, so a different date
+  // format is not a display change either when date display formats are ignored (the default).
+  const changes = compared.changes.filter((change) => change !== "VALUE" && !(change === "DISPLAY_VALUE" && options.normalization.ignoreDateDisplayFormat));
   if (dateNormalization.left.normalizedDate !== dateNormalization.right.normalizedDate) changes.unshift("VALUE");
   return { ...compared, changes, equal: changes.length === 0, dateNormalization };
 }
