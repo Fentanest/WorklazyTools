@@ -389,20 +389,22 @@ function alignColumns(left: SheetIndex, right: SheetIndex, options: ExcelCompare
       ...Array.from({ length: right.sheet.columnCount }, (_, i) => i + 1).filter((i) => !rightUsed.has(i)).map((i) => ({ beforeIndex: null, afterIndex: i - 1 })),
     ] };
   }
+  const leftItems = Array.from({ length: left.sheet.columnCount }, (_, index) => axisItem(index + 1, columnContent(left, index + 1, options.left.headerRow, options)));
+  const rightItems = Array.from({ length: right.sheet.columnCount }, (_, index) => axisItem(index + 1, columnContent(right, index + 1, options.right.headerRow, options)));
   // Moved columns: an order-keeping alignment cannot pair crossing columns, so headers that appear
-  // once on each side pair by name when they cross; the other columns are added or removed.
+  // once on each side pair by name when they cross; the remaining columns keep the order-keeping
+  // alignment among themselves (duplicate or empty headers that did not move still pair).
   const headers = (index: SheetIndex, headerRow: number) => Array.from({ length: index.sheet.columnCount }, (_, column) => headerRow >= 1 ? cellText(getCell(index, headerRow, column + 1)) : "");
   const named = uniqueHeaderPairs(headers(left, options.left.headerRow), headers(right, options.right.headerRow));
   if (headerPairsReordered(named)) {
-    const leftUsed = new Set(named.map((pair) => pair.leftColumn)), rightUsed = new Set(named.map((pair) => pair.rightColumn));
-    return { budgetFallback: false, pairs: [
+    const leftUsed = new Set(named.map((pair) => pair.leftColumn - 1)), rightUsed = new Set(named.map((pair) => pair.rightColumn - 1));
+    const restLeft = leftItems.filter((_, index) => !leftUsed.has(index)), restRight = rightItems.filter((_, index) => !rightUsed.has(index));
+    const rest = alignAxis(restLeft, restRight, options.alignmentCellBudget, checkCanceled);
+    return { budgetFallback: rest.budgetFallback, pairs: [
       ...named.map((pair) => ({ beforeIndex: pair.leftColumn - 1, afterIndex: pair.rightColumn - 1 })),
-      ...Array.from({ length: left.sheet.columnCount }, (_, i) => i + 1).filter((i) => !leftUsed.has(i)).map((i) => ({ beforeIndex: i - 1, afterIndex: null })),
-      ...Array.from({ length: right.sheet.columnCount }, (_, i) => i + 1).filter((i) => !rightUsed.has(i)).map((i) => ({ beforeIndex: null, afterIndex: i - 1 })),
+      ...rest.pairs.map((pair) => ({ beforeIndex: pair.beforeIndex === null ? null : restLeft[pair.beforeIndex].index - 1, afterIndex: pair.afterIndex === null ? null : restRight[pair.afterIndex].index - 1 })),
     ] };
   }
-  const leftItems = Array.from({ length: left.sheet.columnCount }, (_, index) => axisItem(index + 1, columnContent(left, index + 1, options.left.headerRow, options)));
-  const rightItems = Array.from({ length: right.sheet.columnCount }, (_, index) => axisItem(index + 1, columnContent(right, index + 1, options.right.headerRow, options)));
   return alignAxis(leftItems, rightItems, options.alignmentCellBudget, checkCanceled);
 }
 

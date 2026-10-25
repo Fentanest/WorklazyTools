@@ -768,3 +768,29 @@ test("manual column mapping starts from same-header pairs", () => {
   ]);
   assert.deepEqual(initialColumnMapping(["A", "A"], ["A", "B"]), [{ leftColumn: 1, rightColumn: 1 }, { leftColumn: 2, rightColumn: 2 }]);
 });
+
+test("a partial column move keeps unmoved duplicate and empty headers paired", () => {
+  for (const amount of ["Amount", ""]) {
+    const before = book([["ID", "Name", amount, amount], ["1", "a", "10", "20"], ["2", "b", "30", "40"]]);
+    const after = book([["Name", "ID", amount, amount], ["a", "1", "10", "20"], ["b", "2", "30", "40"]]);
+    const result = compareSpreadsheetPair(before, after, baseOptions());
+    assert.equal(result.summary.added, 0, amount);
+    assert.equal(result.summary.removed, 0, amount);
+    assert.equal(result.summary.changed, 0, amount);
+  }
+});
+
+test("large reports keep the source rows of grouped reconciliations", async () => {
+  const grouped = { recordId: "run:0", matchingReason: "RECONCILIATION:MANY_TO_ONE", status: "matched" as const, leftRow: 2, rightRow: 2, leftColumn: null, rightColumn: null, key: "", displayKey: "", leftValue: "1 + 2", rightValue: "3", change: "", reason: "MANY_TO_ONE", sourceRows: { left: [2, 9], right: [2] } };
+  const plain = (index: number) => ({ recordId: `run:${index}`, matchingReason: "POSITION:auto-columns", status: "matched" as const, leftRow: index + 2, rightRow: index + 2, leftColumn: 1, rightColumn: 1, key: "", displayKey: "", leftValue: "v", rightValue: "v", change: "", reason: "MATCHED" });
+  for (const count of [10_000, 10_001]) {
+    const records = [grouped, ...Array.from({ length: count - 1 }, (_, index) => plain(index + 1))] as never[];
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(await buildExcelCompareReport({ runId: "run", summary: { matched: count, changed: 0, added: 0, removed: 0, duplicate: 0, ambiguous: 0, unmatched: 0, error: 0 }, parameters: [["mode", "reconcile"]], warnings: [], records }, { leftName: "l.csv", rightName: "r.csv", leftSheet: "S", rightSheet: "S" }) as never);
+    const parameters: Record<string, string> = {};
+    workbook.getWorksheet("Parameters")!.eachRow((row) => { parameters[String(row.getCell(1).value)] = String(row.getCell(2).value); });
+    assert.deepEqual(JSON.parse(parameters["record:run:0"]).sourceRows, { left: [2, 9], right: [2] }, String(count));
+    assert.equal(Object.keys(parameters).filter((key) => key.startsWith("record:")).length, count === 10_000 ? 10_000 : 1);
+    if (count > 10_000) assert.match(parameters.recordProvenance, /^10000 of 10001 records listed by record sheet order/);
+  }
+});
