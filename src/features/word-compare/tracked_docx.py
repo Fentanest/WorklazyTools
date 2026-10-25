@@ -2816,10 +2816,18 @@ def _validate_manifest(before_path, after_path):
         story_facts[side]=model["storyFacts"]
         note_facts[side]=model["noteFacts"]
         inventory = model["sourceInventory"]
-        entries = {_manifest_key(ref): ref for ref in inventory}
         supplied = _MANIFEST["sources"][side]
-        if len(supplied) != len(entries) or {_manifest_key(ref): ref for ref in supplied} != entries:
-            raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_INVENTORY")
+        if supplied is inventory:
+            # Our own extraction (_attach_source_inventory): its references are well formed.
+            entries = {}
+            for ref in inventory:
+                key = (ref["part"], tuple(ref["path"]))
+                _MANIFEST_KEY_CACHE[id(ref)] = (ref, key, len(ref["path"]))
+                entries[key] = ref
+        else:
+            entries = {_manifest_key(ref): ref for ref in inventory}
+            if len(supplied) != len(entries) or {_manifest_key(ref): ref for ref in supplied} != entries:
+                raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_INVENTORY")
         actual[side] = entries
         with zipfile.ZipFile(path) as archive:
             # Structure and text only; emission parses namespace-aware.
@@ -3577,34 +3585,57 @@ def _consume_manifest_subtree(side, node):
             _MANIFEST_USED.add(decision["id"])
 
 
+def _attach_source_inventory(manifest, before_path, after_path):
+    """serializeManifestForTracked writes each side's inventory as `{"$inventory": count}`: it is
+    the extraction of the same input bytes, which this module reproduces (memoized). Substitute
+    our own extraction; inputRevision is checked against the files afterwards, so a manifest for
+    other inputs is still refused. A manifest that inlines its sources is compared in full."""
+    sources = manifest.get("sources") if isinstance(manifest, dict) else None
+    if not isinstance(sources, dict):
+        return manifest
+    for side, path in (("before", before_path), ("after", after_path)):
+        stub = sources.get(side)
+        if isinstance(stub, dict) and set(stub) == {"$inventory"}:
+            with open(path, "rb") as source:
+                inventory = extract_document_model_parsed(source.read(), True, True, LANGUAGE)["sourceInventory"]
+            if type(stub["$inventory"]) is not int or stub["$inventory"] != len(inventory):
+                raise ValueError("INVALID_COMPARISON_MANIFEST_SOURCE_INVENTORY")
+            sources[side] = inventory
+    return manifest
+
+
 def _resolve_manifest_sources(manifest):
     """Restore `{"$src":[side,index]}` and `{"$fact":[side,index,property]}` stubs written by
     serializeManifestForTracked."""
     if not isinstance(manifest, dict):
         return manifest
     sources = manifest.get("sources")
-    stack = [(manifest, key) for key in manifest if key != "sources"]
+    def resolve(value):
+        if "$src" in value:
+            stub = value["$src"]
+            if not isinstance(sources, dict) or not isinstance(stub, list) or len(stub) != 2 or stub[0] not in ("before", "after") or not isinstance(stub[1], int) or not 0 <= stub[1] < len(sources.get(stub[0], [])):
+                raise ValueError("INVALID_COMPARISON_MANIFEST")
+            return sources[stub[0]][stub[1]]
+        stub = value["$fact"]
+        if not isinstance(sources, dict) or not isinstance(stub, list) or len(stub) != 3 or stub[0] not in ("before", "after") or not isinstance(stub[1], int) or not 0 <= stub[1] < len(sources.get(stub[0], [])):
+            raise ValueError("INVALID_COMPARISON_MANIFEST")
+        properties = sources[stub[0]][stub[1]].get("normalizedProperties")
+        if not isinstance(properties, dict) or not isinstance(stub[2], str) or stub[2] not in properties:
+            raise ValueError("INVALID_COMPARISON_MANIFEST")
+        return properties[stub[2]]
+    # Only containers are visited; a stub is replaced in place and not descended into.
+    stack = [value for key, value in manifest.items() if key != "sources" and isinstance(value, (dict, list))]
     while stack:
-        holder, key = stack.pop()
-        value = holder[key]
-        if isinstance(value, dict):
-            if len(value) == 1 and "$src" in value:
-                stub = value["$src"]
-                if not isinstance(sources, dict) or not isinstance(stub, list) or len(stub) != 2 or stub[0] not in ("before", "after") or not isinstance(stub[1], int) or not 0 <= stub[1] < len(sources.get(stub[0], [])):
-                    raise ValueError("INVALID_COMPARISON_MANIFEST")
-                holder[key] = sources[stub[0]][stub[1]]
-            elif len(value) == 1 and "$fact" in value:
-                stub = value["$fact"]
-                if not isinstance(sources, dict) or not isinstance(stub, list) or len(stub) != 3 or stub[0] not in ("before", "after") or not isinstance(stub[1], int) or not 0 <= stub[1] < len(sources.get(stub[0], [])):
-                    raise ValueError("INVALID_COMPARISON_MANIFEST")
-                properties = sources[stub[0]][stub[1]].get("normalizedProperties")
-                if not isinstance(properties, dict) or not isinstance(stub[2], str) or stub[2] not in properties:
-                    raise ValueError("INVALID_COMPARISON_MANIFEST")
-                holder[key] = properties[stub[2]]
-            else:
-                stack.extend((value, name) for name in value)
-        elif isinstance(value, list):
-            stack.extend((value, index) for index in range(len(value)))
+        holder = stack.pop()
+        for key, value in (holder.items() if type(holder) is dict else enumerate(holder)):
+            kind = type(value)
+            if kind is dict:
+                if len(value) == 1 and ("$src" in value or "$fact" in value):
+                    holder[key] = resolve(value)
+                else:
+                    stack.append(value)
+            elif kind is list:
+                stack.append(value)
     return manifest
 
 
@@ -3639,12 +3670,14 @@ def _install_manifest(manifest):
 
 
 def _register_manifest_root(root, part, side):
-    def visit(node, path):
-        _MANIFEST_NODE_KEYS[node] = (side, (part, tuple(path)))
-        _MANIFEST_SOURCE_NODES[(side, (part, tuple(path)))] = node
-        for index, child in enumerate(node):
-            visit(child, path + [index])
-    visit(root, [])
+    node_keys, source_nodes = _MANIFEST_NODE_KEYS, _MANIFEST_SOURCE_NODES
+    stack = [(root, ())]
+    while stack:
+        node, path = stack.pop()
+        key = (side, (part, path))
+        node_keys[node] = key
+        source_nodes[key] = node
+        stack.extend((child, path + (index,)) for index, child in enumerate(node))
 
 
 def _manifest_decision(before, after):
@@ -4768,7 +4801,7 @@ def _generate_tracked_document(before_path, after_path, output_path, author, inc
             after_model = extract_document_model(source.read(), True, True)
         manifest_json = worklazyComparisonManifestJson(before_model, after_model, bool(include_formatting), bool(include_tables), bool(include_metadata))
     try:
-        _install_manifest(_resolve_manifest_sources(json.loads(_manifest_text(manifest_json))))
+        _install_manifest(_resolve_manifest_sources(_attach_source_inventory(json.loads(_manifest_text(manifest_json)), before_path, after_path)))
     except (KeyError, TypeError, IndexError, RecursionError) as error:
         raise ValueError("INVALID_COMPARISON_MANIFEST") from error
     requested_mask = json.loads(formatting_mask_json) if formatting_mask_json is not None else {group: True for group in ("fontFamily", "size", "style", "color", "paragraph", "numbering")}

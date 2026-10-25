@@ -10,8 +10,12 @@ type Side = "before" | "after";
  * elsewhere as `{"$src":[side,index]}`; `_resolve_manifest_sources` in tracked_docx.py
  * restores it. A reference that differs from its entry in any field stays inline.
  * Property facts copied from an inventory entry (formatting scopes, object events) are
- * the entry's own objects; each is written as `{"$fact":[side,index,property]}`. */
-export function serializeManifestForTracked(manifest: DocumentComparisonManifest): string {
+ * the entry's own objects; each is written as `{"$fact":[side,index,property]}`.
+ *
+ * The inventories themselves are the Python extraction of the same input bytes, which the
+ * generator reproduces; each is written as `{"$inventory":count}` (`_attach_source_inventory`).
+ * `inlineSources` keeps them inline so the generator compares them in full. */
+export function serializeManifestForTracked(manifest: DocumentComparisonManifest, { inlineSources = false }: { inlineSources?: boolean } = {}): string {
   const lists = new Set<unknown>([manifest.sources.before, manifest.sources.after]);
   const positions = new Map<object, [Side, number]>();
   const entries = new Map<string, Array<{ side: Side; index: number; json: string }>>();
@@ -46,6 +50,7 @@ export function serializeManifestForTracked(manifest: DocumentComparisonManifest
     return entry ? { $src: [entry.side, entry.index] } : undefined;
   };
   return JSON.stringify(manifest, function (this: unknown, _key, value) {
+    if (!inlineSources && this === manifest.sources && lists.has(value)) return { $inventory: (value as unknown[]).length };
     if (lists.has(this) || factHolders.has(this)) return value;
     if (value && typeof value === "object" && facts.has(value)) return { $fact: facts.get(value) };
     if (value && typeof value === "object" && !Array.isArray(value) && typeof value.part === "string" && Array.isArray(value.path) && typeof value.kind === "string") {

@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { loadPyodide } from "pyodide";
 import { compareDocumentModels, diffText } from "../src/features/document-compare/documentComparison.ts";
+import { serializeManifestForTracked } from "../src/features/document-compare/manifestWire.ts";
 let diffCalls = 0;
 globalThis.worklazyDiffJson = (before, after) => { diffCalls++; return JSON.stringify(diffText(before, after)); };
 globalThis.worklazyComparisonManifestJson = (before, after, formatting, tables, metadata) => JSON.stringify(compareDocumentModels("before", "after", JSON.parse(before), JSON.parse(after), { formatting, tables, metadata }, "en").manifest);
+// The worker's transport: inventories by reference, references and facts as stubs.
+globalThis.worklazyWireManifestJson = (before, after, formatting, tables, metadata) => serializeManifestForTracked(compareDocumentModels("before", "after", JSON.parse(before), JSON.parse(after), { formatting, tables, metadata }, "en").manifest);
 const py = await loadPyodide();
 py.globals.set("WORKLAZY_FORMATTING_POLICY_JSON", fs.readFileSync("src/features/word-compare/formatting-policy.json", "utf8"));
 for (const name of ["compare", "accept_revisions", "tracked_docx"]) py.runPython(fs.readFileSync(`src/features/word-compare/${name}.py`, "utf8"));
@@ -63,6 +66,18 @@ original = manifest()
 export(original)
 assert accepted_text() == 'Stable anchor'
 scenarios.append('valid deletion')
+def document_xml():
+    with zipfile.ZipFile('/out.docx') as archive:
+        return re.sub(rb'w:date="[^"]*"', b'', archive.read('word/document.xml'))
+inline_output = document_xml()
+from js import worklazyWireManifestJson
+wire = json.loads(worklazyWireManifestJson(extract_document_model(open('/before.docx', 'rb').read(), True, True, 'en'), extract_document_model(open('/after.docx', 'rb').read(), True, True, 'en'), True, True, True))
+assert all(set(wire['sources'][side]) == {'$inventory'} for side in ('before', 'after')), wire['sources']
+export(wire)
+assert document_xml() == inline_output
+scenarios.append('inventory by reference')
+value = copy.deepcopy(wire); value['sources']['before']['$inventory'] += 1
+refused('inventory reference count mismatch', value)
 value = copy.deepcopy(original); value['decisions'] = [item for item in value['decisions'] if item['after']]
 refused('missing deletion decision', value)
 value = copy.deepcopy(original); value['decisions'].append(copy.deepcopy(value['decisions'][-1]))
@@ -197,6 +212,6 @@ package('/after.docx', para('Stable anchor'))
 refused('before-only footnote story', manifest())
 `);
 const scenarios = py.globals.get("scenarios").toJs();
-assert.equal(scenarios.length, 25);
+assert.equal(scenarios.length, 27);
 assert.equal(diffCalls, 0, "The emitter must not ask TypeScript to recompute a text diff");
 console.log(JSON.stringify({ scenarios: scenarios.length, checks: scenarios }));

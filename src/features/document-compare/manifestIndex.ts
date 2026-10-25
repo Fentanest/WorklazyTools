@@ -2,6 +2,8 @@ import type { DocumentComparisonManifest, DocumentSourceReference } from "./comp
 
 type Side = "before" | "after";
 export const sourceKey = (ref: Pick<DocumentSourceReference, "part" | "path">) => JSON.stringify([ref.part, ref.path]);
+// Index keys: one-to-one with `sourceKey` (part names hold no NUL; paths are integers), cheaper to build.
+const pathKey = (part: string, path: readonly number[] | undefined) => part + "\u0000" + (path ? path.join(",") : "-");
 
 /** Lookups that were linear scans over every XML node per decision. Every list keeps
  * the original array order and every single lookup keeps the first match, so results
@@ -25,11 +27,11 @@ function sideIndex(manifest: DocumentComparisonManifest, side: Side): SideIndex 
   const index: SideIndex = { length: sources.length, byKey: new Map(), byParagraph: new Map(), byEventParagraph: new Map(), children: new Map(), order: new Map() };
   sources.forEach((source, position) => {
     index.order.set(source, position);
-    const key = sourceKey(source);
+    const key = pathKey(source.part, source.path);
     if (!index.byKey.has(key)) index.byKey.set(key, source);
-    if (source.paragraphPath) push(index.byParagraph, JSON.stringify([source.part, source.paragraphPath]), source);
-    if (source.objectEvent) push(index.byEventParagraph, JSON.stringify([source.part, source.objectEvent.paragraphPath]), source);
-    if (source.path.length) push(index.children, JSON.stringify([source.part, source.path.slice(0, -1), source.kind]), source);
+    if (source.paragraphPath) push(index.byParagraph, pathKey(source.part, source.paragraphPath), source);
+    if (source.objectEvent) push(index.byEventParagraph, pathKey(source.part, source.objectEvent.paragraphPath), source);
+    if (source.path.length) push(index.children, pathKey(source.part, source.path.slice(0, -1)) + "\u0000" + source.kind, source);
   });
   cache.set(sources, index);
   return index;
@@ -48,22 +50,25 @@ function comparePaths(a: number[], b: number[]) {
 
 /** `sources[side].find((ref) => sourceKey(ref) === sourceKey(target))` */
 export function findSource(manifest: DocumentComparisonManifest, side: Side, target: Pick<DocumentSourceReference, "part" | "path">) {
-  return sideIndex(manifest, side).byKey.get(sourceKey(target));
+  const index = sideIndex(manifest, side);
+  // An inventory entry is the only entry with its (part, path).
+  if (index.order.has(target as DocumentSourceReference)) return target as DocumentSourceReference;
+  return index.byKey.get(pathKey(target.part, target.path));
 }
 
 /** Sources whose `paragraphPath` equals `path` in `part`, in source order. */
 export function paragraphSources(manifest: DocumentComparisonManifest, side: Side, part: string, path: number[]) {
-  return sideIndex(manifest, side).byParagraph.get(JSON.stringify([part, path])) ?? [];
+  return sideIndex(manifest, side).byParagraph.get(pathKey(part, path)) ?? [];
 }
 
 /** Sources with an object event whose `paragraphPath` equals `path` in `part`, in source order. */
 export function eventSources(manifest: DocumentComparisonManifest, side: Side, part: string, path: number[] | undefined) {
-  return sideIndex(manifest, side).byEventParagraph.get(JSON.stringify([part, path])) ?? [];
+  return sideIndex(manifest, side).byEventParagraph.get(pathKey(part, path)) ?? [];
 }
 
 /** Direct children of `parent` with the given kind, in source order. */
 export function childSources(manifest: DocumentComparisonManifest, side: Side, parent: Pick<DocumentSourceReference, "part" | "path">, kind: string) {
-  return sideIndex(manifest, side).children.get(JSON.stringify([parent.part, parent.path, kind])) ?? [];
+  return sideIndex(manifest, side).children.get(pathKey(parent.part, parent.path) + "\u0000" + kind) ?? [];
 }
 
 /** `root` and every source under it (same part, `root.path` prefix), in source order. */

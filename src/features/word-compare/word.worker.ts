@@ -11,6 +11,7 @@ import { compareDocumentModels, diffText, type ComparisonModel } from "../docume
 import { serializeManifestForTracked } from "../document-compare/manifestWire";
 import { sniffDocumentFormat, type DocumentFormat } from "../document-compare/documentFormat";
 import { extractLegacyDocModel } from "./docModel";
+import { restoreModelTransport } from "./modelTransport";
 
 const PYODIDE_VERSION = pyodidePackage.version;
 const PYODIDE_BASE_URL = new URL(
@@ -252,7 +253,7 @@ function extractWordModel(
 ) {
   if (format === "doc") return extractLegacyDocModel(new Uint8Array(buffer), options, language);
   if (format === "docx" && extract) {
-    return JSON.parse(restoreModelJson(extract(new Uint8Array(buffer), true, true, language))) as ComparisonModel;
+    return restoreModelTransport(JSON.parse(restoreModelJson(extract(new Uint8Array(buffer), true, true, language)))) as ComparisonModel;
   }
   throw new Error(language === "en" ? "The Word file format is not supported." : "지원하지 않는 Word 파일 형식입니다.");
 }
