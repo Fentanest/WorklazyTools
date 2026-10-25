@@ -1,6 +1,7 @@
 import { hasNativeHeader } from "./nativeHeader";
 import { formattingGroups, maskLabels } from "./formattingMask";
-import { AlertCircle, Download, FileText, Info, LockKeyhole, TextSearch } from "lucide-react";
+import { AlertCircle, Download, FileText, Info, LoaderCircle, LockKeyhole, TextSearch } from "lucide-react";
+import type { WordCompareResult } from "../excel-merger/types";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -97,6 +98,10 @@ export function DocumentComparePage() {
     const controller = new AbortController();
     comparisonControllerRef.current = controller;
     operation.start(L(`${session.beforeFiles.length}개 문서 쌍의 실제 형식을 확인하고 있습니다.`, `Checking the actual formats of ${session.beforeFiles.length} document pairs.`));
+    // Screen results are shown as soon as every pair has one; tracked DOCX files follow and fill in
+    // their download buttons (the session keeps that work alive across the results pages).
+    let shown = false;
+    const pairCount = session.beforeFiles.length;
     try {
       const pairs = session.beforeFiles.map((beforeFile, index) => ({
         beforeFile,
@@ -104,6 +109,54 @@ export function DocumentComparePage() {
         beforePassword: session.passwords[fileKey(beforeFile)] || undefined,
         afterPassword: session.passwords[fileKey(session.afterFiles[index])] || undefined,
       }));
+      const tracking = session.trackedOutput;
+      const screens = new Map<number, WordCompareResult>(), arrived = new Map<number, { buffer?: ArrayBuffer; warnings: string[] }>();
+      const applyTracked = (index: number, buffer: ArrayBuffer | undefined) => session.updateResult(index + 1, (current) => ({
+        ...current,
+        result: { ...current.result },
+        trackedUrl: buffer ? URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })) : undefined,
+        trackedFileName: buffer ? trackedFileName(index + 1, current.result.beforeName, current.result.afterName, language) : undefined,
+        trackedStatus: buffer ? "ready" : "unavailable",
+      }));
+      const show = async () => {
+        const results = pairs.map((_, index) => screens.get(index)!);
+        controller.signal.throwIfAborted();
+        let reports: ArrayBuffer[] = [];
+        let reportUnavailable = false;
+        if (session.excelOutput) {
+          operation.update(80, L(`${results.length}개 Excel 보고서를 준비합니다.`, `Preparing ${results.length} Excel reports.`));
+          try {
+            reports = await createComparisonExcelReports(results, (nextProgress, message) => {
+              operation.update(80 + Math.round(nextProgress * 0.2), message);
+            }, language, controller.signal);
+          } catch (reason) {
+            if (controller.signal.aborted || (reason instanceof DOMException && reason.name === "AbortError")) throw reason;
+            reportUnavailable = true; // Report serialization failed; completed comparisons stay usable.
+          }
+        }
+        controller.signal.throwIfAborted();
+        session.replaceResults(results.map((result, index) => ({
+          pairNumber: index + 1,
+          reportUnavailable,
+          originalBeforeUrl: URL.createObjectURL(pairs[index].beforeFile),
+          originalAfterUrl: URL.createObjectURL(pairs[index].afterFile),
+          result,
+          ...createComparisonReportArtifact(reports[index], index + 1, result.beforeName, result.afterName, language),
+          trackedStatus: tracking ? "pending" : undefined,
+        })));
+        shown = true;
+        for (const [index, item] of arrived) applyTracked(index, item.buffer);
+        // The page may now be left: the tracked files keep coming into the session.
+        session.adoptBackground(controller);
+        if (comparisonControllerRef.current === controller) comparisonControllerRef.current = undefined;
+        setLoading(false);
+        operation.succeed(reportUnavailable
+          ? L("비교를 완료했습니다. Excel 보고서는 만들지 못했지만 비교 결과와 생성된 파일은 유지됩니다.", "Comparison complete. Excel reports are unavailable; comparison results and generated files are preserved.")
+          : tracking
+            ? L(`${results.length}개 문서 쌍의 비교 결과를 만들었습니다. Word 변경 추적 파일은 이어서 만듭니다.`, `Created comparison results for ${results.length} document pairs. Tracked-changes Word files follow.`)
+            : L(`${results.length}개 문서 쌍의 결과를 모두 만들었습니다.`, `Created results for all ${results.length} document pairs.`));
+      };
+      let showing: Promise<void> | undefined;
       const workerResults = await compareDocumentFilePairs(pairs, {
         formatting: session.formatting,
         formattingMask: session.formattingMask,
@@ -113,46 +166,28 @@ export function DocumentComparePage() {
         rewriteRevisionAuthor: session.trackedOutput && session.rewriteRevisionAuthor,
         revisionAuthor: session.revisionAuthor.trim() || "Worklazy Tools",
       }, (nextProgress, message) => {
-        operation.update(session.excelOutput ? Math.round(nextProgress * 0.8) : nextProgress, message);
-      }, language, controller.signal);
-      const results = workerResults.map((item) => item.result);
-      controller.signal.throwIfAborted();
-      let reports: ArrayBuffer[] = [];
-      let reportUnavailable = false;
-      if (session.excelOutput) {
-        operation.update(80, L(`${results.length}개 Excel 보고서를 준비합니다.`, `Preparing ${results.length} Excel reports.`));
-        try {
-        reports = await createComparisonExcelReports(results, (nextProgress, message) => {
-          operation.update(80 + Math.round(nextProgress * 0.2), message);
-        }, language, controller.signal);
-        } catch (reason) {
-          if (controller.signal.aborted || (reason instanceof DOMException && reason.name === "AbortError")) throw reason;
-          reportUnavailable = true; // Report serialization failed; completed comparisons stay usable.
-        }
-      }
-      controller.signal.throwIfAborted();
-      session.replaceResults(results.map((result, index) => {
-        const trackedBuffer = workerResults[index]?.trackedBuffer;
-        return {
-          pairNumber: index + 1,
-          reportUnavailable,
-          originalBeforeUrl:URL.createObjectURL(pairs[index].beforeFile),
-          originalAfterUrl:URL.createObjectURL(pairs[index].afterFile),
-          result,
-          ...createComparisonReportArtifact(reports[index], index + 1, result.beforeName, result.afterName, language),
-          trackedUrl: trackedBuffer ? URL.createObjectURL(new Blob([trackedBuffer], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" })) : undefined,
-          trackedFileName: trackedBuffer ? trackedFileName(index + 1, result.beforeName, result.afterName, language) : undefined,
-        };
-      }));
-      operation.succeed(reportUnavailable
-        ? L("비교를 완료했습니다. Excel 보고서는 만들지 못했지만 비교 결과와 생성된 파일은 유지됩니다.", "Comparison complete. Excel reports are unavailable; comparison results and generated files are preserved.")
-        : L(`${results.length}개 문서 쌍의 결과를 모두 만들었습니다.`, `Created results for all ${results.length} document pairs.`));
+        if (!shown) operation.update(session.excelOutput ? Math.round(nextProgress * 0.8) : nextProgress, message);
+      }, language, controller.signal, {
+        onScreen: (index, result) => { screens.set(index, result); if (screens.size === pairs.length && !showing) showing = show(); },
+        onTracked: (index, buffer, warnings) => { arrived.set(index, { buffer, warnings }); if (shown) applyTracked(index, buffer); },
+      });
+      workerResults.forEach((item, index) => { if (!screens.has(index)) screens.set(index, item.result); });
+      showing ??= show();
+      await showing;
+      // Pairs that never had a tracked file (not DOCX on both sides) stop showing it as pending.
+      pairs.forEach((_, index) => { if (!arrived.has(index)) session.updateResult(index + 1, (current) => current.trackedStatus === "pending" ? { ...current, trackedStatus: undefined } : current); });
     } catch (reason) {
-      const message = comparisonErrorMessage(reason, language);
-      setError(message);
-      operation.fail(message);
+      if (shown) {
+        // Results are on screen: only the tracked files are missing (a newer comparison or leaving the tool aborts quietly).
+        if (!controller.signal.aborted) for (let pairNumber = 1; pairNumber <= pairCount; pairNumber++) session.updateResult(pairNumber, (current) => current.trackedStatus === "pending" ? { ...current, trackedStatus: "unavailable" } : current);
+      } else {
+        const message = comparisonErrorMessage(reason, language);
+        setError(message);
+        operation.fail(message);
+      }
     } finally {
-      setLoading(false);
+      if (shown) session.releaseBackground(controller);
+      else setLoading(false);
       if (comparisonControllerRef.current === controller) comparisonControllerRef.current = undefined;
     }
   };
@@ -258,13 +293,14 @@ export function DocumentComparePage() {
 
       {session.results.length > 0 && <section className="mt-6" data-testid="document-results" aria-live="polite">
         <div className="mb-3"><p className="text-xs font-extrabold tracking-[.08em] text-green-700 uppercase dark:text-green-300">{L("작업 완료", "Complete")}</p><h2 className="mt-1 font-heading text-2xl font-medium">{L(`${session.results.length}개 문서 쌍의 결과`, `Results for ${session.results.length} document pairs`)}</h2><p className="mt-2 text-sm text-muted-foreground">{L("지원되는 결과를 문서 쌍별로 열 수 있습니다.", "Open the supported outputs for each document pair.")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></div>
-        <div className="flex flex-col gap-2.5">{session.results.map((item) => <Card as="article" className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 overflow-visible rounded-3xl border border-border p-4 shadow-sm max-[720px]:grid-cols-[auto_minmax(0,1fr)]" data-testid="document-result-card" key={item.pairNumber}>
+        <div className="flex flex-col gap-2.5">{session.results.map((item) => <Card as="article" className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 overflow-visible rounded-3xl border border-border p-4 shadow-sm max-[720px]:grid-cols-[auto_minmax(0,1fr)]" data-testid="document-result-card" data-tracked-status={item.trackedStatus ?? "none"} key={item.pairNumber}>
           <span className="grid size-9 place-items-center rounded-xl bg-primary text-sm font-extrabold text-primary-foreground">{item.pairNumber}</span>
           <div className="grid min-w-0 grid-cols-[minmax(0,auto)_auto_minmax(0,auto)] items-center justify-start gap-2 max-[720px]:grid-cols-1 max-[720px]:gap-1"><strong className="max-w-52 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{item.result.beforeName}</strong><span className="text-muted-foreground max-[720px]:hidden">→</span><strong className="max-w-52 overflow-hidden text-ellipsis whitespace-nowrap text-sm">{item.result.afterName}</strong><small className="col-span-full text-xs text-muted-foreground max-[720px]:col-span-1">{item.result.changes.length ? L(`${item.result.changes.length}개 변경 발견`, `${item.result.changes.length} changes found`) : L("변경 없음", "No changes")}</small></div>
           <div className="flex flex-wrap items-center justify-end gap-2 max-[720px]:col-span-full max-[720px]:grid max-[720px]:grid-cols-2 [&>*]:min-h-9 [&>*]:justify-center">
             {session.webOutput && <Button render={<Link to={`${resultBasePath}/${item.pairNumber}`} data-testid="document-view-result" />} variant="secondary" className="rounded-xl font-bold"><TextSearch size={15} /> {L("웹 비교 보기", "View web comparison")}</Button>}
             {item.reportUrl && <Button render={<a href={item.reportUrl} download={item.reportFileName} data-testid="document-excel-download" />} className="rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90" onClick={() => setSaved(true)}><Download size={15} /> {L("Excel 보고서", "Excel report")}</Button>}
             {item.reportUrl && <FileShareButton url={item.reportUrl} fileName={item.reportFileName || L("문서-비교보고서.xlsx", "document-comparison-report.xlsx")} />}
+            {item.trackedStatus === "pending" && <Button type="button" variant="secondary" disabled className="rounded-xl font-bold" data-testid="document-tracked-pending"><LoaderCircle className="animate-spin" size={15} /> {L("Word 변경 추적 만드는 중", "Creating tracked Word file")}</Button>}
             {item.trackedUrl && <Button render={<a href={item.trackedUrl} download={item.trackedFileName} data-testid="document-tracked-download" />} className="rounded-xl bg-primary font-bold text-primary-foreground hover:bg-primary/90" onClick={() => setSaved(true)}><Download size={15} /> {L("Word 변경 추적", "Tracked Word file")}</Button>}
           </div>
           {item.reportUnavailable && <UtilityNotice data-testid="document-excel-unavailable" className="col-span-full" kind="info">{L("Excel 보고서를 만들지 못했습니다. 비교 결과와 생성된 파일은 유지됩니다.", "The Excel report is unavailable. Comparison results and generated files are preserved.")}</UtilityNotice>}

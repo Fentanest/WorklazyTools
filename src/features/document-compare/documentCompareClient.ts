@@ -1,5 +1,5 @@
 import { normalizeFormattingMask, defaultFormattingMask } from "./formattingMask.ts";
-import type { WordCompareOptions, WordWorkerPairResult } from "../word-compare/wordWorkerClient.ts";
+import type { WordComparisonEvents, WordCompareOptions, WordWorkerPairResult } from "../word-compare/wordWorkerClient.ts";
 import { compareWordFilePairs } from "../word-compare/wordWorkerClient.ts";
 import type { HwpCompareOptions } from "../hwp-compare/hwpWorkerClient.ts";
 import { compareHwpFilePairs } from "../hwp-compare/hwpWorkerClient.ts";
@@ -25,6 +25,7 @@ export async function compareDocumentFilePairs(
   onProgress?: (progress: number, message: string) => void,
   language: "ko" | "en" = "ko",
   signal?: AbortSignal,
+  events?: WordComparisonEvents,
 ) {
   const inspected = await inspectPairs(pairs, language, signal);
   const indexedResults = new Map<number, WordWorkerPairResult>();
@@ -41,12 +42,25 @@ export async function compareDocumentFilePairs(
     const share = (group.pairs.length / pairs.length) * 100;
     const progress = (value: number, message: string) => onProgress?.(base + (value / 100) * share, message);
     const applied = formattingScopeForPair(!group.native,options);
+    // A native pair with a narrowed formatting mask says the mask applies to DOCX only (once, before it is shown).
+    const warned = new WeakSet<object>();
+    const nativeWarning = (result: WordWorkerPairResult["result"]) => {
+      if (!group.native || warned.has(result) || !Object.values(normalizeFormattingMask(options.formattingMask)).some(enabled=>!enabled)) return;
+      warned.add(result);
+      result.warnings.push(language === "en" ? "Detailed formatting groups apply to DOCX pairs only. This pair uses the full native formatting scope when formatting is enabled." : "세부 서식 선택은 DOCX 쌍에만 적용됩니다. 이 문서 쌍은 서식 비교를 켜면 기존의 전체 서식 범위로 비교합니다.");
+    };
+    // Events carry the caller's pair index; screen results of groups without a separate tracked pass arrive with the group.
+    const forward: WordComparisonEvents | undefined = events && {
+      onScreen: (index, result) => { nativeWarning(result); events.onScreen?.(group.pairs[index].index, result); },
+      onTracked: (index, buffer, warnings) => events.onTracked?.(group.pairs[index].index, buffer, warnings),
+    };
     const results = group.family === "word"
-      ? await compareWordFilePairs(group.pairs.map(({ beforeFile, afterFile }) => ({ beforeFile, afterFile })), applied, progress, language, signal)
+      ? await compareWordFilePairs(group.pairs.map(({ beforeFile, afterFile }) => ({ beforeFile, afterFile })), applied, progress, language, signal, forward)
       : await compareHwpFilePairs(group.pairs.map(({ beforeFile, afterFile, beforePassword, afterPassword }) => ({ beforeFile, afterFile, beforePassword, afterPassword })), applied, progress, language, signal);
     results.forEach((result, resultIndex) => {
-      if (group.native && Object.values(normalizeFormattingMask(options.formattingMask)).some(enabled=>!enabled)) result.result.warnings.push(language === "en" ? "Detailed formatting groups apply to DOCX pairs only. This pair uses the full native formatting scope when formatting is enabled." : "세부 서식 선택은 DOCX 쌍에만 적용됩니다. 이 문서 쌍은 서식 비교를 켜면 기존의 전체 서식 범위로 비교합니다.");
+      nativeWarning(result.result);
       indexedResults.set(group.pairs[resultIndex].index, result);
+      if (group.family === "hwp") events?.onScreen?.(group.pairs[resultIndex].index, result.result);
     });
     completed += group.pairs.length;
   }

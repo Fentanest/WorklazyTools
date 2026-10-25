@@ -17,6 +17,13 @@ export interface WordWorkerPairResult {
   trackedBuffer?: ArrayBuffer;
 }
 
+/** Results as they become available: each pair's screen result, then its tracked DOCX (or the
+ * warnings explaining why there is none). The returned promise still settles once with every pair. */
+export interface WordComparisonEvents {
+  onScreen?: (index: number, result: WordCompareResult) => void;
+  onTracked?: (index: number, trackedBuffer: ArrayBuffer | undefined, warnings: string[]) => void;
+}
+
 export interface WordFilePair {
   beforeFile: File;
   afterFile: File;
@@ -28,6 +35,7 @@ export async function compareWordFilePairs(
   onProgress?: (progress: number, message: string) => void,
   language: "ko" | "en" = "ko",
   signal?: AbortSignal,
+  events?: WordComparisonEvents,
 ) {
   const canceledMessage = language === "en" ? "Word comparison was cancelled." : "Word 문서 비교를 취소했습니다.";
   const startError = language === "en" ? "Could not start Word comparison. Reload the page and try again." : "Word 문서 비교를 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요.";
@@ -64,6 +72,9 @@ export async function compareWordFilePairs(
 
   return new Promise<WordWorkerPairResult[]>((resolve, reject) => {
     let settled = false;
+    const collected: Array<WordWorkerPairResult | undefined> = payloads.map(() => undefined), trackedSeen = new Set<number>();
+    const failure = () => new Error(language === "en" ? "An error occurred while comparing Word documents." : "Word 문서 비교 중 오류가 발생했습니다.");
+    const validIndex = (value: unknown): value is number => Number.isInteger(value) && (value as number) >= 0 && (value as number) < payloads.length;
     const finish = () => { if (settled) return false; settled = true; signal?.removeEventListener("abort", abort); worker.onmessage = worker.onerror = worker.onmessageerror = null; worker.terminate(); return true; };
     const abort = () => { if (finish()) reject(new DOMException(canceledMessage, "AbortError")); };
     signal?.addEventListener("abort", abort, { once: true });
@@ -74,7 +85,29 @@ export async function compareWordFilePairs(
         onProgress?.(event.data.progress, event.data.message);
         return;
       }
+      if (event.data?.type === "screen") {
+        const index = event.data.index;
+        if (!validIndex(index) || collected[index] || !validEntry({ result: event.data.result }, index)) { if (finish()) reject(failure()); return; }
+        collected[index] = { result: event.data.result as WordCompareResult };
+        events?.onScreen?.(index, collected[index]!.result);
+        return;
+      }
+      if (event.data?.type === "tracked") {
+        const index = event.data.index, buffer = event.data.trackedBuffer, warnings = event.data.warnings;
+        const entry = validIndex(index) ? collected[index] : undefined;
+        if (!entry || trackedSeen.has(index) || !Array.isArray(warnings) || !warnings.every((message: unknown) => typeof message === "string") || !validEntry({ result: entry.result, trackedBuffer: buffer }, index)) { if (finish()) reject(failure()); return; }
+        trackedSeen.add(index);
+        entry.trackedBuffer = buffer;
+        entry.result.warnings.push(...warnings);
+        events?.onTracked?.(index, buffer, warnings);
+        return;
+      }
       if (!finish()) return;
+      if (event.data?.type === "done") {
+        if (collected.every(Boolean)) resolve(collected as WordWorkerPairResult[]);
+        else reject(failure());
+        return;
+      }
       if (event.data?.type === "result" && Array.isArray(event.data.result) && event.data.result.length === payloads.length && event.data.result.every(validEntry)) resolve(event.data.result as WordWorkerPairResult[]);
       else reject(new Error(event.data?.type === "error" && typeof event.data.error?.message === "string" ? event.data.error.message : language === "en" ? "An error occurred while comparing Word documents." : "Word 문서 비교 중 오류가 발생했습니다."));
     };

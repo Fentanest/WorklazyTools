@@ -214,6 +214,20 @@ TEXT_SKIPPED_TAGS = DELETED_TEXT_TAGS | {W + "pPr", W + "rPr", W + "sectPr", W +
 
 
 def _text(node):
+    """Accepted-view text of `node`, memoized within one extraction (the extractor reads trees only;
+    the entry keeps the node so its id cannot be reused by another element)."""
+    memo = _FACT_MEMO["text"]
+    if memo is not None:
+        entry = memo.get(id(node))
+        if entry is not None and entry[0] is node:
+            return entry[1]
+        value = _text_uncached(node)
+        memo[id(node)] = (node, value)
+        return value
+    return _text_uncached(node)
+
+
+def _text_uncached(node):
     parts = []
     stack = [node]
     while stack:
@@ -240,10 +254,18 @@ def _run_style(run):
         item = props.find(W + name)
         if item is not None:
             values.append(name + ":" + item.attrib.get(W + "val", "1"))
+    memo = _FACT_MEMO["styleJson"]
     for name in ("color", "highlight", "sz", "rFonts"):
         item = props.find(W + name)
         if item is not None:
-            values.append(name + ":" + json.dumps(item.attrib, sort_keys=True))
+            # The same few attribute sets repeat on every run: serialize each once per extraction.
+            key = tuple(item.attrib.items()) if memo is not None else None
+            encoded = memo.get(key) if memo is not None else None
+            if encoded is None:
+                encoded = json.dumps(item.attrib, sort_keys=True)
+                if memo is not None:
+                    memo[key] = encoded
+            values.append(name + ":" + encoded)
     return "|".join(values)
 
 
@@ -273,7 +295,7 @@ def _policy_sets(policy):
     return cached[1:]
 
 
-_FACT_MEMO = {"facts": None}
+_FACT_MEMO = {"facts": None, "text": None, "styleJson": None}
 
 
 def _element_key(node):
@@ -528,7 +550,19 @@ def _source_paths(root, part, archive=None):
                                             if target_path in archive.namelist():
                                                 payload += archive.read(target_path)
                 reference["opaqueSignature"] = hashlib.sha256(payload).hexdigest()
-                property_runs = [(character, canonical(run.find(W + "rPr")) if run.find(W + "rPr") is not None else None) for run in node.iter(W + "r") for character in _text(run)]
+                # Text with its run properties, adjacent equal properties joined: equal exactly when the
+                # per-character (character, properties) sequences are equal, without per-character work.
+                property_runs = []
+                for run in node.iter(W + "r"):
+                    text = _text(run)
+                    if not text:
+                        continue
+                    run_properties = run.find(W + "rPr")
+                    canonical_properties = canonical(run_properties) if run_properties is not None else None
+                    if property_runs and property_runs[-1][1] == canonical_properties:
+                        property_runs[-1][0] += text
+                    else:
+                        property_runs.append([text, canonical_properties])
                 properties = node.find(W + "pPr")
                 copy_payload = (canonical(properties) if properties is not None else None, property_runs)
                 reference["copySignature"] = hashlib.sha256(json.dumps(copy_payload, ensure_ascii=False).encode("utf-8")).hexdigest()
@@ -1253,6 +1287,8 @@ def _extract_document_model_object(document_bytes, include_tables, include_metad
     _PARSED_PARTS["parts"] = {}
     _PARSED_PARTS["xml"] = {}
     _FACT_MEMO["facts"] = {}
+    _FACT_MEMO["text"] = {}
+    _FACT_MEMO["styleJson"] = {}
     try:
         records = _parse_document(bytes(document_bytes), include_tables, include_metadata)
     finally:
@@ -1260,6 +1296,8 @@ def _extract_document_model_object(document_bytes, include_tables, include_metad
         _PARSED_PARTS["parts"] = None
         _PARSED_PARTS["xml"] = None
         _FACT_MEMO["facts"] = None
+        _FACT_MEMO["text"] = None
+        _FACT_MEMO["styleJson"] = None
 
     def comments_of(record):
         return [

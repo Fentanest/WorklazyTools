@@ -326,6 +326,16 @@ def _accept_xml(data, is_settings=False):
     return _serialize_xml(root)
 
 
+# Element names `_accept_xml` acts on (any prefix). A part without one of them only round-trips
+# through parse and serialization, so it is kept byte for byte (no tracked revision to accept).
+_REVISION_MARKUP = re.compile(
+    rb"<(?:[A-Za-z_][\w.-]*:)?(?:ins|del|moveFrom|moveTo|cellIns|cellDel|cellMerge|numberingChange|trackRevisions"
+    rb"|rPrChange|pPrChange|tblPrChange|tblPrExChange|tblGridChange|trPrChange|tcPrChange|sectPrChange"
+    rb"|moveFromRangeStart|moveFromRangeEnd|moveToRangeStart|moveToRangeEnd"
+    rb"|customXmlInsRangeStart|customXmlInsRangeEnd|customXmlDelRangeStart|customXmlDelRangeEnd)[\s/>]"
+)
+
+
 def _is_accept_part(name):
     return name in ACCEPTED_XML_PARTS or bool(re.fullmatch(r"word/(?:header|footer)\d+\.xml", name))
 
@@ -352,11 +362,18 @@ def accept_tracked_document(input_path, output_path):
                     target=rel.get("Target","");stories.add(target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join("word",target)))
         for info in archive.infolist():
             if _is_accept_part(info.filename) or info.filename in stories:
+                data = archive.read(info.filename)
+                if not _REVISION_MARKUP.search(data):
+                    continue
                 replacements[info.filename] = _accept_xml(
-                    archive.read(info.filename),
+                    data,
                     is_settings=info.filename == "word/settings.xml",
                 )
-    _copy_archive(input_path, output_path, replacements)
+    if replacements:
+        _copy_archive(input_path, output_path, replacements)
+    else:
+        import shutil
+        shutil.copyfile(input_path, output_path)
     return sum(1 for name in replacements if name != "word/settings.xml")
 
 

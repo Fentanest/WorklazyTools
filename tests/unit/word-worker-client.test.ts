@@ -83,3 +83,42 @@ test("result settles once and late progress cannot reach consumer", async () => 
   assert.equal(progress, 1); assert.equal(worker.terminated, 1);
   assert.equal(worker.onmessage, null); assert.equal(worker.onmessageerror, null);
 });
+test("screen results arrive first, tracked files follow, done settles with both", async () => {
+  const seen: string[] = [];
+  const pending = compareWordFilePairs(pairs(), options, undefined, "en", undefined, {
+    onScreen: (index, result) => seen.push(`screen:${index}:${result.beforeName}`),
+    onTracked: (index, buffer, warnings) => seen.push(`tracked:${index}:${buffer?.byteLength}:${warnings.length}`),
+  }); await setImmediate();
+  const message = FakeWorker.instances[0].onmessage!;
+  message({ data: { type: "screen", index: 0, result: structuredClone(emptyResult) } } as MessageEvent);
+  assert.deepEqual(seen, ["screen:0:before.docx"]); assert.equal(FakeWorker.instances[0].terminated, 0);
+  message({ data: { type: "tracked", index: 0, trackedBuffer: new ArrayBuffer(4), warnings: [] } } as MessageEvent);
+  message({ data: { type: "done" } } as MessageEvent);
+  const [entry] = await pending;
+  assert.deepEqual(seen, ["screen:0:before.docx", "tracked:0:4:0"]); assert.equal(entry.trackedBuffer?.byteLength, 4); assert.equal(FakeWorker.instances[0].terminated, 1);
+});
+test("a missing tracked file adds its warning to the pair result", async () => {
+  const pending = compareWordFilePairs(pairs(), options, undefined, "en"); await setImmediate();
+  const message = FakeWorker.instances[0].onmessage!;
+  message({ data: { type: "screen", index: 0, result: structuredClone(emptyResult) } } as MessageEvent);
+  message({ data: { type: "tracked", index: 0, trackedBuffer: undefined, warnings: ["no docx"] } } as MessageEvent);
+  message({ data: { type: "done" } } as MessageEvent);
+  const [entry] = await pending; assert.equal(entry.trackedBuffer, undefined); assert.deepEqual(entry.result.warnings, ["no docx"]);
+});
+test("out-of-order, duplicate or malformed progressive messages are rejected", async () => {
+  const cases = [
+    [{ type: "tracked", index: 0, trackedBuffer: new ArrayBuffer(1), warnings: [] }],
+    [{ type: "screen", index: 1, result: emptyResult }],
+    [{ type: "screen", index: 0, result: emptyResult }, { type: "screen", index: 0, result: emptyResult }],
+    [{ type: "screen", index: 0, result: { ...emptyResult, afterName: "x.docx" } }],
+    [{ type: "screen", index: 0, result: emptyResult }, { type: "tracked", index: 0, trackedBuffer: new ArrayBuffer(0), warnings: [] }],
+    [{ type: "screen", index: 0, result: emptyResult }, { type: "tracked", index: 0, warnings: [1] }],
+    [{ type: "done" }],
+  ];
+  for (const sequence of cases) {
+    const pending = compareWordFilePairs(pairs(), options, undefined, "en"); await setImmediate();
+    const worker = FakeWorker.instances.at(-1)!;
+    for (const data of sequence) worker.onmessage?.({ data: structuredClone(data) } as MessageEvent);
+    await assert.rejects(pending, /An error occurred/, JSON.stringify(sequence)); assert.equal(worker.terminated, 1);
+  }
+});

@@ -1,5 +1,6 @@
 import type {ComparisonDecision,DocumentComparisonManifest,DocumentSourceReference} from './comparisonManifest.ts';
 import type {StoryFacts} from './storyProjection.ts';
+import {findSource} from './manifestIndex.ts';
 /** `blankOwner`: both section breaks sit on empty paragraphs, which the comparison omits and the
  * tracked document keeps from the revision; such breaks pair by order instead of by decision. */
 /** `oneSided`: the break sits in a paragraph that only one side has (deleted or inserted whole);
@@ -11,26 +12,29 @@ export function buildSectionPairs(manifest:DocumentComparisonManifest,a:StoryFac
  if(!manifest.options.metadata&&!manifest.options.formatting)return {pairs,reasons};
  const decisions:ComparisonDecision[]=[];const visit=(items:ComparisonDecision[])=>{for(const item of items){decisions.push(item);visit(item.children??[]);}};visit(manifest.decisions);
  const blank:{before:StoryFacts['sections'];after:StoryFacts['sections']}={before:[],after:[]};
+ // Indexed forms of the former linear scans (same first match: an inventory entry is the only one with its part and path).
+ const sourceAt=(side:'before'|'after',part:string,path:number[])=>findSource(manifest,side,{part,path});
+ const ownerOf=(side:'before'|'after',source:{part:string;path:number[]})=>{const owner=source.path.length>=2?sourceAt(side,source.part,source.path.slice(0,-2)):undefined;return owner?.kind==='p'?owner:undefined;};
+ const decided={before:new Set<string>(),after:new Set<string>()},paragraphDecision={before:new Map<string,ComparisonDecision>(),after:new Map<string,ComparisonDecision>()};
+ for(const item of decisions)for(const side of ['before','after'] as const)for(const ref of item[side]){const key=sourceKey(ref);decided[side].add(key);if(item.type==='paragraph'&&!paragraphDecision[side].has(key))paragraphDecision[side].set(key,item);}
  // A section-break paragraph sits directly in the body or in a body-level content control.
  const inBodyEnvelope=(side:'before'|'after',owner:DocumentSourceReference)=>{
-  const refs=manifest.sources[side],at=(path:number[])=>refs.find(ref=>ref.part===owner.part&&sourceKey(ref)===sourceKey({...owner,path}));
+  const at=(path:number[])=>sourceAt(side,owner.part,path);
   const parent=at(owner.path.slice(0,-1));
   if(parent?.kind==='body')return true;
   return parent?.kind==='sdtContent'&&at(owner.path.slice(0,-2))?.kind==='sdt'&&at(owner.path.slice(0,-3))?.kind==='body';
  };
  const hasBreak=(facts:StoryFacts,owner:DocumentSourceReference)=>facts.sections.some(section=>!section.final&&section.source.part===owner.part&&section.source.path.length===owner.path.length+2&&owner.path.every((v,i)=>section.source.path[i]===v));
  const blankOwner=(side:'before'|'after',section:StoryFacts['sections'][number])=>{
-  const source=section.source,refs=manifest.sources[side];
-  const owner=refs.find(ref=>ref.kind==='p'&&ref.part===source.part&&source.path.length===ref.path.length+2&&ref.path.every((v,i)=>source.path[i]===v));
-  if(!owner||owner.rawText?.trim()||owner.opaqueSignature||decisions.some(item=>item[side].some(ref=>sourceKey(ref)===sourceKey(owner))))return false;
-  return refs.some(ref=>ref.kind==='body'&&ref.part===owner.part&&sourceKey(ref)===sourceKey({...owner,path:owner.path.slice(0,-1)}));
+  const owner=ownerOf(side,section.source);
+  if(!owner||owner.rawText?.trim()||owner.opaqueSignature||decided[side].has(sourceKey(owner)))return false;
+  return sourceAt(side,owner.part,owner.path.slice(0,-1))?.kind==='body';
  };
  for(const section of b.sections.filter(section=>!section.final))if(blankOwner('after',section))blank.after.push(section);
  for(const section of a.sections.filter(section=>!section.final)){
   if(blankOwner('before',section)){blank.before.push(section);continue;}
-  const source=section.source;
-  const owner=manifest.sources.before.find(ref=>ref.kind==='p'&&ref.part===source.part&&source.path.length===ref.path.length+2&&ref.path.every((v,i)=>source.path[i]===v));
-  const decision=owner&&decisions.find(item=>item.type==='paragraph'&&item.before.some(ref=>sourceKey(ref)===sourceKey(owner)));
+  const owner=ownerOf('before',section.source);
+  const decision=owner&&paragraphDecision.before.get(sourceKey(owner));
   const directBody=owner&&inBodyEnvelope('before',owner);
   if(directBody&&decision&&!decision.moved&&decision.type==='paragraph'&&decision.before.length===1&&(!decision.after.length||decision.after.length===1&&!hasBreak(b,decision.after[0]))){pairs.push({id:'section:'+decision.id,before:section,ownerDecisionId:decision.id,final:false,oneSided:true});continue;}
   if(!directBody||!decision||decision.moved||decision.before.length!==1||decision.after.length!==1){reasons.push('unsupported-section-boundary');continue;}
@@ -43,9 +47,8 @@ export function buildSectionPairs(manifest:DocumentComparisonManifest,a:StoryFac
  // Breaks in wholly inserted paragraphs are recorded with that paragraph.
  for(const section of b.sections.filter(section=>!section.final)){
   if(pairs.some(pair=>pair.after&&sourceKey(pair.after.source)===sourceKey(section.source))||blank.after.includes(section))continue;
-  const source=section.source;
-  const owner=manifest.sources.after.find(ref=>ref.kind==='p'&&ref.part===source.part&&source.path.length===ref.path.length+2&&ref.path.every((v,i)=>source.path[i]===v));
-  const decision=owner&&decisions.find(item=>item.type==='paragraph'&&item.after.some(ref=>sourceKey(ref)===sourceKey(owner)));
+  const owner=ownerOf('after',section.source);
+  const decision=owner&&paragraphDecision.after.get(sourceKey(owner));
   const directBody=owner&&inBodyEnvelope('after',owner);
   if(directBody&&decision&&!decision.moved&&decision.after.length===1&&(!decision.before.length||decision.before.length===1&&!hasBreak(a,decision.before[0])))pairs.push({id:'section:'+decision.id,after:section,ownerDecisionId:decision.id,final:false,oneSided:true});
  }

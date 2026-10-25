@@ -6,7 +6,6 @@ import compareScript from "./compare.py?raw";
 import trackedDocxScript from "./tracked_docx.py?raw";
 import formattingPolicy from "./formatting-policy.json";
 import pyodidePackage from "pyodide/package.json";
-import type { WordCompareResult } from "../excel-merger/types";
 import { compareDocumentModels, diffText, type ComparisonModel } from "../document-compare/documentComparison";
 import { serializeManifestForTracked } from "../document-compare/manifestWire";
 import { sniffDocumentFormat, type DocumentFormat } from "../document-compare/documentFormat";
@@ -92,14 +91,26 @@ worker.onmessage = async (event: MessageEvent) => {
     } else {
       progress(42, L("DOC 문서 비교 준비를 완료했습니다.", "DOC comparison is ready."));
     }
-    const results: Array<{ result: WordCompareResult; trackedBuffer?: ArrayBuffer }> = [];
-    const transfers: ArrayBuffer[] = [];
+    // Screen results go out first, pair by pair; tracked DOCX files follow in a second pass. Until
+    // then each pair keeps only its compact tracked manifest and its files in the Pyodide file system.
+    const trackedJobs: Array<{ index: number; beforePath: string; afterPath: string; trackedPath: string; temporaryPaths: string[]; manifest: Uint8Array; mask: string; label: string }> = [];
+    const removeFiles = (paths: string[]) => {
+      for (const path of paths) {
+        try {
+          pyodide?.FS.unlink(path);
+        } catch {
+          // The path may not have been created before cancellation or failure.
+        }
+      }
+    };
 
     for (let index = 0; index < pairs.length; index += 1) {
       activePair = index + 1;
       const pair = pairs[index];
-      const startProgress = 45 + Math.round((index / pairs.length) * 50);
-      const endProgress = 45 + Math.round(((index + 1) / pairs.length) * 50);
+      // With tracked files the screen pass takes 45–70% and the tracked pass 70–99%.
+      const screenSpan = event.data.options.trackedDocument ? 25 : 50;
+      const startProgress = 45 + Math.round((index / pairs.length) * screenSpan);
+      const endProgress = 45 + Math.round(((index + 1) / pairs.length) * screenSpan);
       progress(startProgress, L(`[${activePair}/${pairs.length}] ${pair.beforeName} ↔ ${pair.afterName} 분석 중…`, `[${activePair}/${pairs.length}] Analyzing ${pair.beforeName} ↔ ${pair.afterName}…`));
       const pairFormats = formats[index];
       const pathPrefix = `/tmp/worklazy-word-${index}`;
@@ -111,7 +122,7 @@ worker.onmessage = async (event: MessageEvent) => {
       const temporaryPaths = [beforePath, afterPath, acceptedBeforePath, acceptedAfterPath, trackedPath];
       let beforeBuffer = pair.beforeBuffer;
       let afterBuffer = pair.afterBuffer;
-      let trackedBuffer: ArrayBuffer | undefined;
+      let keepFiles = false;
       try {
         const docxPair = pairFormats.before === "docx" && pairFormats.after === "docx";
         const rewriteRevisionAuthor = Boolean(event.data.options.trackedDocument && event.data.options.rewriteRevisionAuthor);
@@ -155,57 +166,61 @@ worker.onmessage = async (event: MessageEvent) => {
           result.warnings.push(L("변경 추적 파일의 메모와 기존 변경 기록은 수정본 기준으로 유지됩니다. 메모 본문의 변경은 Word에서 거부하여 원본으로 복원할 수 없습니다.", "Comments and existing revision history in the tracked file are kept from the revised file. Rejecting changes in Word does not restore original comment text."));
         }
         if (event.data.options.trackedDocument && docxPair && pyodide && generateTracked) {
-          progress(Math.min(endProgress - 1, startProgress + Math.round((endProgress - startProgress) * 0.7)), L(`[${activePair}/${pairs.length}] Word 변경 추적 파일 생성 중…`, `[${activePair}/${pairs.length}] Creating tracked-changes Word file…`));
           const trackedBeforePath = rewriteRevisionAuthor ? acceptedBeforePath : beforePath;
           const trackedAfterPath = rewriteRevisionAuthor ? acceptedAfterPath : afterPath;
           if (!rewriteRevisionAuthor) {
             pyodide.FS.writeFile(beforePath, new Uint8Array(pair.beforeBuffer));
             pyodide.FS.writeFile(afterPath, new Uint8Array(pair.afterBuffer));
           }
-          try {
-            generateTracked(
-              trackedBeforePath,
-              trackedAfterPath,
-              trackedPath,
-              event.data.options.revisionAuthor,
-              event.data.options.formatting,
-              event.data.options.tables,
-              event.data.options.metadata,
-              compactManifestBytes(serializeManifestForTracked(result.manifest)),
-              JSON.stringify(result.manifest.formattingMask.requested),
-            );
-            const trackedBytes = pyodide.FS.readFile(trackedPath) as Uint8Array;
-            trackedBuffer = trackedBytes.slice().buffer;
-            transfers.push(trackedBuffer);
-          } catch (error) {
-            // The tracked file is an extra download: any failure here (a guarded source shape,
-            // memory exhaustion or an unexpected generator error) drops only this pair's DOCX.
-            trackedBuffer = undefined;
-            const guarded = /COMPARISON_MANIFEST|COMPARISON_DECISION|UNMAPPED_VISIBLE_XML_NODE|SHARED_DIFF|UNSUPPORTED_TRACKED_SOURCE/.test(String(error));
-            result.warnings.push(guarded ? L(
-              "일부 원문 위치를 변경 추적 파일에 안전하게 연결할 수 없어 DOCX 다운로드를 제공하지 않습니다. 화면 비교 결과를 확인해 주세요.",
-              "The tracked DOCX download is unavailable because some source locations could not be represented safely. Review the on-screen comparison.",
-            ) : L(
-              "변경 추적 파일을 만드는 중 문제가 생겨 이 문서 쌍의 DOCX 다운로드를 제공하지 않습니다. 화면 비교 결과는 그대로 확인할 수 있습니다.",
-              "The tracked DOCX download is unavailable for this document pair because creating it failed. The on-screen comparison is still available.",
-            ));
-          }
+          trackedJobs.push({ index, beforePath: trackedBeforePath, afterPath: trackedAfterPath, trackedPath, temporaryPaths, manifest: compactManifestBytes(serializeManifestForTracked(result.manifest)), mask: JSON.stringify(result.manifest.formattingMask.requested), label: `[${activePair}/${pairs.length}]` });
+          keepFiles = true;
         }
-        results.push({ result, trackedBuffer });
+        worker.postMessage({ type: "screen", index, result });
       } finally {
-        for (const path of temporaryPaths) {
-          try {
-            pyodide?.FS.unlink(path);
-          } catch {
-            // The path may not have been created before cancellation or failure.
-          }
-        }
+        if (!keepFiles) removeFiles(temporaryPaths);
       }
       progress(endProgress, L(`[${activePair}/${pairs.length}] 비교 결과 정리 완료`, `[${activePair}/${pairs.length}] Comparison result ready`));
     }
 
+    for (const [position, job] of trackedJobs.entries()) {
+      activePair = job.index + 1;
+      progress(70 + Math.round((position / trackedJobs.length) * 29), L(`${job.label} Word 변경 추적 파일 생성 중…`, `${job.label} Creating tracked-changes Word file…`));
+      let trackedBuffer: ArrayBuffer | undefined;
+      const warnings: string[] = [];
+      try {
+        generateTracked!(
+          job.beforePath,
+          job.afterPath,
+          job.trackedPath,
+          event.data.options.revisionAuthor,
+          event.data.options.formatting,
+          event.data.options.tables,
+          event.data.options.metadata,
+          job.manifest,
+          job.mask,
+        );
+        trackedBuffer = (pyodide!.FS.readFile(job.trackedPath) as Uint8Array).slice().buffer;
+      } catch (error) {
+        // The tracked file is an extra download: any failure here (a guarded source shape,
+        // memory exhaustion or an unexpected generator error) drops only this pair's DOCX.
+        trackedBuffer = undefined;
+        const guarded = /COMPARISON_MANIFEST|COMPARISON_DECISION|UNMAPPED_VISIBLE_XML_NODE|SHARED_DIFF|UNSUPPORTED_TRACKED_SOURCE/.test(String(error));
+        warnings.push(guarded ? L(
+          "일부 원문 위치를 변경 추적 파일에 안전하게 연결할 수 없어 DOCX 다운로드를 제공하지 않습니다. 화면 비교 결과를 확인해 주세요.",
+          "The tracked DOCX download is unavailable because some source locations could not be represented safely. Review the on-screen comparison.",
+        ) : L(
+          "변경 추적 파일을 만드는 중 문제가 생겨 이 문서 쌍의 DOCX 다운로드를 제공하지 않습니다. 화면 비교 결과는 그대로 확인할 수 있습니다.",
+          "The tracked DOCX download is unavailable for this document pair because creating it failed. The on-screen comparison is still available.",
+        ));
+      } finally {
+        removeFiles(job.temporaryPaths);
+      }
+      worker.postMessage({ type: "tracked", index: job.index, trackedBuffer, warnings }, trackedBuffer ? [trackedBuffer] : []);
+      progress(70 + Math.round(((position + 1) / trackedJobs.length) * 29), L(`${job.label} 변경 추적 파일 준비 완료`, `${job.label} Tracked-changes file ready`));
+    }
+
     progress(100, L(`${pairs.length}개 문서 쌍 비교 완료`, `Compared ${pairs.length} document pairs`));
-    worker.postMessage({ type: "result", result: results }, transfers);
+    worker.postMessage({ type: "done" });
   } catch (error) {
     const rawMessage = error instanceof Error ? error.message : String(error);
     const detail = /zip|document\.xml|BadZipFile/i.test(rawMessage)

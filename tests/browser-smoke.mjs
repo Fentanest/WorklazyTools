@@ -958,9 +958,13 @@ async function testWordCompare(page, fixtures, tempDir) {
     const input = document.querySelector("[data-testid='document-revision-author'] input");
     return { checked: toggle?.getAttribute("aria-checked"), inputDisabled: input instanceof HTMLInputElement && input.disabled };
   });
-  if (defaultAuthorOption.checked !== "false" || !defaultAuthorOption.inputDisabled) {
-    throw new Error(`Revision-author rewrite was not disabled by default: ${JSON.stringify(defaultAuthorOption)}`);
+  // Accepting existing revisions first is the default since 2026-10-25 (user decision).
+  if (defaultAuthorOption.checked !== "true" || defaultAuthorOption.inputDisabled) {
+    throw new Error(`Revision-author rewrite was not enabled by default: ${JSON.stringify(defaultAuthorOption)}`);
   }
+  // This comparison checks the history-preserving mode (existing revisions kept with their authors);
+  // the default accept-first mode is checked by testWordUnifiedRevisionAuthor.
+  await clickSetting(page, "변경 내용 작성자 통일");
 
   await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await waitForResult(page, 240_000);
@@ -1169,9 +1173,7 @@ async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.revisionsAfterDocx], 1);
   await clickSetting(page, "Excel 보고서");
   const input = await page.$("[data-testid='document-revision-author'] input");
-  if (!input || !await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input was not rendered disabled while rewriting was off.");
-  await clickSetting(page, "변경 내용 작성자 통일");
-  if (await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input did not become enabled.");
+  if (!input || await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input was not enabled while rewriting is on by default.");
   await replaceInputValue(page, input, "Unified Reviewer");
   await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await waitForResult(page, 240_000);
@@ -1185,7 +1187,8 @@ async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
 }
 
 async function waitForResult(page, timeout = 180_000) {
-  await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
+  // Document comparison shows results first and fills tracked DOCX links in afterwards.
+  await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running") && !document.querySelector("[data-tracked-status='pending']")
     && (document.querySelector(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])") || document.querySelector("[data-testid='document-result-card']") || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout });
   const error = await page.$(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])") || await page.$("[data-tool-page='document-compare'] [role='alert']");
   if (error) throw new Error(await error.evaluate((element) => element.textContent || "Unknown UI error"));

@@ -151,11 +151,17 @@ export function completeManifestCoverage(manifest: DocumentComparisonManifest) {
 
 /** Freeze only after the screen projection has completed its cell annotations. */
 export function freezeComparisonManifest<T extends DocumentComparisonManifest>(manifest: T): T {
-  const freeze = (value: unknown) => {
-    if (!value || typeof value !== "object" || Object.isFrozen(value)) return;
-    for (const child of Object.values(value)) freeze(child);
-    Object.freeze(value);
-  };
-  freeze(manifest);
+  // Iterative and without per-object value arrays: the manifest holds every source fact of both documents.
+  const stack: object[] = [manifest];
+  const pending: object[] = [];
+  while (stack.length) {
+    const value = stack.pop()!;
+    if (Object.isFrozen(value)) continue;
+    pending.push(value);
+    if (Array.isArray(value)) { for (let index = 0; index < value.length; index++) { const child: unknown = value[index]; if (child && typeof child === "object") stack.push(child); } }
+    else for (const key of Object.keys(value)) { const child = (value as Record<string, unknown>)[key]; if (child && typeof child === "object") stack.push(child); }
+  }
+  // Children first, as before: an object is frozen only after everything below it.
+  for (let index = pending.length - 1; index >= 0; index--) Object.freeze(pending[index]);
   return manifest;
 }

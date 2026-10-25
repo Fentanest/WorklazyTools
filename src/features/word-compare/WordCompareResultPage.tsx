@@ -1,6 +1,6 @@
 import { DocumentFieldNotes } from "../document-compare/DocumentFieldNotes";
 import type { DocumentComparisonManifest } from "../document-compare/comparisonManifest";
-import { ArrowLeft, ArrowRight, Download, Info, MessageSquare, TextSearch } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Info, LoaderCircle, MessageSquare, TextSearch } from "lucide-react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -36,6 +36,7 @@ export interface DocumentCompareResultPair {
   originalAfterUrl?: string;
   trackedUrl?: string;
   trackedFileName?: string;
+  trackedStatus?: "pending" | "ready" | "unavailable";
 }
 
 interface DocumentCompareResultPageProps {
@@ -106,6 +107,7 @@ export function DocumentCompareResultPage({
       >
         {pair.reportUrl && <Button render={<a href={pair.reportUrl} download={pair.reportFileName} data-testid="document-result-excel-download" />} variant="secondary" className="rounded-xl font-bold"><Download size={15} /> {L("Excel 보고서", "Excel report")}</Button>}
         {pair.reportUrl && <FileShareButton url={pair.reportUrl} fileName={pair.reportFileName || (language === "en" ? "worklazy-comparison-report.xlsx" : "worklazy-비교보고서.xlsx")} />}
+        {pair.trackedStatus === "pending" && trackedLabel && <Button type="button" variant="secondary" disabled className="rounded-xl font-bold" data-testid="document-result-tracked-pending"><LoaderCircle className="animate-spin" size={15} /> {L(`${trackedLabel} 만드는 중`, `Creating ${trackedLabel.toLowerCase()}`)}</Button>}
         {pair.trackedUrl && trackedLabel && <Button render={<a href={pair.trackedUrl} download={pair.trackedFileName} data-testid="document-result-tracked-download" />} variant="secondary" className="rounded-xl font-bold"><Download size={15} /> {trackedLabel}</Button>}
         {pair.trackedUrl && trackedLabel && <FileShareButton url={pair.trackedUrl} fileName={pair.trackedFileName || (language === "en" ? "worklazy-tracked-changes.docx" : "worklazy-변경추적.docx")} />}
       </PageHeader>
