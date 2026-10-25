@@ -157,9 +157,11 @@ const STR = {
     noReceiptNo: "접수번호 없음",
     detailOrigin: "자료 출처",
     ratioMarker: "비율 보정",
+    adjustedQuantity: "보정 수량",
     ratioMarkerTitle: "공시에서 확인한 기업행위 비율로 보정한 수량(추정)입니다",
     detailReportedQuantity: "보고 수량",
     detailRatio: "적용 비율",
+    ratioTipKo: "비율 보정: 공시 수량 {r} × {n} ÷ {d}",
     detailRatioNote: "보고 수량 × {n} ÷ {d} (소수점 이하 버림)",
     detailRatioEvents: "근거 공시",
     ratioEventPrice: "가격 변경일",
@@ -335,9 +337,11 @@ const STR = {
     noReceiptNo: "No receipt number",
     detailOrigin: "Data source",
     ratioMarker: "Ratio-adjusted",
+    adjustedQuantity: "Adjusted quantity",
     ratioMarkerTitle: "Quantity adjusted by corporate-action ratios from filings (estimate)",
     detailReportedQuantity: "Reported quantity",
     detailRatio: "Ratio applied",
+    ratioTipKo: "Ratio-adjusted: reported quantity {r} × {n} ÷ {d}",
     detailRatioNote: "reported quantity × {n} ÷ {d}, rounded down",
     detailRatioEvents: "Source filings",
     ratioEventPrice: "Price change date",
@@ -890,7 +894,7 @@ function ReadyView({
                           <FilingChangeValue value={formatQty(h.quantity)} direction={filingChanges.get(h)?.quantity ?? null}
                             upLabel={t.changeUp} downLabel={t.changeDown} />
                           {h.quantityAdjustment && (
-                            <small className="foliotrace-row-reason" title={t.ratioMarkerTitle}>{t.ratioMarker}</small>
+                            <small className="foliotrace-row-reason" title={t.ratioTipKo.replace("{r}", formatQty(h.quantityAdjustment.reportedQuantity)).replace("{n}", h.quantityAdjustment.ratioNumerator).replace("{d}", h.quantityAdjustment.ratioDenominator)}>{t.ratioMarker}</small>
                           )}
                         </td>
                         <td className="foliotrace-num">
@@ -979,7 +983,7 @@ function ReadyView({
             </SheetDescription>
             <dl className="foliotrace-detail-list">
               <div>
-                <dt>{t.colQuantity}</dt>
+                <dt>{selected.quantityAdjustment ? t.adjustedQuantity : t.colQuantity}</dt>
                 <dd className="foliotrace-num">{formatQty(selected.quantity)}</dd>
               </div>
               {selected.quantityAdjustment && (
@@ -991,7 +995,9 @@ function ReadyView({
                   <div>
                     <dt>{t.detailRatio}</dt>
                     <dd className="foliotrace-num" title={t.ratioMarkerTitle}>
-                      {selected.quantityAdjustment.ratioDenominator} → {selected.quantityAdjustment.ratioNumerator}
+                      {lang === "ko"
+                        ? `${selected.quantityAdjustment.ratioDenominator}주 → ${selected.quantityAdjustment.ratioNumerator}주`
+                        : `${selected.quantityAdjustment.ratioDenominator} → ${selected.quantityAdjustment.ratioNumerator} shares`}
                       <small className="foliotrace-row-reason">
                         {t.detailRatioNote.replace("{n}", selected.quantityAdjustment.ratioNumerator).replace("{d}", selected.quantityAdjustment.ratioDenominator)}
                       </small>
