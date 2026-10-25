@@ -8,6 +8,9 @@ run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'deplo
 # Missing secret or failed checkout stops the run before any deploy: the site keeps its previous data.
 # The local orchestrator starts a deploy with workflow_dispatch (mode=deploy, data_revision=<pushed commit>) after its data push, using a
 # fine-grained token limited to this repository's Actions. The site carries the data revision at /data/foliotrace-source.json (tracking only).
+# Runner (user decision 2026-10-25): build and deploy run on the self-hosted runner Ubuntu24-Git (labels self-hosted, Linux, X64, 235). The
+# `runner` dispatch input is a manual github-hosted fallback; the orchestrator sends only mode/data_revision and gets the default. This
+# workflow has no pull_request trigger, so untrusted fork code never reaches that machine. Artifacts and logs are kept 1 day.
 # Cutover steps: docs/foliotrace-delivery-and-deploy.md.
 #
 # Inert until cutover: a main push deploys only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true' (otherwise skipped).
@@ -17,6 +20,14 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      runner:
+        description: Runner for both jobs (default = own machine Ubuntu24-Git; github-hosted only as a manual fallback when it is down)
+        required: true
+        default: self-hosted
+        type: choice
+        options:
+          - self-hosted
+          - github-hosted
       mode:
         description: validate = build and validate only (Pages untouched); deploy = explicit publish
         required: true
@@ -42,7 +53,7 @@ jobs:
   build:
     # Main push deploys only after cutover (variable gate). A dispatched run is always explicit and never gated.
     if: github.event_name == 'workflow_dispatch' || vars.FOLIOTRACE_DEPLOY_V2 == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","235"]') }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,6 +61,9 @@ jobs:
           # The PDF oracle unit test compares files with a pinned historical
           # commit; a shallow source checkout cannot read those exact blobs.
           fetch-depth: 0
+
+      - name: Remove leftovers of a previous run on this persistent runner
+        run: rm -rf foliotrace-site-data market-calendar-state public/data/foliotrace dist
 
       - name: Require the data repository read key
         env:
@@ -66,6 +80,14 @@ jobs:
           path: foliotrace-site-data
           persist-credentials: false
           fetch-depth: 1
+
+      - name: Remove the data repository read key from this machine
+        # actions/checkout writes the key to a uuid-named 600 file under RUNNER_TEMP and removes it in its post step; this also removes it
+        # if that step never ran (a persistent machine must not keep the key).
+        if: always()
+        run: |
+          grep -rlsE 'BEGIN (OPENSSH|RSA|EC) PRIVATE KEY' "$RUNNER_TEMP" 2>/dev/null | xargs -r rm -f
+          rm -f "$RUNNER_TEMP"/*known_hosts* 2>/dev/null || true
 
       - name: Place FolioTrace data at the path the screen reads
         run: |
@@ -166,7 +188,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","235"]') }}
     steps:
       - name: Check this run is still the newest main
         id: fresh

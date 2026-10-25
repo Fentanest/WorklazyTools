@@ -105,6 +105,16 @@ class CopyCalendarTest(unittest.TestCase):
         self.assertNotIn('if:', step, name)
         self.assertNotIn('continue-on-error:', step, name)
 
+    def test_workflows_runner_and_artifact_policy(self):
+        deploy = Path('.github/workflows/deploy-site.yml').read_text()
+        banner = Path('.github/workflows/product-banner-tests.yml').read_text()
+        self.assertEqual(deploy.count("inputs.runner == 'github-hosted'"), 2)
+        self.assertEqual(deploy.count('"self-hosted","Linux","X64","235"'), 2)
+        self.assertIn('retention-days: 1', deploy)
+        self.assertIn("github.event.pull_request.head.repo.full_name != github.repository", banner)
+        self.assertEqual(banner.count('"self-hosted","Linux","X64","235"'), 1)
+        self.assertNotIn('runs-on: ubuntu-latest', deploy + banner)
+
     def test_interrupted_published_download_records_unavailable_without_failing_site(self):
         self.source = self.root / 'absent-checkout'
         with patch.object(calendar, 'download', side_effect=IncompleteRead(b'partial')), contextlib.redirect_stderr(io.StringIO()) as log:

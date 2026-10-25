@@ -50,10 +50,10 @@
 사전 준비(사용자): 데이터 저장소 생성, 두 Deploy key 등록, `FOLIOTRACE_SITE_DATA_READ_KEY` 비밀값 설정, 시작용 세분화 토큰 발급·호스트 보관, (권고) 데이터 저장소 main 보호.
 1. 코드·워크플로가 main에 들어간다. 비밀값·데이터가 아직 없으면 새 워크플로는 수동 실행 때 키 확인 또는 체크아웃/검증에서 실패한다 = 정상(배포 안 함). 옛 cron은 계속 사이트를 갱신한다(이 변경은 옛 검증기도 공개 개정 1 실데이터로 통과 확인).
 2. 오케스트레이터 첫 전달로 데이터 저장소에 `v1/`이 생긴다.
-3. `Deploy site`를 `mode=validate`로 수동 실행해 키·체크아웃·검증·빌드·테스트 통과를 확인한다(GitHub 호스팅 러너).
+3. `Deploy site`를 `mode=validate`로 수동 실행해 키·체크아웃·검증·빌드·테스트 통과를 확인한다(기본 `Ubuntu24-Git`, 장애 시 수동 `runner=github-hosted`).
 4. 옛 워크플로를 비활성(`gh workflow disable "Deploy GitHub Pages"`)한 뒤 같은 워크플로를 `mode=deploy`로 수동 1회 실배포 → 사이트 값·날짜 확인.
 5. 전환: 저장소 변수 `FOLIOTRACE_DEPLOY_V2=true`(main push 자동 배포 켬), 시작용 토큰을 호스트에 두고 오케스트레이터 dispatch를 켠다. 이후 main push와 오케스트레이터의 dispatch(mode=deploy)로 배포된다.
-6. 안정 확인(예: 연속 정상 배포 3일) 뒤 P4: `foliotrace-data` 브랜치 정리와 DART 시크릿 삭제는 남아 있다(`deploy-pages.yml`·`foliotrace-*.yml` 파일은 삭제 완료). `Ubuntu24-Git` 러너 등록 해제는 별도 사용자 결정 대기.
+6. 안정 확인(예: 연속 정상 배포 3일) 뒤 P4: `foliotrace-data` 브랜치 정리와 DART 시크릿 삭제는 남아 있다(`deploy-pages.yml`·`foliotrace-*.yml` 파일은 삭제 완료). `Ubuntu24-Git` 러너는 해제하지 않고 아래 규정으로 계속 쓴다.
 
 **되돌리기**: 옛 `deploy-pages.yml` 삭제(2026-10-25)로 옛 워크플로 재활성 경로는 없다. 문제가 생기면 변수를 지우거나 false로 해 main push 자동 배포를 끄고 `deploy-site.yml`을 `mode=validate`로 확인한다(옛 `foliotrace-data` 브랜치와 상태는 P4 전까지 보존).
 
@@ -66,3 +66,10 @@
 
 ## 화면 쪽에서 끊은 것
 새 워크플로는 `scripts/foliotrace/folio.py`·`pipeline/foliotrace/publish.py`·`nps_pipeline_adapter.py`를 호출하지 않는다(정적 요약 삽입은 `scripts/foliotrace-static-summary.mjs`로 대체). 파일 삭제와 시험 이전은 P4. `npm run test:foliotrace`는 옛 워크플로 전용으로 남고, 새 워크플로는 `tests/unit/foliotrace-*.test.ts`를 `test:unit`으로 돌린다.
+
+## 러너 규정 (사용자 결정 2026-10-25)
+- `deploy-site.yml`의 build·deploy 두 잡과 `product-banner-tests.yml`은 자체 러너 `Ubuntu24-Git`(라벨 self-hosted, Linux, X64, 235)에서 돈다. 수동 실행의 `runner=github-hosted` 입력은 이 장비가 꺼졌을 때의 우회로이며 두 잡이 같은 선택을 따른다(오케스트레이터는 mode/data_revision만 보내 기본값을 쓴다).
+- 공개 저장소이므로 포크 PR은 절대 자체 러너에서 돌리지 않는다(`product-banner-tests.yml`은 head 저장소가 이 저장소가 아니면 ubuntu-latest). `deploy-site.yml`에는 pull_request 트리거를 추가하지 않는다.
+- 읽기 키는 checkout이 `RUNNER_TEMP`에 600 권한으로 쓰고 post 단계에서 지우며, 추가로 `if: always()` 단계가 남은 개인키 파일을 지운다. 매 실행 시작에 이전 실행 잔재(`foliotrace-site-data`, `public/data/foliotrace`, `dist` 등)를 지운다.
+- 아티팩트는 `retention-days: 1`, 저장소 설정의 보존 기간도 1일이다.
+- 위험: 러너가 꺼져 있으면 배포가 대기열에 머문다(우회: `runner=github-hosted`). 러너가 하나라 `pages` 동시성 그룹과 함께 순차 실행된다.

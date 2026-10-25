@@ -9,12 +9,18 @@ permissions:
   contents: read
 jobs:
   banner:
-    runs-on: ubuntu-latest
+    # Self-hosted Ubuntu24-Git (user decision 2026-10-25) for push, workflow_dispatch and same-repository pull requests only.
+    # SECURITY: this repository is public; a pull request from a fork (head repo != this repo) runs untrusted code and must never reach
+    # the self-hosted machine, so it stays on GitHub's ubuntu-latest. Same-repo PRs need write access, so they are trusted.
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","235"]') }}
     timeout-minutes: 25
     env:
       PB_JOB_ROOT: ${{ github.workspace }}/docs/jobs/todo/product-banner/work/tmp/ci
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/docs/jobs/todo/product-banner/work/tmp/ci/browsers
     steps:
+      - name: Remove leftovers of a previous run on this persistent runner
+        if: runner.environment == 'self-hosted'
+        run: rm -rf "$PB_JOB_ROOT"
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
