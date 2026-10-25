@@ -188,14 +188,19 @@ export function projectWordFormatting(manifest: DocumentComparisonManifest, docu
           for (let index = changes.length - 1; index >= 0; index--) if (changes[index].kind === "format" && changes[index].beforeLocation === view.beforeLocation && changes[index].afterLocation === view.afterLocation) changes.splice(index, 1);
         }
         if (families.length) {
-          pushChange(view, families);
+          // A cell paragraph has no view of its own: its table view carries the change unless the
+          // table comparison already reports every cell it touches.
+          let reported = !ownView && view.tableIndex !== undefined, touched = false;
           if (view.tableIndex !== undefined) {
             const table=tables[view.tableIndex]; table.kind="changed";
             for (const side of ["before","after"] as const) for (const [r,row] of table[side].entries()) for (const [c,cell] of row.entries()) {
               const source=(cell as unknown as {source?:DocumentSourceReference}).source;
-              if (source && decision[side].some(ref => ref.part===source.part && source.path.every((value,index)=>ref.path[index]===value)) && table[side+"Kinds" as "beforeKinds"|"afterKinds"][r][c]==="unchanged") table[side+"Kinds" as "beforeKinds"|"afterKinds"][r][c]="format";
+              if (!source || !decision[side].some(ref => ref.part===source.part && source.path.every((value,index)=>ref.path[index]===value))) continue;
+              const kinds=table[side+"Kinds" as "beforeKinds"|"afterKinds"];touched=true;
+              if (kinds[r][c]==="unchanged") { kinds[r][c]="format"; reported=false; }
             }
           }
+          if (!reported || !touched) pushChange(view, families);
         }
       }
       visit(decision.children ?? [], view);
