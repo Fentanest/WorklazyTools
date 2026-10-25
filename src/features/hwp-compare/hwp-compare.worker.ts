@@ -15,6 +15,7 @@ import {
 } from "../document-compare/documentComparison";
 import type { HwpCompareOptions, HwpWorkerPairResult } from "./hwpWorkerClient";
 import { isOutOfMemory, outOfMemoryMessage } from "../document-compare/memoryFailure";
+import { screenResult } from "../document-compare/screenResult";
 
 interface PairPayload {
   beforeName: string;
@@ -78,7 +79,8 @@ worker.onmessage = async (event: MessageEvent<{ pairs: PairPayload[]; options: H
       before.capabilities = documentCapabilities(sniffDocumentFormat(pair.beforeBuffer) === "hwpx" ? "hwpx" : "hwp",before); after.capabilities = documentCapabilities(sniffDocumentFormat(pair.afterBuffer) === "hwpx" ? "hwpx" : "hwp",after);
       before.provenance = await documentProvenance(pair.beforeBuffer,pair.beforeBuffer);
       after.provenance = await documentProvenance(pair.afterBuffer,pair.afterBuffer);
-      results.push({ result: compareDocumentModels(pair.beforeName, pair.afterName, before, after, options, currentLanguage) });
+      // Only the page's part of the manifest is kept: HWP has no tracked file to generate from it.
+      results.push({ result: screenResult(compareDocumentModels(pair.beforeName, pair.afterName, before, after, options, currentLanguage)) });
       progress(start + size, L(`[${index + 1}/${pairs.length}] HWP 비교 완료`, `[${index + 1}/${pairs.length}] HWP comparison complete`));
       await yieldToWorker();
     }

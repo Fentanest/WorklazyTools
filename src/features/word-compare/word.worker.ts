@@ -12,6 +12,7 @@ import { sniffDocumentFormat, type DocumentFormat } from "../document-compare/do
 import { extractLegacyDocModel } from "./docModel";
 import { restoreModelTransport } from "./modelTransport";
 import { isOutOfMemory, outOfMemoryMessage, trackedOutOfMemoryMessage } from "../document-compare/memoryFailure";
+import { screenResult } from "../document-compare/screenResult";
 
 const PYODIDE_VERSION = pyodidePackage.version;
 const PYODIDE_BASE_URL = new URL(
@@ -176,7 +177,7 @@ worker.onmessage = async (event: MessageEvent) => {
           trackedJobs.push({ index, beforePath: trackedBeforePath, afterPath: trackedAfterPath, trackedPath, temporaryPaths, manifest: compactManifestBytes(serializeManifestForTracked(result.manifest)), mask: JSON.stringify(result.manifest.formattingMask.requested), label: `[${activePair}/${pairs.length}]` });
           keepFiles = true;
         }
-        worker.postMessage({ type: "screen", index, result });
+        worker.postMessage({ type: "screen", index, result: screenResult(result) });
       } finally {
         if (!keepFiles) removeFiles(temporaryPaths);
       }
