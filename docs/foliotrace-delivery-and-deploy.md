@@ -26,7 +26,7 @@
 ## 배포 시작 방식 (사용자 결정 2026-10-25: 로컬 오케스트레이터의 workflow_dispatch)
 - 시작 호출(전달 단계 마지막, 데이터 저장소 push 성공 후):
   `gh api -X POST repos/Fentanest/WorklazyTools/actions/workflows/deploy-site.yml/dispatches -f ref=main -f 'inputs[mode]=deploy' -f 'inputs[data_revision]=<방금 push한 커밋 40자리>'`
-  (생산자 P2 쪽에 이 호출을 추가하는 후속 작업이 필요하다. 이 저장소는 받는 쪽만 구현했다.)
+  (생산자 P2의 전달 단계가 이 호출을 구현했다(P2 55a9eba). 이 저장소는 받는 쪽이다.)
 - 워크플로 입력: `mode` = `validate`(기본, Pages 미변경) | `deploy`(명시적 실배포), `data_revision`(선택). `data_revision`이 오면 빌드가 체크아웃한 데이터 저장소 HEAD와 비교해 같으면 그대로, 다르면 알림을 남기고 **HEAD(더 최신 데이터)로 진행**한다(`scripts/foliotrace-source-meta.mjs compare`).
 - 게이트 `FOLIOTRACE_DEPLOY_V2`: **main push 자동 배포에만** 적용한다(전환 전에는 push 실행이 건너뛰어짐). dispatch는 사람이나 오케스트레이터가 명시적으로 부르는 것이므로 게이트하지 않는다. 따라서 전환 4단계(옛 워크플로 비활성)가 끝나기 전에는 오케스트레이터가 mode=deploy를 부르지 않게 한다(오케스트레이터 설정으로 dispatch를 꺼 둔 채 시작).
 - 출처 리비전 표지(`/data/foliotrace-source.json`)는 추적용으로 유지한다(빌드가 체크아웃한 데이터 저장소 커밋과 datasetVersion; 계약 폴더 밖).
@@ -42,7 +42,7 @@
 | 만료 | 발급일로부터 **1년** |
 | 갱신 | 만료 2주 전(달력에 표시)에 새 토큰 발급(같은 대상·권한) → 파일 교체 → dispatch 1회 성공(mode=validate로 시험) 확인 → 옛 토큰 삭제. 호스트 교체·유출 의심 시 즉시 삭제 후 재발급 |
 | 사용 주체 | 로컬 오케스트레이터 전달 단계 하나(사람·다른 도구는 쓰지 않음) |
-| 유출 시 영향 | 코드는 바꿀 수 없다. 다만 Actions 쓰기로 이 저장소의 `workflow_dispatch` 워크플로를 실행·취소할 수 있다. 보호: `deploy-site.yml`은 검증 통과 데이터만 배포하고 DART 키를 쓰지 않는다. **옛 수집·백필 워크플로(`foliotrace-*.yml`, `deploy-pages.yml`, DART 비밀값 사용)도 같은 토큰으로 실행될 수 있으므로 P4에서 퇴역·비활성한다**(그전에는 비활성 상태로 둔다) |
+| 유출 시 영향 | 코드는 바꿀 수 없다. 다만 Actions 쓰기로 이 저장소의 `workflow_dispatch` 워크플로를 실행·취소할 수 있다. 보호: `deploy-site.yml`은 검증 통과 데이터만 배포하고 DART 키를 쓰지 않는다. **실제로 dispatch 가능한 다른 워크플로가 있다: `deploy-pages.yml`(`workflow_dispatch`, `validate_only` 기본 false, DART_API_KEY 사용, Pages 배포 — 전환 후 비활성·삭제 예정)와 `product-banner-tests.yml`.** 옛 FolioTrace 수집·백필 워크플로(`foliotrace-*.yml`)는 origin/main에서 이미 삭제됐다. `deploy-pages.yml`은 전환 4단계에서 비활성하고 P4에서 삭제한다 |
 
 ## 워크플로 전환 (P3-3)
 새 `deploy-site.yml`을 추가했고 기존 `deploy-pages.yml`(cron·self-hosted `Ubuntu24-Git`·DART 수집)은 **아직 손대지 않았다**. 새 워크플로는 main push 때 저장소 변수 `FOLIOTRACE_DEPLOY_V2 == 'true'`일 때만 돈다(그전엔 건너뜀). dispatch는 항상 가능하고 기본값이 `mode=validate`(Pages 미변경)이다.

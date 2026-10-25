@@ -75,6 +75,12 @@ jobs:
           cp -r foliotrace-site-data/v1/. public/data/foliotrace/v1/
           echo "data repository revision: $(git -C foliotrace-site-data rev-parse HEAD)"
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
       - name: Record data repository revision
         id: data-revision
         env:
@@ -83,12 +89,6 @@ jobs:
           sha=$(git -C foliotrace-site-data rev-parse HEAD)
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
           node scripts/foliotrace-source-meta.mjs compare "$REQUESTED" "$sha"
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
 
       - name: Validate FolioTrace data (contract, hash, size, no private content)
         run: node --experimental-strip-types scripts/validate-foliotrace-snapshot.mjs public --no-html
