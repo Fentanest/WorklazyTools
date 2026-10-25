@@ -14,6 +14,10 @@
 - **기본 모드와 기존 변경 기록**: 입력에 변경 기록이 있으면 기본 모드는 수정본 기록을 유지하므로 Word의 모두 거절이 그 기록까지 되돌린다. 기존 기록을 먼저 수락하는 선택은 정확하다. 화면 안내 문구 점검 대상. — Claude
 - **문서 속성에 연결된 내용 컨트롤**: Word가 docProps 값으로 다시 채우므로 원본 쪽 표시는 수정본 속성값이 된다(w047·w048 글상자). — Claude
 - **Linux 재실행**: Windows에서 실행한 검사(단위·Word 노드·코퍼스 하네스)는 Linux 호스트에서 다시 돌려야 한다. Word 오라클은 Windows 전용 도구다. — Claude
+- **PDF 편집기 브라우저 시험의 낡은 선택자**: `test:browser` 전체(PDF 범위)가 `.pdf-tool-navigation [data-pdf-nav-mode="image-to-pdf"]`를 찾지 못해 멈춘다. main 92c21ca 개발 서버에서도 같은 단계에서 실패해 이번 수리와 무관한 기존 상태로 판정했다(PDF 편집기·변환기 파일 변경 없음). Word·Excel 범위는 통과. — Claude
+- **Linux 전용 경로를 쓰는 시험**: `image-compare-history-ui`·`raster-ocr-panel`·`direct-entry-ocr-cancel` 등은 `/usr/bin/google-chrome`·`/tmp/...` 고정 경로나 gitignored 하네스에 기대어 Windows에서 실행하지 못했다. Linux 재실행에서 확인한다. `image-ocr-smoke`의 보기 전환 단계는 Windows 글꼴에서 고정 머리글이 단추를 가려 기준·후보가 같이 실패했다. — Claude
+- **HWP 읽기 실패 표본**: 동치 확인 12쌍 중 5쌍은 기준·후보 모두 「HWP 문서를 읽지 못했습니다」였다(같은 결과라 동치). 오래된 HWP 형식 지원 여부는 별도 확인 대상이다. — Claude
+- **간헐 실패**: `bundle-output-metadata` 단위 시험 1회 실패 후 재실행 통과(원인 미확인), `image-alignment-smoke` 서버 기동 직후 1회 실패 후 연속 통과. 재발하면 기록한다. — Claude
 
 ## 사용자 요청으로 이월한 비교 기능 종합 검증 (2026-10-24)
 
