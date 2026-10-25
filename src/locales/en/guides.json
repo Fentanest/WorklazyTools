@@ -85,7 +85,7 @@
   },
   "foliotrace": {
     "title": "Using FolioTrace",
-    "description": "An estimated portfolio following NPS domestic equities through DART large-shareholding filings. This is neither an actual account balance nor all NPS assets.",
+    "description": "An estimated portfolio following NPS domestic equities through the year-end holdings list and later DART filings. This is neither an actual account balance nor all NPS assets.",
     "blocks": [
       {
         "title": "Filing date and holding date are different",
@@ -115,7 +115,7 @@
     "faq": {
       "scope": {
         "q": "Is this the NPS actual account balance?",
-        "a": "An estimated portfolio following NPS domestic equities through DART large-shareholding filings. It is not total NPS assets, actual account balances, or actual returns."
+        "a": "An estimated portfolio following NPS domestic equities through the year-end holdings list and later DART filings. It is not total NPS assets, actual account balances, or actual returns."
       },
       "valuation": {
         "q": "How is the estimated value calculated?",
@@ -131,7 +131,7 @@
       },
       "threshold": {
         "q": "Does below 5% ownership mean everything was sold?",
-        "a": "No. Holdings below 5% stay on the list and remain subject to follow-up searches and rechecks. It does not mean all shares were sold or that the value is zero."
+        "a": "No. Holdings below 5% stay on the list, and the total includes them at the last confirmed quantity times the closing price. It does not mean all shares were sold or that the value is zero."
       },
       "refresh": {
         "q": "What does ‘Reload published data’ do?",

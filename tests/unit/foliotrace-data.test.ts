@@ -106,3 +106,22 @@ test('issuer-level dated observation keeps the direct baseline separate', () => 
   assert.equal(validSnapshot({ ...base, holdings: [holding], issuerScopeObservations: [
     { ...scoped, references: [{ ...reference, filingUrl: 'javascript:bad()' }] }] }, version), false)
 })
+
+test('contract revision 2: year-end rows carry a null receipt number and a general source kind', async () => {
+  const { SNAPSHOT_LIMITS } = await import('../../src/features/foliotrace/data/loadSnapshot.ts')
+  const yearEnd = { ...base.holdings[0], receiptNo: null, filingUrl: null, evidence: 'legacy-import',
+    receiptDate: '2025-12-31', holdingDate: '2025-12-31', sourceKind: 'year-end-list' }
+  assert.equal(validSnapshot({ ...base, holdings: [yearEnd] }, version), true)
+  assert.equal(validSnapshot({ ...base, holdings: [{ ...yearEnd, receiptNo: '00000000000000' }] }, version), true)
+  assert.equal(validSnapshot({ ...base, holdings: [{ ...yearEnd, receiptNo: '123' }] }, version), false)
+  for (const kind of ['year-end-list', 'nps-filing', 'issuer-report', 'disclosure-text-read']) {
+    assert.equal(validSnapshot({ ...base, holdings: [{ ...yearEnd, sourceKind: kind }] }, version), true, kind)
+  }
+  for (const kind of ['LLM_READ', 'claude', '', null, 5]) {
+    assert.equal(validSnapshot({ ...base, holdings: [{ ...yearEnd, sourceKind: kind }] }, version), false, String(kind))
+  }
+  // Revision-1 snapshots (no sourceKind, receipt always present) still load.
+  assert.equal(validSnapshot(base, version), true)
+  const many = Array.from({ length: SNAPSHOT_LIMITS.maxHistory + 1 }, () => base.history[0])
+  assert.equal(validSnapshot({ ...base, history: many }, version), false)
+})

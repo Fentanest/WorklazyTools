@@ -12,7 +12,9 @@ import {
   formatKstTimestamp,
   formatPct,
   formatQty,
+  hasReceiptNo,
   holdingStatus,
+  isBelowFivePercent,
   latestUnresolvedReasonLabel,
   quotePriceDetail,
   quoteSessionLabel,
@@ -408,4 +410,22 @@ test("eventRangeOf reports the real receipt-date span, never fabricated", () => 
     ]),
     { from: "2026-01-05", to: "2026-01-07", count: 2 },
   );
+});
+
+test("receipt-less year-end rows and the below-5% filter", () => {
+  assert.equal(hasReceiptNo(null), false);
+  assert.equal(hasReceiptNo("00000000000000"), false);
+  assert.equal(hasReceiptNo("20260303002485"), true);
+  const row = (percent: string | null, tracking: Holding["tracking"] = "active") => ({
+    corpCode: "00101488", stockCode: "009450", name: "종목", securityKind: "common", quantity: "1",
+    companyOwnershipPercent: percent, receiptNo: null, receiptDate: "2025-12-31", holdingDate: "2025-12-31",
+    evidence: "legacy-import", sourceKind: "year-end-list", latestUnresolvedReceiptNo: null, latestUnresolvedReason: null,
+    tracking, quote: null, estimatedValue: null, portfolioWeightPercent: null, valuationExclusionReason: null, filingUrl: null,
+  }) as Holding;
+  assert.equal(isBelowFivePercent(row("0.61")), true);
+  assert.equal(isBelowFivePercent(row("5")), false);
+  assert.equal(isBelowFivePercent(row("7.25")), false);
+  assert.equal(isBelowFivePercent(row(null)), false);
+  const rows = [row("0.61"), row("7.25"), row("3", "below-5-percent")];
+  assert.equal(filterHoldings(rows, "", "below-5").length, 2);
 });

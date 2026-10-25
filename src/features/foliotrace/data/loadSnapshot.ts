@@ -1,7 +1,19 @@
-import type { FolioTraceView, Snapshot } from '../contracts'
+import type { FolioTraceView, Snapshot, SourceKind } from '../contracts'
 
 const DATA_ROOT = '/data/foliotrace/v1/'
 const VERSION = /^[a-f0-9]{64}$/
+
+/** The only accepted source wording; keep in step with the SourceKind type. */
+export const SOURCE_KINDS: readonly SourceKind[] = ['year-end-list', 'nps-filing', 'issuer-report', 'disclosure-text-read']
+
+/** Public size limits (docs/foliotrace-public-snapshot-contract.md). The publishing gate on the producing side is stricter. */
+export const SNAPSHOT_LIMITS = {
+  maxSnapshotBytes: 8 * 1024 * 1024,
+  maxManifestBytes: 4096,
+  maxHoldings: 5000,
+  maxEvents: 5000,
+  maxHistory: 400,
+} as const
 
 interface Manifest {
   schemaVersion: 1
@@ -109,8 +121,9 @@ function validHolding(value: unknown): boolean {
     (value.ownershipNumericKind === undefined || nullable(value.ownershipNumericKind, numericKind)) &&
     (value.observationStatus === undefined || nullable(value.observationStatus,
       item => item === 'verified' || item === 'verified_scoped' || item === 'same_basis_conflict')) &&
-    str(value.receiptNo) && RECEIPT.test(value.receiptNo) && isoDate(value.receiptDate) &&
+    nullable(value.receiptNo, item => str(item) && RECEIPT.test(item)) && isoDate(value.receiptDate) &&
     nullable(value.holdingDate, isoDate) &&
+    (value.sourceKind === undefined || (str(value.sourceKind) && (SOURCE_KINDS as readonly string[]).includes(value.sourceKind))) &&
     ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest', 'indirect-observation', 'issuer-scope-observation'].includes(String(value.evidence)) &&
     (value.indirectSource === undefined || nullable(value.indirectSource, validIndirectSource)) &&
     (value.issuerScopeSource === undefined || nullable(value.issuerScopeSource, validIssuerScopeSource)) &&
@@ -209,6 +222,8 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
       (!Array.isArray(value.issuerScopeObservations) || !value.issuerScopeObservations.every(validIssuerScopeObservation))) return false
   if (value.issuerScopeLaterChanges !== undefined &&
       (!Array.isArray(value.issuerScopeLaterChanges) || !value.issuerScopeLaterChanges.every(validIssuerScopeLaterChange))) return false
+  if (value.holdings.length > SNAPSHOT_LIMITS.maxHoldings || value.events.length > SNAPSHOT_LIMITS.maxEvents ||
+    value.history.length > SNAPSHOT_LIMITS.maxHistory) return false
   return value.holdings.every(validHolding) && value.events.every(validEvent) && value.history.every((row: unknown) =>
     isRecord(row) && isoDate(row.tradeDate) && decimal(row.estimatedValue) && str(row.datasetVersion) && VERSION.test(row.datasetVersion))
 }
@@ -229,6 +244,7 @@ export async function loadFolioTraceSnapshot(signal?: AbortSignal): Promise<Foli
     const response = await fetch(`${DATA_ROOT}${manifest.snapshotPath}`, { cache: 'no-store', signal })
     if (!response.ok) return { status: 'load-error' }
     const payload = await response.arrayBuffer()
+    if (payload.byteLength > SNAPSHOT_LIMITS.maxSnapshotBytes) return { status: 'schema-error' }
     if (await digestHex(payload) !== manifest.snapshotSha256) return { status: 'schema-error' }
     const snapshot: unknown = JSON.parse(new TextDecoder().decode(payload))
     if (!validSnapshot(snapshot, manifest.datasetVersion)) return { status: 'schema-error' }

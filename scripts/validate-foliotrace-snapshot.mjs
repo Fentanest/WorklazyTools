@@ -1,26 +1,21 @@
+// Usage: node --experimental-strip-types scripts/validate-foliotrace-snapshot.mjs <siteRoot> [--no-html]
+//   siteRoot "public": validate the committed data before the build (use --no-html).
+//   siteRoot "dist":   validate the built copy and the static summary in the ko/en pages.
 import assert from 'node:assert/strict'
-import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import { validSnapshot } from '../src/features/foliotrace/data/loadSnapshot.ts'
+import { validatePublicData } from './foliotrace-public-data.mjs'
 
-const directory = process.argv[2] || 'dist'
-const root = path.join(directory, 'data/foliotrace/v1')
-const manifest = JSON.parse(await fs.readFile(path.join(root, 'manifest.json'), 'utf8'))
-assert.match(manifest.datasetVersion, /^[a-f0-9]{64}$/)
-assert.equal(manifest.snapshotPath, `snapshots/${manifest.datasetVersion}.json`)
-const bytes = await fs.readFile(path.join(root, manifest.snapshotPath))
-assert.equal(createHash('sha256').update(bytes).digest('hex'), manifest.snapshotSha256)
-const snapshot = JSON.parse(bytes.toString('utf8'))
-assert.equal(validSnapshot(snapshot, manifest.datasetVersion), true, 'FolioTrace snapshot schema invalid')
-assert.equal(snapshot.holdings.length, snapshot.trackedCount)
-assert.equal(snapshot.holdings.filter(row => row.estimatedValue !== null).length, snapshot.pricedCount)
-assert.ok(snapshot.trackedCount > 0 && snapshot.pricedCount > 0 && snapshot.estimatedValue !== null &&
-  snapshot.valuationCoverage !== 'unavailable', 'All tracked holdings are unpriced; production snapshot withheld')
-for (const lang of ['ko', 'en']) {
-  const html = await fs.readFile(path.join(directory, lang, 'tools/foliotrace/index.html'), 'utf8')
-  assert.ok(html.includes(`data-foliotrace-dataset='${manifest.datasetVersion}'`))
-  if (snapshot.estimatedValue !== null) assert.ok(html.includes(snapshot.estimatedValue))
+const args = process.argv.slice(2)
+const noHtml = args.includes('--no-html')
+const directory = args.find(arg => !arg.startsWith('--')) || 'dist'
+const { manifest, snapshot, bytes } = await validatePublicData(directory)
+if (!noHtml) {
+  for (const lang of ['ko', 'en']) {
+    const html = await fs.readFile(path.join(directory, lang, 'tools/foliotrace/index.html'), 'utf8')
+    assert.ok(html.includes(`data-foliotrace-dataset='${manifest.datasetVersion}'`), `${lang} static summary missing or from another dataset`)
+    if (snapshot.estimatedValue !== null) assert.ok(html.includes(snapshot.estimatedValue), `${lang} static summary lacks the estimated value`)
+  }
 }
 console.log(JSON.stringify({ datasetVersion: manifest.datasetVersion, tracked: snapshot.trackedCount,
-  priced: snapshot.pricedCount, snapshotSha256: manifest.snapshotSha256 }))
+  priced: snapshot.pricedCount, snapshotSha256: manifest.snapshotSha256, bytes }))

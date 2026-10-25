@@ -175,6 +175,18 @@ export function filingChangesForHoldings(
   return changes;
 }
 
+/** Year-end list rows carry no receipt (null; the all-zero placeholder of early dry-runs counts as none). */
+export function hasReceiptNo(receiptNo: string | null): receiptNo is string {
+  return receiptNo !== null && !/^0{14}$/.test(receiptNo);
+}
+
+/** True when the reported ownership is a decimal below 5 (rows kept in the list but outside the 5% filing threshold). */
+export function isBelowFivePercent(h: Holding): boolean {
+  const ownership = parseDecimal(h.companyOwnershipPercent);
+  const threshold = parseDecimal("5");
+  return ownership !== null && threshold !== null && compareParsed(ownership, threshold) < 0;
+}
+
 export function holdingStatus(h: Holding): HoldingStatus {
   if (h.tracking === "below-5-percent") return "exit";
   if (h.evidence === "unresolved-latest") return "unresolved";
@@ -317,7 +329,7 @@ export function filterHoldings(holdings: Holding[], query: string, quality: Qual
     const s = holdingStatus(h);
     if (quality === "priced" && s !== "included") return false;
     if (quality === "unpriced" && s === "included") return false;
-    if (quality === "below-5" && s !== "exit") return false;
+    if (quality === "below-5" && s !== "exit" && !isBelowFivePercent(h)) return false;
     return true;
   });
 }

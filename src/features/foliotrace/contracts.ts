@@ -1,4 +1,9 @@
-/** Public FolioTrace v1 values. Decimal quantities and money are strings. */
+/**
+ * Public FolioTrace snapshot contract, revision 2 (docs/foliotrace-public-snapshot-contract.md).
+ * The wire `schemaVersion` and the data URL stay at 1: revision 2 only relaxes `Holding.receiptNo`
+ * to nullable and adds the optional `Holding.sourceKind`, so revision-1 snapshots still load.
+ * Decimal quantities and money are strings.
+ */
 export type DecimalString = string
 export type IsoDate = string
 
@@ -34,6 +39,9 @@ export interface Quote {
   verified: true
 }
 
+/** General source wording only. Internal tool, model and runtime names must never be added here. */
+export type SourceKind = 'year-end-list' | 'nps-filing' | 'issuer-report' | 'disclosure-text-read'
+
 export interface Holding {
   corpCode: string
   stockCode: string
@@ -43,9 +51,12 @@ export interface Holding {
   companyOwnershipPercent: DecimalString | null
   ownershipNumericKind?: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated' | null
   observationStatus?: 'verified' | 'verified_scoped' | 'same_basis_conflict' | null
-  receiptNo: string
+  /** Null for year-end list rows, which have no DART receipt. The all-zero 14-digit placeholder of early dry-runs is treated the same. */
+  receiptNo: string | null
   receiptDate: IsoDate
   holdingDate: IsoDate | null
+  /** Absent in revision-1 snapshots. Shown in the row details only. */
+  sourceKind?: SourceKind
   evidence: 'legacy-import' | 'dart-structured' | 'dart-document' | 'unresolved-latest' | 'indirect-observation' | 'issuer-scope-observation'
   indirectSource?: {
     documentNo: string | null

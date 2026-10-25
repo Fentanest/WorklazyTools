@@ -98,11 +98,12 @@ class CopyCalendarTest(unittest.TestCase):
         self.assertFalse(self.target.exists())
 
     def test_workflow_always_runs_recovery_after_optional_checkout(self):
-        workflow = Path('.github/workflows/deploy-pages.yml').read_text()
-        step = workflow.split('- name: Copy verified market calendar or restore deployed publication')[1].split('- name: Run unit tests')[0]
-        self.assertIn('--fallback-published', step)
-        self.assertNotIn('if:', step)
-        self.assertNotIn('continue-on-error:', step)
+        for name in ('deploy-pages.yml', 'deploy-site.yml'):
+            workflow = Path('.github/workflows', name).read_text()
+            step = workflow.split('- name: Copy verified market calendar or restore deployed publication')[1].split('- name: Run unit tests')[0]
+            self.assertIn('--fallback-published', step, name)
+            self.assertNotIn('if:', step, name)
+            self.assertNotIn('continue-on-error:', step, name)
 
     def test_interrupted_published_download_records_unavailable_without_failing_site(self):
         self.source = self.root / 'absent-checkout'

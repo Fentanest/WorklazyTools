@@ -30,7 +30,9 @@ import {
   formatKrw,
   formatPct,
   formatQty,
+  hasReceiptNo,
   holdingStatus,
+  isBelowFivePercent,
   latestUnresolvedReasonLabel,
   quotePriceDetail,
   sortHoldings,
@@ -51,9 +53,9 @@ const STR = {
     eyebrow: "FolioTrace · 공개 공시 기반 추정",
     title: "FolioTrace",
     description:
-      "DART 대량보유 공시로 추적하는 국민연금 국내주식 공개 포트폴리오 추정치입니다. 국민연금 전체 자산·실제 계좌 잔고·실제 운용 수익률이 아닙니다.",
+      "연말 보유 목록과 DART 공시로 추적하는 국민연금 국내주식 공개 포트폴리오 추정치입니다. 국민연금 전체 자산·실제 계좌 잔고·실제 운용 수익률이 아닙니다.",
     scopeNote:
-      "국민연금의 국내주식 대량보유 공시를 바탕으로 한 추정 내역입니다.",
+      "국민연금의 연말 국내주식 보유 목록과 이후 공시를 바탕으로 한 추정 내역입니다. 지분율 5% 미만 종목도 포함하며, 마지막으로 확인된 수량에 종가를 곱해 합계에 넣습니다.",
     historicalCoverageTitle: "과거 공시 확인 범위",
     historicalCoverageRange: "확인한 접수일",
     historicalCoverageTarget: "확인할 공시의 마지막 접수일",
@@ -174,6 +176,13 @@ const STR = {
     detailHistory: "해당 종목 공시 이력",
     openFiling: "DART 원문 열기",
     noFilingUrl: "원문 링크 없음",
+    noReceiptNo: "접수번호 없음",
+    detailOrigin: "자료 출처",
+    rowYearEnd: "연말 기준 보유 목록",
+    sourceYearEnd: "연말 기준 보유 목록",
+    sourceNps: "국민연금 대량보유 공시",
+    sourceIssuer: "발행회사 보고서",
+    sourceTextRead: "공시 원문 판독",
     unknownDate: "기준일 모름",
     eventsTitle: "최근 공시 변화",
     eventsDesc: "전체 {total}건 중 최근 {shown}건입니다. 보유 기준일순으로 정렬하며, 기준일이 없을 때만 접수일을 정렬에 사용합니다. 수량·지분율은 공시에 적힌 값입니다.",
@@ -209,6 +218,7 @@ const STR = {
     statusIncluded: "평가 포함",
     statusExcluded: "평가 제외",
     statusActiveRecord: "공시 지분율 5% 이상",
+    statusActiveBelow5: "지분율 5% 미만 · 마지막 확인 수량 기준",
     statusUnknownTracking: "추적 상태 확인 중",
     statusExit: "5% 추적 범위 이탈",
     statusUnresolved: "최신 미확인",
@@ -228,9 +238,9 @@ const STR = {
     eyebrow: "FolioTrace · Public filing estimate",
     title: "FolioTrace",
     description:
-      "An estimated public portfolio of NPS domestic equities tracked from DART major-shareholding filings. Not total NPS assets, real account balances, or actual returns.",
+      "An estimated public portfolio of NPS domestic equities tracked from the year-end holdings list and later DART filings. Not total NPS assets, real account balances, or actual returns.",
     scopeNote:
-      "This estimate follows NPS domestic equities reported in DART filings.",
+      "This estimate follows the NPS year-end domestic equity holdings list and later filings. Holdings below 5% are included; the total multiplies the last confirmed quantity by the closing price.",
     historicalCoverageTitle: "Historical filings checked",
     historicalCoverageRange: "Receipt dates checked",
     historicalCoverageTarget: "Last filing receipt date to check",
@@ -351,6 +361,13 @@ const STR = {
     detailHistory: "Filing history for this security",
     openFiling: "Open DART source",
     noFilingUrl: "No source link",
+    noReceiptNo: "No receipt number",
+    detailOrigin: "Data source",
+    rowYearEnd: "Year-end holdings list",
+    sourceYearEnd: "Year-end holdings list",
+    sourceNps: "NPS large-holding filing",
+    sourceIssuer: "Issuer report",
+    sourceTextRead: "Disclosure text reading",
     unknownDate: "Unknown (no holding date)",
     eventsTitle: "Recent filing changes",
     eventsDesc: "Showing the latest {shown} of {total} records. We sort by the holding date, using the filing date only for sorting when the holding date is unknown. Quantities and percentages are as reported.",
@@ -386,6 +403,7 @@ const STR = {
     statusIncluded: "Included",
     statusExcluded: "Excluded",
     statusActiveRecord: "Filed ownership at or above 5%",
+    statusActiveBelow5: "Below 5% · last confirmed quantity",
     statusUnknownTracking: "Tracking status under review",
     statusExit: "Exited 5% scope",
     statusUnresolved: "Latest unverified",
@@ -585,7 +603,7 @@ function ReadyView({
   const trackingStatusLabel = (holding: Holding) =>
     (indirectReentries.has(`${holding.corpCode}:${holding.receiptNo}`) ||
       (holding.observationStatus === "verified_scoped" && holding.tracking === "active")) ? t.eventIndirectReentry :
-      holding.tracking === "active" ? t.statusActiveRecord :
+      holding.tracking === "active" ? (isBelowFivePercent(holding) ? t.statusActiveBelow5 : t.statusActiveRecord) :
         holding.tracking === "below-5-percent" ? t.statusExit : t.statusUnknownTracking;
   const statusLabel = (s: ReturnType<typeof holdingStatus>) =>
     s === "included" ? t.statusIncluded : s === "excluded" ? t.statusExcluded : s === "exit" ? t.statusExit : t.statusUnresolved;
@@ -859,7 +877,7 @@ function ReadyView({
                           {h.name} <code className="foliotrace-code">{h.stockCode}</code>
                           <small className="foliotrace-row-reason">
                             {t.rowBasis}: {h.holdingDate ?? t.unknownDate} · {h.evidence === "issuer-scope-observation" ? t.issuerScopeSource : h.evidence === "indirect-observation" ? t.rowIndirectSource :
-                              h.evidence === "legacy-import" ? t.eventLegacySource : t.rowDirectSource}
+                              h.evidence === "legacy-import" ? (h.sourceKind === "year-end-list" ? t.rowYearEnd : t.eventLegacySource) : t.rowDirectSource}
                           </small>
                           {h.observationStatus && (
                             <small className="foliotrace-row-reason">
@@ -1072,9 +1090,18 @@ function ReadyView({
               <div>
                 <dt>{t.detailReceipt}</dt>
                 <dd>
-                  {selected.receiptDate} · <code className="foliotrace-code">{selected.receiptNo}</code>
+                  {selected.receiptDate} · {hasReceiptNo(selected.receiptNo)
+                    ? <code className="foliotrace-code">{selected.receiptNo}</code> : t.noReceiptNo}
                 </dd>
               </div>
+              {selected.sourceKind && (
+                <div>
+                  <dt>{t.detailOrigin}</dt>
+                  <dd>{selected.sourceKind === "year-end-list" ? t.sourceYearEnd :
+                    selected.sourceKind === "nps-filing" ? t.sourceNps :
+                      selected.sourceKind === "issuer-report" ? t.sourceIssuer : t.sourceTextRead}</dd>
+                </div>
+              )}
               {selected.indirectSource && (
                 <div>
                   <dt>{t.rowIndirectSource}</dt>
@@ -1136,7 +1163,8 @@ function ReadyView({
                   <div>
                     <dt>{t.prevVerifiedReceipt}</dt>
                     <dd>
-                      {selected.receiptDate} · <code className="foliotrace-code">{selected.receiptNo}</code>
+                      {selected.receiptDate} · {hasReceiptNo(selected.receiptNo)
+                        ? <code className="foliotrace-code">{selected.receiptNo}</code> : t.noReceiptNo}
                     </dd>
                   </div>
                   <div>

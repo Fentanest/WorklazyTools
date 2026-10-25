@@ -1,0 +1,134 @@
+name: Deploy site
+run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.validate_only && 'Validate site build (no deploy)' || 'Manual site deploy') || 'Site deploy on main push' }}
+
+# Replacement for deploy-pages.yml (FolioTrace operations plan P3-3). This workflow collects nothing: it never calls DART, holds no
+# DART key and writes no repository state. It validates the committed FolioTrace data (public/data/foliotrace/v1, delivered by the local
+# orchestrator), builds, tests and deploys. Cutover steps: docs/foliotrace-delivery-and-deploy.md.
+#
+# Inert until cutover: a main push deploys only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true'. Without it the push run is
+# skipped. A manual run can always build and validate (validate_only), which does not touch Pages.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      validate_only:
+        description: Build and validate without publishing Pages
+        required: true
+        default: true
+        type: boolean
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || vars.FOLIOTRACE_DEPLOY_V2 == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # The PDF oracle unit test compares files with a pinned historical
+          # commit; a shallow source checkout cannot read those exact blobs.
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate committed FolioTrace data (contract, hash, size, no private content)
+        run: node --experimental-strip-types scripts/validate-foliotrace-snapshot.mjs public --no-html
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Restore pinned office editor snapshot
+        uses: actions/cache@v4
+        with:
+          path: .cache/zetaoffice/2026-08-25
+          key: zetaoffice-2026-08-25-9ebd9a48-3dab0a54-nanum76f45ef4
+
+      - name: Build static site
+        run: npm run build
+        env:
+          VITE_BASE_PATH: /
+          VITE_SITE_URL: https://worklazy.net/
+
+      - name: Add FolioTrace static summary to the built pages
+        run: node --experimental-strip-types scripts/foliotrace-static-summary.mjs dist
+
+      - name: Validate deployed FolioTrace data and static summary
+        run: node --experimental-strip-types scripts/validate-foliotrace-snapshot.mjs dist
+
+      - name: Checkout published market calendar
+        id: market-calendar
+        continue-on-error: true # Calendar availability must not block the site.
+        uses: actions/checkout@v4
+        with:
+          ref: market-calendar-data
+          path: market-calendar-state
+          persist-credentials: false
+
+      - name: Copy verified market calendar or restore deployed publication
+        # Also runs after checkout failure. The script records failures and
+        # verifies the current site's copy before restoring it into fresh dist.
+        # With no valid publication, the page displays its no-data state.
+        run: python3 scripts/copy-market-calendar.py market-calendar-state/public/v1 dist/data/market-calendar/v1 --fallback-published
+
+      - name: Run unit tests
+        run: npm run test:unit
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run ad eligibility smoke tests
+        run: npm run test:ads
+
+      - name: Check analytics at root and project subpath
+        run: npm run test:analytics-base
+
+      - name: Check Coupang disclosure language at root and project subpath
+        run: npm run test:coupang-base
+
+      - name: Validate SEO and AdSense files
+        run: npm run test:static
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+          retention-days: 1
+
+  deploy:
+    needs: build
+    if: github.event_name == 'push' || !inputs.validate_only
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check this run is still the newest main
+        id: fresh
+        env:
+          EXPECTED_SOURCE: ${{ github.sha }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A newer main push queues its own run, which then deploys; never publish an older build over it.
+          latest=$(gh api "repos/${GH_REPO}/commits/main" --jq .sha)
+          if [ "$latest" = "$EXPECTED_SOURCE" ]; then echo "current=true" >> "$GITHUB_OUTPUT"; else echo "current=false" >> "$GITHUB_OUTPUT"; echo "::notice::main moved to $latest; the newer run deploys"; fi
+      - name: Deploy
+        id: deployment
+        if: steps.fresh.outputs.current == 'true' || github.event_name == 'workflow_dispatch'
+        uses: actions/deploy-pages@v4

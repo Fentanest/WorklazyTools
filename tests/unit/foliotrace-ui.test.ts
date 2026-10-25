@@ -104,3 +104,15 @@ test("long exact amounts wrap in cards/history; table keeps nowrap in its scroll
   // Long values prefer wrapping at group boundaries (<wbr/> adds no text).
   assert.match(pageSource, /<wbr key/);
 });
+
+test("source kind appears in details only, in general wording, and receipt-less rows get no link", () => {
+  for (const banned of ["LLM_READ", "Claude", "Anthropic", "Gemini", "Muse", "Luna", "orchestrator", "claude_batch"]) {
+    assert.ok(!pageSource.includes(banned), `internal name on screen: ${banned}`);
+  }
+  assert.match(pageSource, /selected\.sourceKind && \(/);
+  assert.equal((pageSource.match(/h\.sourceKind/g) ?? []).length, 1, "table rows only distinguish the year-end list");
+  assert.match(pageSource, /hasReceiptNo\(selected\.receiptNo\)/);
+  for (const label of ["공시 원문 판독", "Disclosure text reading", "연말 기준 보유 목록", "Year-end holdings list"]) {
+    assert.ok(pageSource.includes(label), label);
+  }
+});
