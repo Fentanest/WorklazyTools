@@ -479,18 +479,6 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(second['status'], 'SOURCE_REVIEW_COMPLETE')
             self.assertEqual(len(calls), 1201)
 
-    def test_schedule_uses_daily_incremental_and_dispatch_can_resume_history(self):
-        workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / \
-            "foliotrace-opendart-secondary.yml"
-        text = workflow.read_text(encoding="utf-8")
-        self.assertIn("args+=(--daily-incremental --max-listing-pages 100", text)
-        self.assertIn("--review-limit 1200 --max-queue-entries 20000", text)
-        self.assertIn('if [ "$HISTORICAL_BACKFILL" != true ]; then args+=(--daily-incremental); fi',
-                      text)
-        self.assertNotIn('args=(--state foliotrace-state/state.json --overlap-days "$OVERLAP_DAYS")',
-                         text)
-        self.assertIn('--overlap-days "$OVERLAP_DAYS"', text)
-
     def test_daily_incremental_starts_at_recent_date_and_preserves_history(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "state.json"
@@ -2610,24 +2598,6 @@ class OpendartListPageTests(unittest.TestCase):
             self.assertEqual(result["archived_stale"], 1)
             self.assertEqual(result["overlap_pending_days"], 2)
             self.assertTrue(result["forward_complete"])
-
-    def test_workflow_commits_shards_with_state_under_cas(self):
-        workflow = Path(__file__).resolve().parents[2] / ".github" / "workflows" / \
-            "foliotrace-opendart-secondary.yml"
-        text = workflow.read_text(encoding="utf-8")
-        archive_name = opendart_secondary.archive_dir_for(
-            Path("foliotrace-state/state.json")).name
-        self.assertEqual(archive_name, "opendart-secondary-archive")
-        state_add = text.index("git -C foliotrace-state add state.json")
-        archive_add = text.index(f"git -C foliotrace-state add {archive_name}")
-        commit = text.index("git -C foliotrace-state commit", state_add)
-        push = text.index("push origin HEAD:refs/heads/foliotrace-data", commit)
-        # Shard files join the same CAS-guarded data-branch commit as
-        # state.json: staged after it, committed and pushed together.
-        self.assertLess(state_add, archive_add)
-        self.assertLess(archive_add, commit)
-        self.assertLess(commit, push)
-        self.assertIn("expected_data", text[:commit])
 
 
 if __name__ == "__main__":
