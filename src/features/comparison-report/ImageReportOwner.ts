@@ -17,10 +17,10 @@ export class ImageReportOwner {
     })();this.job=work.catch(()=>{});return work;
   }
 }
-export function imageDownloadLease(blob:Blob):ImageDownloadLease{
+export function imageDownloadLease(blob:Blob,fileName='image-working-report.png'):ImageDownloadLease{
  const url=URL.createObjectURL(blob),link=document.createElement('a');let finish!:()=>void,closed=false,timer:ReturnType<typeof setTimeout>|undefined;
  const done=new Promise<void>(resolve=>{finish=resolve;});const release=()=>{if(closed)return;closed=true;if(timer)clearTimeout(timer);URL.revokeObjectURL(url);finish();};
- try{link.href=url;link.download='image-working-report.png';link.click();timer=setTimeout(release,1000);return{done,release};}catch(error){release();throw error;}
+ try{link.href=url;link.download=fileName;link.click();timer=setTimeout(release,1000);return{done,release};}catch(error){release();throw error;}
 }
 
 export const sharedImageReportOwner=new ImageReportOwner();
