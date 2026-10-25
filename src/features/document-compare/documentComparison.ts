@@ -358,7 +358,8 @@ function compareRecordList(
  * Paragraphs nested under a moved or regrouped container keep the container's own path. */
 function markReplacedParagraphShapes(manifest: DocumentComparisonManifest, decisions: ComparisonDecision[], unsafe = false) {
   for (const decision of decisions) {
-    markReplacedParagraphShapes(manifest, decision.children ?? [], unsafe || decision.moved || decision.before.length !== 1 || decision.after.length !== 1);
+    // A wholly inserted or deleted block copies its content verbatim; a moved or reshaped one cannot carry replacements.
+    markReplacedParagraphShapes(manifest, decision.children ?? [], unsafe || decision.moved || (decision.before.length > 0 && decision.after.length > 0 && (decision.before.length !== 1 || decision.after.length !== 1)));
     if (unsafe || decision.type !== "paragraph" || decision.trackedRepresentation !== "revision" || (!decision.before.length && !decision.after.length)) continue;
     const shape = `${decision.before.length}:${decision.after.length}`;
     if (decision.before.length && decision.after.length && shape !== "1:1" && shape !== "1:2" && shape !== "2:1") {

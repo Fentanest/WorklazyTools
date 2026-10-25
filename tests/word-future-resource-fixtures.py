@@ -107,7 +107,8 @@ def reachable(path):
    out=[]
    for n in container:
     if n.tag==W+'p':out.append(paragraph(n,part))
-    elif n.tag==W+'tbl':out.append({'table':[[blocks(c,part)for c in tr if c.tag==W+'tc']for tr in n if tr.tag==W+'tr']})
+    # Like Word, a table left without rows (Accept All or Reject All of a replaced table) is gone.
+    elif n.tag==W+'tbl' and n.find(W+'tr') is not None:out.append({'table':[[blocks(c,part)for c in tr if c.tag==W+'tc']for tr in n if tr.tag==W+'tr']})
    return out
   return blocks(root('word/document.xml').find(W+'body'),'word/document.xml')
 def build_fixtures(directory):

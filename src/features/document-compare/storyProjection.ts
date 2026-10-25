@@ -12,19 +12,27 @@ export function buildStoryProjection(manifest:DocumentComparisonManifest):StoryP
  plan.reasons.push(...a.errors,...b.errors);
  const slots=[...new Set([...a.bindings,...b.bindings].map(ref=>ref.kind+':'+ref.variant))].sort();
  const donors:{before:Record<string,{donorSectionId:string;part:string}>;after:Record<string,{donorSectionId:string;part:string}>}={before:{},after:{}};
- // One-sided breaks take their stories from the neighbouring revised section; they own no bindings.
- for(const section of plan.sections.filter(section=>!section.oneSided))for(const slot of slots){
+ // A section shows its own story or inherits the previous section's on its side; a removed or
+ // added section takes part in that inheritance on its own side but owns no binding. Stories pair
+ // by what each section shows, so a link that only changed between explicit and inherited keeps
+ // one compared story; each revised story pairs with one original story.
+ const shownWith=new Map<string,string|undefined>(),shownBefore=new Map<string,string|undefined>();
+ for(const section of plan.sections)for(const slot of slots){
   const old=a.bindings.find(ref=>section.before&&sourceKey(ref.section)===sourceKey(section.before.source)&&ref.kind+':'+ref.variant===slot),next=b.bindings.find(ref=>section.after&&sourceKey(ref.section)===sourceKey(section.after.source)&&ref.kind+':'+ref.variant===slot);
   const [kind,variant]=slot.split(':') as ['header'|'footer',string];
-  if(old||next){let pair=plan.pairs.find(pair=>pair.beforePart===old?.targetPart&&pair.afterPart===next?.targetPart);
-   if(!pair){pair={id:'story:'+JSON.stringify([kind,old?.targetPart??null,next?.targetPart??null]),kind,beforePart:old?.targetPart,afterPart:next?.targetPart,representation:old&&next?'inline':'unsupported-binding',decisionIds:[],coverage:{before:[],after:[]}};plan.pairs.push(pair);}
-   plan.bindings.push({id:'binding:'+section.id+':'+slot,sectionId:section.id,kind,variant,before:old,after:next,storyId:pair.id});
-  }
   if(old)donors.before[slot]={donorSectionId:section.id,part:old.targetPart};if(next)donors.after[slot]={donorSectionId:section.id,part:next.targetPart};
+  if(section.oneSided)continue;
   const before={explicit:!!old,...donors.before[slot]},after={explicit:!!next,...donors.after[slot]};
-  const pair=plan.pairs.find(pair=>pair.beforePart===before.part&&pair.afterPart===after.part);
+  // A story shown on one side only is compared with an empty story: the tracked document gives
+  // the section an explicit reference to it (an original-only story is copied in, all deleted).
+  // A revised story shown with two different original stories (or the reverse) is unsupported;
+  // no second pair is created, so no source is compared twice.
+  if((after.part&&shownWith.has(after.part)&&shownWith.get(after.part)!==before.part)||(before.part&&shownBefore.has(before.part)&&shownBefore.get(before.part)!==after.part)){plan.reasons.push('changed-story-inheritance');plan.routes.push({sectionId:section.id,kind,variant,before,after});continue;}
+  if(after.part)shownWith.set(after.part,before.part);if(before.part)shownBefore.set(before.part,after.part);
+  let pair=plan.pairs.find(pair=>pair.beforePart===before.part&&pair.afterPart===after.part);
+  if((before.part||after.part)&&!pair){pair={id:'story:'+JSON.stringify([kind,before.part??null,after.part??null]),kind,beforePart:before.part,afterPart:after.part,representation:before.part&&after.part?'inline':'unsupported-binding',decisionIds:[],coverage:{before:[],after:[]}};plan.pairs.push(pair);}
+  if((old||next)&&pair)plan.bindings.push({id:'binding:'+section.id+':'+slot,sectionId:section.id,kind,variant,before:old,after:next,storyId:pair.id});
   plan.routes.push({sectionId:section.id,kind,variant,before,after,storyId:pair?.id});
-  if(Boolean(before.part)!==Boolean(after.part)||before.donorSectionId!==after.donorSectionId)plan.reasons.push('changed-story-inheritance');
  }
  // A story only a removed or added section refers to is not compared; the break keeps the
  // neighbouring revised section's stories on both sides.
@@ -42,7 +50,7 @@ export function buildStoryProjection(manifest:DocumentComparisonManifest):StoryP
   plan.pairs.push({id:'story:'+JSON.stringify([(old??next)!.kind,old?part:null,next?part:null]),kind:(old??next)!.kind,beforePart:old?part:undefined,afterPart:next?part:undefined,representation:old&&next?'inline':'unsupported-binding',decisionIds:[],coverage:{before:[],after:[]}});
  }
  for(const side of ['before','after'] as const){const parts=plan.pairs.map(pair=>pair[side+'Part' as 'beforePart'|'afterPart']).filter(Boolean);if(new Set(parts).size!==parts.length)plan.reasons.push('ambiguous-shared-story');}
- if(plan.bindings.some(binding=>Boolean(binding.before)!==Boolean(binding.after)))plan.reasons.push('unsupported-binding-presence-change');
+ if(plan.bindings.some(binding=>!plan.pairs.some(pair=>pair.id===binding.storyId)))plan.reasons.push('unsupported-binding-presence-change');
  plan.supported=plan.reasons.length===0;
  return plan;
 }
@@ -52,7 +60,7 @@ export function bindStoryDecisions(manifest:DocumentComparisonManifest,pair:Stor
  for(const side of ['before','after'] as const)pair.coverage[side]=manifest.sources[side].filter(ref=>ref.part===pair[side+'Part' as 'beforePart'|'afterPart']&&['p','tbl'].includes(ref.kind??''));
 }
 export function emptyStoryBindingChanges(manifest:DocumentComparisonManifest,language:'ko'|'en') {
- return manifest.storyProjection.bindings.filter(binding=>!manifest.storyProjection.pairs.find(pair=>pair.id===binding.storyId)?.decisionIds.length && Boolean(binding.before)!==Boolean(binding.after)).map(binding=>{
+ return manifest.storyProjection.bindings.filter(binding=>{const pair=manifest.storyProjection.pairs.find(pair=>pair.id===binding.storyId);return !pair?.decisionIds.length && pair?.representation!=='inline' && Boolean(binding.before)!==Boolean(binding.after);}).map(binding=>{
   const label=(binding.kind==='header'?(language==='en'?'Header':'머리말'):(language==='en'?'Footer':'꼬리말'))+({'default':'','first':language==='en'?' (first page)':' (첫 쪽)','even':language==='en'?' (even pages)':' (짝수 쪽)'}[binding.variant]??'');
   const before=binding.before?label:'',after=binding.after?label:'';
   return {comparisonDecisionId:binding.id,kind:binding.before?'deleted' as const:'added' as const,section:'headerFooter' as const,blockType:'paragraph' as const,beforeLocation:before,afterLocation:after,before,after,segments:[{type:binding.before?'deleted' as const:'added' as const,text:label}],comments:[]};

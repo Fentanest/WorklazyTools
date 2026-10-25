@@ -37,7 +37,7 @@ bridgeGlobal.worklazyComparisonManifestJson = (before, after, formatting, tables
 ).manifest);
 
 worker.onmessage = async (event: MessageEvent) => {
-  let extractFunction: { (...args: unknown[]): string; destroy?: () => void } | undefined;
+  let extractFunction: { (...args: unknown[]): ModelBytes; destroy?: () => void } | undefined;
   let trackedFunction: { (...args: unknown[]): number; destroy?: () => void } | undefined;
   let acceptFunction: { (...args: unknown[]): number; destroy?: () => void } | undefined;
   let rewriteCommentsFunction: { (...args: unknown[]): number; destroy?: () => void } | undefined;
@@ -69,7 +69,7 @@ worker.onmessage = async (event: MessageEvent) => {
     progress(3, L(`${pairs.length}개 문서 쌍을 비교할 준비가 되었습니다.`, `${pairs.length} document pairs are ready for comparison.`));
     const needsDocx = formats.some((pair) => pair.before === "docx" || pair.after === "docx");
     let pyodide: Awaited<ReturnType<(typeof import("pyodide"))["loadPyodide"]>> | undefined;
-    let extract: { (...args: unknown[]): string; destroy?: () => void } | undefined;
+    let extract: { (...args: unknown[]): ModelBytes; destroy?: () => void } | undefined;
     let generateTracked: { (...args: unknown[]): number; destroy?: () => void } | undefined;
     if (needsDocx) {
       progress(5, L("DOCX 분석 기능을 준비하는 중… (첫 실행은 시간이 걸릴 수 있어요)", "Preparing DOCX analysis… The first run may take a while."));
@@ -82,7 +82,7 @@ worker.onmessage = async (event: MessageEvent) => {
       loadedPyodide.runPython(compareScript);
       loadedPyodide.runPython(acceptRevisionsScript);
       loadedPyodide.runPython(trackedDocxScript);
-      extract = loadedPyodide.globals.get("extract_document_model") as { (...args: unknown[]): string; destroy?: () => void };
+      extract = loadedPyodide.globals.get("extract_document_model_compact") as { (...args: unknown[]): ModelBytes; destroy?: () => void };
       generateTracked = loadedPyodide.globals.get("generate_tracked_document") as { (...args: unknown[]): number; destroy?: () => void };
       extractFunction = extract;
       trackedFunction = generateTracked;
@@ -167,7 +167,7 @@ worker.onmessage = async (event: MessageEvent) => {
               event.data.options.formatting,
               event.data.options.tables,
               event.data.options.metadata,
-              serializeManifestForTracked(result.manifest),
+              compactManifestBytes(serializeManifestForTracked(result.manifest)),
               JSON.stringify(result.manifest.formattingMask.requested),
             );
             const trackedBytes = pyodide.FS.readFile(trackedPath) as Uint8Array;
@@ -229,16 +229,30 @@ function isWordFormat(format: DocumentFormat): format is "doc" | "docx" {
   return format === "doc" || format === "docx";
 }
 
+// Model and manifest cross between Python and JavaScript as UTF-8 bytes (far faster than long
+// strings) with the WordprocessingML namespace written as one control character, which JSON text
+// never holds unescaped (compare.py MODEL_NAMESPACE_TOKEN, tracked_docx.py _manifest_text).
+const WORD_NAMESPACE = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}";
+type ModelBytes = { toJs(): Uint8Array; destroy?: () => void };
+function restoreModelJson(bytes: ModelBytes) {
+  const view = bytes.toJs();
+  bytes.destroy?.();
+  return new TextDecoder().decode(view).replaceAll("\u0001", WORD_NAMESPACE);
+}
+function compactManifestBytes(json: string) {
+  return new TextEncoder().encode(json.replaceAll(WORD_NAMESPACE, "\u0001"));
+}
+
 function extractWordModel(
   buffer: ArrayBuffer,
   format: DocumentFormat,
   options: { formatting: boolean; tables: boolean; metadata: boolean },
   language: "ko" | "en",
-  extract: { (...args: unknown[]): string } | undefined,
+  extract: { (...args: unknown[]): ModelBytes } | undefined,
 ) {
   if (format === "doc") return extractLegacyDocModel(new Uint8Array(buffer), options, language);
   if (format === "docx" && extract) {
-    return JSON.parse(extract(new Uint8Array(buffer), true, true, language)) as ComparisonModel;
+    return JSON.parse(restoreModelJson(extract(new Uint8Array(buffer), true, true, language))) as ComparisonModel;
   }
   throw new Error(language === "en" ? "The Word file format is not supported." : "지원하지 않는 Word 파일 형식입니다.");
 }

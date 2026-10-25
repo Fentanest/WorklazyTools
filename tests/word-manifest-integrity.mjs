@@ -39,6 +39,23 @@ def accepted_text(part='word/document.xml'):
     accept_tracked_document('/out.docx', '/accepted.docx')
     with zipfile.ZipFile('/accepted.docx') as archive:
         return ''.join(ET.fromstring(archive.read(part)).itertext())
+def views(part='word/document.xml'):
+    """(accepted text, rejected text, accepted drawings, rejected drawings, rejected image targets) of /out.docx."""
+    with zipfile.ZipFile('/out.docx') as archive:
+        root = ET.fromstring(archive.read(part))
+        rels = {node.get('Id'): node.get('Target') for node in ET.fromstring(archive.read('word/_rels/document.xml.rels'))} if 'word/_rels/document.xml.rels' in archive.namelist() else {}
+        media = {name: archive.read(name) for name in archive.namelist() if name.startswith('word/media/')}
+    def collect(node, skip, found, inside=False):
+        inside = inside or node.tag == W + skip
+        if not inside:
+            found.append(node)
+        for child in node:
+            collect(child, skip, found, inside)
+        return found
+    accepted, rejected = collect(root, 'del', []), collect(root, 'ins', [])
+    text = lambda nodes: ''.join(node.text or '' for node in nodes if node.tag in (W + 't', W + 'delText'))
+    blips = [node.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed') for node in rejected if node.tag.endswith('}blip')]
+    return text(accepted), text(rejected), sum(node.tag == W + 'drawing' for node in accepted), sum(node.tag == W + 'drawing' for node in rejected), [media.get('word/' + rels.get(rid, '')) for rid in blips]
 scenarios = []
 package('/before.docx', para('Deleted unique paragraph') + para('Stable anchor'))
 package('/after.docx', para('Stable anchor'))
@@ -64,20 +81,26 @@ value = copy.deepcopy(original); value['coverage']['before'][0]['disposition'] =
 refused('forged preserve-after deletion', value)
 package('/before.docx', '<w:p><w:r><w:drawing><w:testObject/></w:drawing></w:r></w:p>' + para('Stable anchor'))
 package('/after.docx', para('Stable anchor'))
-value = manifest()
-assert any(item['disposition'] == 'unsupported' for item in value['coverage']['before'])
-refused('deleted image-only paragraph', value)
+# Content the run-level path cannot carry is recorded whole: the original deleted (copied verbatim,
+# objects included) and the revision inserted, exact on Accept All and Reject All.
+export(manifest())
+assert views() == ('Stable anchor', 'Stable anchor', 0, 1, []), views()
+scenarios.append('deleted image-only paragraph recorded whole')
 # Identical drawing identities do not make a delete/insert move lossless.
 opaque = '<w:p><w:r><w:drawing><w:testObject/></w:drawing><w:t>Movable drawing paragraph</w:t></w:r></w:p>'
 package('/before.docx', opaque + para('First anchor unique') + para('Second anchor unique'))
 package('/after.docx', para('First anchor unique') + para('Second anchor unique') + opaque)
 value = manifest()
 assert any(item['moved'] for item in value['decisions'])
-refused('moved unchanged opaque signature', value)
+export(value)
+assert views()[:4] == ('First anchor uniqueSecond anchor uniqueMovable drawing paragraph', 'Movable drawing paragraphFirst anchor uniqueSecond anchor unique', 1, 1), views()
+scenarios.append('moved opaque paragraph recorded whole')
 opaque_table = '<w:tbl><w:tr><w:tc>' + opaque + '</w:tc></w:tr></w:tbl>'
 package('/before.docx', opaque_table); package('/after.docx', opaque_table)
 value = manifest(); value['decisions'][0]['moved'] = True
-refused('opaque descendant of table move path', value)
+export(value)
+assert views()[:4] == ('Movable drawing paragraph', 'Movable drawing paragraph', 1, 1), views()
+scenarios.append('opaque descendant of a moved table recorded whole')
 # A stationary structural copy keeps the original drawing node intact.
 package('/before.docx', opaque); package('/after.docx', opaque)
 export(manifest())
@@ -91,11 +114,14 @@ for path, media in (('/before.docx', b'original-resource'), ('/after.docx', b're
     with zipfile.ZipFile(path, 'a') as archive:
         archive.writestr('word/_rels/document.xml.rels', '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image.png"/></Relationships>')
         archive.writestr('word/media/image.png', media)
-refused('same rId changed resource bytes', manifest())
+# Recorded whole, the original image must be copied; this package declares no content type for it.
+refused('same rId changed resource bytes without a content type', manifest())
 # Even an equal object signature is unsafe when paragraph text is rebuilt.
 package('/before.docx', opaque)
 package('/after.docx', opaque.replace('Movable drawing paragraph', 'Revised drawing paragraph'))
-refused('changed text with unchanged opaque signature', manifest())
+export(manifest())
+assert views()[:4] == ('Revised drawing paragraph', 'Movable drawing paragraph', 1, 1), views()
+scenarios.append('changed text with unchanged opaque signature recorded whole')
 # Only real comment source contexts may use the existing comment capability.
 package('/before.docx', para('Stable anchor'))
 package('/after.docx', para('Stable anchor'))
@@ -144,11 +170,28 @@ corrupt = copy.deepcopy(value); corrupt['decisions'][0]['rows'].append(copy.deep
 refused('duplicate table axis', corrupt)
 corrupt = copy.deepcopy(value); corrupt['decisions'][0]['columns'][0]['beforeIndex'] = 9
 refused('out-of-range table axis', corrupt)
-# Reordered note containers cannot be silently paired by colliding numeric IDs.
+# Unreferenced notes whose numeric IDs swapped content are not displayed by Word; revised by ID,
+# both views keep each ID's own text exactly.
 old_notes = '<w:footnote w:id="1">' + para('First note unique') + '</w:footnote><w:footnote w:id="2">' + para('Second note unique') + '</w:footnote>'
 new_notes = '<w:footnote w:id="1">' + para('Second note unique') + '</w:footnote><w:footnote w:id="2">' + para('First note unique') + '</w:footnote>'
 package('/before.docx', para('Stable anchor'), old_notes); package('/after.docx', para('Stable anchor'), new_notes)
-refused('reordered colliding note IDs', manifest())
+export(manifest())
+def note_views():
+    with zipfile.ZipFile('/out.docx') as archive:
+        notes = ET.fromstring(archive.read('word/footnotes.xml'))
+    def text(note, skip):
+        found = []
+        def visit(node, inside=False):
+            inside = inside or node.tag == W + skip
+            if not inside and node.tag in (W + 't', W + 'delText'):
+                found.append(node.text or '')
+            for child in node:
+                visit(child, inside)
+        visit(note)
+        return ''.join(found)
+    return {note.get(W + 'id'): (text(note, 'del'), text(note, 'ins')) for note in notes}
+assert note_views() == {'1': ('Second note unique', 'First note unique'), '2': ('First note unique', 'Second note unique')}, note_views()
+scenarios.append('unreferenced notes revised by ID')
 # A before-only visible story is unsupported until package-reference support.
 package('/after.docx', para('Stable anchor'))
 refused('before-only footnote story', manifest())

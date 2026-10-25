@@ -178,9 +178,16 @@ def _cell_is_deleted(cell):
 
 
 def _preserved_comment_anchors(node):
+    # Like Word, a bookmark wholly inside the deleted content goes with it; one whose other end
+    # lies outside keeps this endpoint at the deletion point.
+    starts = {element.get(W + "id") for element in node.iter() if element.tag == W + "bookmarkStart"}
+    ends = {element.get(W + "id") for element in node.iter() if element.tag == W + "bookmarkEnd"}
+    enclosed = starts & ends
     anchors = []
     for element in node.iter():
         if element.tag in COMMENT_MARKERS:
+            anchors.append(copy.deepcopy(element))
+        elif element.tag in (W + "bookmarkStart", W + "bookmarkEnd") and element.get(W + "id") not in enclosed:
             anchors.append(copy.deepcopy(element))
         elif element.tag == W + "r":
             references = [copy.deepcopy(child) for child in element if child.tag == W + "commentReference"]

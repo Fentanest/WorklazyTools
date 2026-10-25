@@ -207,15 +207,26 @@ class _NumberingResolver:
         return pattern
 
 
+# Text the accepted view does not show: existing deletions, and property elements (a tab stop
+# in paragraph properties is also a w:tab).
+TEXT_SKIPPED_TAGS = {W + "del", W + "moveFrom", W + "pPr", W + "rPr", W + "sectPr", W + "tblPr", W + "trPr", W + "tcPr"}
+
+
 def _text(node):
     parts = []
-    for item in node.iter():
+    stack = [node]
+    while stack:
+        item = stack.pop()
+        if item.tag in TEXT_SKIPPED_TAGS:
+            continue
         if item.tag == W + "t":
             parts.append(item.text or "")
         elif item.tag == W + "tab":
             parts.append("\t")
         elif item.tag in (W + "br", W + "cr"):
             parts.append("\n")
+        else:
+            stack.extend(reversed(list(item)))
     return "".join(parts)
 
 
@@ -261,7 +272,27 @@ def _policy_sets(policy):
     return cached[1:]
 
 
+_FACT_MEMO = {"facts": None}
+
+
+def _element_key(node):
+    return (node.tag, tuple(node.attrib.items()), node.text, tuple(_element_key(child) for child in node))
+
+
 def _normalized_property_node(node, property_name, policy):
+    """`_normalized_property_fact` over an XML element (or None), memoized per distinct element
+    within one extraction (runs and paragraphs repeat the same few property sets)."""
+    memo = _FACT_MEMO["facts"]
+    if memo is None or node is None or not isinstance(node, ET.Element):
+        return _normalized_property_node_uncached(node, property_name, policy)
+    key = (id(policy), property_name, _element_key(node))
+    fact = memo.get(key)
+    if fact is None:
+        fact = memo[key] = _normalized_property_node_uncached(node, property_name, policy)
+    return fact
+
+
+def _normalized_property_node_uncached(node, property_name, policy):
     """`_normalized_property_fact` over an XML element (or None), without building a snapshot tree."""
     supported, unsupported = {}, {}
     history = False
@@ -389,8 +420,18 @@ def _source_paths(root, part, archive=None):
     result = {}
     offsets = {}
     invalid_qname = False
-    try: normalized_root = _qname_safe_parse(archive.read(part),False) if archive is not None and "_qname_safe_parse" in globals() else root
-    except ValueError: normalized_root = root; invalid_qname = True
+    rewrite = None
+    normalized_root = root
+    if archive is not None and "_qname_safe_parse" in globals():
+        data = archive.read(part)
+        try:
+            # Namespace-normalized attribute values for event identities: rewritten in place when
+            # every declaration is on the root, else from a namespace-aware parse.
+            rewrite = _qname_rewriter(data, root) if "_qname_rewriter" in globals() else None
+            if rewrite is None:
+                normalized_root = _qname_safe_parse(data, False)
+        except ValueError:
+            normalized_root = root; invalid_qname = True; rewrite = None
     policy = json.loads(globals().get("WORKLAZY_FORMATTING_POLICY_JSON", "{}"))
     def property_tree(node):
         if node is None:
@@ -500,6 +541,7 @@ def _source_paths(root, part, archive=None):
             nonlocal supported, target, has_image
             attrs = []
             for name, value in sorted(item.attrib.items()):
+                if rewrite is not None: value = rewrite(item, name, value)
                 if item.tag == "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr" and name == "id": continue
                 if name.startswith("xmlns:"):continue
                 if vml_picture and item.tag in {"{urn:schemas-microsoft-com:vml}shape","{urn:schemas-microsoft-com:vml}shapetype"}:
@@ -537,6 +579,8 @@ def _source_paths(root, part, archive=None):
         cursor = [0]; events = []
         def event_walk(node):
             if node is not paragraph and node.tag == W + "p": return
+            # Positions count the text `_text` reads: no property elements or existing deletions.
+            if node.tag in TEXT_SKIPPED_TAGS: return
             if node.tag in {W+"footnoteReference",W+"endnoteReference"}:
                 kind="footnote" if node.tag==W+"footnoteReference" else "endnote"
                 if archive is None or not any(owner['kind']==kind for owner in _note_part_owners(archive)[0]):return
@@ -1071,20 +1115,44 @@ def _cell_payload(cell):
 _EXTRACT_CACHE = []
 
 
+# Transport form of the model: the WordprocessingML namespace (in most property names) as one
+# control character, which JSON text never contains unescaped; the worker restores it before
+# parsing. See compactModelJson / restoreModelJson in word.worker.ts.
+MODEL_NAMESPACE_TOKEN = "\x01"
+
+
+def extract_document_model_compact(document_bytes, include_tables, include_metadata, language="ko"):
+    """UTF-8 bytes of the model in transport form: bytes cross into JavaScript far faster than a
+    long string does."""
+    return extract_document_model(document_bytes, include_tables, include_metadata, language).replace(W, MODEL_NAMESPACE_TOKEN).encode("utf-8")
+
+
 def extract_document_model(document_bytes, include_tables, include_metadata, language="ko"):
     """Memoized `_extract_document_model`: the tracked-DOCX validator re-reads the same
     input bytes the screen comparison just extracted, so the last two results are reused."""
+    return _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)[1]
+
+
+def extract_document_model_parsed(document_bytes, include_tables, include_metadata, language="ko"):
+    """The memoized model decoded once (read-only: shared by every caller)."""
+    entry = _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)
+    if entry[2] is None:
+        entry[2] = json.loads(entry[1])
+    return entry[2]
+
+
+def _extract_document_model_entry(document_bytes, include_tables, include_metadata, language):
     data = bytes(document_bytes)
     key = (hashlib.sha256(data).hexdigest(), bool(include_tables), bool(include_metadata), "en" if language == "en" else "ko")
-    for cached_key, cached in _EXTRACT_CACHE:
-        if cached_key == key:
+    for entry in _EXTRACT_CACHE:
+        if entry[0] == key:
             global LANGUAGE
             LANGUAGE = key[3]
-            return cached
-    result = _extract_document_model(data, include_tables, include_metadata, language)
-    _EXTRACT_CACHE.append((key, result))
+            return entry
+    entry = [key, _extract_document_model(data, include_tables, include_metadata, language), None]
+    _EXTRACT_CACHE.append(entry)
     del _EXTRACT_CACHE[:-2]
-    return result
+    return entry
 
 
 def _extract_document_model(document_bytes, include_tables, include_metadata, language="ko"):
@@ -1097,11 +1165,13 @@ def _extract_document_model(document_bytes, include_tables, include_metadata, la
     LANGUAGE = "en" if language == "en" else "ko"
     _SOURCE_FACTS["cache"] = {}
     _PARSED_PARTS["parts"] = {}
+    _FACT_MEMO["facts"] = {}
     try:
         records = _parse_document(bytes(document_bytes), include_tables, include_metadata)
     finally:
         _SOURCE_FACTS["cache"] = None
         _PARSED_PARTS["parts"] = None
+        _FACT_MEMO["facts"] = None
 
     def comments_of(record):
         return [

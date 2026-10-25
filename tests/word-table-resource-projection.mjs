@@ -148,7 +148,11 @@ for mode in ['custom-part','missing-main-link']:
  entries['word/_rels/document.xml.rels']=_serialize_xml(root)
  with zipfile.ZipFile('/table-unsupported-note.docx','w') as z:
   for n,data in entries.items():z.writestr(n,data)
- model=json.loads(extract_document_model(open('/table-unsupported-note.docx','rb').read(),True,True,'en'));assert 'unsupported-note-part-path' in model['noteFacts']['errors']
+ model=json.loads(extract_document_model(open('/table-unsupported-note.docx','rb').read(),True,True,'en'))
+ # A note part reached through its declared relationship (any path) is read; an unlinked one is
+ # reported. Either way the tracked file is refused here: the revision keeps the standard part.
+ if mode=='custom-part':assert model['noteFacts']['errors']==[] and [owner['part'] for owner in model['noteFacts']['owners']]==['word/custom/notes.xml']
+ else:assert 'unsupported-note-part-path' in model['noteFacts']['errors']
  if os.path.exists('/unsupported-note-out.docx'):os.unlink('/unsupported-note-out.docx')
  try:generate_tracked_document('/table-unsupported-note.docx',base['after'],'/unsupported-note-out.docx','events',True,True,True);raise AssertionError(mode+' emitted')
  except ValueError:assert not os.path.exists('/unsupported-note-out.docx')

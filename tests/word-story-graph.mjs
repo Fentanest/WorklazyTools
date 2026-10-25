@@ -88,16 +88,15 @@ source('/story-before.docx',None if mode=='after-only' else 'original','word/sou
 source('/story-after.docx',None if mode=='before-only' else 'revised','word/custom/'+kind+'-new.xml',kind,'40','200')
 a=extract_document_model(open('/story-before.docx','rb').read(),True,True,'en');b=extract_document_model(open('/story-after.docx','rb').read(),True,True,'en');manifest=worklazyComparisonManifestJson(a,b,formatting,True,metadata)
 if os.path.exists('/story-out.docx'):os.unlink('/story-out.docx')
-if mode!='renamed-paired' and metadata:
- try:generate_tracked_document('/story-before.docx','/story-after.docx','/story-out.docx','events',formatting,True,metadata,manifest,mask_json);raise AssertionError('unsupported binding change accepted')
- except ValueError as error:assert 'UNSUPPORTED_TRACKED_SOURCE_STORY' in str(error)
- assert not os.path.exists('/story-out.docx')
- for variant in ['before','after']:shutil.copyfile('/story-'+variant+'.docx','/story-packages/refused-'+mode+'-'+kind+'-'+str(formatting)+'-'+str(paragraph)+'-'+variant+'.docx')
-else:
+# A story only one side shows is compared with an empty story: the section references it
+# explicitly and the other view shows it empty, which displays like no story at all.
+def shown(path):
+ return {slot:rows for slot,rows in reachable(path).items() if any(rows)} if mode!='renamed-paired' else reachable(path)
+if True:
  generate_tracked_document('/story-before.docx','/story-after.docx','/story-out.docx','events',formatting,True,metadata,manifest,mask_json)
  accept_tracked_document('/story-out.docx','/story-accepted.docx');rejected('/story-out.docx','/story-rejected.docx')
- assert reachable('/story-accepted.docx')==reachable('/story-after.docx'),(mode,kind,'accept',reachable('/story-accepted.docx'),reachable('/story-after.docx'))
- assert reachable('/story-rejected.docx')==reachable('/story-before.docx' if metadata else '/story-after.docx'),(mode,kind,'reject',reachable('/story-rejected.docx'),reachable('/story-before.docx'))
+ assert shown('/story-accepted.docx')==shown('/story-after.docx'),(mode,kind,'accept',reachable('/story-accepted.docx'),reachable('/story-after.docx'))
+ assert shown('/story-rejected.docx')==shown('/story-before.docx' if metadata else '/story-after.docx'),(mode,kind,'reject',reachable('/story-rejected.docx'),reachable('/story-before.docx'))
  assert margin('/story-accepted.docx')=='200'
  assert margin('/story-rejected.docx')==('100' if formatting and paragraph else '200')
  with zipfile.ZipFile('/story-out.docx') as z:
@@ -105,7 +104,7 @@ else:
   for previous in root.findall('.//'+W+'sectPrChange/'+W+'sectPr'):assert previous.find(W+'headerReference') is None and previous.find(W+'footerReference') is None
  name=mode+'-'+kind+'-'+str(formatting)+'-'+str(metadata)+'-'+str(paragraph)
  for variant in ['before','after','out','accepted','rejected']:shutil.copyfile('/story-'+variant+'.docx','/story-packages/'+name+'-'+variant+'.docx')
-`);if(mode!=='renamed-paired'&&metadata)unsupported++;else count++;
+`);count++;
 }
 requested={fontFamily:true,size:true,style:true,color:true,paragraph:true,numbering:true};py.globals.set('mask_json',JSON.stringify(requested));
 py.runPython(String.raw`

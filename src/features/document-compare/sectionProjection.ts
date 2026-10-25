@@ -11,6 +11,14 @@ export function buildSectionPairs(manifest:DocumentComparisonManifest,a:StoryFac
  if(!manifest.options.metadata&&!manifest.options.formatting)return {pairs,reasons};
  const decisions:ComparisonDecision[]=[];const visit=(items:ComparisonDecision[])=>{for(const item of items){decisions.push(item);visit(item.children??[]);}};visit(manifest.decisions);
  const blank:{before:StoryFacts['sections'];after:StoryFacts['sections']}={before:[],after:[]};
+ // A section-break paragraph sits directly in the body or in a body-level content control.
+ const inBodyEnvelope=(side:'before'|'after',owner:DocumentSourceReference)=>{
+  const refs=manifest.sources[side],at=(path:number[])=>refs.find(ref=>ref.part===owner.part&&sourceKey(ref)===sourceKey({...owner,path}));
+  const parent=at(owner.path.slice(0,-1));
+  if(parent?.kind==='body')return true;
+  return parent?.kind==='sdtContent'&&at(owner.path.slice(0,-2))?.kind==='sdt'&&at(owner.path.slice(0,-3))?.kind==='body';
+ };
+ const hasBreak=(facts:StoryFacts,owner:DocumentSourceReference)=>facts.sections.some(section=>!section.final&&section.source.part===owner.part&&section.source.path.length===owner.path.length+2&&owner.path.every((v,i)=>section.source.path[i]===v));
  const blankOwner=(side:'before'|'after',section:StoryFacts['sections'][number])=>{
   const source=section.source,refs=manifest.sources[side];
   const owner=refs.find(ref=>ref.kind==='p'&&ref.part===source.part&&source.path.length===ref.path.length+2&&ref.path.every((v,i)=>source.path[i]===v));
@@ -23,11 +31,11 @@ export function buildSectionPairs(manifest:DocumentComparisonManifest,a:StoryFac
   const source=section.source;
   const owner=manifest.sources.before.find(ref=>ref.kind==='p'&&ref.part===source.part&&source.path.length===ref.path.length+2&&ref.path.every((v,i)=>source.path[i]===v));
   const decision=owner&&decisions.find(item=>item.type==='paragraph'&&item.before.some(ref=>sourceKey(ref)===sourceKey(owner)));
-  const directBody=owner&&manifest.sources.before.some(ref=>ref.kind==='body'&&ref.part===owner.part&&sourceKey(ref)===sourceKey({...owner,path:owner.path.slice(0,-1)}));
-  if(directBody&&decision&&!decision.moved&&decision.type==='paragraph'&&decision.before.length===1&&!decision.after.length){pairs.push({id:'section:'+decision.id,before:section,ownerDecisionId:decision.id,final:false,oneSided:true});continue;}
+  const directBody=owner&&inBodyEnvelope('before',owner);
+  if(directBody&&decision&&!decision.moved&&decision.type==='paragraph'&&decision.before.length===1&&(!decision.after.length||decision.after.length===1&&!hasBreak(b,decision.after[0]))){pairs.push({id:'section:'+decision.id,before:section,ownerDecisionId:decision.id,final:false,oneSided:true});continue;}
   if(!directBody||!decision||decision.moved||decision.before.length!==1||decision.after.length!==1){reasons.push('unsupported-section-boundary');continue;}
   const target=decision.after[0];
-  if(!manifest.sources.after.some(ref=>ref.kind==='body'&&ref.part===target.part&&sourceKey(ref)===sourceKey({...target,path:target.path.slice(0,-1)}))){reasons.push('unsupported-section-envelope');continue;}
+  if(!inBodyEnvelope('after',target)){reasons.push('unsupported-section-envelope');continue;}
   const candidates=b.sections.filter(next=>!next.final&&next.source.part===target.part&&next.source.path.length===target.path.length+2&&target.path.every((v,i)=>next.source.path[i]===v));
   if(candidates.length!==1){reasons.push('unsupported-section-boundary');continue;}
   pairs.push({id:'section:'+decision.id,before:section,after:candidates[0],ownerDecisionId:decision.id,final:false});
@@ -38,14 +46,24 @@ export function buildSectionPairs(manifest:DocumentComparisonManifest,a:StoryFac
   const source=section.source;
   const owner=manifest.sources.after.find(ref=>ref.kind==='p'&&ref.part===source.part&&source.path.length===ref.path.length+2&&ref.path.every((v,i)=>source.path[i]===v));
   const decision=owner&&decisions.find(item=>item.type==='paragraph'&&item.after.some(ref=>sourceKey(ref)===sourceKey(owner)));
-  const directBody=owner&&manifest.sources.after.some(ref=>ref.kind==='body'&&ref.part===owner.part&&sourceKey(ref)===sourceKey({...owner,path:owner.path.slice(0,-1)}));
-  if(directBody&&decision&&!decision.moved&&decision.after.length===1&&!decision.before.length)pairs.push({id:'section:'+decision.id,after:section,ownerDecisionId:decision.id,final:false,oneSided:true});
+  const directBody=owner&&inBodyEnvelope('after',owner);
+  if(directBody&&decision&&!decision.moved&&decision.after.length===1&&(!decision.before.length||decision.before.length===1&&!hasBreak(a,decision.before[0])))pairs.push({id:'section:'+decision.id,after:section,ownerDecisionId:decision.id,final:false,oneSided:true});
  }
- // Breaks on omitted empty paragraphs pair in order when both sides have the same such breaks
- // and every other break paired through its paragraph decision.
+ // Breaks on omitted empty paragraphs pair in order within the same gap between paired
+ // paragraphs; a break only one side has there is recorded with its empty paragraph.
  if(blank.before.length||blank.after.length){
-  if(blank.before.length!==blank.after.length)reasons.push('unsupported-section-boundary');
-  else blank.before.forEach((section,index)=>pairs.push({id:'section:blank:'+index,before:section,after:blank.after[index],final:false,blankOwner:true}));
+  const comparePaths=(x:number[],y:number[])=>{for(let i=0;i<Math.min(x.length,y.length);i++)if(x[i]!==y[i])return x[i]-y[i];return x.length-y.length;};
+  const anchors=decisions.filter(item=>item.before.length&&item.after.length&&!item.moved).map(item=>({before:item.before[0],after:item.after[0]}));
+  const gap=(side:'before'|'after',section:StoryFacts['sections'][number])=>{const owner=section.source.path.slice(0,-2);return anchors.filter(anchor=>anchor[side].part===section.source.part&&comparePaths(anchor[side].path,owner)<0).length;};
+  const groups=new Map<number,{before:StoryFacts['sections'];after:StoryFacts['sections']}>();
+  for(const side of ['before','after'] as const)for(const section of blank[side]){const key=gap(side,section);const group=groups.get(key)??{before:[],after:[]};group[side].push(section);groups.set(key,group);}
+  let index=0;
+  for(const key of [...groups.keys()].sort((x,y)=>x-y)){
+   const group=groups.get(key)!,shared=Math.min(group.before.length,group.after.length);
+   for(let k=0;k<shared;k++)pairs.push({id:'section:blank:'+index++,before:group.before[k],after:group.after[k],final:false,blankOwner:true});
+   for(const section of group.before.slice(shared))pairs.push({id:'section:blank:'+index++,before:section,final:false,blankOwner:true,oneSided:true});
+   for(const section of group.after.slice(shared))pairs.push({id:'section:blank:'+index++,after:section,final:false,blankOwner:true,oneSided:true});
+  }
  }
  // Order breaks so each side's breaks keep document order: merge both orders, emitting a paired
  // break once both reach it and a one-sided break where its own side has it.
