@@ -63,6 +63,8 @@ class _PackageGraph:
         self.before, self.after = before, after
         self.roots, self.additions, self.ids, self.media = {}, {}, {}, {}
         self.output_owner=None
+        # Original parts the VML picture check reads, parsed once per generation (see simple_picture).
+        self.picture_parts = {}
         self.story_parts={item["part"] for item in _story_package_facts(after)["parts"]}|{item["part"] for item in _note_part_owners(after)[0]}|{"word/document.xml","word/footnotes.xml","word/endnotes.xml","word/comments.xml"}
         self.types = ET.fromstring(after.read('[Content_Types].xml')) if '[Content_Types].xml' in after.namelist() else ET.Element(CT+'Types')
         self.before_types = ET.fromstring(before.read('[Content_Types].xml')) if '[Content_Types].xml' in before.namelist() else ET.Element(CT+'Types')
@@ -200,10 +202,20 @@ class _PackageGraph:
             self.additions[self.rel_path(destination)]=_serialize_xml(rels)
         self.additions[destination]=self.before.read(source)
         return destination
+    def simple_picture(self, picture, part):
+        """_simple_vml_picture against the original package. Outside an extraction it parsed the
+        relationships, content types and the whole part for every picture; the check only reads
+        them, so they are parsed once for this (still open) archive."""
+        saved = _PARSED_PARTS["xml"]
+        _PARSED_PARTS["xml"] = self.picture_parts
+        try:
+            return _simple_vml_picture(picture, self.before, part)
+        finally:
+            _PARSED_PARTS["xml"] = saved
     def copy(self, source, part, output_owner=None):
         result=copy.deepcopy(source)
         for original,picture in zip(source.iter(W+'pict'),result.iter(W+'pict')):
-            if not _simple_vml_picture(picture,self.before,part):
+            if not self.simple_picture(picture,part):
                 # Whole-paragraph replacements copy any VML; identities are renumbered below.
                 if not _REPLACE_COPY["active"]:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_VML_PICTURE')
                 self.renumber_vml(picture)
