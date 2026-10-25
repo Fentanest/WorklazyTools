@@ -1090,10 +1090,26 @@ def _restore_projected_tokens(tokens, before_start, projections):
     return result
 
 
+_RESTORE_INDEX = {}
+
+
+def _restore_index(name, entries):
+    """Entries by their before key, in manifest order, built on the first lookup of `name`. The scan it
+    replaces keyed the same entries on every lookup, so a malformed reference still fails then; a build
+    that fails is not kept and fails again on the next lookup."""
+    index = _RESTORE_INDEX.get(name)
+    if index is None:
+        index = {}
+        for entry in entries():
+            index.setdefault(_manifest_key(entry["before"]), []).append(entry)
+        _RESTORE_INDEX[name] = index
+    return index
+
+
 def _restore_whole_properties(result, source, property_name, consume=True):
     origin = _MANIFEST_NODE_KEYS.get(source)
     if origin is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
-    pairs = [pair for pair in _MANIFEST["restorePropertyPairs"] if pair["property"] == property_name and _manifest_key(pair["before"]) == origin[1]]
+    pairs = _restore_index(("property", property_name), lambda: (pair for pair in _MANIFEST["restorePropertyPairs"] if pair["property"] == property_name)).get(origin[1], [])
     if not pairs: return
     if len(pairs) != 1: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
     after = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(pairs[0]["after"])))
@@ -1117,7 +1133,7 @@ def _whole_paragraph_revision_runs(source, kind, writer):
     restoration = None
     if kind == "del" and source in _MANIFEST_NODE_KEYS:
         origin = _MANIFEST_NODE_KEYS[source][1]
-        matches = [entry for decision in _MANIFEST_DECISIONS if decision.get("deletedFormattingPolicy") == "paired-revised" and decision["before"] and decision["after"] for entry in decision.get("wholeRestoreStyles", []) if _manifest_key(entry["before"]) == origin]
+        matches = _restore_index("paired-revised", lambda: (entry for decision in _MANIFEST_DECISIONS if decision.get("deletedFormattingPolicy") == "paired-revised" and decision["before"] and decision["after"] for entry in decision.get("wholeRestoreStyles", []))).get(origin, [])
         if len(matches) > 1: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
         restoration = matches[0] if matches else None
         if restoration is not None:
@@ -3980,7 +3996,7 @@ def _install_manifest(manifest):
             visit(decision.get("children", []))
     visit(manifest["decisions"])
     _MANIFEST_GRID_USED.clear();_MANIFEST_EVENT_OWNERS.clear();_MANIFEST_OBJECT_EXPECTED.clear();_MANIFEST_OBJECT_CONSUMED.clear();_MANIFEST_SYNTHETIC_TOKENS.clear();_MANIFEST_MERGE_SIDES.clear();_REPLACED.clear();_ORIGINAL_MARKS.update(after_names=None,next_id=None);_NOTE_CLONES.update(items=[],next={})
-    _MANIFEST_KEY_CACHE.clear();_MANIFEST_REF_OWNERS.clear();_ACTUAL_INDEX.clear();_ACTUAL_INDEX["actual"]=None
+    _MANIFEST_KEY_CACHE.clear();_MANIFEST_REF_OWNERS.clear();_ACTUAL_INDEX.clear();_ACTUAL_INDEX["actual"]=None;_RESTORE_INDEX.clear()
     for decision in _MANIFEST_DECISIONS:
         for side in ("before","after"):
             for ref in decision.get("objectEvents",{}).get(side,[]):
@@ -5270,7 +5286,7 @@ def generate_tracked_document(before_path, after_path, output_path, author, incl
         _PACKAGE_GRAPH = None
         _ACTUAL_INDEX.clear(); _ACTUAL_INDEX["actual"] = None
         _NESTED_DECISIONS.clear()
-        _MANIFEST_KEY_CACHE.clear(); _MANIFEST_REF_OWNERS.clear()
+        _MANIFEST_KEY_CACHE.clear(); _MANIFEST_REF_OWNERS.clear(); _RESTORE_INDEX.clear()
         _NOTE_IDS.clear()
         _MANIFEST_NODE_KEYS = {}
         _MANIFEST_DECISIONS = []
