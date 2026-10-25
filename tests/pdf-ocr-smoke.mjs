@@ -31,7 +31,7 @@ try{
   const session=new PdfCompareSession(),file=new File([new Uint8Array(bytes)],'rotated.pdf');
   try{const preview=await session.select({id:'rotation',before:file,after:file},{before:0,after:0});const raster=createPdfOcrRaster(preview,'rotation',file.size*2,2*1024*1024);const data={source:raster.sources.before,width:preview.before.width,height:preview.before.height,transform:raster.input.leftTransform};raster.release();return data;}finally{await session.dispose();}
  },rotatedBytes);assert.equal(metadata.source.pageIndex,0);assert.equal(metadata.source.rotation,90);assert.deepEqual(metadata.source.viewBox,[20,30,580,230]);assert.equal(metadata.source.pdfToRendered.length,6);checks+=4;}
- const large=await pdf('LARGE PAGE',[1600,1600]);await compare(large,large);await page.getByText(labels.memory,{exact:false}).waitFor();assert.equal(await page.locator('[data-testid="image-ocr-run"]').count(),0);checks++;
+ const large=await pdf('LARGE PAGE',[1600,1600]);await compare(large,large);await page.locator('[data-testid="image-ocr-run"]').waitFor();assert.equal(await page.getByText(labels.memory,{exact:false}).count(),0);checks++;
  assert.deepEqual(errors,[]);checks++;
  console.log(`PDF OCR passed ${checks} checks`);console.log(JSON.stringify({status:'passed',checks,raw,metadata,metrics}));await context.close();
 }finally{await browser.close();}

@@ -3094,7 +3094,18 @@
       "correctedHint": "Corrected transcripts are separate comparison inputs. Existing boxes and scores refer only to raw OCR and do not locate edited text. OCR is not rerun. A new image comparison or recognition resets review inputs.",
       "rerun": "Recognize again (reset review inputs)",
       "rawBoxes": "These boxes and scores show raw OCR only. Edited transcript text is not assigned new coordinates.",
-      "resultLanguage": "Current recognition result language: {{language}}"
+      "resultLanguage": "Current recognition result language: {{language}}",
+      "view": {
+        "layout": "Layout",
+        "split": "Split",
+        "unified": "Unified",
+        "precision": "Precision",
+        "smart": "Smart",
+        "word": "Word",
+        "character": "Character",
+        "hideUnchanged": "Hide unchanged lines",
+        "wrap": "Wrap lines"
+      }
     },
     "working": {
       "quality": "Comparison size {{width}} × {{height}} pixels · resolution scale {{scale}}%",

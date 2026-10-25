@@ -3088,7 +3088,18 @@
       "correctedHint": "정정 전사는 별도 비교 입력입니다. 기존 단어 박스와 점수는 인식 원문에만 해당하며, 정정된 글자 위치를 뜻하지 않습니다. OCR을 다시 실행하지 않습니다. 새 이미지 비교나 새 인식 실행은 검토 입력을 초기화합니다.",
       "rerun": "다시 인식 (검토 입력 초기화)",
       "rawBoxes": "이 박스와 점수는 인식 원문만 표시합니다. 정정 전사에는 위치를 새로 부여하지 않습니다.",
-      "resultLanguage": "현재 인식 결과 언어: {{language}}"
+      "resultLanguage": "현재 인식 결과 언어: {{language}}",
+      "view": {
+        "layout": "배치",
+        "split": "나란히",
+        "unified": "한 줄로",
+        "precision": "비교 단위",
+        "smart": "똑똑하게",
+        "word": "단어",
+        "character": "글자",
+        "hideUnchanged": "같은 줄 접기",
+        "wrap": "줄 바꿈"
+      }
     },
     "working": {
       "quality": "비교 크기 {{width}} × {{height}} 픽셀 · 크기 비율 {{scale}}%",
