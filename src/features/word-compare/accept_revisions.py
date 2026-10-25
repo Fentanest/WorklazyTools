@@ -334,16 +334,21 @@ _REVISION_MARKUP = re.compile(
     r"|moveFromRangeStart|moveFromRangeEnd|moveToRangeStart|moveToRangeEnd"
     r"|customXmlInsRangeStart|customXmlInsRangeEnd|customXmlDelRangeStart|customXmlDelRangeEnd)[\s/>]"
 )
-_XML_DECLARED_ENCODING = re.compile(rb"^\s*<\?xml[^>]*encoding\s*=\s*[\"']([A-Za-z0-9._-]+)[\"']")
+_XML_DECLARED_ENCODING = re.compile(rb"^\s*<\?xml[^>]*\bencoding\s*=\s*[\"']([A-Za-z0-9._-]+)[\"']")
+# A document type declaration can define entities that expand into revision elements when parsed.
+_DOCUMENT_TYPE = re.compile(rb"<!(?:DOCTYPE|ENTITY)", re.IGNORECASE)
 
 
 def _without_revision_markup(data):
     """True only when the part is certainly UTF-8 (no BOM other than UTF-8's, a UTF-8 or absent
-    encoding declaration, valid UTF-8 without NUL) and has no revision element. Anything else (UTF-16,
-    other encodings, undecodable bytes) goes through the full accept path."""
+    encoding declaration, valid UTF-8 without NUL, no DOCTYPE or entity declaration) and has no revision
+    element. Anything else (UTF-16, other encodings, undecodable bytes, entities that could expand into
+    elements) goes through the full accept path."""
     if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data:
         return False
     body = data[3:] if data.startswith(b"\xef\xbb\xbf") else data
+    if _DOCUMENT_TYPE.search(body):
+        return False
     declared = _XML_DECLARED_ENCODING.match(body)
     if declared and declared.group(1).decode("ascii").lower().replace("_", "-") not in ("utf-8", "utf8"):
         return False
