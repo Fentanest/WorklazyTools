@@ -343,6 +343,6 @@ function comparisonErrorMessage(reason: unknown, language: "ko" | "en") {
   if (!(reason instanceof Error)) return fallback;
   const message = reason.message.trim();
   if (reason.name === "AbortError") return language === "en" ? "Document comparison was cancelled." : "문서 비교를 취소했습니다.";
-  const safeMessage = /^(?:Document pair \d+:|\d+번 문서 쌍:|Password-protected Word files|암호로 보호된 Word 파일|The selected file|선택한 파일|Could not (?:read|analyze|start|download)|문서가 너무 커서|HWP 문서를 읽지 못했습니다|암호를 확인하거나|Word 문서 비교를 시작하지 못했습니다|HWP 문서 비교를 시작하지 못했습니다|This DOC file|이 DOC 파일)/i.test(message);
+  const safeMessage = /^(?:Document pair \d+:|\d+번 문서 쌍:|Password-protected Word files|암호로 보호된 Word 파일|The selected file|선택한 파일|Could not (?:read|analyze|start|download)|문서가 너무 커서|메모리가 부족해|Ran out of memory|HWP 문서를 읽지 못했습니다|암호를 확인하거나|Word 문서 비교를 시작하지 못했습니다|HWP 문서 비교를 시작하지 못했습니다|This DOC file|이 DOC 파일)/i.test(message);
   return safeMessage ? message : fallback;
 }

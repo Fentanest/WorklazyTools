@@ -11,6 +11,7 @@ import { serializeManifestForTracked } from "../document-compare/manifestWire";
 import { sniffDocumentFormat, type DocumentFormat } from "../document-compare/documentFormat";
 import { extractLegacyDocModel } from "./docModel";
 import { restoreModelTransport } from "./modelTransport";
+import { isOutOfMemory, outOfMemoryMessage, trackedOutOfMemoryMessage } from "../document-compare/memoryFailure";
 
 const PYODIDE_VERSION = pyodidePackage.version;
 const PYODIDE_BASE_URL = new URL(
@@ -205,7 +206,7 @@ worker.onmessage = async (event: MessageEvent) => {
         // memory exhaustion or an unexpected generator error) drops only this pair's DOCX.
         trackedBuffer = undefined;
         const guarded = /COMPARISON_MANIFEST|COMPARISON_DECISION|UNMAPPED_VISIBLE_XML_NODE|SHARED_DIFF|UNSUPPORTED_TRACKED_SOURCE/.test(String(error));
-        warnings.push(guarded ? L(
+        warnings.push(isOutOfMemory(error) ? trackedOutOfMemoryMessage(en ? "en" : "ko") : guarded ? L(
           "일부 원문 위치를 변경 추적 파일에 안전하게 연결할 수 없어 DOCX 다운로드를 제공하지 않습니다. 화면 비교 결과를 확인해 주세요.",
           "The tracked DOCX download is unavailable because some source locations could not be represented safely. Review the on-screen comparison.",
         ) : L(
@@ -223,7 +224,7 @@ worker.onmessage = async (event: MessageEvent) => {
     worker.postMessage({ type: "done" });
   } catch (error) {
     const rawMessage = error instanceof Error ? error.message : String(error);
-    const detail = /zip|document\.xml|BadZipFile/i.test(rawMessage)
+    const detail = isOutOfMemory(error) ? outOfMemoryMessage(en ? "en" : "ko") : /zip|document\.xml|BadZipFile/i.test(rawMessage)
       ? L("DOCX 파일 구조를 읽지 못했습니다. 손상되었거나 실제 DOCX 형식이 아닌지 확인해 주세요.", "Could not read the DOCX structure. Check whether the file is damaged or is not actually a DOCX file.")
       : /fetch|network|import/i.test(rawMessage)
         ? L("비교에 필요한 파일을 내려받지 못했습니다. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.", "Could not download files required for comparison. Check your connection and try again.")

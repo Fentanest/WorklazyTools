@@ -122,3 +122,8 @@ test("out-of-order, duplicate or malformed progressive messages are rejected", a
     await assert.rejects(pending, /An error occurred/, JSON.stringify(sequence)); assert.equal(worker.terminated, 1);
   }
 });
+test("a worker that dies out of memory reports the memory message", async () => {
+  const pending = compareWordFilePairs(pairs(), options, undefined, "ko"); await setImmediate();
+  FakeWorker.instances[0].onerror?.({ message: "Uncaught RangeError: Array buffer allocation failed", preventDefault() {} } as ErrorEvent);
+  await assert.rejects(pending, /^Error: 메모리가 부족해 비교를 끝내지 못했습니다/);
+});

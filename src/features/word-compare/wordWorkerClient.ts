@@ -1,5 +1,6 @@
 import type { FormattingMask } from "../document-compare/formattingMask";
 import type { WordCompareResult } from "../excel-merger/types";
+import { isOutOfMemory, outOfMemoryMessage } from "../document-compare/memoryFailure";
 
 export interface WordCompareOptions {
   requestedFormattingMask?: Partial<FormattingMask>;
@@ -114,7 +115,7 @@ export async function compareWordFilePairs(
     worker.onerror = (event) => {
       if (!finish()) return;
       event.preventDefault();
-      reject(new Error(startError));
+      reject(new Error(isOutOfMemory(event.message) ? outOfMemoryMessage(language) : startError));
     };
     worker.onmessageerror = () => {
       if (finish()) reject(new Error(language === "en" ? "Could not read the comparison result." : "비교 결과를 읽지 못했습니다."));

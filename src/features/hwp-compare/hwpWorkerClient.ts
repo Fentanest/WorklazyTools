@@ -1,4 +1,5 @@
 import type { WordCompareResult } from "../excel-merger/types";
+import { isOutOfMemory, outOfMemoryMessage } from "../document-compare/memoryFailure";
 
 export interface HwpCompareOptions {
   formatting: boolean;
@@ -68,6 +69,7 @@ export async function compareHwpFilePairs(
     worker.onerror = (event) => {
       if (!finish()) return;
       event.preventDefault();
+      if (isOutOfMemory(event.message)) { reject(new Error(outOfMemoryMessage(language))); return; }
       reject(new Error(language === "en" ? "Could not start HWP comparison. Reload the page and try again." : "HWP 문서 비교를 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."));
     };
     worker.onmessageerror = () => {
