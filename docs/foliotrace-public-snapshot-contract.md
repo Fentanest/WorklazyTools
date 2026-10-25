@@ -4,7 +4,7 @@
 코드 정본: `src/features/foliotrace/contracts.ts`(형), `src/features/foliotrace/data/loadSnapshot.ts`(`validSnapshot`·`SNAPSHOT_LIMITS`·`SOURCE_KINDS`), `scripts/foliotrace-public-data.mjs`(파일 단위 검증·비공개 내용 검사). 이 문서는 그 설명이며, 어긋나면 코드가 정본이다.
 
 ## 위치와 파일
-- 데이터 경로: `public/data/foliotrace/v1/` (사이트 URL `/data/foliotrace/v1/`). 경로의 `v1`과 파일의 `schemaVersion: 1`은 **그대로 둔다**(개정 2는 호환 확장이라 화면이 읽는 주소와 판별값을 바꾸지 않는다).
+- 데이터 위치: 비공개 저장소 `Fentanest/foliotrace-site-data` main의 `v1/`. 배포 워크플로가 이를 빌드 전에 `public/data/foliotrace/v1/`로 복사한다(사이트 URL `/data/foliotrace/v1/`, 이 저장소에는 커밋하지 않음; docs/foliotrace-delivery-and-deploy.md). 경로의 `v1`과 파일의 `schemaVersion: 1`은 **그대로 둔다**(개정 2는 호환 확장이라 화면이 읽는 주소와 판별값을 바꾸지 않는다).
 - `manifest.json`(≤ 4,096바이트): `schemaVersion=1`, `datasetVersion`(64자리 16진), `snapshotPath=snapshots/<datasetVersion>.json`, `snapshotSha256`(스냅샷 파일 바이트의 SHA-256).
 - 데이터 루트(`v1/`)에는 `manifest.json`과 `snapshots/` 외 아무것도 두지 않는다(검증기가 거절).
 - `snapshots/<datasetVersion>.json`: 스냅샷 본체. 폴더에는 **매니페스트가 가리키는 파일 하나만** 둔다(D5: 일자별 전체 사본 비보관, 이전 파일은 새 전달 때 삭제).

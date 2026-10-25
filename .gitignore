@@ -33,3 +33,6 @@ public/vendor/libreoffice-converter/
 
 public/vendor/markitdown/
 .cache/markitdown/
+
+# FolioTrace public data is copied from the private data repository at deploy time
+public/data/foliotrace/

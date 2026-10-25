@@ -2,14 +2,19 @@ name: Deploy site
 run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.validate_only && 'Validate site build (no deploy)' || 'Manual site deploy') || 'Site deploy on main push' }}
 
 # Replacement for deploy-pages.yml (FolioTrace operations plan P3-3). This workflow collects nothing: it never calls DART, holds no
-# DART key and writes no repository state. It validates the committed FolioTrace data (public/data/foliotrace/v1, delivered by the local
-# orchestrator), builds, tests and deploys. Cutover steps: docs/foliotrace-delivery-and-deploy.md.
+# DART key and writes no repository state. It fetches the FolioTrace public data from the private repository
+# Fentanest/foliotrace-site-data (main, v1/manifest.json + v1/snapshots/, delivered by the local orchestrator) with a READ-ONLY deploy
+# key (secret FOLIOTRACE_SITE_DATA_READ_KEY), places it at public/data/foliotrace/v1, validates, builds, tests and deploys.
+# Missing secret or failed checkout stops the run before any deploy: the site keeps its previous data.
+# Cutover steps: docs/foliotrace-delivery-and-deploy.md.
 #
-# Inert until cutover: a main push deploys only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true'. Without it the push run is
-# skipped. A manual run can always build and validate (validate_only), which does not touch Pages.
+# Inert until cutover: main push and repository_dispatch runs deploy only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true'.
+# Without it they are skipped. A manual run can always build and validate (validate_only), which does not touch Pages.
 on:
   push:
     branches: [main]
+  repository_dispatch:
+    types: [foliotrace-data-updated] # optional notification that the data repository changed (see the delivery doc)
   workflow_dispatch:
     inputs:
       validate_only:
@@ -37,13 +42,37 @@ jobs:
           # commit; a shallow source checkout cannot read those exact blobs.
           fetch-depth: 0
 
+      - name: Require the data repository read key
+        env:
+          KEY_PRESENT: ${{ secrets.FOLIOTRACE_SITE_DATA_READ_KEY != '' }}
+        run: |
+          if [ "$KEY_PRESENT" != "true" ]; then echo "::error::FOLIOTRACE_SITE_DATA_READ_KEY is not set; refusing to build without data"; exit 1; fi
+
+      - name: Checkout FolioTrace public data repository (read-only key)
+        uses: actions/checkout@v4
+        with:
+          repository: Fentanest/foliotrace-site-data
+          ref: main
+          ssh-key: ${{ secrets.FOLIOTRACE_SITE_DATA_READ_KEY }}
+          path: foliotrace-site-data
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Place FolioTrace data at the path the screen reads
+        run: |
+          test -f foliotrace-site-data/v1/manifest.json && test -d foliotrace-site-data/v1/snapshots
+          rm -rf public/data/foliotrace
+          mkdir -p public/data/foliotrace/v1
+          cp -r foliotrace-site-data/v1/. public/data/foliotrace/v1/
+          echo "data repository revision: $(git -C foliotrace-site-data rev-parse HEAD)"
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
 
-      - name: Validate committed FolioTrace data (contract, hash, size, no private content)
+      - name: Validate FolioTrace data (contract, hash, size, no private content)
         run: node --experimental-strip-types scripts/validate-foliotrace-snapshot.mjs public --no-html
 
       - name: Install dependencies
@@ -108,7 +137,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name == 'push' || !inputs.validate_only
+    if: github.event_name != 'workflow_dispatch' || !inputs.validate_only
     permissions:
       contents: read
       pages: write
