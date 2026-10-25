@@ -1,5 +1,5 @@
 import {maskedSourceFormatting} from './formattingMask.ts';
-import {buildObjectEventContexts,eventPosition,splitBoundaryNoteContexts} from './objectEventContext.ts';
+import {buildObjectEventContexts,pairedEventIndex,splitBoundaryNoteContexts} from './objectEventContext.ts';
 import type {ComparisonDecision,DocumentComparisonManifest,DocumentSourceReference} from './comparisonManifest.ts';
 export interface NoteContainer {source:DocumentSourceReference;kind:string;id:string;type:string;contentSignature?:string;specialRevisionShape?:string[]}
 export interface NoteFacts {policy:'worklazy-note-facts-1';parts:string[];owners:Array<{kind:string;part:string;rId?:string;rawTarget?:string}>;containers:NoteContainer[];references:Array<{source:DocumentSourceReference;kind:string;id:string}>;errors:string[]}
@@ -45,7 +45,7 @@ export function buildNoteProjection(manifest:DocumentComparisonManifest):NotePro
    if(old.filter(ref=>ref.source.objectEvent!.start===boundary).length>1&&splitBoundaryNoteContexts(manifest,decision,old.map(ref=>ref.source),next.map(ref=>ref.source)).size!==old.filter(ref=>ref.source.objectEvent!.start===boundary).length&&next.some(ref=>ref.source.objectEvent!.start===leftLength&&JSON.stringify(ref.source.objectEvent!.paragraphPath)===JSON.stringify(decision.after[0].path))&&next.some(ref=>ref.source.objectEvent!.start===0&&JSON.stringify(ref.source.objectEvent!.paragraphPath)===JSON.stringify(decision.after[1].path)))plan.reasons.push('ambiguous-split-note-order');
   }
   const available=[...next];
-  for(const ref of old){const index=available.findIndex(candidate=>candidate.kind===ref.kind&&eventPosition(decision,contexts,'before',ref.source)===eventPosition(decision,contexts,'after',candidate.source));
+  for(const ref of old){const index=pairedEventIndex(decision,contexts,ref.source,available.map(candidate=>candidate.source),source=>available.find(candidate=>candidate.source===source)!.kind===ref.kind);
    const target=index<0?undefined:available.splice(index,1)[0];const before=a.containers.find(note=>note.kind===ref.kind&&note.id===ref.id&&note.type==='normal'),after=target?b.containers.find(note=>note.kind===target.kind&&note.id===target.id&&note.type==='normal'):undefined;
    if(!before||target&&!after){plan.reasons.push('missing-note-target');continue;}const pair=add(before,after);plan.references.push({decisionId:decision.id,before:ref.source,after:target?.source,noteId:pair.id});
   }

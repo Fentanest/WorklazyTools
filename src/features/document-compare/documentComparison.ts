@@ -18,7 +18,7 @@ import type {
 import { alignDocumentSequence, alignSequence, type SequenceGroup, type SequencePair } from "./documentAlignment.ts";
 
 import { buildMergeProjections } from "./mergeProjection.ts";
-import { buildObjectEventContexts, eventPosition } from "./objectEventContext.ts";
+import { buildObjectEventContexts, eventPosition, pairedEventIndex } from "./objectEventContext.ts";
 import { buildDrawingRestoreProjections } from "./drawingRestoreProjection.ts";
 import { buildRestoreStyleProjections } from "./restoreStyleProjection.ts";
 import { buildWordFormatting, projectWordFormatting, type ManifestFormattingView } from "./wordFormatting.ts";
@@ -213,7 +213,7 @@ export function compareDocumentModels(
     // order. Identity is the actual source reference, never a volatile rId.
     const available=after.filter(source=>(source.objectEvent!.kind==="drawing"||options.metadata&&source.objectEvent!.kind==="note"));
     const drawingProperties=before.filter(source=>(source.objectEvent!.kind==="drawing"||options.metadata&&source.objectEvent!.kind==="note")).flatMap(a=>{
-      const index=available.findIndex(b=>a.objectEvent!.kind===b.objectEvent!.kind && (a.objectEvent!.kind!=="note"||a.objectEvent!.signature===b.objectEvent!.signature) && position("before",a)===position("after",b));
+      const index=pairedEventIndex(decision,contexts,a,available,b=>a.objectEvent!.kind===b.objectEvent!.kind && (a.objectEvent!.kind!=="note"||a.objectEvent!.signature===b.objectEvent!.signature));
       if(index<0)return [];
       const b=available.splice(index,1)[0],old=runFact("before",a),next=runFact("after",b);
       const names=[...new Set([...Object.keys(old.supported),...Object.keys(next.supported)])].filter(name=>JSON.stringify(old.supported[name]??[])!==JSON.stringify(next.supported[name]??[]));

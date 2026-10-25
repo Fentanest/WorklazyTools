@@ -3413,6 +3413,24 @@ def _validate_restore_styles(actual):
                 if segment["type"]!="added":old+=size
                 if segment["type"]!="deleted":new+=size
             return new
+        def local_range(context,position):
+            # objectEventContext.ts sourceEventRange: text inserted right at an original boundary
+            # leaves the object anywhere across that insertion.
+            comparison=decision["comparisons"][context["comparisonIndex"]]
+            candidates=[];old=new=0
+            for segment in comparison["segments"]:
+                size=len(segment["text"])
+                if old==position:candidates.append(new)
+                if segment["type"]=="equal" and old<position<old+size:return new+position-old,new+position-old
+                if segment["type"]=="deleted" and old<position<old+size:return new,new
+                if segment["type"]!="added":old+=size
+                if segment["type"]!="deleted":new+=size
+            if old==position:candidates.append(new)
+            candidates.append(local_boundary(context,position))
+            return min(candidates),max(candidates)
+        def range_of(ref):
+            context,item=locations["before"][_manifest_key(ref)];low,high=local_range(context,item["start"])
+            return context["offset"]+low,context["offset"]+high
         def position_of(side,ref,end=False):
             key=(side,_manifest_key(ref),end)
             if key not in position_cache:
@@ -3421,13 +3439,18 @@ def _validate_restore_styles(actual):
             return position_cache[key]
         # Validate TS's correspondence, never recover/select a missing pair.
         drawings={side:[ref for ref in expected[side] if ref["objectEvent"]["kind"]=="drawing" or _MANIFEST["options"]["metadata"] and ref["objectEvent"]["kind"]=="note"] for side in ("before","after")}
-        buckets={side:{} for side in ("before","after")}
-        for side in ("before","after"):
-            for ref in drawings[side]:
-                position=position_of(side,ref)
-                buckets[side].setdefault((position,ref["objectEvent"]["kind"],ref["objectEvent"]["signature"] if ref["objectEvent"]["kind"]=="note" else ""),[]).append(ref)
+        # The pairs TS forms (objectEventContext.ts pairedEventIndex): in source order, the revised
+        # event of the same kind (and note signature) at the exact position, else the first inside
+        # the original's range.
+        expected_pairs=[];available=list(drawings["after"])
+        for ref in drawings["before"]:
+            same=lambda match:match["objectEvent"]["kind"]==ref["objectEvent"]["kind"] and (ref["objectEvent"]["kind"]!="note" or match["objectEvent"]["signature"]==ref["objectEvent"]["signature"])
+            at=position_of("before",ref);low,high=range_of(ref)
+            index=next((i for i,match in enumerate(available) if same(match) and position_of("after",match)==at),None)
+            if index is None:index=next((i for i,match in enumerate(available) if same(match) and low<=position_of("after",match)<=high),None)
+            if index is not None:expected_pairs.append((_manifest_key(ref),_manifest_key(available.pop(index))))
         projections=events.get("drawingProperties")
-        if not isinstance(projections,list) or len(projections)!=sum(min(len(refs),len(buckets["after"].get(position,[]))) for position,refs in buckets["before"].items()):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
+        if not isinstance(projections,list) or len(projections)!=len(expected_pairs):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
         seen={side:set() for side in ("before","after")}
         for pair in projections:
             for side in ("before","after"):
@@ -3435,14 +3458,13 @@ def _validate_restore_styles(actual):
                 if ref not in drawings[side] or _manifest_key(ref) in seen[side]:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
                 seen[side].add(_manifest_key(ref))
             ref,match=pair["before"],pair["after"]
-            position=position_of("before",ref)
-            bucket=(position,ref["objectEvent"]["kind"],ref["objectEvent"]["signature"] if ref["objectEvent"]["kind"]=="note" else "")
-            if ref["objectEvent"]["kind"]!=match["objectEvent"]["kind"] or ref["objectEvent"]["kind"]=="note" and ref["objectEvent"]["signature"]!=match["objectEvent"]["signature"] or position!=position_of("after",match) or buckets["before"][bucket].index(ref)!=buckets["after"][bucket].index(match):raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
+            if (_manifest_key(ref),_manifest_key(match)) not in expected_pairs:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
             old,new=run_fact("before",ref),run_fact("after",match)
             names=[name for name in dict.fromkeys(list(old["supported"])+list(new["supported"])) if old["supported"].get(name,[])!=new["supported"].get(name,[])]
             excluded=[name for name in dict.fromkeys(list(old["unsupported"])+list(new["unsupported"])) if old["unsupported"].get(name,[])!=new["unsupported"].get(name,[])]
             verified={"representation":"preserve-after-history" if new["history"] else "revision","before":ref,"after":match,"beforeFact":old,"afterFact":new,"families":[name for name in names if _mask_enabled("rPr",name)],"excludedFamilies":excluded+[name for name in names if not _mask_enabled("rPr",name)]}
             if pair!=verified:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
+        if [(_manifest_key(pair["before"]),_manifest_key(pair["after"])) for pair in projections]!=expected_pairs:raise ValueError("INVALID_COMPARISON_MANIFEST_OBJECT_PROPERTIES")
         unpaired=[ref for ref in drawings["before"] if not any(pair["before"]==ref for pair in projections)]
         restores=events.get("deletedDrawingStyles")
         if not isinstance(restores,list) or len(restores)!=len(unpaired):raise ValueError("INVALID_COMPARISON_MANIFEST_DRAWING_RESTORE")

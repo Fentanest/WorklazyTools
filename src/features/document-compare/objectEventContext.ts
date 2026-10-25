@@ -27,6 +27,21 @@ export function sourceEventBoundary(decision:ComparisonDecision,position:number)
   }
   return next;
 }
+/** Every revised position an original boundary may stand for: text inserted right at the boundary
+ * leaves an object anywhere across that insertion (a note reference typed after new text). The
+ * single position `sourceEventBoundary` gives is always inside. */
+export function sourceEventRange(decision:ComparisonDecision,position:number):[number,number] {
+  const candidates:number[]=[];let old=0,next=0;
+  for(const segment of decision.comparisons[0].segments){const size=Array.from(segment.text).length;
+    if(old===position)candidates.push(next);
+    if(segment.type==='equal' && old<position && position<old+size)return [next+position-old,next+position-old];
+    if(segment.type==='deleted' && old<position && position<old+size)return [next,next];
+    if(segment.type!=='added')old+=size;if(segment.type!=='deleted')next+=size;
+  }
+  if(old===position)candidates.push(next);
+  const point=sourceEventBoundary(decision,position);candidates.push(point);
+  return [Math.min(...candidates),Math.max(...candidates)];
+}
 export function buildObjectEventContexts(manifest:DocumentComparisonManifest,decision:ComparisonDecision,before:DocumentSourceReference[],after:DocumentSourceReference[]):ObjectEventContext[] {
   const indexes=decision.before.length===1 && decision.after.length===2?[1,2]:decision.before.length===2&&decision.after.length===1?[1]:[0];
   const assigned=splitBoundaryNoteContexts(manifest,decision,before,after);
@@ -40,6 +55,23 @@ export function buildObjectEventContexts(manifest:DocumentComparisonManifest,dec
   });
 }
 export function eventContext(decision:ComparisonDecision,side:'before'|'after',ref:DocumentSourceReference){return decision.objectEvents?.contexts.find(context=>context[side].some(event=>(event.source===ref||key(event.source)===key(ref))));}
+/** `eventPosition` of an original event as the range of revised positions it may stand for. */
+export function eventRange(decision:ComparisonDecision,contexts:ObjectEventContext[],ref:DocumentSourceReference):[number,number] {
+  const context=contexts.find(item=>item.before.some(event=>(event.source===ref||key(event.source)===key(ref))));
+  if(!context){const position=ref.objectEvent!.start;return [position,position];}
+  const event=context.before.find(event=>(event.source===ref||key(event.source)===key(ref)))!;
+  const comparison=decision.comparisons[context.comparisonIndex];
+  const [low,high]=sourceEventRange({...decision,beforeText:comparison.before,afterText:comparison.after,comparisons:[comparison]},event.start);
+  return [context.offset+low,context.offset+high];
+}
+/** Index of the revised event an original one pairs with, in source order: the one at its exact
+ * position, else the first inside its range (`eventRange`); -1 when none qualifies. */
+export function pairedEventIndex(decision:ComparisonDecision,contexts:ObjectEventContext[],ref:DocumentSourceReference,candidates:DocumentSourceReference[],accepts:(candidate:DocumentSourceReference)=>boolean) {
+  const at=eventPosition(decision,contexts,'before',ref),[low,high]=eventRange(decision,contexts,ref);
+  const exact=candidates.findIndex(candidate=>accepts(candidate)&&eventPosition(decision,contexts,'after',candidate)===at);
+  if(exact>=0)return exact;
+  return candidates.findIndex(candidate=>{if(!accepts(candidate))return false;const position=eventPosition(decision,contexts,'after',candidate);return low<=position&&position<=high;});
+}
 export function eventPosition(decision:ComparisonDecision,contexts:ObjectEventContext[],side:'before'|'after',ref:DocumentSourceReference,end=false) {
   const context=contexts.find(item=>item[side].some(event=>(event.source===ref||key(event.source)===key(ref))));
   if(!context)return ref.objectEvent![end?'end':'start'];
