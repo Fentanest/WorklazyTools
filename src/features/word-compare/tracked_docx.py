@@ -546,7 +546,9 @@ def _parse_xml(data):
 
 def _serialize_xml(root):
     if root.tag in {PR+"Relationships",CT+"Types"}:ET.register_namespace("",root.tag[1:].split("}",1)[0])
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    # The bytes of ET.tostring(root, encoding="utf-8", xml_declaration=True), which writes each piece
+    # through a TextIOWrapper (utf-8, xmlcharrefreplace, no newline translation); one encode is faster.
+    return ("<?xml version='1.0' encoding='utf-8'?>\n" + ET.tostring(root, encoding="unicode")).encode("utf-8", "xmlcharrefreplace")
 
 
 def _effective_properties(properties):
