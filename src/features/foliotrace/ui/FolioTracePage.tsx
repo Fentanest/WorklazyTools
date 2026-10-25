@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 import { PageHeader, SectionCard } from "../../../components/ui";
+import { UtilityPage } from "../../../components/UtilitySurface";
 import { Card } from "../../../components/ui/card";
 import {
   Sheet,
@@ -41,7 +42,6 @@ import {
 import type { FilingChangeDirection, Lang, QualityFilter, SortKey } from "./holdings";
 import { XIcon } from "lucide-react";
 import { getFaqsForPath } from "./faq";
-import indirectEvidence from "../data/indirectEvidence.json";
 import delistedReference from "../data/delistedReference.json";
 
 const delistedItems = [...delistedReference.items].sort((a, b) =>
@@ -68,27 +68,7 @@ const STR = {
     historicalFirstTentative: "(조회 진행 중 잠정값)",
     historicalParsePending: "새 공시 내용 확인 중",
     historicalLegacyRecheck: "이전 기록 중 공시 확인이 필요한 건수",
-    indirectTitle: "개별 공시에서 확인한 과거 기록",
     indirectSource: "DART 원문 보기",
-    indirectScope: "다른 회사의 공시에서 찾은 보유 기록과 배정 계획입니다. 배정 계획은 실제 보유를 뜻하지 않습니다. 아직 확인 중인 기록은 현재 보유액에 넣지 않습니다.",
-    indirectSummary: "관련 공시 {candidates}건 발견 · 주식 관련 내용 확인 중 {reviewed}건",
-    indirectDetails: "과거 공시 확인 범위 자세히 보기",
-    historicalObservationTitle: "과거 보유 내역",
-    historicalObservationScope: "공시에 적힌 보유 날짜·수량·지분율입니다. 지분율을 계산할 때 사용한 주식 수의 날짜가 불분명하면 현재 지분율과 비교하지 않습니다.",
-    historicalDenominatorDatePending: "지분율 계산에 사용한 주식 수의 날짜 확인 중",
-    historicalRatioBasisPending: "지분율 계산 기준 확인 중",
-    historicalObservationMore: "더 많은 과거 기록",
-    secondaryAll: "전체 공시 내용 검색으로 확인한 날짜",
-    secondaryEquity: "지분·의결권 공시 내용으로 확인한 날짜",
-    secondaryPriorAll: "1999~2005 전체 공시에서 확인한 날짜",
-    secondaryPriorQ1: "1999년 1~3월 공시에서 확인한 날짜",
-    secondaryPriorEquity: "1999~2005 지분·의결권 공시에서 확인한 날짜",
-    secondaryDirect: "2006~2008 국민연금 제출 공시에서 확인한 날짜",
-    secondaryCandidates: "찾은 관련 공시",
-    secondaryOtherUnreviewed: "아직 내용을 확인하지 않은 공시",
-    secondarySourcePending: "내용 확인을 기다리는 공시",
-    secondaryContextPending: "주식 관련 내용을 확인 중인 공시",
-    secondaryNoScan: "기간별 공시 검색이 시작되기 전입니다. 아래는 개별적으로 확인한 기록입니다.",
     priceBasis: "한국거래소 정규장 마감 가격 기준",
     checkedAt: "공시 확인",
     generatedAt: "자료 작성",
@@ -156,9 +136,6 @@ const STR = {
     issuerScopeSource: "다른 회사 공시에서 확인한 지분율 · 주식 종류 확인 중",
     issuerScopeDetail: "발행주식 기준으로 확인한 수량",
     issuerScopeComparison: "이전 직접 공시와 지분율 계산 기준이 같다고 확인되지 않아 증감은 표시하지 않습니다.",
-    issuerScopeHistory: "주주명부에서 확인한 지분 기록",
-    issuerScopeHistoryNote: "각 날짜의 발행주식수를 기준으로 확인했습니다. 주식 종류와 직접 공시의 비교 기준은 확인 중입니다.",
-    issuerScopeCitedAgain: "같은 날짜 기록을 나중 공시에서 다시 확인",
     issuerScopeLaterChange: "이후 국민연금 보유주식 감소가 기록됐지만 새 수량·지분율은 확인되지 않았습니다",
     documentNumber: "문서 번호",
     verifiedObservationTitle: "다른 회사 공시에서 확인한 지분",
@@ -253,27 +230,7 @@ const STR = {
     historicalFirstTentative: "(provisional while searching)",
     historicalParsePending: "New filings under review",
     historicalLegacyRecheck: "Earlier records awaiting source checks",
-    indirectTitle: "Older records checked in individual filings",
     indirectSource: "Open DART filing",
-    indirectScope: "Other companies' filings can describe NPS holdings or planned allotments. Plans are shown separately from confirmed holdings. Records still under review are left out of current values.",
-    indirectSummary: "{candidates} relevant filings found · stock details need a closer check in {reviewed}",
-    indirectDetails: "See historical filing coverage",
-    historicalObservationTitle: "Historical holdings",
-    historicalObservationScope: "These are the holding date, quantity, and percentage reported in the filing. If the date of the share count used for that percentage is unclear, we do not compare it with the current percentage.",
-    historicalDenominatorDatePending: "Date of the total share count still under review",
-    historicalRatioBasisPending: "How the percentage was calculated is still under review",
-    historicalObservationMore: "More historical records",
-    secondaryAll: "All filing contents searched through",
-    secondaryEquity: "Ownership and voting filings searched through",
-    secondaryPriorAll: "1999–2005 filings searched through",
-    secondaryPriorQ1: "1999 January–March filings searched through",
-    secondaryPriorEquity: "1999–2005 ownership and voting filings searched through",
-    secondaryDirect: "2006–2008 NPS-submitted filings checked through",
-    secondaryCandidates: "Relevant filings found",
-    secondaryOtherUnreviewed: "Filings whose contents have not been checked yet",
-    secondarySourcePending: "Filings awaiting a content check",
-    secondaryContextPending: "Filings with stock details under review",
-    secondaryNoScan: "The period-by-period search has not started. The records below were checked individually.",
     priceBasis: "Closing price from the Korea Exchange regular session",
     checkedAt: "Filings checked",
     generatedAt: "Data prepared",
@@ -341,9 +298,6 @@ const STR = {
     issuerScopeSource: "Ownership confirmed in another company's filing · share class under review",
     issuerScopeDetail: "Shares confirmed against all issued shares",
     issuerScopeComparison: "The earlier direct filing has no confirmed matching percentage basis, so no change is shown.",
-    issuerScopeHistory: "Ownership recorded in shareholder registers",
-    issuerScopeHistoryNote: "Each percentage uses the issued-share count for its own date. Share class and comparison with direct filings remain under review.",
-    issuerScopeCitedAgain: "The same dated record was cited again in a later filing",
     issuerScopeLaterChange: "A later filing reports fewer NPS shares, but gives no new NPS quantity or percentage",
     documentNumber: "Document number",
     verifiedObservationTitle: "Ownership found in another company's filing",
@@ -504,7 +458,7 @@ export function FolioTracePage({ lang, view, onRefresh }: FolioTracePageProps) {
             ? t.schemaErrorDesc
             : t.loading;
     return (
-      <div className="foliotrace-page">
+      <UtilityPage toolId="foliotrace" className="foliotrace-page">
         <PageHeader eyebrow={t.eyebrow} title={title} description={desc} />
         <SectionCard title={title} description={view.message ?? desc}>
           {view.status === "loading" ? (
@@ -524,7 +478,7 @@ export function FolioTracePage({ lang, view, onRefresh }: FolioTracePageProps) {
             </div>
           )}
         </SectionCard>
-      </div>
+      </UtilityPage>
     );
   }
 
@@ -609,7 +563,7 @@ function ReadyView({
     s === "included" ? t.statusIncluded : s === "excluded" ? t.statusExcluded : s === "exit" ? t.statusExit : t.statusUnresolved;
 
   return (
-    <div className="foliotrace-page">
+    <UtilityPage toolId="foliotrace" className="foliotrace-page">
       <PageHeader eyebrow={t.eyebrow} title={t.title} description={t.description}>
         <button type="button" className="foliotrace-retry" onClick={onRefresh}>
           {t.retry}
@@ -929,94 +883,6 @@ function ReadyView({
         )}
       </SectionCard>
 
-      <aside className="foliotrace-indirect-clue" aria-label={t.indirectTitle}>
-        <strong>{t.indirectTitle}</strong>
-        {snapshot.secondaryCoverage ? (
-          <>
-            <small>{t.indirectSummary
-              .replace("{candidates}", String(snapshot.secondaryCoverage.candidateDocumentCount))
-              .replace("{reviewed}", String(snapshot.secondaryCoverage.sourceContextReviewCount))}</small>
-            <details>
-              <summary>{t.indirectDetails}</summary>
-              <div className="foliotrace-coverage-details">
-                <span>{t.secondaryAll}: {snapshot.secondaryCoverage.allContentCheckedThrough ?? "—"}</span>
-                <span>{t.secondaryEquity}: {snapshot.secondaryCoverage.equityContentCheckedThrough ?? "—"}</span>
-                <span>{t.secondaryPriorAll}: {snapshot.secondaryCoverage.priorContentCheckedThrough ?? "—"}</span>
-                <span>{t.secondaryPriorQ1}: {snapshot.secondaryCoverage.priorQ1CheckedThrough ?? "—"}</span>
-                <span>{t.secondaryPriorEquity}: {snapshot.secondaryCoverage.priorEquityCheckedThrough ?? "—"}</span>
-                <span>{t.secondaryDirect}: {snapshot.secondaryCoverage.earlyDirectCheckedThrough ?? "—"}</span>
-                <span>{t.secondaryCandidates}: {snapshot.secondaryCoverage.candidateDocumentCount}</span>
-                <span>{t.secondaryOtherUnreviewed}: {snapshot.secondaryCoverage.noncandidateUnreviewedCount}</span>
-                <span>{t.secondarySourcePending}: {snapshot.secondaryCoverage.sourceReviewPendingCount}</span>
-                <span>{t.secondaryContextPending}: {snapshot.secondaryCoverage.sourceContextReviewCount}</span>
-              </div>
-            </details>
-          </>
-        ) : <small>{t.secondaryNoScan}</small>}
-        {(snapshot.historicalObservations?.length ?? 0) > 0 && (
-          <div className="foliotrace-source-observations">
-            <strong>{t.historicalObservationTitle}</strong>
-            <small>{t.historicalObservationScope}</small>
-            {snapshot.historicalObservations?.slice(0, 20).map((observation) => (
-              <p key={`${observation.receiptNo}:${observation.documentNo}:${observation.sourceRowSha256}`}>
-                <strong>{observation.issuerName}</strong> · {observation.basisDate} · {formatQty(observation.quantity)} · {formatPct(observation.ownershipPercent)}
-                {" · "}{observation.status === "historical_only_denominator_date_unverified" ?
-                  t.historicalDenominatorDatePending : t.historicalRatioBasisPending}
-                {" "}<a href={observation.filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
-              </p>
-            ))}
-            {(snapshot.historicalObservations?.length ?? 0) > 20 && (
-              <small>{t.historicalObservationMore}: {(snapshot.historicalObservations?.length ?? 0) - 20}</small>
-            )}
-          </div>
-        )}
-        {(snapshot.verifiedIndirectObservations?.length ?? 0) > 0 && (
-          <div className="foliotrace-source-observations">
-            <strong>{t.verifiedObservationTitle}</strong>
-            {recentObservations.slice(0, 20).map((observation) => (
-              <p key={observation.observationKey}>
-                <strong>{currentNameByCorpCode.get(observation.corpCode) ?? observation.stockCode}</strong>
-                {" · "}{observation.basisDate} · {observedPercent(observation.ownershipPercent, observation.numericKind)}
-                {" · "}{observation.reason === "same_basis_conflict" ? t.verifiedObservationConflict :
-                  observation.reason === "direct_basis_unverified" ? t.directBasisPending :
-                  observation.appliedToHolding ? t.verifiedObservationApplied : t.verifiedObservationPending}
-                {" "}<a href={observation.filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
-              </p>
-            ))}
-          </div>
-        )}
-        {(snapshot.issuerScopeObservations?.length ?? 0) > 0 && (
-          <div className="foliotrace-source-observations">
-            <strong>{t.issuerScopeHistory}</strong>
-            <small>{t.issuerScopeHistoryNote}</small>
-            {snapshot.issuerScopeObservations?.slice(0, 20).map((observation) => (
-              <p key={observation.observationKey}>
-                <strong>{observation.issuerName}</strong> · {observation.basisDate} ·
-                {" "}{formatQty(observation.sourceQuantity)} / {formatQty(observation.denominatorQuantity)} ·
-                {" "}{formatPct(observation.ownershipPercent)}
-                {observation.references.length > 1 && ` · ${t.issuerScopeCitedAgain}`}
-                {observation.status === "same_basis_conflict" && ` · ${t.verifiedObservationConflict}`}
-                {observation.status === "direct_basis_unverified" && ` · ${t.directBasisPending}`}
-                {snapshot.issuerScopeLaterChanges?.some((change) => change.corpCode === observation.corpCode &&
-                  change.basisDate > observation.basisDate) && ` · ${t.issuerScopeLaterChange}`}
-                {" "}<a href={observation.references[0].filingUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
-              </p>
-            ))}
-          </div>
-        )}
-        {indirectEvidence.items.filter((clue) => !(clue.facts.length === 1 && snapshot.historicalObservations?.some(
-          (observation) => observation.receiptNo === clue.receiptNo &&
-            observation.quantity === clue.facts[0].quantity &&
-            observation.ownershipPercent === clue.facts[0].ownershipPercent &&
-            observation.basisDate === clue.facts[0].basisDate))).map((clue) => (
-          <p key={clue.receiptNo}>
-            {lang === "ko" ? clue.descriptionKo : clue.descriptionEn}
-            {" "}<a href={clue.sourceUrl} target="_blank" rel="noopener noreferrer">{t.indirectSource}</a>
-          </p>
-        ))}
-        <small>{t.indirectScope}</small>
-      </aside>
-
       <SectionCard title={t.guideTitle} description={t.formula}>
         <ul className="foliotrace-guide">
           <li>{t.description}</li>
@@ -1224,6 +1090,6 @@ function ReadyView({
           </SheetContent>
         )}
       </Sheet>
-    </div>
+    </UtilityPage>
   );
 }

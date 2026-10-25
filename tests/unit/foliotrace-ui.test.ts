@@ -73,12 +73,9 @@ test("React page renders the shared FAQ entries visibly (FT-10)", () => {
 
 test("coverage cards show one concise summary with labeled expandable details", () => {
   assert.match(pageSource, /historicalCoverageDetails/);
-  assert.match(pageSource, /indirectDetails/);
-  assert.match(pageSource, /indirectSummary/);
   assert.match(pageSource, /foliotrace-coverage-details/);
   assert.match(cssSource, /\.foliotrace-coverage-details/);
   assert.match(cssSource, /\.foliotrace-history-coverage summary/);
-  assert.match(cssSource, /\.foliotrace-indirect-clue summary/);
 });
 
 test("user-facing copy avoids raw pipeline jargon", () => {
