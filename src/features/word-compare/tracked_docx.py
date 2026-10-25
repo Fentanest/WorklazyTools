@@ -3643,8 +3643,14 @@ def _validate_decision_restore_styles(decision, actual):
             if covered != set(expected): raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_COVERAGE")
 
 
+_MASK_GROUPS = {"text": None, "groups": None}
+
+
 def _mask_enabled(property_name, name):
-    group = json.loads(WORKLAZY_FORMATTING_POLICY_JSON).get("maskGroups", {}).get(property_name, {}).get(name.rsplit("}", 1)[-1], "style" if property_name == "rPr" else "paragraph")
+    # The policy's mask groups, parsed once per policy text (this runs for every enabled family).
+    if _MASK_GROUPS["text"] is not WORKLAZY_FORMATTING_POLICY_JSON:
+        _MASK_GROUPS.update(text=WORKLAZY_FORMATTING_POLICY_JSON, groups=json.loads(WORKLAZY_FORMATTING_POLICY_JSON).get("maskGroups", {}))
+    group = _MASK_GROUPS["groups"].get(property_name, {}).get(name.rsplit("}", 1)[-1], "style" if property_name == "rPr" else "paragraph")
     return _MANIFEST["formattingMask"]["effective"][group]
 
 
