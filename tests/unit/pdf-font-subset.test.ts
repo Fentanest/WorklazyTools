@@ -69,3 +69,12 @@ test("CID CFF subset rejects glyphs outside the font and non-CID programs", () =
   assert.throws(() => subsetCidCff(cff, [{ glyph: original.numGlyphs, localSubrs: [], globalSubrs: [] }]), /Unsupported CFF/);
   assert.throws(() => subsetCidCff(Uint8Array.of(1, 0, 4, 3, 0, 0), []), /Unsupported CFF/);
 });
+
+test("FDSelect ranges must cover every glyph from glyph 0 up to the sentinel", async () => {
+  const { readFdSelect } = await import("../../src/utils/cffSubset.ts");
+  const format3 = (ranges: [number, number][], sentinel: number) => Uint8Array.from([3, 0, ranges.length, ...ranges.flatMap(([first, fd]) => [first >> 8, first & 255, fd]), sentinel >> 8, sentinel & 255]);
+  assert.deepEqual([...readFdSelect(format3([[0, 0], [2, 1]], 4), 0, 4).fds], [0, 0, 1, 1]);
+  for (const bytes of [format3([[1, 0]], 4), format3([[0, 0]], 3), format3([[0, 0], [2, 1], [2, 0]], 4), format3([], 4)]) {
+    assert.throws(() => readFdSelect(bytes, 0, 4), /Unsupported CFF/);
+  }
+});

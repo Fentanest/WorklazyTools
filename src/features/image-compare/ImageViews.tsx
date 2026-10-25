@@ -51,7 +51,16 @@ function PixelCanvas({ roiOverlays,side,result, pixels, view, amount, flickerRig
     context.putImageData(imageData, -bounds.x, -bounds.y); discardOwnedBuffer(imageData.data.buffer);
     if (view === "fade" || view === "slider") discardOwnedBuffer(workingPixels.buffer);
     // Darken everything outside the changed regions (their boxes stay at full brightness).
-    if (darken) { context.fillStyle = "#0006"; context.beginPath(); context.rect(0, 0, canvas.width, canvas.height); for (const region of regions) { const b = region.bounds; context.rect(b.x - bounds.x, b.y - bounds.y, b.width, b.height); } context.fill("evenodd"); }
+    // Overlapping boxes stay bright too: their pixels are kept and put back after dimming.
+    if (darken) {
+      const kept = regions.flatMap(region => {
+        const b = region.bounds, x = Math.max(0, b.x - bounds.x), y = Math.max(0, b.y - bounds.y);
+        const width = Math.min(canvas.width, b.x - bounds.x + b.width) - x, height = Math.min(canvas.height, b.y - bounds.y + b.height) - y;
+        return width > 0 && height > 0 ? [{ x, y, data: context.getImageData(x, y, width, height) }] : [];
+      });
+      context.fillStyle = "#0006"; context.fillRect(0, 0, canvas.width, canvas.height);
+      for (const item of kept) context.putImageData(item.data, item.x, item.y);
+    }
     if (boxes) { context.strokeStyle = "#f43f5e"; context.lineWidth = 2; for (const region of regions) { const b = region.bounds; context.strokeRect(b.x - bounds.x, b.y - bounds.y, b.width, b.height); } }
     for(const sourceSide of side?[side]:['left','right'] as const){const overlay=roiOverlays[sourceSide];if(overlay.status!=="projected")continue;const points=overlay.points;context.strokeStyle=sourceSide==='left'?'#0284c7':'#a855f7';context.lineWidth=3;context.setLineDash([8,4]);context.beginPath();points.forEach((p,i)=>i?context.lineTo(p.x-bounds.x,p.y-bounds.y):context.moveTo(p.x-bounds.x,p.y-bounds.y));context.closePath();context.stroke();context.setLineDash([]);}
     return () => { canvas.width = 1; canvas.height = 1; };

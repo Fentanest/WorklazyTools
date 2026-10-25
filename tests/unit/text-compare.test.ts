@@ -187,3 +187,39 @@ test("ignore rules with many matches stay within limits", () => {
   assert.equal(result.counts.ignored, 1);
   assert.equal(literalSpans("aaaa", ["a"]).length, 1);
 });
+
+test("a one-character change inside a 1 MB line is highlighted exactly in every mode", () => {
+  const left = "a".repeat(500_000) + " " + "b".repeat(500_000), inserted = "a".repeat(500_000) + " X" + "b".repeat(500_000);
+  const deleted = "a".repeat(500_000) + "b".repeat(500_000), replaced = "a".repeat(500_000) + "Z" + "b".repeat(500_000);
+  for (const mode of ["smart", "word", "character"] as const) {
+    const options = { ...defaults, mode };
+    const insert = compareTexts(left, inserted, options);
+    assert.equal(insert.quality, "full", mode);
+    const insertMarks = insert.rows[0].rightMarks.filter(mark => mark.kind === "changed");
+    assert.equal(insertMarks.reduce((sum, mark) => sum + mark.end - mark.start, 0) < 1_000, true, mode);
+    assert.ok(insertMarks.some(mark => mark.start <= 500_001 && mark.end >= 500_002), mode);
+    const remove = compareTexts(left, deleted, options).rows[0].leftMarks.filter(mark => mark.kind === "changed");
+    assert.ok(remove.length && remove.every(mark => mark.end - mark.start < 1_000), mode);
+    const replace = compareTexts(deleted, replaced, options).rows[0];
+    for (const marks of [replace.leftMarks, replace.rightMarks]) assert.ok(marks.every(mark => mark.end - mark.start < 1_000), mode);
+  }
+  // Character mode marks exactly the inserted grapheme, also next to emoji clusters.
+  const emoji = "👍🏽".repeat(3_000);
+  const character = compareTexts(emoji + emoji, emoji + "é" + emoji, { ...defaults, mode: "character" }).rows[0].rightMarks;
+  assert.deepEqual(character.map(mark => [mark.start, mark.end]), [[emoji.length, emoji.length + 1]]);
+});
+
+test("a final line terminator present on one side only is a mergeable change", () => {
+  for (const [left, right] of [["a", "a\n"], ["a\nb", "a\nb\n"], ["a\r\n", "a"]]) {
+    const result = compareTexts(left, right, defaults);
+    const last = result.rows.at(-1)!;
+    assert.equal(last.kind, "changed", JSON.stringify([left, right]));
+    assert.ok([...last.leftMarks, ...last.rightMarks].some(mark => mark.kind === "changed"));
+    const snapshot = { left, right, options: defaults, revision: 0 };
+    assert.equal(mergeRow(snapshot, result, last.id, "left").left, right);
+    assert.equal(mergeRow(snapshot, result, last.id, "right").right, left);
+  }
+  // A line appended after a last line without a terminator stays an addition next to an equal line.
+  const appended = compareTexts("a\nb", "a\nb\nc", defaults);
+  assert.deepEqual(appended.rows.map(row => row.kind), ["equal", "equal", "added"]);
+});

@@ -11,6 +11,48 @@ const CELL_BUDGET = 1_500_000;
 const editLimit = (items: number) => Math.max(64, Math.floor(CELL_BUDGET * 8 / (items + 1)));
 // A line's content without its terminator: appending after a last line without one is an added line.
 const lineContent = (line: TextLine) => line.key.endsWith("\n") ? line.key.slice(0, -1) : line.key;
+// Lines longer than this (both sides together) are diffed between their common prefix and suffix.
+const LONG_LINE = 10_000;
+let sharedSegmenter: Intl.Segmenter | undefined;
+const graphemeSegmenter = () => sharedSegmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
+// Below U+0300 there are no combining marks, surrogates or joiners: each code unit is its own
+// grapheme cluster except a CR LF pair.
+const simpleGraphemes = (text: string) => /^[\u0000-\u02ff]*$/u.test(text) && !text.includes("\r\n");
+const graphemes = (text: string) => simpleGraphemes(text) ? text.split("") : Array.from(graphemeSegmenter().segment(text), item => item.segment);
+/** Whether `index` is a grapheme cluster boundary of `text`, judged within a local window. */
+function graphemeBoundary(text: string, index: number) {
+  if (index <= 0 || index >= text.length) return true;
+  const start = Math.max(0, index - 64);
+  for (const item of graphemeSegmenter().segment(text.slice(start, index + 64))) {
+    if (start + item.index === index) return true;
+    if (start + item.index > index) return false;
+  }
+  return false;
+}
+const wordCharacter = (character: string | undefined) => character !== undefined && /[\p{L}\p{N}_]/u.test(character);
+/** Common prefix and suffix lengths of two lines, cut on grapheme boundaries of both and, for word
+ * comparison, outside words when a word boundary is near, so a small change inside a very long
+ * line is diffed exactly. */
+function commonEnds(left: string, right: string, words: boolean): [number, number] {
+  const limit = Math.min(left.length, right.length);
+  // Moves a cut back to the nearest position that satisfies `ok`; words give up after 256 units.
+  const cut = (position: number, ok: (at: number) => boolean, reach: number) => {
+    for (let at = position; at >= 0 && position - at <= reach; at--) if (ok(at)) return at;
+    return undefined;
+  };
+  const graphemesAt = (l: number, r: number) => graphemeBoundary(left, l) && graphemeBoundary(right, r);
+  let prefix = 0;
+  while (prefix < limit && left.charCodeAt(prefix) === right.charCodeAt(prefix)) prefix++;
+  const prefixOk = (at: number) => at === 0 || graphemesAt(at, at);
+  const prefixWord = (at: number) => at === 0 || !(wordCharacter(left[at - 1]) && (wordCharacter(left[at]) || wordCharacter(right[at])));
+  prefix = (words ? cut(prefix, at => prefixWord(at) && prefixOk(at), 256) : undefined) ?? cut(prefix, prefixOk, prefix)!;
+  let suffix = 0;
+  while (suffix < limit - prefix && left.charCodeAt(left.length - 1 - suffix) === right.charCodeAt(right.length - 1 - suffix)) suffix++;
+  const suffixOk = (at: number) => at === 0 || graphemesAt(left.length - at, right.length - at);
+  const suffixWord = (at: number) => at === 0 || !(wordCharacter(left[left.length - at]) && (wordCharacter(left[left.length - at - 1]) || wordCharacter(right[right.length - at - 1])));
+  suffix = (words ? cut(suffix, at => suffixWord(at) && suffixOk(at), 256) : undefined) ?? cut(suffix, suffixOk, suffix)!;
+  return [prefix, suffix];
+}
 export function mappedLines(mapped: MappedText): TextLine[] {
   const lines: TextLine[] = []; let rawStart = 0, number = 1;
   const matches = [...mapped.value.matchAll(/[^\n]*\n|[^\n]+$/g)];
@@ -27,8 +69,7 @@ export function mappedLines(mapped: MappedText): TextLine[] {
 function graphemeDiff(left: string, right: string, check: () => void): { segments: Segment[]; coarse: boolean } {
   if(left.length+right.length>100_000)return {segments:[...(left?[{type:"deleted" as const,text:left}]:[]),...(right?[{type:"added" as const,text:right}]:[])],coarse:true};
   if (!Intl.Segmenter) throw new Error("GRAPHEME_UNAVAILABLE");
-  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  const a = Array.from(segmenter.segment(left), item => item.segment), b = Array.from(segmenter.segment(right), item => item.segment);
+  const a = graphemes(left), b = graphemes(right);
   const exact = myersAlign(a, b, (x, y) => x === y, editLimit(a.length + b.length), check);
   const aligned = exact ? { pairs: exact, budgetFallback: false } : alignSequenceWithBudget(a, b, { signature: x => x, equals: (x,y) => x===y, score: (x,y) => x===y?3:-3, acceptsPair: (x,y)=>x===y, cellBudget: CELL_BUDGET, checkCanceled: check });
   const segments: Segment[] = [];
@@ -59,9 +100,9 @@ function marks(mapped: MappedText, line: TextLine | undefined, segments: Segment
  * sequence or a letter with combining marks is never split between equal and changed text. */
 function snapToGraphemes(segments: Segment[]): Segment[] {
   if (!Intl.Segmenter) return segments;
-  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  const boundaries = (text: string) => { const set = new Set<number>([text.length]); for (const item of segmenter.segment(text)) set.add(item.index); return set; };
   const left = segments.filter(s => s.type !== "added").map(s => s.text).join(""), right = segments.filter(s => s.type !== "deleted").map(s => s.text).join("");
+  if (simpleGraphemes(left) && simpleGraphemes(right)) return segments;
+  const boundaries = (text: string) => { const set = new Set<number>([text.length]); for (const item of graphemeSegmenter().segment(text)) set.add(item.index); return set; };
   const leftBounds = boundaries(left), rightBounds = boundaries(right);
   const result: Segment[] = [];
   const push = (type: Segment["type"], text: string) => { if (!text) return; const previous = result.at(-1); if (previous?.type === type) previous.text += text; else result.push({ type, text }); };
@@ -89,7 +130,9 @@ function alignLines(a: TextLine[], b: TextLine[], check: () => void): { pairs: S
   // Inside a run, a line whose content differs only by indentation or trailing space pairs first.
   const score = (x: TextLine, y: TextLine) => lineContent(x) === lineContent(y) ? 5 : lineContent(x).trim() === lineContent(y).trim() ? 4 : 0;
   const options = { signature: (x: TextLine) => lineContent(x), equals: (x: TextLine, y: TextLine) => lineContent(x) === lineContent(y), score, acceptsPair: () => true, cellBudget: CELL_BUDGET, checkCanceled: check };
-  const anchors = myersAlign(a, b, options.equals, editLimit(a.length + b.length), check);
+  // The anchor pass compares lines O((N+M)·D) times: each distinct content becomes one integer.
+  const ids = new Map<string, number>(), intern = (line: TextLine) => { const key = lineContent(line); let id = ids.get(key); if (id === undefined) ids.set(key, id = ids.size); return id; };
+  const anchors = myersAlign(a.map(intern), b.map(intern), (x, y) => x === y, editLimit(a.length + b.length), check);
   if (!anchors) return alignSequenceWithBudget(a, b, options);
   const pairs: SequenceAlignmentPair[] = []; let budgetFallback = false, gapA: number[] = [], gapB: number[] = [];
   const flush = () => {
@@ -125,13 +168,26 @@ export function compareTexts(left: string, right: string, options: TextOptions, 
   const counts={changed:0,added:0,deleted:0,ignored:0,equal:0};
   const rows=aligned.pairs.map<TextRow>((pair,index)=>{
     check(); const l=pair.beforeIndex===null?undefined:a[pair.beforeIndex],r=pair.afterIndex===null?undefined:b[pair.afterIndex];
-    const kind=!l?"added":!r?"deleted":lineContent(l)===lineContent(r)?(l.raw.replace(/\n$/u,"")===r.raw.replace(/\n$/u,"")?"equal":"ignored"):"changed";
+    // Lines pair on their content; a final line terminator present on one side only is still a change.
+    const lastPair=pair.beforeIndex===a.length-1&&pair.afterIndex===b.length-1;
+    const kind=!l?"added":!r?"deleted":lineContent(l)===lineContent(r)?(lastPair&&l.key.endsWith("\n")!==r.key.endsWith("\n")?"changed":l.raw.replace(/\n$/u,"")===r.raw.replace(/\n$/u,"")?"equal":"ignored"):"changed";
     counts[kind]++;
     let segments:Segment[];
     if (kind==="equal"||kind==="ignored") segments=[{type:"equal",text:l?.key??r?.key??""}];
-    else if (options.mode==="character") { const result=graphemeDiff(l?.key??"",r?.key??"",check);segments=result.segments;coarse ||=result.coarse; }
     else {
-      const lv=l?.key??"",rv=r?.key??"";
+      const full=[l?.key??"",r?.key??""];
+      const [prefix,suffix]=full[0].length+full[1].length>LONG_LINE?commonEnds(full[0],full[1],options.mode!=="character"):[0,0];
+      const lv=full[0].slice(prefix,full[0].length-suffix),rv=full[1].slice(prefix,full[1].length-suffix);
+      segments=diffLine(lv,rv);
+      if(prefix)segments.unshift({type:"equal",text:full[0].slice(0,prefix)});
+      if(suffix)segments.push({type:"equal",text:full[0].slice(full[0].length-suffix)});
+    }
+    return {id:`${revision}:${index}`,kind,left:l,right:r,leftMarks:marks(lm,l,segments,"left"),rightMarks:marks(rm,r,segments,"right")};
+  });
+  function diffLine(lv:string,rv:string):Segment[] {
+    let segments:Segment[];
+    if (options.mode==="character") { const result=graphemeDiff(lv,rv,check);segments=result.segments;coarse ||=result.coarse; }
+    else {
       const tokens=(text:string)=>(text.match(/\s+|[\p{L}\p{N}_]+|[^\s\p{L}\p{N}_]/gu)??[]).length;
       if ((tokens(lv)+1)*(tokens(rv)+1)>CELL_BUDGET) coarse=true;
       segments=snapToGraphemes(diffText(lv,rv));
@@ -142,13 +198,17 @@ export function compareTexts(left: string, right: string, options: TextOptions, 
           let deleted="",added="";
           while(i<segments.length&&segments[i].type!=="equal") {const s=segments[i++];if(s.type==="deleted")deleted+=s.text;else added+=s.text;}
           if(deleted&&added&&Math.max(deleted.length,added.length)<=4000) {const result=graphemeDiff(deleted,added,check);refined.push(...result.segments);coarse ||=result.coarse;}
-          else {if(deleted)refined.push({type:"deleted",text:deleted});if(added)refined.push({type:"added",text:added});}
+          else {
+            // A replacement too long to refine stays whole; that is a summarized result.
+            if(deleted&&added)coarse=true;
+            if(deleted)refined.push({type:"deleted",text:deleted});if(added)refined.push({type:"added",text:added});
+          }
         }
         segments=refined;
       }
     }
-    return {id:`${revision}:${index}`,kind,left:l,right:r,leftMarks:marks(lm,l,segments,"left"),rightMarks:marks(rm,r,segments,"right")};
-  });
+    return segments;
+  }
   const mapping=(value:MappedText)=>({rawLength:value.raw.length,normalizedLength:value.value.length,starts:Uint32Array.from(value.starts),ends:Uint32Array.from(value.ends),removedSpans:value.removed.map(span=>({...span,rules:[...span.rules]}))});
   const provenance={policyVersion:TEXT_NORMALIZATION_POLICY.version,rules:options.ignoreRules.map((literal,id)=>({id,literal})),left:mapping(lm),right:mapping(rm)};
   return {revision,provenance,options:structuredClone(options),rows,counts,quality:coarse?"line-coarse":"full",reasons:coarse?["COMPARISON_BUDGET"]:[]};

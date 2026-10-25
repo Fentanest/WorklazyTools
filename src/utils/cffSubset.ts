@@ -157,7 +157,7 @@ function charsetLength(bytes: Uint8Array, start: number, glyphs: number) {
   return position - start;
 }
 
-function readFdSelect(bytes: Uint8Array, start: number, glyphs: number) {
+export function readFdSelect(bytes: Uint8Array, start: number, glyphs: number) {
   const fds = new Uint16Array(glyphs);
   const format = bytes[start];
   if (format === 0) {
@@ -169,13 +169,16 @@ function readFdSelect(bytes: Uint8Array, start: number, glyphs: number) {
   const ranges = (bytes[start + 1] << 8) | bytes[start + 2];
   const length = 1 + 2 + ranges * 3 + 2;
   if (start + length > bytes.length) fail();
+  // Ranges must cover [0, glyphs) in order: the first starts at glyph 0 and the sentinel is glyphs.
+  if (ranges === 0 || ((bytes[start + 3] << 8) | bytes[start + 4]) !== 0) fail();
   for (let range = 0; range < ranges; range++) {
     const at = start + 3 + range * 3;
     const first = (bytes[at] << 8) | bytes[at + 1];
     const next = (bytes[at + 3] << 8) | bytes[at + 4];
-    if (next < first || next > glyphs) fail();
+    if (next <= first || next > glyphs) fail();
     fds.fill(bytes[at + 2], first, next);
   }
+  if (((bytes[start + 3 + ranges * 3] << 8) | bytes[start + 4 + ranges * 3]) !== glyphs) fail();
   return { fds, length };
 }
 
@@ -206,6 +209,7 @@ export function subsetCidCff(cff: Uint8Array, uses: readonly CffGlyphUse[]): Uin
     return { dict, privateDict, subrs, used: new Set<number>() };
   });
 
+  if (fdSelect.fds.some(fd => fd >= fdDicts.length)) fail();
   const usedGlyphs = new Set<number>([0]);
   const usedGlobal = new Set<number>();
   for (const use of uses) {

@@ -28,11 +28,14 @@ export function mergeRow(snapshot:TextSnapshot,result:TextResult,rowId:string,ta
   const text=snapshot[target];
   let start=current?.start??next?.start??text.length,end=current?.end??start;
   // The merged lines take the target's line ending; the target keeps its own terminator at the end.
-  const eol=/\r\n/u.test(text)?"\r\n":"\n",ending=/\r?\n$/u;
+  // A target without any line break has no convention of its own; it takes the source's.
+  const eol=/\r\n/u.test(text)?"\r\n":/\n/u.test(text)?"\n":source?.raw.match(/\r?\n$/u)?.[0]??"\n",ending=/\r?\n$/u;
   let insertion="";
   if(source){
     const body=source.raw.replace(ending,"").replace(/\r?\n/gu,eol);
-    const terminated=current?ending.test(current.raw):start<text.length||ending.test(source.raw);
+    // Between the two last lines the source's final terminator is part of what is merged.
+    const bothLast=!!current&&current.end===text.length&&source.end===snapshot[target==="left"?"right":"left"].length;
+    const terminated=bothLast?ending.test(source.raw):current?ending.test(current.raw):start<text.length||ending.test(source.raw);
     insertion=body+(terminated?eol:"");
     if(start===text.length&&text&&!ending.test(text))insertion=eol+insertion;
   }else if(current&&end===text.length&&!ending.test(current.raw)){
