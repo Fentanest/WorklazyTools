@@ -38,7 +38,11 @@ function graphemeBoundary(text: string, index: number) {
   for (const cached of boundaryCache) if (cached.text === text && cached.start <= index && index < cached.end) return cached.starts.has(index);
   let start = index - 1;
   while (start > 0 && !safeBoundary(text, start)) start--;
-  const end = Math.min(text.length, index + 256), starts = new Set<number>();
+  // The window grows with its distance from the safe start (repeated misses stay linear overall)
+  // and never ends inside a surrogate pair, whose high half alone is not the character.
+  let end = Math.min(text.length, index + Math.max(256, index - start));
+  if (end < text.length && (text.charCodeAt(end - 1) & 0xfc00) === 0xd800) end++;
+  const starts = new Set<number>();
   for (const item of graphemeSegmenter().segment(text.slice(start, end))) starts.add(start + item.index);
   boundaryCache = [{ text, start, end, starts }, ...boundaryCache.slice(0, 3)];
   return starts.has(index);

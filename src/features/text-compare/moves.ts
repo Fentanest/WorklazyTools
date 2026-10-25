@@ -16,10 +16,12 @@ import type { TextLine, TextRow } from "./resultTypes.ts";
 export interface MoveSide {
   /** Moved block number, shared by both sides of the block. */
   group: number;
-  /** Counterpart lines on the other side, 1-based, end exclusive. */
+  /** Counterpart lines on the other side as source line numbers, 1-based, end exclusive. */
   start: number;
   end: number;
   score: number;
+  /** Row of the counterpart block's first line. */
+  target: string;
 }
 
 const MIN_LINES = 3;
@@ -78,8 +80,9 @@ class RangeSet {
   add(range: [number, number]) { this.ranges.splice(this.before(range), 0, range); }
 }
 
-function computeMoves(operations: { kind: "equal" | "delete" | "insert"; lines: string[] }[], deadline: number): Move[] | undefined {
-  const inTime = () => performance.now() < deadline;
+// Lines here are ordinals of the compared (normalized) lines on each side, 1-based.
+function computeMoves(operations: { kind: "equal" | "delete" | "insert"; lines: string[] }[], deadline: number, now: () => number): Move[] | undefined {
+  const inTime = () => now() < deadline;
   const deletions: Chunk[] = [], insertions: Chunk[] = [], replacedDeletions = new Set<number>(), replacedInsertions = new Set<number>();
   let left = 1, right = 1;
   operations.forEach((operation, index) => {
@@ -113,7 +116,9 @@ function computeMoves(operations: { kind: "equal" | "delete" | "insert"; lines: 
       takenFrom.add(from.lineStart); takenTo.add(target.lineStart);
     }
   }
-  if (!inTime()) return undefined;
+  // Past the budget after the whole-chunk pass its moves are kept, as in the original.
+  const wholeChunks = [...moves];
+  if (!inTime()) return wholeChunks;
   // 2. Runs of trimmed-equal lines in the remaining chunks, extended by similar neighbours.
   const leftLines = new Map<number, string>(), rightLines = new Map<number, string>();
   for (const chunk of deletions) if (!takenFrom.has(chunk.lineStart)) chunk.lines.forEach((line, i) => leftLines.set(chunk.lineStart + i, line));
@@ -143,7 +148,7 @@ function computeMoves(operations: { kind: "equal" | "delete" | "insert"; lines: 
   for (const line of leftLines.keys()) {
     const key = keyAt(leftIds, line);
     for (const candidate of key === undefined ? [] : starts.get(key) ?? []) {
-      if (!inTime()) return undefined;
+      if (!inTime()) return wholeChunks;
       // Only the first line of a run of equal pairs starts a block.
       if (leftIds.has(line - 1) && leftIds.get(line - 1) === rightIds.get(candidate - 1)) continue;
       let fromEnd = line + 1, toEnd = candidate + 1;
@@ -152,7 +157,7 @@ function computeMoves(operations: { kind: "equal" | "delete" | "insert"; lines: 
       fromRanges.replaceWrappedBy([line, fromEnd]); toRanges.replaceWrappedBy([candidate, toEnd]);
       runs.set(line, { toStart: candidate, toEnd, fromEnd });
     }
-    if (!inTime()) return undefined;
+    if (!inTime()) return wholeChunks;
   }
   const ordered = [...runs.entries()].sort(([, a], [, b]) => (b.toEnd - b.toStart) - (a.toEnd - a.toStart));
   const takenFromRanges = new RangeSet(), takenToRanges = new RangeSet();
@@ -179,33 +184,30 @@ function computeMoves(operations: { kind: "equal" | "delete" | "insert"; lines: 
 }
 
 /** Annotates the rows' moved lines in place; row kinds and counts are unchanged. Returns the number of moved blocks. */
-export function annotateMoves(rows: TextRow[], deadline = performance.now() + BUDGET_MS): number {
+export function annotateMoves(rows: TextRow[], deadline = performance.now() + BUDGET_MS, now: () => number = () => performance.now()): number {
   const operations: { kind: "equal" | "delete" | "insert"; lines: string[] }[] = [];
+  // Rows by compared-line ordinal: ignore rules or line-ending normalization can make a compared
+  // line span several source lines, so ordinals and source line numbers differ.
+  const leftRows: TextRow[] = [], rightRows: TextRow[] = [];
   const push = (kind: "equal" | "delete" | "insert", line: string) => {
     const last = operations.at(-1);
     if (last?.kind === kind) last.lines.push(line); else operations.push({ kind, lines: [line] });
   };
   for (let i = 0; i < rows.length;) {
-    if (rows[i].kind === "equal" || rows[i].kind === "ignored") { push("equal", content(rows[i].left!)); i++; continue; }
+    if (rows[i].kind === "equal" || rows[i].kind === "ignored") { push("equal", content(rows[i].left!)); leftRows.push(rows[i]); rightRows.push(rows[i]); i++; continue; }
     const run: TextRow[] = [];
     while (i < rows.length && rows[i].kind !== "equal" && rows[i].kind !== "ignored") run.push(rows[i++]);
-    for (const row of run) if (row.left) push("delete", content(row.left));
-    for (const row of run) if (row.right) push("insert", content(row.right));
+    for (const row of run) if (row.left) { push("delete", content(row.left)); leftRows.push(row); }
+    for (const row of run) if (row.right) { push("insert", content(row.right)); rightRows.push(row); }
   }
-  const moves = computeMoves(operations, deadline);
+  const moves = computeMoves(operations, deadline, now);
   if (!moves?.length) return 0;
-  const leftRows = new Map<number, TextRow>(), rightRows = new Map<number, TextRow>();
-  for (const row of rows) { if (row.left) leftRows.set(row.left.number, row); if (row.right) rightRows.set(row.right.number, row); }
+  // A block's ordinals [start, end) shown as the source lines its rows cover.
+  const span = (side: "left" | "right", list: TextRow[], start: number, end: number) => ({ start: list[start - 1][side]!.number, end: list[end - 2][side]!.lastNumber + 1, target: list[start - 1].id });
   moves.sort((a, b) => a.fromStart - b.fromStart).forEach((move, index) => {
-    const group = index + 1;
-    for (let line = move.fromStart; line < move.fromEnd; line++) {
-      const row = leftRows.get(line);
-      if (row) row.leftMove = { group, start: move.toStart, end: move.toEnd, score: move.score };
-    }
-    for (let line = move.toStart; line < move.toEnd; line++) {
-      const row = rightRows.get(line);
-      if (row) row.rightMove = { group, start: move.fromStart, end: move.fromEnd, score: move.score };
-    }
+    const group = index + 1, to = span("right", rightRows, move.toStart, move.toEnd), from = span("left", leftRows, move.fromStart, move.fromEnd);
+    for (let line = move.fromStart; line < move.fromEnd; line++) leftRows[line - 1].leftMove = { group, ...to, score: move.score };
+    for (let line = move.toStart; line < move.toEnd; line++) rightRows[line - 1].rightMove = { group, ...from, score: move.score };
   });
   return moves.length;
 }

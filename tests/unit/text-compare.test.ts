@@ -274,3 +274,49 @@ test("moved blocks of three or more lines are linked on both sides like Diffchec
   // Row kinds and counts are those of the comparison without moves.
   assert.deepEqual(up.result.counts, { changed: 0, added: 4, deleted: 4, ignored: 0, equal: 6 });
 });
+
+test("grapheme windows never end inside a surrogate pair and grow on long clusters", () => {
+  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const starts = (text: string) => new Set([...segmenter.segment(text)].map(item => item.index).concat(text.length));
+  const left = "a".repeat(6000) + "👩" + "́".repeat(252) + "‍👩", right = "a".repeat(6000) + "x" + "́".repeat(252) + "‍👩";
+  for (const mode of ["smart", "word", "character"] as const) {
+    const row = compareTexts(left, right, { ...defaults, mode }).rows[0];
+    for (const [marks, text] of [[row.leftMarks, left], [row.rightMarks, right]] as const) {
+      const bounds = starts(text);
+      for (const mark of marks.filter(item => item.kind === "changed")) assert.ok(bounds.has(mark.start) && bounds.has(mark.end), `${mode} ${mark.start}-${mark.end}`);
+    }
+  }
+  // One cluster of 300,000 combining marks: boundary checks stay near-linear.
+  const long = "👩" + "́".repeat(300_000) + "‍👩", started = performance.now();
+  compareTexts(long, "x" + long.slice(2), { ...defaults, mode: "character" }, 0, 60_000);
+  assert.ok(performance.now() - started < 4_000, `${Math.round(performance.now() - started)} ms`);
+});
+
+test("moves attach to the moved rows when compared lines span several source lines", () => {
+  const block = "m1 moved text\nm2 moved text\nm3 moved text\n", middle = "mid one\nmid two\nmid three\n";
+  const moved = (result: ReturnType<typeof compareTexts>, side: "left" | "right") => result.rows.filter(row => side === "left" ? row.leftMove : row.rightMove).map(row => row[side]!.raw.trim());
+  // An ignore rule removing a line break merges two source lines into one compared line.
+  const merged = compareTexts(`head\nDROP\n${block}${middle}tail\n`, `head\nDROP\n${middle}${block}tail\n`, { ...defaults, ignoreRules: ["DROP\n"] });
+  assert.deepEqual(moved(merged, "left"), ["m1 moved text", "m2 moved text", "m3 moved text"]);
+  assert.deepEqual(moved(merged, "right"), ["m1 moved text", "m2 moved text", "m3 moved text"]);
+  const first = merged.rows.find(row => row.leftMove)!;
+  // Ranges are source line numbers; the label jumps to the counterpart's first row.
+  assert.deepEqual([first.leftMove!.start, first.leftMove!.end], [6, 9]);
+  assert.equal(merged.rows.find(row => row.id === first.leftMove!.target)!.right!.raw.trim(), "m1 moved text");
+  // A lone CR normalized to a line break shifts source and compared numbering apart.
+  const cr = compareTexts(`head\r${block}${middle}tail\n`, `head\r${middle}${block}tail\n`, { ...defaults, normalizeLineEndings: true });
+  assert.deepEqual(moved(cr, "left"), ["m1 moved text", "m2 moved text", "m3 moved text"]);
+  assert.ok(cr.rows.filter(row => row.kind === "equal").every(row => !row.leftMove && !row.rightMove));
+});
+
+test("moves found by the whole-chunk pass survive a later time-out", async () => {
+  const { annotateMoves } = await import("../../src/features/text-compare/moves.ts");
+  const result = compareTexts("a1 text\na2 text\na3 text\nk1\nk2\nk3\nk4\n", "k1\nk2\nk3\nk4\na1 text\na2 text\na3 text\n", defaults);
+  for (const row of result.rows) { delete row.leftMove; delete row.rightMove; }
+  let calls = 0;
+  // First check in time, every later check past the 5 s budget.
+  assert.equal(annotateMoves(result.rows, 5_000, () => calls++ === 0 ? 0 : 6_000), 1);
+  calls = 0;
+  for (const row of result.rows) { delete row.leftMove; delete row.rightMove; }
+  assert.equal(annotateMoves(result.rows, 5_000, () => 6_000), 0);
+});
