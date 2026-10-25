@@ -32,8 +32,10 @@ export function compareRgba(left: Uint8ClampedArray, right: Uint8ClampedArray, w
     changedMask[p] = changed ? 255 : 0; if (changed) changedPixelCount++;
     const delta = valid ? Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]), options.background === "transparent" ? Math.abs(left[i + 3] - right[i + 3]) : 0) : 0;
     channelDelta[p] = delta;
-    // An opacity-only change has no pixelmatch color and is shown in the first color.
-    overlay.set(changed ? diff[i + 3] > 0 ? [diff[i], diff[i + 1], diff[i + 2], 255] : [...HIGHLIGHT_LIGHTER, 255] : [left[i], left[i + 1], left[i + 2], Math.round(left[i + 3] * 0.35)], i);
+    // An opacity-only change (same source RGB) is shown in the first color: weighting by opacity
+    // would otherwise make it look darker or lighter to pixelmatch.
+    const opacityOnly = left[i] === right[i] && left[i + 1] === right[i + 1] && left[i + 2] === right[i + 2] && left[i + 3] !== right[i + 3];
+    overlay.set(changed ? diff[i + 3] > 0 && !opacityOnly ? [diff[i], diff[i + 1], diff[i + 2], 255] : [...HIGHLIGHT_LIGHTER, 255] : [left[i], left[i + 1], left[i + 2], Math.round(left[i + 3] * 0.35)], i);
     subtract.set([delta, delta, delta, valid ? 255 : 0], i);
   }
   return { changedMask, channelDelta, overlay, subtract, changedPixelCount, comparablePixelCount, differenceRatio: comparablePixelCount ? changedPixelCount / comparablePixelCount : 0, addedBoundaryPixelCount, removedBoundaryPixelCount };

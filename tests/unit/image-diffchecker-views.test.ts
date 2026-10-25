@@ -29,3 +29,16 @@ test("region presets follow Diffchecker's values scaled by the image diagonal / 
   assert.deepEqual(regionPreset("words", 100, 100), { diffThreshold: 20, groupingRadius: 2, minArea: 15, maxAreaFraction: 0.15 });
   assert.deepEqual(regionPreset("graphics", 100, 100), { diffThreshold: 25, groupingRadius: 5, minArea: 100, maxAreaFraction: 0.5 });
 });
+
+test("an opacity-only change keeps the first highlight color whatever the gray level", () => {
+  const options = { ...DEFAULT_PIXEL_OPTIONS, background: "transparent" as const, alphaThreshold: 0 };
+  for (const [gray, from, to] of [[128, 255, 64], [255, 255, 64], [0, 255, 64], [128, 64, 255]]) {
+    const left = Uint8ClampedArray.from([gray, gray, gray, from]), right = Uint8ClampedArray.from([gray, gray, gray, to]);
+    const result = compareRgba(left, right, 1, 1, valid(1), valid(1), options);
+    assert.equal(result.changedPixelCount, 1, `${gray} ${from}->${to}`);
+    assert.deepEqual([...result.overlay.subarray(0, 4)], [...HIGHLIGHT_LIGHTER, 255], `${gray} ${from}->${to}`);
+  }
+  // A real color change under the same transparency setting still uses the two colors.
+  const darker = compareRgba(Uint8ClampedArray.from([200, 200, 200, 255]), Uint8ClampedArray.from([20, 20, 20, 255]), 1, 1, valid(1), valid(1), options);
+  assert.deepEqual([...darker.overlay.subarray(0, 4)], [...HIGHLIGHT_DARKER, 255]);
+});
