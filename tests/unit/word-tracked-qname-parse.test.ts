@@ -3,9 +3,9 @@ import fs from "node:fs";
 import test from "node:test";
 import { loadPyodide } from "pyodide";
 
-// _qname_safe_parse takes a fast path when every namespace declaration is on the root element; for
-// every input it must leave the same tree (attribute order included), the same namespace
-// registrations and the same error as the event-by-event parse it falls back to.
+// _qname_safe_parse takes a fast path without per-element scopes when no prefix is rebound and
+// values use root declarations; for every input it must leave the same tree (attribute order
+// included), the same namespace registrations and the same error as the event-by-event parse.
 test("QName-safe parsing fast path matches the event-by-event parse", { timeout: 120_000 }, async () => {
   Object.assign(globalThis, { worklazyDiffJson: () => "[]", worklazyComparisonManifestJson: () => "{}" });
   const py = await loadPyodide();
@@ -20,7 +20,9 @@ body = '<w:body><w:p w14:paraId="1"><mc:AlternateContent><mc:Choice Requires="wp
 samples = {
     "root declared": '<w:document' + decl("w", "mc", "w14", "wp14", "xsi") + ' mc:Ignorable="w14 wp14">' + body + '</w:document>',
     "nested declaration": '<w:document' + decl("w", "mc", "w14") + ' mc:Ignorable="w14"><w:body><w:p' + decl("wp14") + '><mc:AlternateContent><mc:Choice Requires="wp14"/></mc:AlternateContent></w:p></w:body></w:document>',
-    "nested rebinding": '<w:document' + decl("w", "mc", "w14") + ' mc:Ignorable="w14"><w:body xmlns:w14="urn:other"><w:p mc:Ignorable="w14"/></w:body></w:document>',
+    "nested unused declaration": '<w:document' + decl("w", "mc", "w14", "wp14") + ' mc:Ignorable="w14"><w:body><w:p' + decl("v") + ' mc:Ignorable="wp14"><v:shape/></w:p><w:p' + decl("w14") + '/></w:body></w:document>',
+    "nested before use elsewhere": '<w:document' + decl("w", "mc") + '><w:body><w:p' + decl("w14") + '/><w:p mc:Ignorable="w14"/></w:body></w:document>',
+    "nested rebinding":'<w:document' + decl("w", "mc", "w14") + ' mc:Ignorable="w14"><w:body xmlns:w14="urn:other"><w:p mc:Ignorable="w14"/></w:body></w:document>',
     "undeclared prefix": '<w:document' + decl("w", "mc") + ' mc:Ignorable="w14"/>',
     "empty Requires": '<w:document' + decl("w", "mc") + '><mc:AlternateContent><mc:Choice Requires=" "/></mc:AlternateContent></w:document>',
     "two-word xsi:type": '<w:document' + decl("w", "xsi") + '><w:t xsi:type="w:a w:b"/></w:document>',
@@ -47,13 +49,15 @@ for name, text in samples.items():
         fast, slow = run(_qname_safe_parse, data, register), run(_qname_safe_parse_events, data, register)
         if fast != slow: mismatch.append([name, register])
         kinds[name] = fast[0][0] if fast[0][0] == "ok" else fast[0][1] + ":" + fast[0][2]
-fast_taken = {name: _qname_safe_parse_root_declared(samples[name].encode("utf-8"), False) is not None for name in ("root declared", "nested declaration", "malformed")}
+fast_taken = {name: _qname_safe_parse_unscoped(samples[name].encode("utf-8"), False) is not None for name in ("root declared", "nested unused declaration", "nested declaration", "nested before use elsewhere", "nested rebinding", "malformed")}
 ET._namespace_map.clear(); ET._namespace_map.update(initial)
 json.dumps({"mismatch": mismatch, "kinds": kinds, "fast": fast_taken})
 `) as string;
   const outcome = JSON.parse(result);
   assert.deepEqual(outcome.mismatch, []);
-  assert.deepEqual(outcome.fast, { "root declared": true, "nested declaration": false, malformed: false });
+  // A declaration below the root leaves the fast path only when a value uses it or rebinds a prefix.
+  assert.deepEqual(outcome.fast, { "root declared": true, "nested unused declaration": true, "nested declaration": false, "nested before use elsewhere": false, "nested rebinding": false, malformed: false });
+  assert.equal(outcome.kinds["nested before use elsewhere"], "ValueError:UNSUPPORTED_TRACKED_SOURCE_QNAME", "a prefix declared only in an earlier sibling is out of scope");
   assert.equal(outcome.kinds["root declared"], "ok");
   assert.equal(outcome.kinds["undeclared prefix"], "ValueError:UNSUPPORTED_TRACKED_SOURCE_QNAME");
   assert.equal(outcome.kinds["empty Requires"], "ValueError:UNSUPPORTED_TRACKED_SOURCE_QNAME");

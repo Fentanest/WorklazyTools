@@ -514,51 +514,66 @@ def _qname_rewriter(data, root):
     return rewrite
 
 
-def _qname_safe_parse_root_declared(data, register_namespaces):
-    """`_qname_safe_parse` for XML whose namespace declarations are all on the root element, as most
-    parts are: every element then has the root's context, so the rewrite can follow the parse in
-    document order with the same registrations, attribute insertions and errors. The parser reports
-    only declarations and starts instead of a Python step per start and end. None when a declaration
-    comes after the root starts or the XML does not parse; the event-by-event path then decides."""
+def _qname_safe_parse_unscoped(data, register_namespaces):
+    """`_qname_safe_parse` without a scope per element, for XML where no prefix is bound to two
+    namespaces: the root's declarations are then in scope everywhere, and a value using only those
+    resolves as with the full scope. Declarations, registrations, rewrites and errors follow the same
+    events in the same order (iterparse delivers them in the same chunks); only end events and the
+    per-element contexts are left out. None when a prefix is rebound, a value uses a prefix declared
+    below the root (in scope only there), or the XML does not parse: the event-by-event path then
+    decides, repeating registrations made so far, which leaves them as they were."""
     iterator = ET.iterparse(io.BytesIO(data), events=("start-ns", "start"))
-    context = {}; started = False
+    context = None; declared = {}
     try:
         for event, value in iterator:
             if event == "start-ns":
-                if started:
+                prefix, uri = value
+                if declared.setdefault(prefix or "", uri) != uri:
                     return None
-                prefix, uri = value; context[prefix or ""] = uri
                 if register_namespaces and prefix and not prefix.startswith("wltq"):
                     try: ET.register_namespace(prefix or "", uri)
                     except ValueError: pass
-            else:
-                started = True
+                continue
+            if context is None:
+                context = dict(declared)
+            if value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice" and not value.get("Requires", "").split():raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
+            if _QNAME_ATTRIBUTES.isdisjoint(value.attrib):
+                continue
+            if _rewrite_qname_attributes(value, context, declared, register_namespaces) is None:
+                return None
     except ET.ParseError:
         return None
-    root = iterator.root
-    for value in root.iter():
-        if value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice" and not value.get("Requires", "").split():raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
-        for name, raw in (list(value.attrib.items()) if not _QNAME_ATTRIBUTES.isdisjoint(value.attrib) else ()):
-            prefixes = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable", "{http://schemas.openxmlformats.org/markup-compatibility/2006}MustUnderstand"} or (name == "Requires" and value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice")
-            typed = name == "{http://www.w3.org/2001/XMLSchema-instance}type"
-            qnames = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}ProcessContent", "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveElements", "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveAttributes"}
-            if not prefixes and not typed and not qnames: continue
-            if typed and len(raw.split())!=1:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
-            words = []
-            for word in raw.split():
-                prefix, local = (word, "") if prefixes else word.split(":", 1) if ":" in word else ("", word)
-                uri = context.get(prefix)
-                if uri is None: raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
-                token = "wltq" + hashlib.sha256(uri.encode()).hexdigest()
-                value.set("xmlns:" + token, uri)
-                if register_namespaces:ET.register_namespace("wltn" + hashlib.sha256(uri.encode()).hexdigest(), uri)
-                words.append(token if prefixes else token + ":" + local)
-            value.set(name, " ".join(words))
-    return root
+    return iterator.root
+
+
+def _rewrite_qname_attributes(value, context, declared, register_namespaces):
+    """The QName attribute rewrite of one element (as in `_qname_safe_parse_events`) against the
+    root's declarations. None when a value uses a prefix declared only below the root; a prefix
+    declared nowhere yet is out of scope with the full scope too, so that error is raised here."""
+    for name, raw in list(value.attrib.items()):
+        prefixes = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}Ignorable", "{http://schemas.openxmlformats.org/markup-compatibility/2006}MustUnderstand"} or (name == "Requires" and value.tag == "{http://schemas.openxmlformats.org/markup-compatibility/2006}Choice")
+        typed = name == "{http://www.w3.org/2001/XMLSchema-instance}type"
+        qnames = name in {"{http://schemas.openxmlformats.org/markup-compatibility/2006}ProcessContent", "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveElements", "{http://schemas.openxmlformats.org/markup-compatibility/2006}PreserveAttributes"}
+        if not prefixes and not typed and not qnames: continue
+        if typed and len(raw.split())!=1:raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
+        words = []
+        for word in raw.split():
+            prefix, local = (word, "") if prefixes else word.split(":", 1) if ":" in word else ("", word)
+            uri = context.get(prefix)
+            if uri is None:
+                if prefix in declared:
+                    return None
+                raise ValueError("UNSUPPORTED_TRACKED_SOURCE_QNAME")
+            token = "wltq" + hashlib.sha256(uri.encode()).hexdigest()
+            value.set("xmlns:" + token, uri)
+            if register_namespaces:ET.register_namespace("wltn" + hashlib.sha256(uri.encode()).hexdigest(), uri)
+            words.append(token if prefixes else token + ":" + local)
+        value.set(name, " ".join(words))
+    return value
 
 
 def _qname_safe_parse(data, register_namespaces=True):
-    root = _qname_safe_parse_root_declared(data, register_namespaces)
+    root = _qname_safe_parse_unscoped(data, register_namespaces)
     return root if root is not None else _qname_safe_parse_events(data, register_namespaces)
 
 
