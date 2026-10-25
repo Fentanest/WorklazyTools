@@ -1,31 +1,35 @@
 name: Deploy site
-run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.validate_only && 'Validate site build (no deploy)' || 'Manual site deploy') || 'Site deploy on main push' }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'deploy' && 'Site deploy (dispatched)' || 'Validate site build (no deploy)') || 'Site deploy on main push' }}
 
 # Replacement for deploy-pages.yml (FolioTrace operations plan P3-3). This workflow collects nothing: it never calls DART, holds no
 # DART key and writes no repository state. It fetches the FolioTrace public data from the private repository
 # Fentanest/foliotrace-site-data (main, v1/manifest.json + v1/snapshots/, delivered by the local orchestrator) with a READ-ONLY deploy
 # key (secret FOLIOTRACE_SITE_DATA_READ_KEY), places it at public/data/foliotrace/v1, validates, builds, tests and deploys.
 # Missing secret or failed checkout stops the run before any deploy: the site keeps its previous data.
-# Scheduled runs (every 30 min) compare the data repository head with the revision carried by the live site
-# (/data/foliotrace-source.json) and deploy only when it differs.
+# The local orchestrator starts a deploy with workflow_dispatch (mode=deploy, data_revision=<pushed commit>) after its data push, using a
+# fine-grained token limited to this repository's Actions. The site carries the data revision at /data/foliotrace-source.json (tracking only).
 # Cutover steps: docs/foliotrace-delivery-and-deploy.md.
 #
-# Inert until cutover: main push and repository_dispatch runs deploy only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true'.
-# Without it they are skipped. A manual run can always build and validate (validate_only), which does not touch Pages.
+# Inert until cutover: a main push deploys only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true' (otherwise skipped).
+# A dispatched run is explicit and not gated: mode=validate (default) never touches Pages, mode=deploy publishes.
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: '7,37 * * * *' # data change check every 30 minutes; deploys only when the data repository head is new
-  repository_dispatch:
-    types: [foliotrace-data-updated] # kept for a future sender; nothing sends it today (see the delivery doc)
   workflow_dispatch:
     inputs:
-      validate_only:
-        description: Build and validate without publishing Pages
+      mode:
+        description: validate = build and validate only (Pages untouched); deploy = explicit publish
         required: true
-        default: true
-        type: boolean
+        default: validate
+        type: choice
+        options:
+          - validate
+          - deploy
+      data_revision:
+        description: Optional data repository commit the sender just pushed (the run logs a notice if the checked-out head differs)
+        required: false
+        default: ''
+        type: string
 
 concurrency:
   group: pages
@@ -35,54 +39,9 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    # Scheduled runs end here when the data repository head is already on the live site (short run, no build).
-    if: github.event_name == 'workflow_dispatch' || vars.FOLIOTRACE_DEPLOY_V2 == 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.decide.outputs.changed || steps.decide-scheduled.outputs.changed }}
-    steps:
-      - name: Decide
-        id: decide
-        if: github.event_name != 'schedule'
-        run: echo "changed=true" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout (scripts only)
-        if: github.event_name == 'schedule'
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-
-      - name: Require the data repository read key
-        if: github.event_name == 'schedule'
-        env:
-          KEY_PRESENT: ${{ secrets.FOLIOTRACE_SITE_DATA_READ_KEY != '' }}
-        run: |
-          if [ "$KEY_PRESENT" != "true" ]; then echo "::error::FOLIOTRACE_SITE_DATA_READ_KEY is not set"; exit 1; fi
-
-      - name: Checkout FolioTrace public data repository head (read-only key)
-        if: github.event_name == 'schedule'
-        uses: actions/checkout@v4
-        with:
-          repository: Fentanest/foliotrace-site-data
-          ref: main
-          ssh-key: ${{ secrets.FOLIOTRACE_SITE_DATA_READ_KEY }}
-          path: foliotrace-site-data
-          persist-credentials: false
-          fetch-depth: 1
-
-      - name: Compare with the revision carried by the live site
-        id: decide-scheduled
-        if: github.event_name == 'schedule'
-        run: |
-          rev=$(git -C foliotrace-site-data rev-parse HEAD)
-          result=$(node scripts/foliotrace-source-meta.mjs decide "$rev" https://worklazy.net/data/foliotrace-source.json | tail -1)
-          echo "data head $rev -> $result"
-          echo "$result" >> "$GITHUB_OUTPUT"
-
   build:
-    needs: check
-    if: needs.check.outputs.changed == 'true'
+    # Main push deploys only after cutover (variable gate). A dispatched run is always explicit and never gated.
+    if: github.event_name == 'workflow_dispatch' || vars.FOLIOTRACE_DEPLOY_V2 == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -118,7 +77,12 @@ jobs:
 
       - name: Record data repository revision
         id: data-revision
-        run: echo "sha=$(git -C foliotrace-site-data rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        env:
+          REQUESTED: ${{ inputs.data_revision }}
+        run: |
+          sha=$(git -C foliotrace-site-data rev-parse HEAD)
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          node scripts/foliotrace-source-meta.mjs compare "$REQUESTED" "$sha"
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -194,7 +158,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name != 'workflow_dispatch' || !inputs.validate_only
+    if: github.event_name == 'push' || inputs.mode == 'deploy'
     permissions:
       contents: read
       pages: write
