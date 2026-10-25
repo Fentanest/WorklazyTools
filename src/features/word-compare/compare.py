@@ -209,7 +209,8 @@ class _NumberingResolver:
 
 # Text the accepted view does not show: existing deletions, and property elements (a tab stop
 # in paragraph properties is also a w:tab).
-TEXT_SKIPPED_TAGS = {W + "del", W + "moveFrom", W + "pPr", W + "rPr", W + "sectPr", W + "tblPr", W + "trPr", W + "tcPr"}
+DELETED_TEXT_TAGS = {W + "del", W + "moveFrom"}
+TEXT_SKIPPED_TAGS = DELETED_TEXT_TAGS | {W + "pPr", W + "rPr", W + "sectPr", W + "tblPr", W + "trPr", W + "tcPr"}
 
 
 def _text(node):
@@ -460,7 +461,7 @@ def _source_paths(root, part, archive=None):
             return None
         return {"name": node.tag, "attributes": dict(node.attrib), "text": node.text or "", "children": [property_tree(child) for child in node]}
     w_sect, w_style, w_p, w_r = W + "sectPr", W + "style", W + "p", W + "r"
-    def visit(node, path, paragraph=None):
+    def visit(node, path, paragraph=None, deleted=False):
         tag = node.tag
         if tag in PROPERTY_CONTAINER_TAGS:
             for index, child in enumerate(node):
@@ -491,10 +492,13 @@ def _source_paths(root, part, archive=None):
         if tag == w_p:
             paragraph = path
             offsets[fact_key[1]] = 0
+        if tag == w_p:
+            deleted = False
         if tag == w_r and paragraph is not None:
             owner = tuple(paragraph)
             start = offsets[owner]
-            offsets[owner] += len(_text(node))
+            # Positions count the text `_text` reads for the paragraph: existing deletions add none.
+            offsets[owner] += 0 if deleted else len(_text(node))
             reference["paragraphPath"] = paragraph
             reference["textRange"] = [start, offsets[owner]]
         if tag == w_p:
@@ -534,8 +538,9 @@ def _source_paths(root, part, archive=None):
             # style (and the document defaults and latent style table) is not a source. Content
             # the paragraph and field passes below read keeps its sources.
             return
+        deleted = deleted or tag in DELETED_TEXT_TAGS
         for index, child in enumerate(node):
-            visit(child, path + [index], paragraph)
+            visit(child, path + [index], paragraph, deleted)
     style_part = part == "word/styles.xml"
     visit(root, [])
     # XML positions and relationship identities are extraction facts, not pairs.

@@ -368,9 +368,12 @@ def _inherit_mc_context(result, source):
     return result
 
 
-def _source_copy(source):
+def _source_copy(source, mapping=None):
     origin = _MANIFEST_NODE_KEYS.get(source)
     result=_PACKAGE_GRAPH.copy(source, origin[1][0],_PACKAGE_GRAPH.output_owner) if _PACKAGE_GRAPH is not None and origin and origin[0] == "before" else copy.deepcopy(source)
+    if mapping is not None:
+        # Both copies keep the source's structure; nodes removed below are simply never reached.
+        mapping.update(zip(map(id, source.iter()), result.iter()))
     if _MANIFEST is not None and origin and origin[0]=='before':
         parents={child:parent for parent in result.iter() for child in parent}
         for original,cloned in list(zip(source.iter(),result.iter())):
@@ -640,13 +643,15 @@ def _property_revision(after_properties, before_properties, property_tag, change
     return result
 
 
-def _property_action(before, after, property_tag):
+def _property_action(before, after, property_tag, consume=True):
     left = _MANIFEST_NODE_KEYS.get(before)
     right = _MANIFEST_NODE_KEYS.get(after)
     if left is None or right is None or left[0] != "before" or right[0] != "after":
         raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_SOURCE")
     for action in _MANIFEST["propertyActions"]:
         if _manifest_key(action["before"]) == left[1] and _manifest_key(action["after"]) == right[1] and action["property"] == _local_name(property_tag):
+            if not consume:
+                return action
             if action["id"] in _MANIFEST_PROPERTY_USED:
                 raise ValueError("INVALID_COMPARISON_MANIFEST_PROPERTY_DUPLICATE")
             _MANIFEST_PROPERTY_USED.add(action["id"])
@@ -671,8 +676,22 @@ def _apply_property_revision(result, before, property_tag, change_tag, writer, a
         result.insert(index, revised)
 
 
-def _accepted_copy(source, preserve_comments=False):
+def _revision_copy(source):
+    """A revision block copied as is for a replacement's inserted side: its own history stays,
+    except a property change whose payload is not exactly one previous property set (Word cannot
+    restore it), which is accepted (removed) rather than copied."""
     result = _source_copy(source)
+    for parent in list(result.iter()):
+        for child in list(parent):
+            if child.tag in PROPERTY_CHANGE_TAGS:
+                expected = child.tag[:-len("Change")]
+                if len(child) != 1 or child[0].tag != expected:
+                    parent.remove(child)
+    return result
+
+
+def _accepted_copy(source, preserve_comments=False, mapping=None):
+    result = _source_copy(source, mapping)
 
     def clean(parent):
         index = 0
@@ -952,6 +971,11 @@ def _mark_paragraph_end(paragraph, kind, writer):
     run_properties = paragraph_properties.find(W + "rPr")
     if run_properties is None:
         run_properties = ET.SubElement(paragraph_properties, W + "rPr")
+    if kind == "ins":
+        # A mark carries one insertion: the wholly inserted paragraph's mark is this insertion (a
+        # deletion of that mark recorded in the revision stays).
+        for child in [child for child in run_properties if child.tag in INSERTED_CONTENT_TAGS]:
+            run_properties.remove(child)
     marker = ET.Element(W + kind, writer.attributes())
     run_properties.insert(0, marker)
 
@@ -1066,7 +1090,7 @@ def _restore_projected_tokens(tokens, before_start, projections):
     return result
 
 
-def _restore_whole_properties(result, source, property_name):
+def _restore_whole_properties(result, source, property_name, consume=True):
     origin = _MANIFEST_NODE_KEYS.get(source)
     if origin is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
     pairs = [pair for pair in _MANIFEST["restorePropertyPairs"] if pair["property"] == property_name and _manifest_key(pair["before"]) == origin[1]]
@@ -1074,7 +1098,7 @@ def _restore_whole_properties(result, source, property_name):
     if len(pairs) != 1: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
     after = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(pairs[0]["after"])))
     if after is None: raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
-    action = _property_action(source, after, W + property_name) if _MANIFEST["options"]["formatting"] else None
+    action = _property_action(source, after, W + property_name, consume) if _MANIFEST["options"]["formatting"] else None
     properties = copy.deepcopy(after.find(W+property_name)) if property_name=="tblGrid" and action and action["representation"]=="preserve-after-history" else _project_properties(source.find(W + property_name), after.find(W + property_name), property_name)
     current = result.find(W + property_name)
     if current is not None: result.remove(current)
@@ -1314,12 +1338,14 @@ def _replace_table(source, kind, writer):
     """One side of a whole-table replacement: every row and paragraph marked, content kept."""
     side = "after" if kind == "ins" else "before"
     _consume_manifest_subtree(side, source)
+    mapping = {}
     _REPLACE_COPY["active"] = kind == "del"
     try:
-        table = _accepted_copy(source, preserve_comments=(kind == "ins"))
+        table = _accepted_copy(source, mapping=mapping) if kind == "del" else _revision_copy(source)
     finally:
         _REPLACE_COPY["active"] = False
     if kind == "del":
+        _project_deleted_copy(table, source, mapping)
         _strip_original_markers(table)
     parents = {child: parent for parent in table.iter() for child in parent}
     def in_text_box(node):
@@ -1342,11 +1368,17 @@ def _is_replaced(decision):
 
 
 def _wrap_runs(container, kind, writer):
-    """Wrap every run of an accepted paragraph copy in w:ins / w:del, keeping run content."""
+    """Wrap every run of a paragraph copy in w:ins / w:del, keeping run content. A deleted copy is
+    the accepted original; an inserted copy is the revision as is, whose existing insertions and
+    deletions stay its own (another author's history is not re-attributed)."""
     children = list(container)
     container[:] = []
     pending = None
     for child in children:
+        if kind == "ins" and (child.tag in INSERTED_CONTENT_TAGS or child.tag in DELETED_CONTENT_TAGS):
+            pending = None
+            container.append(child)
+            continue
         if child.tag == W + "r":
             if kind == "del":
                 for item in child:
@@ -1378,6 +1410,251 @@ def _wrap_runs(container, kind, writer):
             container.append(child)
             continue
         raise ValueError("UNSUPPORTED_TRACKED_SOURCE_REPLACE_CONTENT")
+
+
+# Run children a projected run may be split between: each is text, or one position of it.
+SPLITTABLE_RUN_CHILDREN = {W + "t", W + "tab", W + "br", W + "cr"}
+XML_SPACE = "{http://www.w3.org/XML/1998/namespace}space"
+
+
+def _owner_decision(side, node):
+    origin = _MANIFEST_NODE_KEYS.get(node)
+    if _MANIFEST is None or origin is None or origin[0] != side:
+        return None
+    positions = _manifest_ref_owners().get((side, origin[1]))
+    return _MANIFEST_DECISIONS[min(positions)] if positions else None
+
+
+def _first_text_run(paragraph):
+    """The paragraph's first run with text, as TypeScript's covering run for position 0 (nested
+    paragraphs and existing deletions are not the paragraph's own runs)."""
+    stack = list(reversed(list(paragraph)))
+    while stack:
+        node = stack.pop()
+        if node.tag in DELETED_CONTENT_TAGS or node.tag in (W + "p", W + "pPr", W + "rPr"):
+            continue
+        if node.tag == W + "r":
+            if _text(node):
+                return node
+            continue
+        stack.extend(reversed(list(node)))
+    return None
+
+
+def _deleted_copy_projection(paragraph, counterpart=None):
+    """How a replacement formats its deleted copy of `paragraph`, as the run-by-run path formats
+    deleted text: (spans, revised paragraph), each span (start, end, revised rPr or None) naming
+    the revised run whose excluded formatting families the deleted text keeps. TypeScript's restore
+    projection is used when the decision has one, else the counterpart's first text run. None for
+    an unpaired paragraph, which keeps its original formatting."""
+    origin = _MANIFEST_NODE_KEYS.get(paragraph)
+    decision = _owner_decision("before", paragraph)
+    entry = next((item for item in (decision or {}).get("wholeRestoreStyles", []) if _manifest_key(item["before"]) == origin[1]), None) if origin else None
+    if entry is not None:
+        revised = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(entry["afterParagraph"])))
+        spans = []
+        for projection in sorted(entry["projections"], key=lambda item: item["beforeStart"]):
+            donor = None
+            if projection["policy"] == "copy-revised-run":
+                source = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(projection["source"])))
+                if source is None:
+                    raise ValueError("INVALID_COMPARISON_MANIFEST_STYLE_SOURCE")
+                donor = source.find(W + "rPr")
+            spans.append((projection["beforeStart"], projection["beforeStart"] + projection["length"], donor))
+        return spans, revised
+    if counterpart is None and decision is not None and decision.get("after"):
+        counterpart = _MANIFEST_SOURCE_NODES.get(("after", _manifest_key(decision["after"][0])))
+    if counterpart is None:
+        return None
+    run = _first_text_run(counterpart)
+    return [(0, float("inf"), run.find(W + "rPr") if run is not None else None)], counterpart
+
+
+def _donor_at(spans, position):
+    starts = [span[0] for span in spans]
+    index = bisect.bisect_right(starts, position) - 1
+    if 0 <= index < len(spans) and position < spans[index][1]:
+        return spans[index][2]
+    # Content after the last projected character (a trailing object) takes the last span.
+    return spans[max(0, min(index, len(spans) - 1))][2] if spans else None
+
+
+def _project_run(run, donor):
+    properties = run.find(W + "rPr")
+    # The donor's own revision history is the revision's, never the restored original's.
+    projected = _project_properties(properties, _effective_properties(donor), "rPr")
+    if properties is not None:
+        run.remove(properties)
+    if projected is not None:
+        run.insert(0, projected)
+
+
+def _split_projected_run(run, start, length, spans):
+    """`run` with each position's projected properties, split where they change (text runs only;
+    a run with objects takes the properties of its first position)."""
+    donors = [_donor_at(spans, start + offset) for offset in range(length)] or [_donor_at(spans, start)]
+    if all(donor is donors[0] for donor in donors) or any(child.tag not in SPLITTABLE_RUN_CHILDREN and child.tag != W + "rPr" for child in run):
+        _project_run(run, donors[0])
+        return [run]
+    properties = run.find(W + "rPr")
+    pieces, position = [], 0
+    def piece(donor):
+        if pieces and pieces[-1][1] is donor:
+            return pieces[-1][0]
+        new = ET.Element(W + "r", dict(run.attrib))
+        if properties is not None:
+            new.append(copy.deepcopy(properties))
+        _project_run(new, donor)
+        pieces.append((new, donor))
+        return new
+    for child in run:
+        if child.tag == W + "rPr":
+            continue
+        if child.tag != W + "t":
+            piece(donors[min(position, len(donors) - 1)]).append(copy.deepcopy(child))
+            position += 1
+            continue
+        for character in child.text or "":
+            target = piece(donors[position])
+            last = target[-1] if len(target) else None
+            if last is None or last.tag != W + "t" or last.get("worklazy-split") is None:
+                last = ET.SubElement(target, W + "t", {"worklazy-split": "1", XML_SPACE: "preserve"})
+                last.text = ""
+            last.text += character
+            position += 1
+    for new, _ in pieces:
+        for item in new.iter(W + "t"):
+            item.attrib.pop("worklazy-split", None)
+    return [new for new, _ in pieces]
+
+
+def _project_copy_runs(container, spans, offset=0):
+    """Project the runs of an accepted copy by source text position (`_text` counting); returns
+    the position after `container`."""
+    index = 0
+    while index < len(container):
+        child = container[index]
+        if child.tag == W + "r":
+            length = len(_text(child))
+            pieces = _split_projected_run(child, offset, length, spans)
+            container[index:index + 1] = pieces
+            index += len(pieces)
+            offset += length
+            continue
+        if child.tag in REPLACE_RUN_CONTAINERS:
+            offset = _project_copy_runs(child, spans, offset)
+        elif child.tag == CONTENT_CONTROL_TAG:
+            content = child.find(CONTENT_CONTROL_BODY_TAG)
+            if content is not None:
+                offset = _project_copy_runs(content, spans, offset)
+        elif child.tag != W + "pPr":
+            offset += len(_text(child))
+        index += 1
+    return offset
+
+
+def _projected_paragraph_core(original, revised):
+    """Paragraph properties (without mark, section and history) the restored original shows:
+    included families from the original, excluded ones from the revision."""
+    def core(node):
+        result = ET.Element(W + "pPr")
+        for child in (node if node is not None else []):
+            if child.tag not in PARAGRAPH_BASE_EXCLUDED:
+                result.append(copy.deepcopy(child))
+        return result
+    return _project_properties(core(original), _effective_properties(core(revised)) if revised is not None else None, "pPr")
+
+
+def _project_deleted_paragraph(paragraph, revised):
+    """Formatting of a deleted original paragraph copy: projected paragraph properties and mark."""
+    properties = paragraph.find(W + "pPr")
+    donor = revised.find(W + "pPr") if revised is not None else None
+    projected = _projected_paragraph_core(properties, donor)
+    mark = _project_properties(properties.find(W + "rPr") if properties is not None else None, _effective_properties(donor.find(W + "rPr")) if donor is not None else None, "rPr")
+    section = properties.find(W + "sectPr") if properties is not None else None
+    result = projected if projected is not None else ET.Element(W + "pPr")
+    if mark is not None:
+        result.append(mark)
+    if section is not None:
+        result.append(section)
+    if properties is not None:
+        paragraph.remove(properties)
+    if len(result) or result.attrib:
+        paragraph.insert(0, result)
+
+
+# Row and cell properties that are the table's geometry, not formatting: the restored original
+# keeps its own so its cells still fit its grid.
+TABLE_GEOMETRY_TAGS = {"trPr": {W + name for name in ("gridBefore", "gridAfter", "wBefore", "wAfter")},
+                       "tcPr": {W + name for name in ("gridSpan", "hMerge", "vMerge")}}
+TCPR_ORDER = [W + name for name in ("cnfStyle", "tcW", "gridSpan", "hMerge", "vMerge", "tcBorders", "shd", "noWrap", "tcMar", "textDirection", "tcFitText", "vAlign", "hideMark", "headers", "cellIns", "cellDel", "cellMerge", "tcPrChange")]
+
+
+def _keep_table_geometry(target, source, name):
+    tags = TABLE_GEOMETRY_TAGS[name]
+    original = source.find(W + name)
+    current = target.find(W + name)
+    kept = [copy.deepcopy(child) for child in (original if original is not None else []) if child.tag in tags]
+    if current is None:
+        if not kept:
+            return
+        current = ET.Element(W + name)
+        target.insert(0, current)
+    for child in [child for child in current if child.tag in tags]:
+        current.remove(child)
+    current.extend(kept)
+    if name == "tcPr":
+        rank = {tag: index for index, tag in enumerate(TCPR_ORDER)}
+        current[:] = sorted(list(current), key=lambda child: rank.get(child.tag, len(rank)))
+    if not len(current) and not current.attrib:
+        target.remove(current)
+
+
+def _project_deleted_copy(copy_root, source, mapping, paragraphs=True):
+    """Format a replacement's deleted copy of `source` as the run-by-run path formats deleted
+    content: paired paragraphs, rows, cells and tables keep the revision's excluded formatting."""
+    parents = {child: parent for parent in source.iter() for child in parent}
+    def in_text_box(node):
+        while node in parents:
+            node = parents[node]
+            if node.tag == W + "txbxContent":
+                return True
+        return False
+    for node in source.iter():
+        target = mapping.get(id(node))
+        if target is None:
+            continue
+        if node.tag == W + "p" and paragraphs and not in_text_box(node):
+            projection = _deleted_copy_projection(node)
+            if projection is not None:
+                _project_copy_runs(target, projection[0])
+                _project_deleted_paragraph(target, projection[1])
+        elif node.tag == W + "tbl":
+            _restore_whole_properties(target, node, "tblPr", consume=False)
+            decision = _owner_decision("before", node)
+            projection = (decision or {}).get("gridProjection")
+            if projection and projection.get("mode") == "paired":
+                grid = ET.Element(W + "tblGrid")
+                for entry in projection["restore"]:
+                    if entry["implicit"]:
+                        grid.append(ET.Element(W + "gridCol"))
+                        continue
+                    root = _MANIFEST_SOURCE_NODES[(entry["side"], _manifest_key(decision[entry["side"]][0]))]
+                    grid.append(copy.deepcopy(root.find(W + "tblGrid").findall(W + "gridCol")[entry["index"]]))
+                current = target.find(W + "tblGrid")
+                index = list(target).index(current) if current is not None else (list(target).index(target.find(W + "tblPr")) + 1 if target.find(W + "tblPr") is not None else 0)
+                if current is not None:
+                    target.remove(current)
+                target.insert(index, grid)
+        elif node.tag in (W + "tr", W + "tc"):
+            name = "trPr" if node.tag == W + "tr" else "tcPr"
+            _restore_whole_properties(target, node, name, consume=False)
+            _keep_table_geometry(target, node, name)
+            restored = target.find(W + name)
+            if restored is not None and node.tag == W + "tr" and target.find(W + "tblPrEx") is not None:
+                # CT_Row: w:tblPrEx comes first.
+                target.remove(restored)
+                target.insert(list(target).index(target.find(W + "tblPrEx")) + 1, restored)
 
 
 def _donor_section(before_section):
@@ -1483,10 +1760,12 @@ def _replace_paragraph_copy(source, kind, writer, counterpart, properties, secti
             target = _donor_section(section)
         index = list(properties).index(section)
         properties.remove(section)
+        mapping = {}
         try:
-            paragraph = _accepted_copy(source)
+            paragraph = _accepted_copy(source, mapping=mapping)
         finally:
             properties.insert(index, section)
+        _project_deleted_copy(paragraph, source, mapping)
         copied = _deleted_section_copy(section, target)
         paragraph_properties = paragraph.find(W + "pPr")
         if paragraph_properties is None:
@@ -1494,8 +1773,13 @@ def _replace_paragraph_copy(source, kind, writer, counterpart, properties, secti
             paragraph.insert(0, paragraph_properties)
         anchor = next((i for i, child in enumerate(paragraph_properties) if child.tag in {W + "rPr", W + "pPrChange"}), len(paragraph_properties))
         paragraph_properties.insert(anchor, copied)
+    elif kind == "del":
+        mapping = {}
+        paragraph = _accepted_copy(source, mapping=mapping)
+        _project_deleted_copy(paragraph, source, mapping)
     else:
-        paragraph = _accepted_copy(source, preserve_comments=(kind == "ins"))
+        # The revision as is: its own insertions, deletions and property history stay its author's.
+        paragraph = _revision_copy(source)
     if kind == "del":
         _strip_original_markers(paragraph)
     _wrap_runs(paragraph, kind, writer)
@@ -1821,16 +2105,21 @@ def _replace_in_place(before, after, writer, include_formatting=True):
         index = list(properties).index(section) if section is not None else None
         if section is not None:
             properties.remove(section)
+        mapping = {}
         try:
-            old = _accepted_copy(before)
+            old = _accepted_copy(before, mapping=mapping)
         finally:
             if section is not None:
                 properties.insert(index, section)
     finally:
         _REPLACE_COPY["active"] = False
+    # The deleted runs keep the revision's excluded formatting (the paragraph itself is the revision's).
+    _project_copy_runs(old, _deleted_copy_projection(before, after)[0])
+    _project_deleted_copy(old, before, mapping, paragraphs=False)
     _strip_original_markers(old)
     _wrap_runs(old, "del", writer)
-    paragraph = _accepted_copy(after, preserve_comments=True)
+    # The revision as is: its own insertions, deletions and property history stay its author's.
+    paragraph = _revision_copy(after)
     _wrap_runs(paragraph, "ins", writer)
     new_properties = paragraph.find(W + "pPr")
     content = [child for child in old if child.tag != W + "pPr"]
@@ -1838,18 +2127,19 @@ def _replace_in_place(before, after, writer, include_formatting=True):
     for offset, child in enumerate(content):
         paragraph.insert(anchor + offset, child)
     if include_formatting:
-        old_properties = old.find(W + "pPr")
+        # Reject restores the original's included paragraph families; excluded ones keep the
+        # revision's. A revision that already records its own paragraph history keeps it.
+        restored = _projected_paragraph_core(old.find(W + "pPr"), new_properties)
         def base(node):
             return [_canonical_property(child) for child in node if child.tag not in PARAGRAPH_BASE_EXCLUDED] if node is not None else []
-        if base(old_properties) != base(new_properties):
+        if base(restored) != base(new_properties) and (new_properties is None or new_properties.find(W + "pPrChange") is None):
             if new_properties is None:
                 new_properties = ET.Element(W + "pPr")
                 paragraph.insert(0, new_properties)
             change = ET.Element(W + "pPrChange", writer.attributes())
             previous = ET.SubElement(change, W + "pPr")
-            for child in (old_properties if old_properties is not None else []):
-                if child.tag not in PARAGRAPH_BASE_EXCLUDED:
-                    previous.append(copy.deepcopy(child))
+            for child in (restored if restored is not None else []):
+                previous.append(child)
             new_properties.append(change)
         new_section = new_properties.find(W + "sectPr") if new_properties is not None else None
         if section is not None and new_section is not None:
@@ -2132,12 +2422,19 @@ def _mark_row(row, kind, writer):
     if row_properties is None:
         row_properties = ET.Element(W + "trPr")
         row.insert(0, row_properties)
+    if kind == "ins":
+        # The wholly inserted row is this insertion; a row deletion recorded in the revision stays.
+        for child in row_properties.findall(W + "ins"):
+            row_properties.remove(child)
     marker = ET.Element(W + kind, writer.attributes())
-    change = row_properties.find(W + "trPrChange")
-    if change is None:
+    # CT_TrPr: w:ins before w:del, both before w:trPrChange.
+    anchor = row_properties.find(W + "del") if kind == "ins" else None
+    if anchor is None:
+        anchor = row_properties.find(W + "trPrChange")
+    if anchor is None:
         row_properties.append(marker)
     else:
-        row_properties.insert(list(row_properties).index(change), marker)
+        row_properties.insert(list(row_properties).index(anchor), marker)
 
 
 def _mark_cell(cell, kind, writer):
@@ -2514,7 +2811,9 @@ def _validate_story_projection(facts,actual):
     if any(not p['final'] for p in sections):
         if not any(s['final'] for s in a['sections']) or not any(s['final'] for s in b['sections']):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTIONS')
         if any(p.get('before',{}).get('activation')!=p.get('after',{}).get('activation') for p in sections if not p.get('oneSided')):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_SECTION_ACTIVATION')
-    if a.get('settings')!=b.get('settings'):raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY_ACTIVATION')
+    # The even/odd header setting is not tracked by Word; the output keeps the revised value (user
+    # decision 2026-10-25, warned in the worker). Any other activation setting still refuses.
+    if {k:v for k,v in (a.get('settings') or {}).items() if k!='evenAndOddHeaders'}!={k:v for k,v in (b.get('settings') or {}).items() if k!='evenAndOddHeaders'}:raise ValueError('UNSUPPORTED_TRACKED_SOURCE_STORY_ACTIVATION')
     pairs=plan.get('pairs',[]);pair_ids={pair['id'] for pair in pairs}
     # Bindings may differ in presence: stories pair by what each section shows (one side may show
     # none, compared with an empty story).

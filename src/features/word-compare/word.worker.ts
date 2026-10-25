@@ -148,6 +148,9 @@ worker.onmessage = async (event: MessageEvent) => {
         if (!event.data.options.tables || !event.data.options.metadata) {
           result.warnings.push(L("비교에서 제외한 서식·표·문서 정보는 수정본 기준으로 유지됩니다.", "Excluded formatting, tables and document information are kept from the revised file."));
         }
+        if (event.data.options.trackedDocument && event.data.options.metadata && docxPair && Boolean(beforeModel.storyFacts?.settings?.evenAndOddHeaders) !== Boolean(afterModel.storyFacts?.settings?.evenAndOddHeaders)) {
+          result.warnings.push(L("두 파일의 짝수·홀수 페이지 머리말/꼬리말 설정이 다릅니다. 변경 추적 파일은 수정본 설정을 따르며, Word에서 변경을 거부해도 이 설정은 원본으로 돌아가지 않습니다.", "The two files differ in the odd/even page header and footer setting. The tracked file uses the revised setting; rejecting changes in Word does not restore the original setting."));
+        }
         if ((beforeModel.comments?.length || afterModel.comments?.length) && event.data.options.trackedDocument) {
           result.warnings.push(L("변경 추적 파일의 메모와 기존 변경 기록은 수정본 기준으로 유지됩니다. 메모 본문의 변경은 Word에서 거부하여 원본으로 복원할 수 없습니다.", "Comments and existing revision history in the tracked file are kept from the revised file. Rejecting changes in Word does not restore original comment text."));
         }

@@ -69,7 +69,9 @@ for name,old,new in [('width',['1000','2000'],['1800','3200']),('insert-column',
   # cell insertions); the table is recorded as the original deleted and the revision inserted.
   structural=tables and name!='width'
   assert (kept_grid if structural else grid)('/grid-accepted.docx')==[new]
-  target=old if included or structural else [new[0],old[1],new[1]] if tables and name=='delete-middle' else [new[0]] if tables and name=='insert-column' else [new[0],old[1]] if tables and name=='delete-column' else new
+  # Reject restores included widths; excluded widths keep the revision's for paired columns (the
+  # replaced original table too), and an unpaired original column keeps its own.
+  target=old if included else [new[0],old[1],new[1]] if tables and name=='delete-middle' else [new[0]] if tables and name=='insert-column' else [new[0],old[1]] if tables and name=='delete-column' else new
   assert (kept_grid if structural else grid)('/grid-rejected.docx')==[target],(name,formatting,layout,grid('/grid-rejected.docx'),target)
   with zipfile.ZipFile('/grid-out.docx') as z:
    root=ET.fromstring(z.read('word/document.xml'));changes=list(root.iter(W+'tblGridChange'));assert len(changes)==(1 if tables and included and not structural else 0)
@@ -146,12 +148,13 @@ for case in ['span','offset','history-structure']:
   with zipfile.ZipFile('/guard-out.docx') as src,zipfile.ZipFile('/guard-rejected.docx','w') as out:
    for entry in src.infolist():out.writestr(entry,_serialize_xml(reject(_qname_safe_parse(src.read(entry.filename)))[0]) if entry.filename=='word/document.xml' else src.read(entry.filename))
   assert kept_grid('/guard-accepted.docx')==grid('/guard-after.docx'),(case,'accept grid')
-  assert kept_grid('/guard-rejected.docx')==grid('/guard-before.docx'),(case,'reject grid')
+  # Excluded widths keep the revision's for the paired first column; the unpaired one keeps its own.
+  assert kept_grid('/guard-rejected.docx')==(grid('/guard-before.docx') if layout else [[grid('/guard-after.docx')[0][0]]+grid('/guard-before.docx')[0][1:]]),(case,'reject grid',layout,kept_grid('/guard-rejected.docx'))
   def geometry(path):
    with zipfile.ZipFile(path) as z:table=ET.fromstring(z.read('word/document.xml')).find('.//'+W+'tbl')
    return ([(n.tag,n.get(W+'val')) for n in table.iter() if n.tag in (W+'gridSpan',W+'gridBefore')],[''.join(t.text or '' for t in cell.iter(W+'t')) for cell in table.iter(W+'tc')])
   assert geometry('/guard-accepted.docx')==geometry('/guard-after.docx'),(case,'accept geometry')
-  assert geometry('/guard-rejected.docx')==geometry('/guard-before.docx'),(case,'reject geometry')
+  assert geometry('/guard-rejected.docx')==geometry('/guard-before.docx'),(case,'reject geometry',layout,geometry('/guard-rejected.docx'),geometry('/guard-before.docx'))
  checks.append(case+'-geometry-replaced')
 
 json.dumps(checks)

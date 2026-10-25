@@ -85,7 +85,8 @@ export function buildSectionPairs(manifest:DocumentComparisonManifest,a:StoryFac
  if(old.length||next.length)pairs.push({id:'section:final-body',before:old[0],after:next[0],final:true});
  for(const side of ['before','after'] as const){const facts=side==='before'?a:b;if(JSON.stringify(facts.sections.map(section=>sourceKey(section.source)))!==JSON.stringify(pairs.flatMap(pair=>pair[side]?[sourceKey(pair[side]!.source)]:[])))reasons.push('changed-section-order-or-count');}
  if(manifest.options.metadata&&pairs.some(pair=>!pair.final)&&(!old.length||!next.length))reasons.push('implicit-final-multisection');
- if(manifest.options.metadata&&a.settings?.evenAndOddHeaders!==b.settings?.evenAndOddHeaders)reasons.push('changed-story-activation');
+ // A changed even/odd header setting is not a story change: the tracked file keeps the revised
+ // setting (Word does not track it) and the worker warns about it.
  if(manifest.options.metadata&&pairs.some(pair=>!pair.final))for(const pair of pairs)if(!pair.oneSided&&JSON.stringify(pair.before?.activation)!==JSON.stringify(pair.after?.activation))reasons.push('changed-section-activation');
  return {pairs,reasons};
 }
