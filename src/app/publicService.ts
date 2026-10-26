@@ -29,7 +29,6 @@ export function documentReadiness(
 ): DocumentReadiness {
   if (isVideoUnavailablePath(pathname)) return "unavailable";
   const path = stripLanguagePrefix(pathname).replace(/\/+$/, "") || "/";
-  if (path === "/tools/hwp-editor" && /^\/en(?:\/|$)/.test(pathname)) return "navigation";
   const redactor = path === "/tools/document-redactor";
   const office = path === "/tools/office-editor/app" || path === "/tools/pdf-converter/document-to-pdf";
   const excel = path === "/tools/excel-merger/xls-preserve";
@@ -66,7 +65,6 @@ export function safeAnalyticsPage(pathname: string, search = "", hash = "") {
   if (!language) return null;
   if (hash) return null;
   let path = stripLanguagePrefix(pathname).replace(/\/+$/, "") || "/";
-  if (path === "/tools/hwp-editor" && language === "en") return null;
   if (!isKnownPublicPath(path)) return null;
   const parameters = new URLSearchParams(search);
   const allowed = path === "/tools" && parameters.size === 1 && publicToolCategories.has(parameters.get("category") ?? "")

@@ -65,10 +65,9 @@ export function RouteSeo() {
     setMeta("name", "twitter:image", image);
     setMeta("name", "twitter:image:alt", imageDefinition.alt);
     setCanonical(canonical);
-    const englishAlternatePath = canonicalPath === "/tools/hwp-editor" ? "/tools" : canonicalPath;
     setAlternate("ko", getCanonicalUrl("ko", canonicalPath));
-    setAlternate("en", getCanonicalUrl("en", englishAlternatePath));
-    setAlternate("x-default", getCanonicalUrl("en", englishAlternatePath));
+    setAlternate("en", getCanonicalUrl("en", canonicalPath));
+    setAlternate("x-default", getCanonicalUrl("en", canonicalPath));
     setJsonLd(createStructuredData(language, canonicalPath, canonical));
   }, [location.pathname]);
 

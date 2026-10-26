@@ -110,9 +110,16 @@ const socialSlugByRoute = {
 
 for (const language of ["ko", "en"]) {
 for (const route of routes) {
-  if (language === "en" && route === "tools/hwp-editor") continue;
   const filePath = path.join("dist", language, route, "index.html");
   const html = await fs.readFile(filePath, "utf8");
+  if (route === "tools/hwp-editor") {
+    for (const [locale, target] of [["ko", "ko"], ["en", "en"], ["x-default", "en"]]) {
+      if (!html.includes(`hreflang="${locale}" href="https://worklazy.net/${target}/tools/hwp-editor/"`)) {
+        throw new Error(`${filePath}: HWP hreflang ${locale} must point to its matching editor.`);
+      }
+    }
+    console.log(`HWP static coverage: ${language}/tools/hwp-editor/ (metadata, paired hreflang, assets).`);
+  }
   if (route === "tools/document-redactor") assertRedactorStatic(html);
   if (route === "tools/pdf-converter/document-to-pdf") {
     if (!html.includes('name="worklazy-office-isolation"') || !html.includes('src="./coi-serviceworker.js"')) throw new Error(`${filePath}: missing Office isolation bootstrap`);
@@ -444,7 +451,7 @@ if (sitemap.includes("/tools/office-editor/app/") || sitemap.includes("/tools/ex
 if (!VIDEO_STUDIO_PUBLIC && sitemap.includes("/tools/video-studio/")) throw new Error("sitemap.xml contains unpublished Video Studio routes.");
 for (const route of routes) {
   if (route && !sitemap.includes(`/ko/${route}/`)) throw new Error(`sitemap.xml is missing ko/${route}.`);
-  if (route && route !== "tools/hwp-editor" && !sitemap.includes(`/en/${route}/`)) throw new Error(`sitemap.xml is missing en/${route}.`);
+  if (route && !sitemap.includes(`/en/${route}/`)) throw new Error(`sitemap.xml is missing en/${route}.`);
 }
 if (!sitemap.includes('xmlns:xhtml=') || !sitemap.includes('hreflang="x-default"')) throw new Error("sitemap.xml is missing multilingual alternate links.");
 

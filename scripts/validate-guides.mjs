@@ -165,7 +165,6 @@ export function validateGuidesData({ guidesData, appRoutes, expectations = faqEx
     };
 
     for (const [guideKey, guide] of Object.entries(guides)) {
-      if (lang === "en" && guideKey === "hwpEditor") continue;
       if (!guide.title || typeof guide.title !== "string" || !guide.title.trim()) addError(`[${lang}] Guide '${guideKey}' is missing 'title'`);
       if (!guide.description || typeof guide.description !== "string" || !guide.description.trim()) addError(`[${lang}] Guide '${guideKey}' is missing 'description'`);
       inspectMemoText(guideKey, guide.title, "title");
@@ -189,7 +188,7 @@ export function validateGuidesData({ guidesData, appRoutes, expectations = faqEx
 
     for (const route of routeSet) {
       const slug = resolveSlug(route, slugByPath);
-      if (!slug || (lang === "en" && slug === "hwp-editor")) continue;
+      if (!slug) continue;
       const guideKey = getGuideKeyForPath(slug, route);
       const guide = guides[guideKey];
       if (!guide || !guide.title?.trim() || !guide.description?.trim() || !Array.isArray(guide.blocks) || guide.blocks.length === 0) {

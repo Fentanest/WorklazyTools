@@ -102,7 +102,7 @@ export function App() {
           <Route path="tools/pdf-compare" element={<PublishedComparison id="pdf-compare"><LazyToolRoute label="PDF compare"><PdfComparePage /></LazyToolRoute></PublishedComparison>} />
           <Route path="tools/word-compare/*" element={<LocalizedNavigate to="/tools/document-compare" />} />
           <Route path="tools/hwp-compare/*" element={<LocalizedNavigate to="/tools/document-compare" />} />
-          <Route path="tools/hwp-editor" element={<KoreanOnlyRoute><LazyToolRoute label="HWP editor"><HwpEditorPage /></LazyToolRoute></KoreanOnlyRoute>} />
+          <Route path="tools/hwp-editor" element={<LazyToolRoute label="HWP editor"><HwpEditorPage /></LazyToolRoute>} />
           <Route path="tools/office-editor" element={<LazyToolRoute label="Office editor"><OfficeEditorPage /></LazyToolRoute>} />
           <Route path="tools/office-editor/app" element={<LazyToolRoute label="Office editor workspace"><OfficeEditorAppPage /></LazyToolRoute>} />
           {__VIDEO_STUDIO_PUBLIC__ && VideoStudioPage ? <>
@@ -174,11 +174,6 @@ function LanguageLayout() {
 
   if (!isAppLanguage(lang)) return <InvalidLanguageRedirect />;
   return <Outlet />;
-}
-
-function KoreanOnlyRoute({ children }: { children: React.ReactNode }) {
-  const language = useAppLanguage();
-  return language === "ko" ? children : <LocalizedNavigate to="/tools" />;
 }
 
 type PdfRouteProps =

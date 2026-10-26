@@ -20,7 +20,7 @@ assert.ok(registry.length > 0);
 assert.equal(new Set(registry.map((t) => t.id)).size, registry.length);
 assert.deepEqual(registry.find((t) => t.id === "product-banner"), { id: "product-banner", category: "media", path: "/tools/product-banner", title: "알리익스프레스 광고 배너 만들기", shortTitle: "알리익스프레스 광고 배너 만들기", description: "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 광고 배너를 만들고 HTML·iframe 코드를 저장하세요. 파일은 브라우저에서 처리합니다.", eyebrow: "알리익스프레스 광고 배너", accent: "pink", status: "available" });
 const published = registry.filter((t) => t.status === "available" && (t.id !== "video-studio" || VIDEO_STUDIO_PUBLIC));
-const expectedPaths = (language, category) => published.filter((t) => (language !== "en" || t.id !== "hwp-editor") && (!category || t.category === category)).map((t) => `/${language}${t.path}`).sort();
+const expectedPaths = (language, category) => published.filter((t) => (!category || t.category === category)).map((t) => `/${language}${t.path}`).sort();
 const verifyPaths = (actual, language, category) => assert.deepEqual(actual.sort(), expectedPaths(language, category));
 
 const baseUrl = process.env.TEST_BASE_URL || "http://127.0.0.1:4173";
@@ -98,7 +98,7 @@ try {
   }
   const storedLanguage = await page.evaluate(() => localStorage.getItem("worklazy_lang"));
   if (storedLanguage !== "en") throw new Error(`Language storage was not updated: ${storedLanguage}`);
-  await page.waitForSelector(".all-tools-grid");
+  await page.waitForSelector('[data-tool-page="hwp-editor"]');
   // Native select keyboard: focus, ArrowDown to Korean, Enter commits.
   await page.$eval(".wl-topbar select[data-ui-component='language-switcher']", (select) => select.focus());
   await page.keyboard.press("ArrowUp");
@@ -484,7 +484,8 @@ try {
   verifyPaths(await page.$$eval(".all-tools-grid .ui-tool-card", (cards) => cards.map((card) => card.getAttribute("href"))), "en");
   if (englishToolCount !== expectedPaths("en").length) throw new Error(`English tool catalog mismatch: ${englishToolCount}`);
   await page.goto(`${baseUrl}/en/tools/hwp-editor`, { waitUntil: "networkidle0" });
-  if (new URL(page.url()).pathname !== "/en/tools") throw new Error(`English HWP editor was not hidden: ${page.url()}`);
+  await page.waitForSelector('[data-tool-page="hwp-editor"] iframe');
+  if (new URL(page.url()).pathname.replace(/\/$/, "") !== "/en/tools/hwp-editor") throw new Error(`English HWP editor did not open: ${page.url()}`);
 
   if (errors.length) throw new Error(`Browser errors:\n${errors.join("\n")}`);
   console.log(`Utility tool smoke tests passed: Korean and English routes, hreflang, categorized tools, paired editors, world map, utility tools, video unpublication and PDF page range. External HTTP(S) requests intercepted before the network: ${interceptedExternalRequests.length}.`);

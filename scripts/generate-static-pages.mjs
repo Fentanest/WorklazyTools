@@ -36,7 +36,6 @@ await fs.writeFile(path.join(outputDirectory,'comparison-publication.json'),JSON
 const generated = [];
 for (const language of languages) {
   for (const route of localizedRoutes) {
-    if (language === "en" && route === "tools/hwp-editor") continue;
     const page = makePage(language, route);
     const routeUrl = absolute(language, route);
     const canonicalRoute = canonicalSeoPath(`/${route}`).replace(/^\//, "");
@@ -147,7 +146,7 @@ function makePage(language, route) {
 
 function renderPage(template, page, canonical) {
   const alternateKo = absolute("ko", page.route);
-  const alternateEn = absolute("en", page.route === "tools/hwp-editor" ? "tools" : page.route);
+  const alternateEn = absolute("en", page.route);
   const image = new URL(page.socialImage.path, siteUrl).href;
   const locale = page.language === "ko" ? "ko_KR" : "en_US";
   const inLanguage = page.language === "ko" ? "ko-KR" : "en-US";

@@ -45,12 +45,8 @@ const representativeProfiles = Object.freeze([
 ]);
 
 const mobileBottomProfiles = Object.freeze([koDarkMobile, enLightMobile]);
-const koreanOnlyProfiles = Object.freeze([koLightDesktop, koDarkMobile]);
-const koreanOnlyBottomProfiles = Object.freeze([koDarkMobile]);
-const englishRedirectProfiles = Object.freeze([enLightMobile, enDarkDesktop]);
 const interactionProfiles = Object.freeze([enDarkDesktop]);
 const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, koLightMobile320, enLightMobile320]);
-const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
   "image-compare", "folder-compare",
   "text-compare",
@@ -94,7 +90,6 @@ const readySelectorFor = (route, contentSelector) => contentSelector
   ?? (route.toolId === "foliotrace" ? ".foliotrace-page" : null)
   ?? (route.toolId === "office-editor" ? OFFICE_EDITOR_SELECTOR : null)
   ?? (migratedToolIds.has(route.toolId) ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR);
-const HWP_ENGLISH_NA_REASON = "The HWP editor is intentionally Korean-only; its English URL redirects to /en/tools and is recorded as a separate redirect scenario.";
 
 const scenario = (definition) => Object.freeze({
   fixture: null,
@@ -148,7 +143,6 @@ const defaultFixtureFor = (toolId) => toolId === "security-tools"
   : null;
 
 const initialScenarioFor = (route) => {
-  const koreanOnly = route.toolId === "hwp-editor";
   const redactor = route.toolId === "document-redactor";
   // The redactor shell mounts before its content paints; gating on the shell
   // alone screenshots an empty container. The file input proves content paint.
@@ -161,20 +155,16 @@ const initialScenarioFor = (route) => {
     stateType: "initial",
     path: route.path,
     kind: "tool",
-    profiles: koreanOnly ? koreanOnlyProfiles : representativeProfiles,
-    profileReductionReason: koreanOnly
-      ? "English is product-level N/A. Korean keeps paired desktop/light and mobile/dark coverage; the redirect has its own scenario."
-      : "Representative pairwise coverage retains both locales, themes, and viewports without the eight-way full product.",
+    profiles: representativeProfiles,
+    profileReductionReason: "Representative pairwise coverage retains both locales, themes, and viewports without the eight-way full product.",
     fixture: defaultFixtureFor(route.toolId),
     readySelector: readySelectorFor(route, contentSelector),
     assertSelector: readySelectorFor(route, contentSelector),
-    localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
     ...(redactor ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
   });
 };
 
 const bottomScenarioFor = (route) => {
-  const koreanOnly = route.toolId === "hwp-editor";
   const migrated = migratedToolIds.has(route.toolId);
   const redactor = route.toolId === "document-redactor";
   const contentSelector = redactor ? `[data-tool-page='${route.toolId}'] input[type='file']` : null;
@@ -186,10 +176,8 @@ const bottomScenarioFor = (route) => {
     stateType: "bottom",
     path: route.path,
     kind: "tool",
-    profiles: koreanOnly ? koreanOnlyBottomProfiles : mobileBottomProfiles,
-    profileReductionReason: koreanOnly
-      ? "The clearance contract is mobile-only and English is product-level N/A, so the Korean dark mobile profile is the sole applicable profile."
-      : "The clearance contract is mobile-only; KO/dark and EN/light retain both locales and themes while avoiding redundant desktop captures.",
+    profiles: mobileBottomProfiles,
+    profileReductionReason: "The clearance contract is mobile-only; KO/dark and EN/light retain both locales and themes while avoiding redundant desktop captures.",
     fixture: defaultFixtureFor(route.toolId),
     actions: [{ type: "scroll-bottom" }],
     readySelector: readySelectorFor(route, contentSelector),
@@ -199,7 +187,6 @@ const bottomScenarioFor = (route) => {
       : route.toolId === "foliotrace"
         ? ".foliotrace-page > :last-child"
       : (migrated ? `[data-tool-page='${route.toolId}'] > :last-child` : DEFAULT_BOTTOM_TARGET_SELECTOR),
-    localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
     ...(redactor ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
   });
 };
@@ -672,8 +659,8 @@ const interactionDefinitions = Object.freeze({
   }),
   "hwp-editor": Object.freeze({
     stateId: "interaction-document-loaded",
-    profiles: Object.freeze([koLightDesktop, koDarkMobile]),
-    profileReductionReason: "The Korean-only loaded workspace must retain desktop language-switcher and mobile action-bar coverage after the P-QA collision fix.",
+    profiles: representativeProfiles,
+    profileReductionReason: "The loaded workspace retains both locales, themes, and desktop/mobile action-bar coverage.",
     fixture: { kind: "base64-file", path: "fixtures/rhwp-roundtrip-empty.hwp.b64", fileName: "visual-hwp-document.hwp", mimeType: "application/x-hwp" },
     actions: [
       { type: "upload", selector: "[data-tool-page='hwp-editor'] input[type='file']" },
@@ -714,7 +701,6 @@ const interactionScenariosFor = (route) => {
   const configured = interactionDefinitions[route.toolId];
   if (!configured) return [];
   const definitions = Array.isArray(configured) ? configured : [configured];
-  const koreanOnly = route.toolId === "hwp-editor";
   const migrated = migratedToolIds.has(route.toolId);
   return definitions.map((definition) => scenario({
     scenarioId: `${route.id}--${definition.stateId}`,
@@ -724,15 +710,12 @@ const interactionScenariosFor = (route) => {
     stateType: "interaction",
     path: definition.path ?? route.path,
     kind: "tool",
-    profiles: definition.profiles ?? (koreanOnly ? koreanInteractionProfiles : interactionProfiles),
-    profileReductionReason: definition.profileReductionReason ?? (koreanOnly
-      ? "The HWP editor is Korean-only; one Korean light desktop profile covers the loaded-document workspace while initial and bottom retain mobile and dark coverage."
-      : "Minimum interaction coverage uses one EN/dark/desktop profile; initial and bottom scenarios retain the remaining locale, theme, and viewport axes."),
+    profiles: definition.profiles ?? interactionProfiles,
+    profileReductionReason: definition.profileReductionReason ?? "Minimum interaction coverage uses one EN/dark/desktop profile; initial and bottom scenarios retain the remaining locale, theme, and viewport axes.",
     fixture: definition.fixture ?? defaultFixtureFor(route.toolId),
     actions: definition.actions,
     readySelector: definition.readySelector ?? (migrated ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR),
     assertSelector: definition.assertSelector,
-    localeNotApplicableReason: koreanOnly ? HWP_ENGLISH_NA_REASON : null,
     ...(route.toolId === "document-redactor" ? { navigationWaitUntil: "load", bypassCsp: true } : {}),
   }));
 };
@@ -740,22 +723,6 @@ const interactionScenariosFor = (route) => {
 const toolScenarios = availableToolRoutes.flatMap((route) => {
   const interactions = interactionScenariosFor(route);
   return [initialScenarioFor(route), bottomScenarioFor(route), ...interactions];
-});
-
-const hwpEnglishRedirectScenario = scenario({
-  scenarioId: "hwp-editor-empty--redirect-en-tools",
-  routeId: "hwp-editor-empty",
-  toolId: "hwp-editor",
-  stateId: "redirect-en-tools",
-  stateType: "redirect",
-  path: "/tools/hwp-editor",
-  kind: "redirect",
-  profiles: englishRedirectProfiles,
-  profileReductionReason: "Only English profiles apply to this product-level redirect; KO is covered by the tool's initial and bottom scenarios.",
-  actions: [{ type: "assert-path", pathname: "/en/tools" }],
-  readySelector: ".tools-index-page",
-  assertSelector: ".tools-index-page",
-  localeNotApplicableReason: "Korean is N/A for this redirect assertion because /ko/tools/hwp-editor is the supported tool route.",
 });
 
 const pdfFinishScenarios = [
@@ -911,7 +878,6 @@ const pdfFinishScenarios = [
 export const visualRegressionScenarios = Object.freeze([
   ...indexScenarios,
   ...toolScenarios,
-  hwpEnglishRedirectScenario,
   ...pdfFinishScenarios,
 ]);
 
