@@ -14,6 +14,18 @@
 
 - 갤럭시 탭 S7의 실제 Chrome/Samsung Internet 파일 선택기(내 파일·갤러리·외부 제공자)에서 17장 동시/개별 추가, 삭제·재선택·정렬, 준비/변환 취소, 백그라운드 복귀와 저메모리 조건을 확인한다. 이번 데스크톱 Chromium·모바일 viewport 검사와 통제된 읽기 실패는 당시 원인이나 실제 장비 재현의 증거가 아니다. 직접 원인 로그가 없으며 CMYK/특수 ICC의 모든 뷰어 색상 일치도 보증하지 않는다. — Codx
 
+## 2026-10-26 출고 이월 (main 47d4f50)
+
+비교 이식 수리·도구 불러오기 일시 실패 복구·HWP 편집기 영어권 개방을 함께 출고하며 남긴 항목이다. Word 생성 시간 관문 R30은 아래 「Diffchecker 이식 수리 후속」에 있다.
+
+- **WebKit 복구 대기 시한 없음**: WebKit(아이폰·Safari) 재시도는 실패한 modulepreload 의 오류 이벤트를 기다린 뒤 그 주소를 `cache: "reload"` 로 다시 받는다(WebKit bug 270357 대응, `src/app/chunkRecovery.ts`). 오류 이벤트가 끝내 오지 않으면 자동 복구 없이 「다시 불러오는 중」에 머문다. 홈 단추로 나갈 수는 있다. 시한을 둘지는 이벤트 지연 실측과 함께 판단한다. — Claude
+- **Safari·아이폰 실기 미확인**: 도구 불러오기 복구는 Playwright WebKit 26.6(Docker 원격 서버)·Chromium·Firefox 에서 503 1회/2회로 확인했다. 실제 Safari·iOS 기기에서는 확인하지 않았다. — Claude
+- **HWP 편집기 영어 화면의 내장 메뉴**: 영어권 개방 뒤 호스트 화면은 영어지만 내장 rhwp Studio 메뉴·도구 모음은 한국어다(외부 구성요소). 영어 사용자 안내 문구를 둘지는 사용자 결정. — Claude
+- **기존 시험 문제(Linux 재검사에서 확인, 이번 출고와 무관)**:
+  - `npm run test:browser` 전체 범위의 PDF 편집기 구간이 화면에 없는 `[data-pdf-nav-mode="image-to-pdf"]` 탭을 찾다 멈춘다. 분기점 37d67b8e 에도 그 탭이 없다. 출고 검사는 TEST_SCOPE=excel·word 로 대신했다.
+  - `tests/raster-ocr-panel-smoke.mjs` 의 caller 예산 단언이 옛 256MiB 기준이다. OCR 예산은 b71f872 에서 `IMAGE_LIMITS.memoryBytes`(1.5GiB)로 바뀌었다. git 제외 하네스(`docs/jobs/todo/diffchecker-port-20261023/raster-ocr-harness.html`)에도 기대고 있다. 단언을 고칠지는 사용자 결정 대기.
+  - `tests/direct-entry-ocr-cancel-smoke.mjs` 는 저장소에 없는 `/tmp/worklazy-u9-core/browser/input.pdf` 고정 입력이 필요하다. 3쪽 PDF를 만들어 넣어도 41행 대기에서 시간 초과가 나며, 분기점 37d67b8e 에서도 같다. 원인 미확인. — Claude
+
 ## Diffchecker 이식 수리 후속 (2026-10-25)
 
 - **열이 바뀐 표의 칸 단위 기록**: 지금은 표 전체 교체로 기록한다(실제 문서에서 칸 단위 기록은 칸 너비 tcW가 새 격자에 맞지 않아 Word 결과가 어긋남). 칸 너비를 격자에 맞추면 바뀐 열만 표시하는 칸 단위 기록으로 되돌릴 수 있다. — Claude
