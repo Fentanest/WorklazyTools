@@ -53,7 +53,7 @@ async function attempt(name, profile, action, { storageThrows = false } = {}) {
         errorSeen = true; window.recordRecovery({ kind: "routeErrors", path: location.pathname });
       }
       const recovery = document.querySelector("[data-route-recovering]");
-      if (recovery && !recoverySeen) { recoverySeen = true; window.recordRecovery({ kind: "recovering", text: recovery.textContent, role: recovery.getAttribute("role") }); }
+      if (recovery && !recoverySeen) { recoverySeen = true; window.recordRecovery({ kind: "recovering", text: recovery.querySelector("p")?.textContent, role: recovery.getAttribute("role") }); }
     }).observe(document, { subtree: true, attributes: true, childList: true });
   }, { storageThrows });
   const page = await context.newPage();
@@ -136,6 +136,36 @@ try {
         assert.equal(record.routeErrors.length, 0, "no transient error copy or error document");
         assert.ok(record.recovering.length > 0);
         assert.ok(record.recovering.every((item) => item.role === "status" && item.text === "Reloading…"));
+      });
+      if (profile === "desktop") await attempt("A-cancelled-reload-home", profile, async ({ page, record }) => {
+        await home(page);
+        // Match AppShell's unsaved-work guard, with real browser activation.
+        await page.evaluate(() => window.addEventListener("beforeunload", (event) => event.preventDefault()));
+        await page.click("body");
+        let failures = 0;
+        await page.route("**/assets/AudioStudioPage-*.js", async (route) => {
+          if (failures++ === 0) await route.abort("failed"); else await route.continue();
+        });
+        const confirmation = page.waitForEvent("dialog").then(async (dialog) => {
+          assert.equal(dialog.type(), "beforeunload");
+          await dialog.dismiss();
+        });
+        await navigate(page, "/en/tools/audio-studio/");
+        await confirmation;
+        const recovery = page.locator("[data-route-recovering]");
+        await recovery.waitFor();
+        assert.equal(await recovery.getAttribute("role"), "status");
+        assert.equal(record.routeErrors.length, 0);
+        assert.equal(automaticReloads(record), 0, "cancelled reload leaves the current document");
+        assert.equal(record.storage.filter((item) => item.action === "set").length, 1, "no repeated automatic attempt");
+        const homeButton = recovery.getByRole("button", { name: "Go Home", exact: true });
+        assert.equal(await homeButton.count(), 1, "cancelled recovery must offer an exit");
+        await page.screenshot({ path: path.join(output, "desktop-A-cancelled-reload-home-recovering.png") });
+        page.once("dialog", (next) => void next.accept());
+        await homeButton.click();
+        await page.locator(".home-page").waitFor();
+        assert.equal(new URL(page.url()).pathname, "/en/");
+        assert.equal(automaticReloads(record), 0, "manual home does not retry the failed tool");
       });
       await attempt("A-storage-throws", profile, async ({ page, record }) => {
         await home(page); server.state.fault = "404";

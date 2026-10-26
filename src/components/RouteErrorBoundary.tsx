@@ -70,7 +70,7 @@ function RouteFailure({ recovering }: { recovering: boolean }) {
     <div className="page tool-page tool-route-loading outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring" role={recovering ? "status" : "alert"} tabIndex={-1} ref={notice} data-route-error={recovering ? undefined : true} data-route-recovering={recovering ? true : undefined}>
       <div className="grid max-w-lg gap-4 px-4 text-center text-foreground">
         <p>{t(recovering ? "recovery.reloading" : "recovery.toolFailed")}</p>
-        {!recovering && <Button type="button" onClick={goHome}>{t("recovery.goHome")}</Button>}
+        <Button type="button" onClick={goHome}>{t("recovery.goHome")}</Button>
       </div>
     </div>
   );
