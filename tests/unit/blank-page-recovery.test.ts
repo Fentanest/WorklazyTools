@@ -64,6 +64,24 @@ test("only the same rejection shares recovery; browser import errors work withou
   for (const message of ["Failed to fetch", "Cannot read properties of undefined", "render failed"]) assert.equal(api.recoverChunkError(new Error(message)), false);
 });
 
+test("a failed WebKit preload refresh spends the existing budget without reloading past a second failure", async () => {
+  const entries = new Map<string, string>();
+  const listeners = new Map<string, (event: any) => void>();
+  const calls: unknown[] = [];
+  const location = { pathname: "/ko/tools/pdf-editor/", search: "", reload: () => calls.push("reload") };
+  const context = vm.createContext({ exports: {}, window: { location, addEventListener: (name: string, listener: (event: any) => void) => listeners.set(name, listener) }, document: { querySelector: (selector: string) => selector.startsWith("link") }, sessionStorage: {
+    getItem: (key: string) => entries.get(key), setItem: (key: string, value: string) => entries.set(key, value),
+  }, fetch: async (url: string, options: { cache: string }) => { calls.push([url, options.cache, [...entries.values()]]); return { ok: false }; } });
+  vm.runInContext(compile(read("src/app/chunkRecovery.ts")), context);
+  const api = context.exports;
+  api.installChunkRecovery();
+  const first = new TypeError("Importing a module script failed.");
+  const recovery = api.recoverChunkError(first, true);
+  listeners.get("error")!({ target: { tagName: "LINK", rel: "modulepreload", href: "https://test/tool.js" } });
+  const results = [await recovery, await api.recoverChunkError(new TypeError(first.message))];
+  assert.deepEqual({ results, calls }, { results: [false, false], calls: [["https://test/tool.js", "reload", ["pending"]]] });
+});
+
 test("Office/XLS reloadOnce suppresses same path+search and tolerates all storage access failures", async () => {
   const source = read("src/features/office-editor/office_coi_serviceworker.js");
   const store = new Map();

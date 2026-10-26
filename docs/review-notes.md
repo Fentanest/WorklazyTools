@@ -5,6 +5,8 @@
 
 R1 수리: 실제 이동 여부와 무관하게 남는 복구 상태에서 홈 버튼을 숨긴 조건만 제거했다. 취소·지연·거부·Office 준비 미완료의 공통 출구를 제공하며 정상 복구의 상태 문구·오류 표식 부재·기존 예산과 소유권은 유지한다. 전후 재현과 검사 원로그는 `docs/jobs/todo/tool-load-recovery-20261026/evidence-r1/`에 보존한다. — Codx
 
+W1 수리: WebKit 270357의 실패 preload 메모리 캐시 재사용을 공식 원문·서버 REQ로 확인했다. import 거부보다 늦게 오는 link 오류 이벤트를 기다려 실패 URL만 cache:reload로 재요청하고, 실패하면 추가 reload 없이 종료한다. 기존 키·Office/XLS 소유자·Chromium/Firefox 경로를 유지하며, 타이머 후보의 실패까지 `docs/jobs/todo/tool-load-recovery-20261026/evidence-r2/`에 보존한다. — Codx
+
 기준 `16e52d3`에서 Vite의 새로고침과 공통 경계의 오류 문서 이동이 경쟁했다. PDF 편집기·문서 비교·이미지 편집의 0/150/400ms × 실패 1/2회 18건을 수정 전/후 같은 preview 재현기로 대조했다. 수정 전 150/400ms의 1회 실패는 모두 오류 문서로 갔고, 수정 후 첫 실패 9건은 오류 표시 없이 열리며 두 번째 실패 9건은 오류 문서로 종료했다. 내부 PdfFinishPanel 1회 실패도 복구했다.
 
 경로와 오류 객체가 같은 거부만 진행 중 복구를 공유하고, 경계는 첫 commit부터 한·영 상태 문구를 표시한다. Vite 이벤트 없는 import 거부, 저장소 예외, 일반 렌더 오류, D3/D4, 광고 비적격 처리와 ToolReady 예산 해제를 유지했다. Redactor는 별도 새로고침 소유자가 없는 CSP 문서여서 일반 복구에 포함했다. Office·문서→PDF·XLS 보존은 기존 COI 키를 사용하며 조각 재시도 값만 ToolReady까지 유지한다. 활성화 전 조각 실패가 준비 예산을 먼저 소비하는 순서를 재현해, 소유자의 활성화 결과를 기다린 뒤 한 번만 이동하도록 했다. worker의 fetch/cache 분기는 byte 동일하다. 비공개 Video Studio는 실제 접근도 미제공 화면이며 isolation meta·도구 조각 요청 0개였다.

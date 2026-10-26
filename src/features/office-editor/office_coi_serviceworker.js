@@ -46,13 +46,15 @@ if (typeof window === 'undefined') {
   const isolationReady = window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
   let reloading = false;
   let chunkFailurePending = false;
+  let prepareChunkReload;
+  let reloadResult = true;
   const reloadOnce = (chunkFailure = false) => {
     try {
       const used = sessionStorage.getItem(reloadKey);
       if (reloading) {
         // A chunk rejection can join the preparation reload already in flight.
         if (chunkFailure && used !== chunkTarget) sessionStorage.setItem(reloadKey, chunkTarget);
-        return true;
+        return reloadResult;
       }
       if (used === reloadTarget || used === chunkTarget) return false;
       sessionStorage.setItem(reloadKey, chunkFailure ? chunkTarget : reloadTarget);
@@ -61,8 +63,11 @@ if (typeof window === 'undefined') {
       return false;
     }
     reloading = true;
-    configuration.doReload();
-    return true;
+    const reload = () => { configuration.doReload(); return true; };
+    reloadResult = chunkFailure && prepareChunkReload
+      ? prepareChunkReload().then((ready) => ready && reload())
+      : reload();
+    return reloadResult;
   };
   const reloadWhenActivated = (worker) => new Promise((resolve) => {
     if (!worker) { resolve(false); return; }
@@ -87,8 +92,9 @@ if (typeof window === 'undefined') {
       }, () => false)
       : Promise.resolve(false);
   window.worklazyDocumentRecovery = {
-    reloadForChunk: async () => {
+    reloadForChunk: async (prepare) => {
       chunkFailurePending = true;
+      prepareChunkReload = prepare;
       // Share the preparation reload, after activation; never spend its budget
       // on a new document that is still unable to use the isolated workspace.
       return Boolean(await preparation) && reloadOnce(true);
