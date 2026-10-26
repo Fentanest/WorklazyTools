@@ -22,8 +22,6 @@
 - **Safari·아이폰 실기 미확인**: 도구 불러오기 복구는 Playwright WebKit 26.6(Docker 원격 서버)·Chromium·Firefox 에서 503 1회/2회로 확인했다. 실제 Safari·iOS 기기에서는 확인하지 않았다. — Claude
 - **HWP 편집기 영어 화면의 내장 메뉴**: 영어권 개방 뒤 호스트 화면은 영어지만 내장 rhwp Studio 메뉴·도구 모음은 한국어다(외부 구성요소). 영어 사용자 안내 문구를 둘지는 사용자 결정. — Claude
 - **기존 시험 문제(Linux 재검사에서 확인, 이번 출고와 무관)**:
-  - `npm run test:browser` 전체 범위의 PDF 편집기 구간이 화면에 없는 `[data-pdf-nav-mode="image-to-pdf"]` 탭을 찾다 멈춘다. 분기점 37d67b8e 에도 그 탭이 없다. 출고 검사는 TEST_SCOPE=excel·word 로 대신했다.
-  - `tests/raster-ocr-panel-smoke.mjs` 의 caller 예산 단언이 옛 256MiB 기준이다. OCR 예산은 b71f872 에서 `IMAGE_LIMITS.memoryBytes`(1.5GiB)로 바뀌었다. git 제외 하네스(`docs/jobs/todo/diffchecker-port-20261023/raster-ocr-harness.html`)에도 기대고 있다. 단언을 고칠지는 사용자 결정 대기.
   - `tests/direct-entry-ocr-cancel-smoke.mjs` 는 저장소에 없는 `/tmp/worklazy-u9-core/browser/input.pdf` 고정 입력이 필요하다. 3쪽 PDF를 만들어 넣어도 41행 대기에서 시간 초과가 나며, 분기점 37d67b8e 에서도 같다. 원인 미확인. — Claude
 
 ## Diffchecker 이식 수리 후속 (2026-10-25)
@@ -46,8 +44,7 @@
 - **기본 모드와 기존 변경 기록**: 입력에 변경 기록이 있으면 기본 모드는 수정본 기록을 유지하므로 Word의 모두 거절이 그 기록까지 되돌린다. 기존 기록을 먼저 수락하는 선택은 정확하다. 화면 안내 문구 점검 대상. — Claude
 - **문서 속성에 연결된 내용 컨트롤**: Word가 docProps 값으로 다시 채우므로 원본 쪽 표시는 수정본 속성값이 된다(w047·w048 글상자). — Claude
 - **Linux 재실행**: Windows에서 실행한 검사(단위·Word 노드·코퍼스 하네스)는 Linux 호스트에서 다시 돌려야 한다. Word 오라클은 Windows 전용 도구다. — Claude
-- **PDF 편집기 브라우저 시험의 낡은 선택자**: `test:browser` 전체(PDF 범위)가 `.pdf-tool-navigation [data-pdf-nav-mode="image-to-pdf"]`를 찾지 못해 멈춘다. main 92c21ca 개발 서버에서도 같은 단계에서 실패해 이번 수리와 무관한 기존 상태로 판정했다(PDF 편집기·변환기 파일 변경 없음). Word·Excel 범위는 통과. — Claude
-- **Linux 전용 경로를 쓰는 시험**: `image-compare-history-ui`·`raster-ocr-panel`·`direct-entry-ocr-cancel` 등은 `/usr/bin/google-chrome`·`/tmp/...` 고정 경로나 gitignored 하네스에 기대어 Windows에서 실행하지 못했다. Linux 재실행에서 확인한다. `image-ocr-smoke`의 보기 전환 단계는 Windows 글꼴에서 고정 머리글이 단추를 가려 기준·후보가 같이 실패했다. — Claude
+- **Linux 전용 경로를 쓰는 시험**: `image-compare-history-ui`·`direct-entry-ocr-cancel` 등은 `/usr/bin/google-chrome`·`/tmp/...` 고정 경로에 기대어 Windows에서 실행하지 못했다. Linux 재실행에서 확인한다. `image-ocr-smoke`의 보기 전환 단계는 Windows 글꼴에서 고정 머리글이 단추를 가려 기준·후보가 같이 실패했다. — Claude
 - **HWP 읽기 실패 표본**: 동치 확인 12쌍 중 5쌍은 기준·후보 모두 「HWP 문서를 읽지 못했습니다」였다(같은 결과라 동치). 오래된 HWP 형식 지원 여부는 별도 확인 대상이다. — Claude
 - **환경 의존 실패**: `bundle-output-metadata` 단위 시험은 Windows에서 TMP가 짧은 경로(ADMINI~1)일 때 실패한다(긴 경로에서 통과, 기준 코드도 같음). `image-alignment-smoke`는 서버 기동 직후 1회 실패 후 연속 통과. — Claude
 

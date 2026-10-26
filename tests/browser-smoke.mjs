@@ -290,9 +290,11 @@ async function testPdfTools(page, fixtures, tempDir) {
     && document.activeElement?.classList.contains("pdf-mobile-output-summary"));
   await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
 
-  await navigatePdfTab(page, "/tools/pdf-editor/image-to-pdf", "image-to-pdf", "image/jpeg");
+  await navigateTo(page, `${koBaseUrl}/tools/pdf-converter/`);
+  await navigatePdfTab(page, "/tools/pdf-converter/image-to-pdf", "image-to-pdf", "image/jpeg");
   await (await page.$('input[type="file"][accept*="image/jpeg"]')).uploadFile(fixtures.tinyPng);
   await page.waitForSelector(".pdf-image-card");
+  await page.waitForSelector("[data-testid='pdf-output-card'] [data-ui-component=primary-button]:not(:disabled)");
   await clickPrimaryAction(page);
   await waitForResult(page);
   const imagePdfPath = path.join(tempDir, "image.pdf");
@@ -300,7 +302,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const imagePdf = await PDFDocument.load(await fs.readFile(imagePdfPath));
   if (imagePdf.getPageCount() !== 1) throw new Error("Image-to-PDF did not create one page.");
 
-  await navigatePdfTab(page, "/tools/pdf-editor/pdf-to-image", "pdf-to-image", "application/pdf");
+  await navigatePdfTab(page, "/tools/pdf-converter/pdf-to-image", "pdf-to-image", "application/pdf");
   await (await page.$('input[type="file"]')).uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
   await clickPrimaryAction(page);
@@ -311,7 +313,7 @@ async function testPdfTools(page, fixtures, tempDir) {
   const pngNames = Object.keys(imageZip.files).filter((name) => name.endsWith(".png"));
   if (pngNames.length !== 2) throw new Error(`PDF-to-image ZIP has ${pngNames.length} PNG files instead of 2.`);
 
-  await navigatePdfTab(page, "/tools/pdf-editor/convert", "convert", "application/pdf");
+  await navigatePdfTab(page, "/tools/pdf-converter/pdf-to-document", "pdf-to-document", "application/pdf");
   const convertInput = await page.$('input[type="file"]');
   await convertInput.uploadFile(fixtures.textPdf);
   await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 2);
@@ -327,7 +329,13 @@ async function testPdfTools(page, fixtures, tempDir) {
     throw new Error("PDF-to-DOCX output did not contain text from both pages.");
   }
 
-  const xlsxButton = await page.$('.pdf-format-grid button:nth-child(2)');
+  // XLSX extracts detected tables, not one text worksheet per PDF page.
+  await page.$eval('[data-ui-component="file-list"] button', (button) => button.click());
+  await page.waitForSelector(".pdf-page-card", { hidden: true });
+  await convertInput.uploadFile(path.resolve("tests/fixtures/document-conversion-engines/two-table-pages.pdf"));
+  await page.waitForFunction(() => document.querySelectorAll('.pdf-page-source[title="two-table-pages.pdf"]').length === 2
+    && !document.querySelector("[data-testid='pdf-output-card'] [data-ui-component=primary-button]")?.disabled);
+  const xlsxButton = await findButtonByText(page, '.pdf-format-grid button > strong', "XLSX");
   if (!xlsxButton) throw new Error("PDF XLSX format button was not found.");
   await xlsxButton.click();
   await clickPrimaryAction(page);
@@ -336,11 +344,18 @@ async function testPdfTools(page, fixtures, tempDir) {
   await saveBlobLink(page, "[data-testid='pdf-download']", xlsxPath);
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await fs.readFile(xlsxPath));
-  if (workbook.worksheets.length !== 2 || !workbook.worksheets[0].getCell("A1").text.includes("First PDF page")) {
-    throw new Error("PDF-to-XLSX output did not preserve page worksheets and text.");
+  if (workbook.worksheets.map((sheet) => sheet.name).join(",") !== "Table 1 (Source 1),Table 2 (Source 2)"
+    || workbook.worksheets.some((sheet) => sheet.getCell("A1").text !== "Item" || sheet.getCell("B1").text !== "Count"
+      || sheet.getCell("A2").text !== "Apples" || sheet.getCell("B2").text !== "42")) {
+    throw new Error("PDF-to-XLSX output did not preserve both source tables and their cells.");
   }
 
-  const txtButton = await page.$('.pdf-format-grid button:nth-child(3)');
+  await page.$eval('[data-ui-component="file-list"] button', (button) => button.click());
+  await page.waitForSelector(".pdf-page-card", { hidden: true });
+  await convertInput.uploadFile(fixtures.textPdf);
+  await page.waitForFunction((name) => document.querySelectorAll(`.pdf-page-source[title="${name}"]`).length === 2
+    && !document.querySelector("[data-testid='pdf-output-card'] [data-ui-component=primary-button]")?.disabled, {}, path.basename(fixtures.textPdf));
+  const txtButton = await findButtonByText(page, '.pdf-format-grid button > strong', "TXT");
   if (!txtButton) throw new Error("PDF TXT format button was not found.");
   await txtButton.click();
   await clickPrimaryAction(page);
@@ -374,7 +389,7 @@ async function navigateTo(page, url) {
 }
 
 async function navigatePdfTab(page, pathname, mode, acceptedType) {
-  await page.$eval(`.pdf-tool-navigation [data-pdf-nav-mode="${mode}"]`, (link) => link.click());
+  await page.$eval(`.pdf-tool-navigation a[href="/ko${pathname}"]`, (link) => link.click());
   await page.waitForFunction((expectedPath, expectedMode, expectedType) => {
     const panel = document.querySelector(`.pdf-tool-page[data-pdf-mode="${expectedMode}"]`);
     const input = document.querySelector(".pdf-tool-page input[type='file']");
@@ -816,7 +831,8 @@ async function testExcelSheetGridLayout(page, fixtures) {
   }
 
   await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
-  await new Promise((resolve) => setTimeout(resolve, 100));
+  // The Button transitions its min-height when the mobile breakpoint changes.
+  await page.waitForFunction(() => document.querySelector("[data-testid='excel-sheet-file-group']:first-child [data-testid='excel-sheet-name-chip']")?.getBoundingClientRect().height >= 44, { timeout: 5_000 });
   await page.evaluate(() => {
     document.documentElement.style.scrollBehavior = "auto";
     const summary = document.querySelector("[data-testid='excel-mobile-sheet-summary']");
@@ -1435,7 +1451,7 @@ async function createFixtures(directory) {
   const secondPdfPage = pdf.addPage([600, 400]);
   secondPdfPage.drawText("Second PDF page", { x: 48, y: 330, size: 18, font, color: rgb(0.1, 0.1, 0.1) });
   await fs.writeFile(textPdf, await pdf.save());
-  await fs.writeFile(tinyPng, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zk90AAAAASUVORK5CYII=", "base64"));
+  await fs.writeFile(tinyPng, Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGP4/x8AAwAB//wl3FEAAAAASUVORK5CYII=", "base64"));
 
   return { xlsxOne, xlsxTwo, csv, xls, xlsb, xlsm, encryptedXlsx, sheetSelectionXlsx, sheetGridXlsx, sheetGridLongFileName, sheetGridLongSheetName, sheetTrimXlsx, themeXlsxOne, themeXlsxTwo, beforeDocx, afterDocx, beforeDocxTwo, afterDocxTwo, boundaryBeforeDocx, boundaryAfterDocx, formattingBeforeDocx, formattingAfterDocx, revisionsBeforeDocx, revisionsAfterDocx, revisionOracle: revisionFixtures.oracle, textPdf, tinyPng };
 }
