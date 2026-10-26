@@ -1,5 +1,6 @@
 # CHANGELOG
 
+- FolioTrace 옛 서버 수집 파이프라인 삭제(P4): `pipeline/foliotrace/`, `scripts/foliotrace/`, `tests/foliotrace/` 41개 파일과 `npm run test:foliotrace`를 제거했다. 수집·판독·평가·게시는 `foliotrace-pipeline` 저장소가 맡고 사이트는 공개 JSON만 읽는다. 저장소 소유자가 `foliotrace-data` 브랜치와 Actions 시크릿 `DART_API_KEY`를 삭제해야 한다(미배포). — Claude(Sonnet)
 - FolioTrace 화면 배치 개선: 카드 나열을 정보 묶음으로 바꿨다. 머리말 기준일 목록, 핵심 수치 한 묶음(평가금액·평가 종목·반영 공시), 2단(상위 종목 순위·집중도 한 줄 / 최근 공시 변화 + 평가 제외 사유별 개수), 촘촘한 종목 표(증감색·알약 필터·이름 아래 보정·제외 사유), 계산 방법 3단, 휴대폰 두 줄 목록. 검색·정렬·상세·추이·전체 공시·FAQ·상장폐지 참고는 유지, 데이터 계약 불변(미배포). — Claude(Sonnet)
 
 - 도구 조각의 첫 일시 로드 실패는 오류 화면 대신 한·영 재로딩 상태에서 한 번 복구한다. 재실패·저장소 불가·일반 렌더 오류는 기존 오류 화면으로 종료하며, 격리 문서는 준비 소유자의 예산과 활성화 순서를 유지한다(미배포). — Codx

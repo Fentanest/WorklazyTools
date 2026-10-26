@@ -53,9 +53,9 @@
 3. `Deploy site`를 `mode=validate`로 수동 실행해 키·체크아웃·검증·빌드·테스트 통과를 확인한다(기본 `Ubuntu24-Git`, 장애 시 수동 `runner=github-hosted`).
 4. (이력: 옛 워크플로 비활성 단계는 `deploy-pages.yml` 삭제(2026-10-25)로 불필요해졌다.) `deploy-site.yml`을 `mode=deploy`로 수동 1회 실배포 → 사이트 값·날짜 확인.
 5. 전환: 저장소 변수 `FOLIOTRACE_DEPLOY_V2=true`(main push 자동 배포 켬), 시작용 토큰을 호스트에 두고 오케스트레이터 dispatch를 켠다. 이후 main push와 오케스트레이터의 dispatch(mode=deploy)로 배포된다.
-6. 안정 확인(예: 연속 정상 배포 3일) 뒤 P4: `foliotrace-data` 브랜치 정리와 DART 시크릿 삭제는 남아 있다(`deploy-pages.yml`·`foliotrace-*.yml` 파일은 삭제 완료). `Ubuntu24-Git` 러너는 해제하지 않고 아래 규정으로 계속 쓴다.
+6. 안정 확인(예: 연속 정상 배포 3일) 뒤 P4: 옛 서버 수집 코드(`pipeline/foliotrace/`·`scripts/foliotrace/`·`tests/foliotrace/`)는 2026-10-26 삭제됐다(수집·판독·평가·게시는 별도 저장소 `foliotrace-pipeline`로 이동). 저장소 소유자가 직접 해야 할 일: `foliotrace-data` 브랜치 삭제와 Actions 시크릿 `DART_API_KEY` 삭제(Claude는 삭제하지 않음). `Ubuntu24-Git` 러너는 해제하지 않고 아래 규정으로 계속 쓴다.
 
-**되돌리기**: 옛 `deploy-pages.yml` 삭제(2026-10-25)로 옛 워크플로 재활성 경로는 없다. 문제가 생기면 변수를 지우거나 false로 해 main push 자동 배포를 끄고 `deploy-site.yml`을 `mode=validate`로 확인한다(옛 `foliotrace-data` 브랜치와 상태는 P4 전까지 보존).
+**되돌리기**: 옛 `deploy-pages.yml` 삭제(2026-10-25)로 옛 워크플로 재활성 경로는 없다. 문제가 생기면 변수를 지우거나 false로 해 main push 자동 배포를 끄고 `deploy-site.yml`을 `mode=validate`로 확인한다(옛 `foliotrace-data` 브랜치는 소유자 삭제 전까지 남아 있으나 사이트는 쓰지 않는다).
 
 **수동 실행 주의**: `workflow_dispatch` 실배포(`mode=deploy`)는 "최신 main" 가드를 일부러 우회한다(선택한 ref를 그대로 배포). 옛 워크플로가 비활성인지 확인하고, main이 아닌 ref로 실배포하지 않는다.
 
@@ -65,7 +65,7 @@
 옛 공개본의 `history`(8건)는 이어받지 않는다. 새 생산자는 첫 전달부터 새 이력을 쌓는다. 화면은 이미 "같은 방식으로 계산한 기록이 더 쌓이면 추이를 보여 드립니다"(기록 1건) / "같은 계산 기준의 실제 기록이 두 번 이상 쌓이면 표시합니다"(설명)를 쓰므로 별도의 "집계 기준 변경" 표기를 추가하지 않았다.
 
 ## 화면 쪽에서 끊은 것
-새 워크플로는 `scripts/foliotrace/folio.py`·`pipeline/foliotrace/publish.py`·`nps_pipeline_adapter.py`를 호출하지 않는다(정적 요약 삽입은 `scripts/foliotrace-static-summary.mjs`로 대체). 파일 삭제와 시험 이전은 P4. `npm run test:foliotrace`는 옛 워크플로 전용으로 남고, 새 워크플로는 `tests/unit/foliotrace-*.test.ts`를 `test:unit`으로 돌린다.
+옛 수집 파이프라인(`scripts/foliotrace/folio.py`, `pipeline/foliotrace/*`)과 파이썬 시험(`tests/foliotrace`, `npm run test:foliotrace`)은 2026-10-26 P4로 이 저장소에서 삭제했고 `foliotrace-pipeline` 저장소로 옮겼다. 사이트는 공개 JSON만 읽으며 정적 요약 삽입은 `scripts/foliotrace-static-summary.mjs`가 한다. 새 워크플로는 `tests/unit/foliotrace-*.test.ts`를 `test:unit`으로 돌린다.
 
 ## 러너 규정 (사용자 결정 2026-10-25)
 - `deploy-site.yml`의 build·deploy 두 잡과 `product-banner-tests.yml`은 자체 러너 `Ubuntu24-Git`(라벨 self-hosted, Linux, X64, 235)에서 돈다. 수동 실행의 `runner=github-hosted` 입력은 이 장비가 꺼졌을 때의 우회로이며 두 잡이 같은 선택을 따른다(오케스트레이터는 mode/data_revision만 보내 기본값을 쓴다).
