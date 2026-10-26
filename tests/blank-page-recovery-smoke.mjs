@@ -272,8 +272,7 @@ try {
     if (!only || only === "normal") {
       for (const language of ["ko", "en"]) for (const tool of availableToolRoutes) await attempt(`normal-${language}-${tool.toolId}`, profile, async ({ page, record }) => {
         await page.goto(`${server.url}/${language}${tool.path.replace(/\/$/, "")}/`);
-        if (language === "en" && tool.toolId === "hwp-editor") await page.locator(".tools-index-page").waitFor();
-        else if (tool.toolId === "excel-merger") await page.locator(".ui-page-header").waitFor();
+        if (tool.toolId === "excel-merger") await page.locator(".ui-page-header").waitFor();
         else await page.locator(`[data-tool-page="${tool.toolId}"]`).waitFor();
         assert.equal(await page.locator("[data-route-error]").count(), 0);
         assert.equal(record.helpShown.length, 0);

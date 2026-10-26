@@ -22,9 +22,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
     if (nextLanguage === language) return;
     storeLanguage(nextLanguage);
     const currentPath = normalizeToolPath(stripLanguagePrefix(location.pathname));
-    const destination = nextLanguage === "en" && currentPath === "/tools/hwp-editor"
-      ? localizedPath(nextLanguage, "/tools")
-      : localizedPath(nextLanguage, currentPath);
+    const destination = localizedPath(nextLanguage, currentPath);
     if (isRedactorDocument() || isRedactorPath(location.pathname)) { window.location.assign(`${withSiteBasePath(destination, import.meta.env.BASE_URL)}${location.search}${location.hash}`); return; }
     navigate(`${destination}${location.search}${location.hash}`);
   };

@@ -17,7 +17,6 @@ export function useToolCatalog() {
       description: t(`categories.${category.id}.description`),
     }));
     const localizedTools: ToolDefinition[] = tools
-      .filter((tool) => language === "ko" || tool.id !== "hwp-editor")
       .map((tool) => ({
         ...tool,
         path: localizedPath(language, tool.path),

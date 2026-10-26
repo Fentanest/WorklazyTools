@@ -46,7 +46,6 @@ const manifestPaths = new Set(manifest.map((row) => row.path.slice(1)));
 const exceptionPaths = new Set(exceptionList.map((entry) => String(entry.path).replace(/^\//, "")));
 
 const EXPECTED_EXCEPTIONS = new Set([
-  "tools/hwp-editor", // en unavailable
   "tools/document-compare/results/:pairNumber", // session-only, no static
   "tools/office-editor/app", // isolated, noindex
   "tools/excel-merger/xls-preserve", // isolated, noindex
@@ -209,6 +208,14 @@ for (const row of manifest) {
   const unprefixed = path.join(root, "dist", row.path.slice(1), "index.html");
   if (!fs.existsSync(unprefixed)) fail(`Missing unprefixed redirect: ${row.path.slice(1)}/`);
 }
+
+for (const language of ["ko", "en"]) {
+  const route = "tools/hwp-editor";
+  if (!foundRoutes.get(route)?.has("src/app/App.tsx")) fail(`Missing HWP App route: ${route}`);
+  const file = path.join(root, "dist", language, route, "index.html");
+  if (!fs.existsSync(file)) fail(`Missing deployed HWP document: ${language}/${route}/`);
+}
+console.log("HWP direct-entry coverage: 2 locales (ko, en), App route and deployed static documents.");
 
 if (scanned === 0) fail("Scanner executed over 0 files.");
 console.log(`Direct-entry audit: ${scanned} executing sources, ${foundRoutes.size} route strings, ${manifest.length} manifest rows, ${exceptionPaths.size} exceptions.`);
