@@ -29,8 +29,10 @@ import {
   filingChangesForHoldings,
   filterHoldings,
   formatKstTimestamp,
+  formatCount,
   formatKrw,
   formatPct,
+  formatPctShort,
   formatQty,
   hasReceiptNo,
   holdingStatus,
@@ -484,9 +486,9 @@ const EVENT_KIND: Record<Lang, Record<FilingEvent["kind"], string>> = {
   },
 };
 
-function observedPercent(value: string | null, kind?: Holding["ownershipNumericKind"]): string {
+function observedPercent(value: string | null, kind?: Holding["ownershipNumericKind"], short = false): string {
   if (value === null) return "—";
-  const rendered = formatPct(value);
+  const rendered = short ? formatPctShort(value) : formatPct(value);
   if (kind === "lower_bound") return `≥${rendered}`;
   if (kind === "upper_bound") return `≤${rendered}`;
   if (kind === "estimated") return `≈${rendered}`;
@@ -660,7 +662,7 @@ function ReadyView({
   );
   const eventsDescription = t.eventsDesc
     .replace("{shown}", String(recentEvents.length))
-    .replace("{total}", String(snapshot.events.length));
+    .replace("{total}", formatCount(snapshot.events.length));
 
   const selected: Holding | null =
     selectedCode === null ? null : (snapshot.holdings.find((h) => h.stockCode === selectedCode) ?? null);
@@ -755,22 +757,22 @@ function ReadyView({
             {snapshot.estimatedValue !== null && <>{breakableValue(formatKrw(snapshot.estimatedValue, lang))}</>}
             {snapshot.valuationCoverage === "unavailable"
               ? ` ${t.unavailableReasonComplete}`
-              : unconfirmedCount > 0 ? ` · ${t.figExcluded.replace("{n}", String(unconfirmedCount))}` : ""}
+              : unconfirmedCount > 0 ? ` · ${t.figExcluded.replace("{n}", formatCount(unconfirmedCount))}` : ""}
           </span>
         </div>
         <div className="foliotrace-figure">
           <span className="foliotrace-figure-label">{t.figPriced}</span>
           <strong className="foliotrace-figure-value foliotrace-num">
-            {snapshot.pricedCount}<span className="foliotrace-figure-unit"> / {snapshot.trackedCount}</span>
+            {formatCount(snapshot.pricedCount)}<span className="foliotrace-figure-unit"> / {formatCount(snapshot.trackedCount)}</span>
           </strong>
           <span className="foliotrace-figure-sub">
-            {ratioAdjustedPriced > 0 ? t.figRatio.replace("{n}", String(ratioAdjustedPriced)) : snapshot.valuationTradeDate ?? ""}
+            {ratioAdjustedPriced > 0 ? t.figRatio.replace("{n}", formatCount(ratioAdjustedPriced)) : snapshot.valuationTradeDate ?? ""}
           </span>
         </div>
         <div className="foliotrace-figure">
           <span className="foliotrace-figure-label">{t.figEvents}</span>
           <strong className="foliotrace-figure-value foliotrace-num">
-            {eventRange?.count ?? 0}{t.figEventsUnit && <span className="foliotrace-figure-unit">{t.figEventsUnit}</span>}
+            {formatCount(eventRange?.count ?? 0)}{t.figEventsUnit && <span className="foliotrace-figure-unit">{t.figEventsUnit}</span>}
           </strong>
           <span className="foliotrace-figure-sub foliotrace-num">
             {eventRange ? `${eventRange.from} ~ ${eventRange.to}` : `${t.lastChange}: ${snapshot.latestReceiptDate ?? "—"}`}
@@ -851,7 +853,7 @@ function ReadyView({
                     <span className="foliotrace-bar-track" role="img" aria-label={`${h.name} ${formatPct(h.portfolioWeightPercent)}`}>
                       <span className="foliotrace-bar-fill" style={{ width: `${maxWeight > 0 ? (w / maxWeight) * 100 : 0}%` }} />
                     </span>
-                    <span className="foliotrace-num foliotrace-bar-value">{formatPct(h.portfolioWeightPercent)}</span>
+                    <span className="foliotrace-num foliotrace-bar-value" title={formatPct(h.portfolioWeightPercent)}>{formatPctShort(h.portfolioWeightPercent)}</span>
                     <span className="foliotrace-num foliotrace-bar-amount">{amountText(h)}</span>
                   </li>
                 );
@@ -867,7 +869,7 @@ function ReadyView({
             <div className="foliotrace-block-head">
               <h2 id="foliotrace-recent-h" className="foliotrace-h2">{t.eventsTitle}</h2>
               <a className="foliotrace-more-link" href="#foliotrace-events">
-                {t.eventsAll.replace("{total}", String(snapshot.events.length))}
+                {t.eventsAll.replace("{total}", formatCount(snapshot.events.length))}
               </a>
             </div>
             {recentSummary.length === 0 ? (
@@ -886,7 +888,7 @@ function ReadyView({
                       </span>
                       <span className="foliotrace-recent-value foliotrace-num">
                         <FilingChangeValue
-                          value={event.companyOwnershipPercent === null ? "—" : observedPercent(event.companyOwnershipPercent, event.numericKind)}
+                          value={event.companyOwnershipPercent === null ? "—" : observedPercent(event.companyOwnershipPercent, event.numericKind, true)}
                           direction={direction} upLabel={t.changeUp} downLabel={t.changeDown} />
                       </span>
                     </li>
@@ -898,10 +900,10 @@ function ReadyView({
 
           {excludedGroups.total > 0 && (
             <section className="foliotrace-panel foliotrace-excluded" aria-labelledby="foliotrace-excluded-h">
-              <h2 id="foliotrace-excluded-h" className="foliotrace-h3">{t.excludedTitle.replace("{n}", String(excludedGroups.total))}</h2>
-              <dl className="foliotrace-excluded-list foliotrace-num">
+              <h2 id="foliotrace-excluded-h" className="foliotrace-h3">{t.excludedTitle.replace("{n}", formatCount(excludedGroups.total))}</h2>
+              <dl className="foliotrace-excluded-list">
                 {excludedGroups.rows.map(([label, count]) => (
-                  <div key={label}><dt>{label}</dt><dd>{count}</dd></div>
+                  <div key={label}><dt>{label}</dt><dd className="foliotrace-num">{formatCount(count)}</dd></div>
                 ))}
               </dl>
               <p className="foliotrace-note">{t.excludedFoot}</p>
@@ -916,7 +918,7 @@ function ReadyView({
       <section id="foliotrace-holdings" className="foliotrace-block" aria-labelledby="foliotrace-holdings-h">
         <div className="foliotrace-block-head foliotrace-holdings-head">
           <h2 id="foliotrace-holdings-h" className="foliotrace-h2">
-            {t.tableAll} <span className="foliotrace-count foliotrace-num">{snapshot.holdings.length}</span>
+            {t.tableAll} <span className="foliotrace-count foliotrace-num">{formatCount(snapshot.holdings.length)}</span>
           </h2>
           {snapshot.holdings.length > 0 && (
             <div className="foliotrace-controls">
@@ -971,7 +973,7 @@ function ReadyView({
         ) : (
           <>
             <p className="foliotrace-result-count" role="status" aria-live="polite">
-              {t.resultCount}: <span className="foliotrace-num">{filtered.length}</span> {t.unitCount}
+              {t.resultCount}: <span className="foliotrace-num">{formatCount(filtered.length)}</span> {t.unitCount}
             </p>
             {filtered.length === 0 ? (
               <p className="foliotrace-state-text" role="status">
@@ -985,17 +987,18 @@ function ReadyView({
                   return (
                     <li key={h.stockCode}>
                       <button type="button" className="foliotrace-mrow" onClick={() => setSelectedCode(h.stockCode)}
-                        aria-label={`${h.name} ${h.stockCode} ${t.detailButton}`}>
+                        aria-label={`${h.name} ${h.stockCode} ${t.detailButton}`}
+                        title={`${observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)} · ${formatPct(h.portfolioWeightPercent)}`}>
                         <span className="foliotrace-mrow-name">{h.name} <span className="foliotrace-code-plain foliotrace-num">{h.stockCode}</span></span>
                         <span className="foliotrace-mrow-value foliotrace-num">{amountText(h)}</span>
                         <span className="foliotrace-mrow-sub foliotrace-num">
                           <FilingChangeValue value={`${formatQty(h.quantity)}${lang === "ko" ? t.mQty : ` ${t.mQty}`}`}
                             direction={change?.quantity ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
                           {" · "}{t.mOwn}{" "}
-                          <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}
+                          <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind, true)}
                             direction={change?.ownership ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
                         </span>
-                        <span className="foliotrace-mrow-weight foliotrace-num">{t.mWeight} {formatPct(h.portfolioWeightPercent)}</span>
+                        <span className="foliotrace-mrow-weight foliotrace-num">{t.mWeight} {formatPctShort(h.portfolioWeightPercent)}</span>
                         {h.quantityAdjustment && (
                           <span className="foliotrace-mrow-note foliotrace-marker">{ratioLineText(t, h.quantityAdjustment)}</span>
                         )}
@@ -1041,8 +1044,8 @@ function ReadyView({
                             <FilingChangeValue value={formatQty(h.quantity)} direction={filingChanges.get(h)?.quantity ?? null}
                               upLabel={t.changeUp} downLabel={t.changeDown} />
                           </td>
-                          <td className="foliotrace-num">
-                            <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}
+                          <td className="foliotrace-num" title={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}>
+                            <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind, true)}
                               direction={filingChanges.get(h)?.ownership ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
                           </td>
                           <td className="foliotrace-num" title={h.quote ? `${t.detailPrice}: ${h.quote.tradeDate}` : undefined}>
@@ -1051,7 +1054,7 @@ function ReadyView({
                           <td className="foliotrace-num foliotrace-strong" title={h.estimatedValue === null ? undefined : formatKrw(h.estimatedValue, lang)}>
                             {amountText(h)}
                           </td>
-                          <td className="foliotrace-num">{formatPct(h.portfolioWeightPercent)}</td>
+                          <td className="foliotrace-num" title={formatPct(h.portfolioWeightPercent)}>{formatPctShort(h.portfolioWeightPercent)}</td>
                           <td className="foliotrace-receipt-date" title={`${t.eventReceipt}: ${h.receiptDate}`}>{h.holdingDate ?? t.unknownDate}</td>
                         </tr>
                       );
@@ -1240,6 +1243,10 @@ function ReadyView({
               <div>
                 <dt>{t.detailValue}</dt>
                 <dd className="foliotrace-num">{selected.estimatedValue === null ? "—" : breakableValue(formatKrw(selected.estimatedValue, lang))}</dd>
+              </div>
+              <div>
+                <dt>{t.colWeight}</dt>
+                <dd className="foliotrace-num">{formatPct(selected.portfolioWeightPercent)}</dd>
               </div>
               <div>
                 <dt>{t.colOwnership}</dt>

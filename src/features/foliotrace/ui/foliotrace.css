@@ -680,8 +680,9 @@
 }
 
 .foliotrace-excluded-list > div {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
   gap: 1rem;
 }
 
@@ -695,6 +696,7 @@
 
 .foliotrace-excluded-list dd {
   margin: 0;
+  text-align: right;
   font-weight: 700;
   color: var(--label, #18181b);
 }

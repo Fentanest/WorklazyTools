@@ -127,6 +127,25 @@ export function sumPercentText(values: Array<string | null>): string | null {
   return `${whole}.${tenths % 10n}%`;
 }
 
+/** Integer count with thousands separators. */
+export function formatCount(value: number): string {
+  return groupInt(String(Math.trunc(value)));
+}
+
+/**
+ * Percent with exactly 2 decimals, rounded half up on the decimal string.
+ * Display only: the exact value belongs in a title/tooltip and the detail sheet.
+ */
+export function formatPctShort(value: string | null): string {
+  const parsed = parseDecimal(value);
+  if (parsed === null) return "—";
+  const digits = BigInt(parsed.int + parsed.frac.padEnd(2, "0").slice(0, 2));
+  const roundUp = parsed.frac.length > 2 && parsed.frac.charCodeAt(2) >= 53;
+  const scaled = (roundUp ? digits + 1n : digits).toString().padStart(3, "0");
+  const neg = parsed.neg && scaled !== "000";
+  return `${neg ? "-" : ""}${groupInt(scaled.slice(0, -2))}.${scaled.slice(-2)}%`;
+}
+
 export function formatPct(value: string | null): string {
   const parsed = parseDecimal(value);
   if (parsed === null) return "—";
@@ -303,6 +322,10 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
   corporate_action_ratio_unverified: {
     ko: "기업행위 비율을 확인하지 못해 평가에서 제외",
     en: "Excluded: the corporate-action ratio could not be confirmed",
+  },
+  delisting_pending: {
+    ko: "상장폐지 진행 중이라 평가에서 제외",
+    en: "Excluded while delisting is in progress",
   },
   corporate_action_unverified: {
     ko: "공시 후 주식 변동 여부가 확인되지 않아 평가에서 제외",

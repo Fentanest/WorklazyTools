@@ -10,7 +10,9 @@ import {
   filingChangesForHoldings,
   filterHoldings,
   formatKrw,
+  formatCount,
   formatKstTimestamp,
+  formatPctShort,
   formatPct,
   formatQty,
   hasReceiptNo,
@@ -470,4 +472,19 @@ test("compact KRW text and exact percent sums (redesign helpers)", () => {
   assert.equal(compactKrw(null, "ko"), null);
   assert.equal(sumPercentText(["28.39", "21.04"]), "49.4%");
   assert.equal(sumPercentText(["1", null]), null);
+});
+
+test("short percent rounds half up on the string and counts get separators", () => {
+  assert.equal(formatPctShort("28.298641"), "28.30%");
+  assert.equal(formatPctShort("9.2"), "9.20%");
+  assert.equal(formatPctShort("7.76447"), "7.76%");
+  assert.equal(formatPctShort("7.765"), "7.77%");
+  assert.equal(formatPctShort("9.995"), "10.00%");
+  assert.equal(formatPctShort("0.004"), "0.00%");
+  assert.equal(formatPctShort("9"), "9.00%");
+  assert.equal(formatPctShort(null), "—");
+  assert.equal(formatCount(1175), "1,175");
+  assert.equal(formatCount(12), "12");
+  assert.match(exclusionReasonLabel("delisting_pending", "ko") ?? "", /상장폐지 진행 중/);
+  assert.match(exclusionReasonLabel("delisting_pending", "en") ?? "", /delisting/);
 });
