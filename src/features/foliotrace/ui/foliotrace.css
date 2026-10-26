@@ -571,7 +571,7 @@
 
 .foliotrace-bar-row {
   display: grid;
-  grid-template-columns: 1.75rem minmax(0, 1.4fr) minmax(0, 2fr) 4.75rem 5.75rem;
+  grid-template-columns: 1.75rem minmax(0, 2fr) minmax(0, 1.4fr) 5.5rem 5.75rem;
   gap: 1rem;
   align-items: center;
   padding: 0.75rem 0;
@@ -686,6 +686,7 @@
 }
 
 .foliotrace-excluded-list dt {
+  text-align: left;
   color: var(--label-secondary, #636369);
   min-width: 0;
   white-space: normal;

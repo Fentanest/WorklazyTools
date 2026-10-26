@@ -1,5 +1,6 @@
 # CHANGELOG
 
+- FolioTrace 화면 배치 개선: 카드 나열을 정보 묶음으로 바꿨다. 머리말 기준일 목록, 핵심 수치 한 묶음(평가금액·평가 종목·반영 공시), 2단(상위 종목 순위·집중도 한 줄 / 최근 공시 변화 + 평가 제외 사유별 개수), 촘촘한 종목 표(증감색·알약 필터·이름 아래 보정·제외 사유), 계산 방법 3단, 휴대폰 두 줄 목록. 검색·정렬·상세·추이·전체 공시·FAQ·상장폐지 참고는 유지, 데이터 계약 불변(미배포). — Claude(Sonnet)
 - FolioTrace 화면(R0): 공개 스냅샷에 선택 필드 `holdings[].quantityAdjustment`(보고 수량·정수 비율·근거 공시)와 제외 사유 `corporate_action_pending`·`corporate_action_ratio_unverified` 라벨(한영)을 추가했다. 보정 종목은 표에 '비율 보정'을 표시하고 상세에 보고 수량·비율·DART 링크를 보이며 변화 색은 중립이다. 안내에 추정 문구 한 줄. 필드가 없는 기존 데이터는 그대로 표시된다(미배포). — Claude(Sonnet)
 - FolioTrace 화면: 하단의 정적 목록 '개별 공시에서 확인한 과거 기록'(과거 기록·커버리지 요약 묶음)과 수작업 `indirectEvidence.json`·전용 테스트·CSS·문구를 삭제했다(새 판독 파이프라인이 반영). 상단 머리글이 고정 검색 바에 가리던 문제는 다른 도구처럼 `UtilityPage` 여백을 적용해 수리했다(미배포). — Claude(Sonnet)
 - `deploy-site.yml`(build·deploy)과 `product-banner-tests.yml`을 자체 러너 `Ubuntu24-Git`으로 옮겼다(사용자 결정 2026-10-25). 수동 `runner=github-hosted` 우회로를 두고, 포크 PR은 자체 러너에서 제외했으며, 읽기 키 `if: always()` 보조 삭제·이전 실행 잔재 정리를 넣고 아티팩트 `retention-days: 1`은 유지했다. 최신 main 확인은 gh 대신 git ls-remote(토큰 없음)로 바꿨다(미배포). — Claude(Sonnet)
