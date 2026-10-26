@@ -2,24 +2,34 @@ import { Component, useEffect, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 
-import { confirmToolReady } from "../app/chunkRecovery";
+import { confirmToolReady, recoverChunkError } from "../app/chunkRecovery";
 import { Button } from "./ui/button";
 import { setAdIneligible } from "../app/adEligibility";
 import { withSiteBasePath } from "../app/siteBasePath";
 
 
-class RouteBoundary extends Component<{ children: ReactNode; resetKey: string; onError?: () => void }, { failed: boolean; resetKey: string }> {
-  state = { failed: false, resetKey: this.props.resetKey };
+class RouteBoundary extends Component<{ children: ReactNode; resetKey: string; onError?: () => void }, { failed: boolean; recovering: boolean; resetKey: string }> {
+  state = { failed: false, recovering: false, resetKey: this.props.resetKey };
+  private mounted = false;
+  componentDidMount() { this.mounted = true; }
+  componentWillUnmount() { this.mounted = false; }
   static getDerivedStateFromProps(props: { resetKey: string }, state: { resetKey: string }) {
-    return props.resetKey === state.resetKey ? null : { failed: false, resetKey: props.resetKey };
+    return props.resetKey === state.resetKey ? null : { failed: false, recovering: false, resetKey: props.resetKey };
   }
   static getDerivedStateFromError() {
-    return { failed: true };
+    // Decide after commit, without flashing failure copy before recovery starts.
+    return { failed: true, recovering: true };
   }
-  componentDidCatch() {
-    this.props.onError?.();
+  componentDidCatch(error: unknown) {
+    const resetKey = this.props.resetKey;
+    // An isolated document may still be waiting for its preparation owner.
+    void Promise.resolve(recoverChunkError(error)).then((recovering) => {
+      if (!this.mounted || this.props.resetKey !== resetKey) return;
+      this.setState({ recovering });
+      if (!recovering) this.props.onError?.();
+    });
   }
-  render() { return this.state.failed ? <RouteFailure /> : this.props.children; }
+  render() { return this.state.failed ? <RouteFailure recovering={this.state.recovering} /> : this.props.children; }
 }
 
 export function RouteErrorBoundary({ children }: { children: ReactNode }) {
@@ -43,7 +53,7 @@ export function RouteErrorBoundary({ children }: { children: ReactNode }) {
   return <RouteBoundary resetKey={`${location.pathname}${location.search}`} onError={handleError}>{children}</RouteBoundary>;
 }
 
-function RouteFailure() {
+function RouteFailure({ recovering }: { recovering: boolean }) {
   const { t } = useTranslation("common");
   const notice = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -57,10 +67,10 @@ function RouteFailure() {
     window.location.assign(withSiteBasePath(`/${lang}/`, import.meta.env.BASE_URL));
   };
   return (
-    <div className="page tool-page tool-route-loading outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring" role="alert" tabIndex={-1} ref={notice} data-route-error>
+    <div className="page tool-page tool-route-loading outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring" role={recovering ? "status" : "alert"} tabIndex={-1} ref={notice} data-route-error={recovering ? undefined : true} data-route-recovering={recovering ? true : undefined}>
       <div className="grid max-w-lg gap-4 px-4 text-center text-foreground">
-        <p>{t("recovery.toolFailed")}</p>
-        <Button type="button" onClick={goHome}>{t("recovery.goHome")}</Button>
+        <p>{t(recovering ? "recovery.reloading" : "recovery.toolFailed")}</p>
+        {!recovering && <Button type="button" onClick={goHome}>{t("recovery.goHome")}</Button>}
       </div>
     </div>
   );
