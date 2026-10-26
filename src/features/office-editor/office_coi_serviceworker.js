@@ -42,36 +42,73 @@ if (typeof window === 'undefined') {
   const scriptUrl = document.currentScript.src;
   const reloadKey = `worklazy_coi_reload:${new URL(scriptUrl).pathname}`;
   const reloadTarget = `${window.location.pathname}${window.location.search}`;
+  const chunkTarget = `chunk:${reloadTarget}`;
   const isolationReady = window.crossOriginIsolated && typeof SharedArrayBuffer !== 'undefined';
-  const reloadOnce = () => {
+  let reloading = false;
+  let chunkFailurePending = false;
+  let prepareChunkReload;
+  let reloadResult = true;
+  const reloadOnce = (chunkFailure = false) => {
     try {
-      if (sessionStorage.getItem(reloadKey) === reloadTarget) return;
-      sessionStorage.setItem(reloadKey, reloadTarget);
+      const used = sessionStorage.getItem(reloadKey);
+      if (reloading) {
+        // A chunk rejection can join the preparation reload already in flight.
+        if (chunkFailure && used !== chunkTarget) sessionStorage.setItem(reloadKey, chunkTarget);
+        return reloadResult;
+      }
+      if (used === reloadTarget || used === chunkTarget) return false;
+      sessionStorage.setItem(reloadKey, chunkFailure ? chunkTarget : reloadTarget);
     } catch {
       // An unavailable guard must never cause repeated document reloads.
-      return;
+      return false;
     }
-    configuration.doReload();
+    reloading = true;
+    const reload = () => { configuration.doReload(); return true; };
+    reloadResult = chunkFailure && prepareChunkReload
+      ? prepareChunkReload().then((ready) => ready && reload())
+      : reload();
+    return reloadResult;
   };
-  const reloadWhenActivated = (worker) => {
-    if (!worker || worker.state === 'redundant') return;
-    if (worker.state === 'activated') {
-      reloadOnce();
-      return;
-    }
-    worker.addEventListener('statechange', () => {
-      if (worker.state === 'activated') reloadOnce();
-    });
+  const reloadWhenActivated = (worker) => new Promise((resolve) => {
+    if (!worker) { resolve(false); return; }
+    const check = () => {
+      if (worker.state !== 'activated' && worker.state !== 'redundant') return;
+      worker.removeEventListener?.('statechange', check);
+      resolve(worker.state === 'activated' && reloadOnce(chunkFailurePending));
+    };
+    if (worker.state === 'activated' || worker.state === 'redundant') check();
+    else worker.addEventListener('statechange', check);
+  });
+  const preparation = isolationReady ? Promise.resolve(true)
+    : configuration.shouldRegister() && window.isSecureContext && navigator.serviceWorker
+      ? navigator.serviceWorker.register(scriptUrl).then((registration) => {
+        if (!configuration.quiet) console.log('Document preparation registered', registration.scope);
+        if (registration.active || registration.waiting || registration.installing) {
+          return reloadWhenActivated(registration.active || registration.waiting || registration.installing);
+        }
+        return new Promise((resolve) => registration.addEventListener('updatefound', () => {
+          resolve(reloadWhenActivated(registration.installing));
+        }, { once: true }));
+      }, () => false)
+      : Promise.resolve(false);
+  window.worklazyDocumentRecovery = {
+    reloadForChunk: async (prepare) => {
+      chunkFailurePending = true;
+      prepareChunkReload = prepare;
+      // Share the preparation reload, after activation; never spend its budget
+      // on a new document that is still unable to use the isolated workspace.
+      return Boolean(await preparation) && reloadOnce(true);
+    },
+    confirmToolReady: () => {
+      if (!isolationReady || reloading) return;
+      try { sessionStorage.removeItem(reloadKey); } catch { /* Recovery remains manual. */ }
+    },
   };
   if (isolationReady) {
-    try { sessionStorage.removeItem(reloadKey); } catch { /* Storage is optional after successful isolation. */ }
-  }
-  if (!isolationReady && configuration.shouldRegister() && window.isSecureContext && navigator.serviceWorker) {
-    navigator.serviceWorker.register(scriptUrl).then((registration) => {
-      if (!configuration.quiet) console.log('Document preparation registered', registration.scope);
-      if (registration.active) reloadOnce();
-      else if (registration.waiting || registration.installing) reloadWhenActivated(registration.waiting || registration.installing);
-      else registration.addEventListener('updatefound', () => reloadWhenActivated(registration.installing));
-    }, () => undefined);
+    // Isolation success releases preparation only. A chunk retry must survive
+    // this document's startup until React confirms the actual tool is ready.
+    try {
+      if (!sessionStorage.getItem(reloadKey)?.startsWith('chunk:')) sessionStorage.removeItem(reloadKey);
+    } catch { /* Storage is optional after successful isolation. */ }
   }
 }
