@@ -2,6 +2,7 @@
 
 import { parseSpreadsheetInput } from "../spreadsheet-core/inputAdapter.ts";
 import { compareSpreadsheetPair } from "./compareEngine.ts";
+import { DUPLICATE_KEY_TOO_LONG } from "./duplicateReport.ts";
 import { buildExcelCompareInspection } from "./inspection.ts";
 import { buildExcelCompareReport } from "./report.ts";
 import { assertGeneratedXlsxReport } from "./reportIntegrity.ts";
@@ -51,29 +52,35 @@ async function handle(request: Request) {
     progress(46, "COMPARING");
     const compared = compareSpreadsheetPair(leftBook, rightBook, request.options);
     progress(80, "WRITING_REPORT");
-    const reportBytes = await buildExcelCompareReport(compared, {
-      leftName: request.leftName,
-      rightName: request.rightName,
-      leftSheet: request.options.left.sheetName,
-      rightSheet: request.options.right.sheetName,
-    });
-    const reportBuffer = transferableArrayBuffer(reportBytes);
-    await assertGeneratedXlsxReport(reportBuffer);
+    let reportBuffer=new ArrayBuffer(0),reportError:ExcelComparePairResult['reportError'];
+    try{const reportBytes=await buildExcelCompareReport(compared,{leftName:request.leftName,rightName:request.rightName,leftSheet:request.options.left.sheetName,rightSheet:request.options.right.sheetName});reportBuffer=transferableArrayBuffer(reportBytes);await assertGeneratedXlsxReport(reportBuffer);}
+    catch(error){
+      // A key the report cannot hold is a pair-level input problem: fail the pair
+      // with its guidance code so the other pairs still bundle (R2-01 contract).
+      if(error instanceof Error&&error.message===DUPLICATE_KEY_TOO_LONG)throw error;
+      reportBuffer=new ArrayBuffer(0);reportError=error instanceof Error&&error.message==='COMPARISON_XLSX_TEXT_UNSUPPORTED'?'COMPARISON_XLSX_TEXT_UNSUPPORTED':'REPORT_GENERATION_FAILED';
+    }
     const reportByteLength = reportBuffer.byteLength;
     const result: ExcelComparePairResult = {
       leftName: request.leftName,
       rightName: request.rightName,
       leftFormat: leftBook.format,
       rightFormat: rightBook.format,
+      runId: compared.runId,
+      parameters: compared.parameters,
+      originalSheets: compared.originalSheets,
       summary: compared.summary,
       records: compared.records,
       warnings: compared.warnings,
+      reportError,
       reportBuffer,
       reportByteLength,
       reportName: "report.xlsx",
     };
     leftBook = undefined as unknown as typeof leftBook;
     rightBook = undefined as unknown as typeof rightBook;
+    // Ids and matching reasons follow from runId, position and options; the page restores them.
+    for (const record of compared.records) { delete record.recordId; delete record.matchingReason; }
     progress(100, "COMPLETE");
     worker.postMessage({ type: "result", result }, [reportBuffer]);
   } catch (error) {

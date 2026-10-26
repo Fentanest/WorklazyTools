@@ -565,6 +565,13 @@ const S8_ENTRIES = [
   { path: "/ko/tools/document-compare/" },
   { path: "/ko/tools/document-compare/results/1/", expiredMarker: '[data-testid="document-expired-result"]', expectAds: false },
   { path: "/ko/tools/pdf-compare/" },
+  { path: "/ko/tools/text-compare/" },
+  { path: "/ko/tools/image-compare/" },
+  { path: "/ko/tools/folder-compare/" },
+  { path: "/en/tools/text-compare/" },
+  { path: "/en/tools/image-compare/" },
+  { path: "/en/tools/folder-compare/" },
+
   { path: "/ko/tools/office-editor/app/" },
   { path: "/ko/tools/excel-merger/xls-preserve/" },
   { path: "/ko/tools/document-redactor/" },

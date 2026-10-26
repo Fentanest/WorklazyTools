@@ -14,11 +14,12 @@ export function errorCode(error: unknown, fallback: 'read-failed' | 'render-fail
   }
   return fallback;
 }
-export async function openComparisonPdf(file: File, signal: AbortSignal): Promise<OwnedPdf> {
+export async function openComparisonPdf(file: File, signal: AbortSignal, suppliedBytes?:ArrayBuffer): Promise<OwnedPdf> {
   checkAbort(signal);
   let bytes: ArrayBuffer;
-  try { bytes = await waitWithAbort(file.arrayBuffer(), signal); } catch (error) { checkAbort(signal); throw new PdfCompareError(errorCode(error)); }
-  checkAbort(signal);
+  // File reads cannot be aborted. Await settlement before releasing this owner to the next job.
+  try { bytes = suppliedBytes ?? await file.arrayBuffer(); } catch (error) { checkAbort(signal); throw new PdfCompareError(errorCode(error)); }
+  if (signal.aborted) { structuredClone(undefined, { transfer: [bytes] }); checkAbort(signal); }
   // PDF.js performs parsing; do not apply pdf-lib's editing admission policy.
   if (!new TextDecoder('latin1').decode(bytes.slice(0, 1024)).includes('%PDF-')) throw new PdfCompareError('invalid-pdf');
   let owner: Awaited<ReturnType<typeof openOwnedPdfDocument>>;
@@ -63,14 +64,16 @@ export function runPixelWorker(before: HTMLCanvasElement, after: HTMLCanvasEleme
   checkAbort(signal);
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./pdf-compare.worker.ts', import.meta.url), { type: 'module' });
-    const finish = () => { signal.removeEventListener('abort', abort); worker.terminate(); };
-    const abort = () => { finish(); reject(new DOMException('Aborted', 'AbortError')); };
+    let settled=false;
+    const finish = () => { if(settled)return false;settled=true;signal.removeEventListener('abort', abort);worker.onmessage=worker.onerror=worker.onmessageerror=null;worker.terminate();return true; };
+    const abort = () => { if(finish())reject(new DOMException('Aborted', 'AbortError')); };
     signal.addEventListener('abort', abort, { once: true });
-    worker.onerror = () => { finish(); reject(new PdfCompareError('render-failed')); };
+    worker.onerror = (event) => {event.preventDefault();if(finish())reject(new PdfCompareError('render-failed'));};
+    worker.onmessageerror=()=>{if(finish())reject(new PdfCompareError('render-failed'));};
     worker.onmessage = (event: MessageEvent<PixelReply & { error?: string }>) => {
-      finish();
+      if(!finish())return;
       if (signal.aborted) reject(new DOMException('Aborted', 'AbortError'));
-      else if (event.data.error) reject(new PdfCompareError('render-failed'));
+      else if (!event.data||event.data.error||!Number.isInteger(event.data.count)||event.data.count<0||event.data.count>before.width*before.height||!Number.isFinite(event.data.ratio)||!Array.isArray(event.data.segments)) reject(new PdfCompareError('render-failed'));
       else resolve(event.data);
     };
     try {
@@ -78,6 +81,6 @@ export function runPixelWorker(before: HTMLCanvasElement, after: HTMLCanvasEleme
       const a = before.getContext('2d')!.getImageData(0, 0, before.width, before.height).data;
       const b = after.getContext('2d')!.getImageData(0, 0, after.width, after.height).data;
       worker.postMessage({ before: a, after: b, threshold, overlay, beforeText: texts?.before, afterText: texts?.after }, [a.buffer, b.buffer]);
-    } catch (error) { finish(); reject(error); }
+    } catch (error) { if(finish())reject(error); }
   });
 }

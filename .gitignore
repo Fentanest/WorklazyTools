@@ -36,3 +36,6 @@ public/vendor/markitdown/
 
 # FolioTrace public data is copied from the private data repository at deploy time
 public/data/foliotrace/
+# Rebuilt from pinned vendor/comparison sources.
+/public/vendor/opencv/
+/public/vendor/comparison/

@@ -1,8 +1,14 @@
-import { writeXlsxReport, type XlsxReportSheet } from "../../utils/xlsxReport.ts";
+import {writeSourceFaithfulXlsxReport} from "../comparison-report/sourceXlsxText.ts";
+import { type XlsxReportSheet } from "../../utils/xlsxReport.ts";
 import type { ExcelCompareEngineResult } from "./compareEngine.ts";
 import { duplicateReportParameters, formatDuplicateReportRows } from "./duplicateReport.ts";
 import type { ExcelCompareRecord, ExcelCompareStandardRecord } from "./types.ts";
 
+// Per-record provenance rows (record id -> report sheet and rows) are written for every record up to
+// this many records. A larger comparison keeps only the rows that carry information the record
+// sheets do not (the source rows of grouped reconciliations) plus one marker row: the other ids
+// follow the order of each record sheet.
+export const RECORD_PROVENANCE_LIMIT = 10_000;
 const REPORT_SHEETS = ["Summary", "Parameters", "Matched", "Changed", "Added", "Removed", "Duplicates", "Ambiguous", "Errors"] as const;
 const RECORD_HEADERS = ["Left file", "Right file", "Left sheet", "Right sheet", "Left row", "Right row", "Left column", "Right column", "Key", "Left value", "Right value", "Change", "Reason"];
 
@@ -34,6 +40,7 @@ export async function buildExcelCompareReport(
         ["rightFile", context.rightName],
         ...result.parameters,
         ...duplicateMetadata,
+        ...reportProvenance(result.records, duplicateLayout.rows, result.records.length <= RECORD_PROVENANCE_LIMIT),
         ...result.warnings.map((warning) => ["warning", warning] as [string, string]),
       ],
     },
@@ -64,7 +71,7 @@ export async function buildExcelCompareReport(
     recordSheet("Errors", standardRecords(result.records, "error", "unmatched"), context),
   ];
   if (sheets.map((sheet) => sheet.name).join("|") !== REPORT_SHEETS.join("|")) throw new Error("REPORT_TOPOLOGY_INVALID");
-  return writeXlsxReport({ creator: "Worklazy Tools", sheets });
+  return writeSourceFaithfulXlsxReport({ creator: "Worklazy Tools", sheets });
 }
 
 function standardRecords(
@@ -94,4 +101,24 @@ function recordSheet(name: string, records: ExcelCompareStandardRecord[], contex
       item.reason,
     ]),
   };
+}
+
+function reportProvenance(records: ExcelCompareRecord[], duplicateRows: Array<{ record: ExcelCompareRecord }>, everyRecord: boolean): Array<[string, string]> {
+  const nextRows = new Map<string, number>();
+  const duplicateRanges = new Map<ExcelCompareRecord, [number, number]>();
+  duplicateRows.forEach((item, i) => {
+    const existing = duplicateRanges.get(item.record);
+    duplicateRanges.set(item.record, [existing?.[0] ?? i + 2, i + 2]);
+  });
+  let omitted = 0;
+  const rows = records.flatMap((record): Array<[string, string]> => {
+    if (!record.recordId) return [];
+    const sheet = record.status === "duplicate" ? "Duplicates" : record.status === "unmatched" || record.status === "error" ? "Errors" : `${record.status[0].toUpperCase()}${record.status.slice(1)}`;
+    const rows = record.status === "duplicate" ? duplicateRanges.get(record) ?? [] : [(nextRows.get(sheet) ?? 1) + 1];
+    if (record.status !== "duplicate") nextRows.set(sheet, rows[0]);
+    if (!everyRecord && (record.status === "duplicate" || !record.sourceRows)) { omitted++; return []; }
+    return [[`record:${record.recordId}`, JSON.stringify({ sheet, startRow: rows[0], endRow: rows.at(-1), status: record.status, matchingReason: record.matchingReason, reason: record.reason, leftRow: record.leftRow, rightRow: record.rightRow, leftColumn: record.leftColumn, rightColumn: record.rightColumn, sourceRows: record.status === "duplicate" ? undefined : record.sourceRows })]];
+  });
+  if (omitted) rows.push(["recordProvenance", `${omitted} of ${records.length} records listed by record sheet order (over ${RECORD_PROVENANCE_LIMIT}); grouped source rows kept`]);
+  return rows;
 }

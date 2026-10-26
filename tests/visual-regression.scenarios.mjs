@@ -52,6 +52,8 @@ const interactionProfiles = Object.freeze([enDarkDesktop]);
 const finishNavigationProfiles = Object.freeze([koLightMobile, enLightMobile, koLightMobile320, enLightMobile320]);
 const koreanInteractionProfiles = Object.freeze([koLightDesktop]);
 const migratedToolIds = new Set([
+  "image-compare", "folder-compare",
+  "text-compare",
   "product-banner",
   "market-calendar",
   "document-redactor",
@@ -203,6 +205,34 @@ const bottomScenarioFor = (route) => {
 };
 
 const interactionDefinitions = Object.freeze({
+  "image-compare": Object.freeze({
+    stateId: "interaction-pixel-result",
+    fixture: {kind: "generated-png", fileName: "comparison-image.png", width: 240, height: 160},
+    actions: [
+      {type: "upload", selector: "[data-tool-page='image-compare'] input[type='file']", elementIndex: 0},
+      {type: "upload", selector: "[data-tool-page='image-compare'] input[type='file']", elementIndex: 1, fixture: {kind:"generated-png",fileName:"comparison-changed.png",width:240,height:160,changed:true}},
+      {type: "click", selector: "[data-testid='image-compare-run']"},
+      {type: "wait", selector: "[data-testid='image-result']:not([data-changed-pixels='0'])"},
+      {type: "scroll-into-view", selector: "[data-testid='image-result']", offset: -128},
+    ],
+    assertSelector: "[data-testid='image-views']",
+  }),
+  "folder-compare": Object.freeze({
+    stateId: "interaction-path-options",
+    actions: [{type: "click", selector: "[data-tool-page='folder-compare'] input[type='checkbox']", elementIndex: 0}],
+    assertSelector: "[data-tool-page='folder-compare'] input[type='checkbox']:checked",
+  }),
+  "text-compare": Object.freeze({
+    stateId: "interaction-comparison-result",
+    actions: [
+      { type: "replace-text", selector: "[data-testid='text-compare-left']", value: "Deadline: Monday\nKeep this line." },
+      { type: "replace-text", selector: "[data-testid='text-compare-right']", value: "Deadline: Friday\nKeep this line." },
+      { type: "click", selector: "[data-testid='text-compare-run']" },
+      { type: "wait", selector: "[data-testid='text-compare-summary']" },
+      { type: "scroll-into-view", selector: "[data-testid='text-diff-view']", offset: -128 },
+    ],
+    assertSelector: "[data-testid='text-diff-view']",
+  }),
   "product-banner": Object.freeze({
     stateId: "interaction-iframe-preview",
     actions: [{ type: "select", selector: "[data-tool-page='product-banner'] select:is([aria-label='Preview'], [aria-label='미리보기'])", value: "iframe" }],

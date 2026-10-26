@@ -45,8 +45,11 @@ export function assertStaticFaqHtml(html, { filePath = "static output", expected
 }
 
 async function main() {
-const { VIDEO_STUDIO_PUBLIC } = await import("../src/app/publicServiceConfig.mjs");
+const { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonPathPublished } = await import("../src/app/publicServiceConfig.mjs");
 
+const comparisonPublication=JSON.parse(await fs.readFile('dist/comparison-publication.json','utf8'));
+if(comparisonPublication.enabled!==COMPARISON_PORT_PUBLIC)throw new Error('Comparison publication flag differs from built artifact.');
+if(!COMPARISON_PORT_PUBLIC){const sitemap=await fs.readFile('dist/sitemap.xml','utf8');for(const id of COMPARISON_TOOL_IDS)if(sitemap.includes(`/tools/${id}/`))throw new Error('Unpublished comparison route in sitemap.');}
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
 // The Markdown worker has no network fallback: every selected wheel must ship.
@@ -78,12 +81,15 @@ const routes = ["tools/product-banner",
   "tools/hwp-editor", "tools/office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["tools/video-studio", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio"] : []), "tools/audio-studio", "tools/audio-studio/trim", "tools/image-studio",
   "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark",
   "tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr",
-  "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
+  "tools/image-compare", "tools/folder-compare", "tools/text-compare", "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
   "tools/document-redactor", "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
   "tools/security-tools", "tools/qr-studio", "tools/qr-studio/bulk", "tools/data-converter",
   "about", "privacy", "terms", "contact", "licenses",
-];
+].filter(route=>isComparisonPathPublished(route));
 const socialSlugByRoute = {
+  "tools/image-compare": "image-compare",
+  "tools/folder-compare": "folder-compare",
+  "tools/text-compare": "text-compare",
   "tools/document-markdown": "document-markdown",
   "tools/pdf-converter/document-to-pdf": "document-to-pdf", "tools/pdf-converter/pdf-to-document": "pdf-to-document", "tools/pdf-converter/pdf-to-document/ocr": "pdf-editor-ocr",
   "tools/pdf-converter": "pdf-converter", "tools/pdf-converter/image-to-pdf": "image-to-pdf", "tools/pdf-converter/pdf-to-image": "pdf-to-image",

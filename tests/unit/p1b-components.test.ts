@@ -7,7 +7,8 @@ import { fileURLToPath } from "node:url";
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (relativePath: string) => fs.readFileSync(path.join(repositoryRoot, relativePath), "utf8");
 const componentFiles = fs.readdirSync(path.join(repositoryRoot, "src/features"), { recursive: true })
-  .filter((entry): entry is string => typeof entry === "string" && entry.endsWith(".tsx"));
+  .filter((entry): entry is string => typeof entry === "string" && entry.endsWith(".tsx"))
+  .map((entry) => entry.split(path.sep).join("/"));
 const toolAccents = ["green", "blue", "violet", "orange", "pink", "sky", "coral"] as const;
 
 test("ToolGuide keeps its public structure and localized eyebrow through shadcn cards", () => {
@@ -24,7 +25,9 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
     "excel-cleaner/ExcelCleanerPage.tsx",
     "excel-compare/ExcelComparePage.tsx",
     "excel-merger/ExcelMergerPage.tsx",
+    "folder-compare/FolderComparePage.tsx",
     "hwp-editor/HwpEditorPage.tsx",
+    "image-compare/ImageComparePage.tsx",
     "image-privacy/ImagePrivacyPage.tsx",
     "image-studio/ImageStudioPage.tsx",
     "market-calendar/MarketCalendarPage.tsx",
@@ -37,6 +40,7 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
     "product-banner/ProductBannerPage.tsx",
     "qr-studio/QrStudioPage.tsx",
     "security-tools/SecurityToolsPage.tsx",
+    "text-compare/TextComparePage.tsx",
     "text-formatter/TextFormatterPage.tsx",
     "text-merger/TextMergerPage.tsx",
     "text-tools/TextToolsPage.tsx",

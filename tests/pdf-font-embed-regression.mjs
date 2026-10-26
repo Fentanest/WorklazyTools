@@ -34,13 +34,15 @@ const samples = [
 const isolatedGlyphs = ["한", "글", "테", "스", "트"];
 const results = [];
 
-for (const [kind, fontBytes] of [["full", fullFont], ["subset", subsetFont]]) {
+// "-subsetted" kinds embed only the drawn glyphs; they must render exactly like the whole program.
+for (const [kind, fontBytes, subset] of [["full", fullFont, false], ["subset", subsetFont, false],
+  ["full-subsetted", fullFont, true], ["subset-subsetted", subsetFont, true]]) {
   const sourceFont = fontkit.create(fontBytes);
   const cff = sourceFont["CFF "];
   assert.equal(cff?.isCIDFont, true, `${kind}: fixture must be a CID-keyed CFF font`);
 
   const document = await createPdfDocument();
-  const font = await embedCustomPdfFont(document, exactArrayBuffer(fontBytes));
+  const font = await embedCustomPdfFont(document, exactArrayBuffer(fontBytes), { subset });
   const page = document.addPage([560, 260]);
   const encoded = samples.map((sample, index) => {
     const value = font.encodeText(sample).toString();
@@ -107,6 +109,15 @@ for (const [kind, fontBytes] of [["full", fullFont], ["subset", subsetFont]]) {
   const ghostscriptGlyphPage = PNG.sync.read(await fs.readFile(path.join(outputRoot, `${kind}-gs-2.png`)));
   const glyphHashes = isolatedGlyphs.map((_, index) => cropInkHash(ghostscriptGlyphPage, (30 + index * 70) * 2, 100));
   assert.equal(new Set(glyphHashes).size, isolatedGlyphs.length, `${kind}: Ghostscript rendered repeated tofu glyphs`);
+
+  if (subset) {
+    const whole = results.find((result) => result.kind === kind.replace("-subsetted", ""));
+    assert.ok(structure.fontBytes.length < whole.fontBytes / 4, `${kind}: subset program is not smaller`);
+    for (const name of [`poppler-1`, `poppler-2`, `gs-1`, `gs-2`]) {
+      const [ours, theirs] = await Promise.all([kind, whole.kind].map((owner) => fs.readFile(path.join(outputRoot, `${owner}-${name}.png`))));
+      assert.ok(PNG.sync.read(ours).data.equals(PNG.sync.read(theirs).data), `${kind}: ${name} differs from the whole font program`);
+    }
+  }
 
   const extracted = await pdfJsText(pdfBytes);
   assert.equal(extracted.includes("堺"), false, `${kind}: PDF.js extracted a glyph number as a CJK character`);

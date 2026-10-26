@@ -1,8 +1,9 @@
+import { fileURLToPath } from "node:url";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
 
-const projectRoot = path.resolve(new URL("..", import.meta.url).pathname);
+const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const publicVendorRoot = path.join(projectRoot, "public", "vendor");
 
 await copyPyodide();

@@ -1,4 +1,6 @@
-import { ArrowLeft, ArrowRight, Download, Info, MessageSquare, TextSearch } from "lucide-react";
+import { DocumentFieldNotes } from "../document-compare/DocumentFieldNotes";
+import type { ScreenManifest } from "../document-compare/screenResult";
+import { ArrowLeft, ArrowRight, Download, Info, LoaderCircle, MessageSquare, TextSearch } from "lucide-react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
@@ -21,6 +23,8 @@ import type {
 import { useLocalizedPath } from "../../i18n/routing";
 import { useAppLanguage } from "../../i18n/routing";
 
+import "./word-result-mobile.css";
+
 type ResultTab = "document" | "headerFooter" | "note";
 
 export interface DocumentCompareResultPair {
@@ -28,8 +32,11 @@ export interface DocumentCompareResultPair {
   result: WordCompareResult;
   reportUrl?: string;
   reportFileName?: string;
+  originalBeforeUrl?: string;
+  originalAfterUrl?: string;
   trackedUrl?: string;
   trackedFileName?: string;
+  trackedStatus?: "pending" | "ready" | "unavailable";
 }
 
 interface DocumentCompareResultPageProps {
@@ -60,6 +67,7 @@ export function DocumentCompareResultPage({
   const pair = results.find((item) => item.pairNumber === pairNumber);
   const [resultTab, setResultTab] = useState<ResultTab>("document");
   const [showFullContent, setShowFullContent] = useState(true);
+  const [mobileSide, setMobileSide] = useState<"before" | "after">("before");
 
   const areaPages = useMemo(() => pair?.result.views?.[resultTab] ?? [], [pair, resultTab]);
   const visiblePages = useMemo(
@@ -99,10 +107,16 @@ export function DocumentCompareResultPage({
       >
         {pair.reportUrl && <Button render={<a href={pair.reportUrl} download={pair.reportFileName} data-testid="document-result-excel-download" />} variant="secondary" className="rounded-xl font-bold"><Download size={15} /> {L("Excel 보고서", "Excel report")}</Button>}
         {pair.reportUrl && <FileShareButton url={pair.reportUrl} fileName={pair.reportFileName || (language === "en" ? "worklazy-comparison-report.xlsx" : "worklazy-비교보고서.xlsx")} />}
+        {pair.trackedStatus === "pending" && trackedLabel && <Button type="button" variant="secondary" disabled className="rounded-xl font-bold" data-testid="document-result-tracked-pending"><LoaderCircle className="animate-spin" size={15} /> {L(`${trackedLabel} 만드는 중`, `Creating ${trackedLabel.toLowerCase()}`)}</Button>}
         {pair.trackedUrl && trackedLabel && <Button render={<a href={pair.trackedUrl} download={pair.trackedFileName} data-testid="document-result-tracked-download" />} variant="secondary" className="rounded-xl font-bold"><Download size={15} /> {trackedLabel}</Button>}
         {pair.trackedUrl && trackedLabel && <FileShareButton url={pair.trackedUrl} fileName={pair.trackedFileName || (language === "en" ? "worklazy-tracked-changes.docx" : "worklazy-변경추적.docx")} />}
       </PageHeader>
       <PrivacyBanner compact />
+      <DocumentFieldNotes manifest={(pair.result as WordCompareResult & {manifest?:ScreenManifest}).manifest} language={language} />
+      {(pair.originalBeforeUrl || pair.originalAfterUrl) && <div className="mt-3 flex flex-wrap gap-4 text-sm">
+        {pair.originalBeforeUrl && <a href={pair.originalBeforeUrl} download={pair.result.beforeName} data-original-file="before" className="underline">{L("수정 전 원본 파일", "Original before file")}</a>}
+        {pair.originalAfterUrl && <a href={pair.originalAfterUrl} download={pair.result.afterName} data-original-file="after" className="underline">{L("수정 후 원본 파일", "Original revised file")}</a>}
+      </div>}
 
       <Card as="section" className="mt-3 gap-0 overflow-visible rounded-4xl border border-border p-5 shadow-md" data-testid="document-result-view" key={`${pair.pairNumber}-${resultTab}-${showFullContent}`}>
         <ComparisonSummary result={pair.result} />
@@ -123,10 +137,17 @@ export function DocumentCompareResultPage({
           </div>
         </div>
 
+        <div className="word-result-mobile-switch mt-3" data-testid="document-mobile-side">
+          <SegmentedControl label={L("표시할 문서", "Visible document")} value={mobileSide} onChange={setMobileSide} options={[
+            { value: "before", label: L("수정 전", "Before") },
+            { value: "after", label: L("수정 후", "After") },
+          ]} />
+        </div>
         <DiffLegend showComments={showCommentLegend} />
         <DocumentPageComparison
           beforeName={pair.result.beforeName}
           afterName={pair.result.afterName}
+          mobileSide={mobileSide}
           items={visiblePages}
           tables={pair.result.tables}
         />
@@ -184,7 +205,8 @@ function ContentToggle({ checked, onChange }: { checked: boolean; onChange: (che
   );
 }
 
-function DocumentPageComparison({ beforeName, afterName, items, tables }: {
+function DocumentPageComparison({ beforeName, afterName, items, tables, mobileSide }: {
+  mobileSide: "before" | "after";
   beforeName: string;
   afterName: string;
   items: WordDocumentViewItem[];
@@ -210,7 +232,7 @@ function DocumentPageComparison({ beforeName, afterName, items, tables }: {
         <Button variant="secondary" className="min-w-0 justify-center rounded-xl max-[820px]:whitespace-normal max-[820px]:leading-[1.3]" type="button" onClick={() => goToChange(1)} disabled={currentChange === changedIndexes.length - 1} aria-label={language === "en" ? "Next change" : "다음 변경"} title={language === "en" ? "Next change" : "다음 변경"}><span className="min-[821px]:max-[1599px]:hidden">{language === "en" ? "Next" : "다음"}</span> <ArrowRight size={14} aria-hidden="true" /></Button>
       </nav>}
       <div className="col-start-1 row-start-1 min-w-0 overflow-x-auto overscroll-x-contain rounded-2xl border border-border bg-slate-200 focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-[var(--wl-focus)] max-[820px]:col-start-1 max-[820px]:row-start-2 dark:bg-slate-800" role="region" aria-label={language === "en" ? "Side-by-side document scroll area" : "수정 전후 문서 가로 스크롤 영역"} tabIndex={0}>
-      <div className="grid min-w-[940px] grid-cols-2 gap-x-[22px] p-5 text-[#1d1d1f]" role="table" data-testid="document-page-view" aria-label={language === "en" ? "Full before-and-after document comparison" : "수정 전후 문서 전체 비교"}>
+      <div className="grid min-w-[940px] grid-cols-2 gap-x-[22px] p-5 text-[#1d1d1f]" role="table" data-testid="document-page-view" data-mobile-side={mobileSide} aria-label={language === "en" ? "Full before-and-after document comparison" : "수정 전후 문서 전체 비교"}>
         <div role="row" className="col-span-full grid grid-cols-2 gap-x-[22px]">
         <div className="sticky top-0 z-[3] flex min-w-0 items-center gap-2 rounded-t-lg border border-b-0 border-[#d5d5da] bg-white/[.97] px-9 py-3 shadow-[0_-3px_14px_rgba(35,38,45,.08)]" role="columnheader" data-document-side="before"><span className="shrink-0 rounded-md bg-[#efeff2] px-1.5 py-1 text-xs font-extrabold text-[#606066]">{language === "en" ? "Before" : "수정 전"}</span><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm">{beforeName}</strong></div>
         <div className="sticky top-0 z-[3] flex min-w-0 items-center gap-2 rounded-t-lg border border-b-0 border-[#d5d5da] bg-white/[.97] px-9 py-3 shadow-[0_-3px_14px_rgba(35,38,45,.08)]" role="columnheader" data-document-side="after"><span className="shrink-0 rounded-md bg-[#efeff2] px-1.5 py-1 text-xs font-extrabold text-[#606066]">{language === "en" ? "After" : "수정 후"}</span><strong className="overflow-hidden text-ellipsis whitespace-nowrap text-sm">{afterName}</strong></div>
@@ -242,6 +264,8 @@ function DocumentBlock({ item, side, table, first, last }: {
   const language = useAppLanguage();
   const location = side === "before" ? item.beforeLocation : item.afterLocation;
   const text = side === "before" ? item.before : item.after;
+  const objectLabels = (item as WordDocumentViewItem & {objectLabels?:string[]}).objectLabels ?? [];
+  const formattingLabels = (item as WordDocumentViewItem & { formattingLabels?: string[] }).formattingLabels ?? [];
   if (table) {
     const tableMissing = side === "before" ? table.beforeIndex === null : table.afterIndex === null;
     return (
@@ -250,6 +274,8 @@ function DocumentBlock({ item, side, table, first, last }: {
           <small className="sr-only">{location || (side === "before" ? (language === "en" ? "Not in before" : "수정 전에는 없음") : (language === "en" ? "Not in after" : "수정 후에는 없음"))}</small>
           {(item.kind !== "unchanged" || item.moved) && <span className="rounded-md bg-[#f0f0f3]/90 px-1.5 py-1 text-xs font-extrabold text-[#57575e]">{changeKindLabel(item.kind, language)}{item.moved && item.kind !== "moved" ? ` · ${language === "en" ? "Moved" : "이동"}` : ""}</span>}
         </div>
+        {objectLabels.length > 0 && <p className="my-1 text-xs text-blue-700">{objectLabels.join(" · ")}</p>}
+        {formattingLabels.length > 0 && <p className="my-1 text-xs text-violet-700" data-testid="document-formatting-labels">{formattingLabels.join(" · ")}</p>}
         <DocumentTable table={table} side={side} />
       </div>
     );
@@ -271,6 +297,8 @@ function DocumentBlock({ item, side, table, first, last }: {
             ? <SideDiffText segments={item.segments} side={side} fallback={text} />
             : text || "\u00a0"}
         </p>}
+      {objectLabels.length > 0 && <p className="my-1 text-xs text-blue-700">{objectLabels.join(" · ")}</p>}
+        {formattingLabels.length > 0 && <p className="my-1 text-xs text-violet-700" data-testid="document-formatting-labels">{formattingLabels.join(" · ")}</p>}
       <InlineComments comments={item.comments ?? []} side={side} />
     </div>
   );

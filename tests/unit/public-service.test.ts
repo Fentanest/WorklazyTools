@@ -8,6 +8,8 @@ const noMarkers = { redactor: false, office: false, excel: false };
 
 test("public tools are eligible by readiness, not an old tool-type ad or analytics blacklist", () => {
   for (const route of [
+    "/ko/tools/text-compare/", "/en/tools/text-compare/",
+    "/ko/tools/image-compare/", "/en/tools/image-compare/", "/ko/tools/folder-compare/", "/en/tools/folder-compare/",
     "/ko/tools/pdf-editor/", "/ko/tools/pdf-compare/", "/ko/tools/document-compare/",
     "/ko/tools/hwp-editor/", "/ko/tools/excel-merger/", "/ko/tools/audio-studio/",
   ]) {

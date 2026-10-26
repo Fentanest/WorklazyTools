@@ -59,7 +59,7 @@ try {
   await fs.writeFile(path.join(temporaryDirectory, "duplicate-ui-right.csv"), `${groupedUiRight.join("\n")}\n`, "utf8");
   const fixture = (name) => path.join(temporaryDirectory, name);
   const browser = await puppeteer.launch({
-    executablePath: "/usr/bin/google-chrome",
+    executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome",
     headless: true,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
@@ -574,7 +574,7 @@ async function assertB4Affordance(page, leftPath, rightPath) {
     height: button.getBoundingClientRect().height,
     background: getComputedStyle(button).backgroundColor,
     shadow: getComputedStyle(button).boxShadow,
-    hoverClass: button.className.includes("hover:bg-green-500/10!"),
+    hoverClass: button.className.includes("hover:bg-primary/10!"),
   }));
   await page.hover("[data-testid=excel-add-pair]");
   await new Promise((resolve) => setTimeout(resolve, 180));
@@ -592,7 +592,7 @@ async function assertB4Affordance(page, leftPath, rightPath) {
     height: button.getBoundingClientRect().height,
     background: getComputedStyle(button).backgroundColor,
     shadow: getComputedStyle(button).boxShadow,
-    hoverClass: button.className.includes("hover:bg-green-500/10!"),
+    hoverClass: button.className.includes("hover:bg-primary/10!"),
   }));
   await page.hover("[data-testid=excel-pair-swap]");
   await new Promise((resolve) => setTimeout(resolve, 180));

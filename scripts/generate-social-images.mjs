@@ -6,6 +6,9 @@ const outputDirectory = path.resolve("public/social/tools");
 
 const tools = [
   tool("market-calendar", "#0879d9", "주식시장 휴장일", "주식시장 거래 달력", "휴장일 · 개장·마감 · 미국 시장 한국 시간", "Market holidays", "Stock Market Calendar", "Market holidays · local hours · Korea time"),
+  tool("image-compare", "#d9548c", "이미지 비교", "그림과 글자의 차이 확인", "픽셀 · 정렬 후보 · 변경 영역 · 글자 인식", "Image comparison", "Compare Images and Text", "Pixels · alignment · regions · local OCR"),
+  tool("folder-compare", "#0879d9", "읽기 전용 파일 비교", "폴더·ZIP 내용 비교", "파일 내용 · 이름 변경 후보 · 선택한 쌍 상세 비교", "Read-only file comparison", "Compare Folders and ZIPs", "File contents · rename candidates · pair details"),
+  tool("text-compare", "#0879d9", "텍스트 비교", "두 글의 차이 확인", "줄·단어·글자 · 무시 규칙 · 선택 변경 적용", "Text comparison", "Compare Two Texts", "Lines · words · characters · copy changes"),
   tool("document-markdown", "#d53228", "문서 → Markdown", "문서 → Markdown", "워드 · 엑셀 · PPTX · 텍스트 PDF", "Document to Markdown", "Document to Markdown", "Word · Excel · PPTX · text PDF"),
   tool("document-to-pdf", "#d53228", "PDF 변환", "문서를 PDF로 변환", "워드·엑셀·PPT 변환 · 한글 인쇄", "PDF conversion", "Document to PDF", "Word, Excel & PPT · HWP via print"),
   tool("pdf-to-document", "#d53228", "PDF 변환", "PDF를 문서로 변환", "DOCX · XLSX · PPTX · HWPX · OCR", "PDF conversion", "PDF to Document", "DOCX · XLSX · PPTX · HWPX · OCR"),

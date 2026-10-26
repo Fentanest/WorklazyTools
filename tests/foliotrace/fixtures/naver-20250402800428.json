@@ -1,0 +1,29 @@
+{
+  "rcept_no": "20250402800428",
+  "form": "A3_MAJOR_SHAREHOLDER_CHANGE",
+  "parser": "structured-v2-2026-10-05",
+  "failures": [],
+  "trades": [
+    {
+      "date": "2025-03-13",
+      "reason": "장내매수(+)",
+      "kind": "보통주식",
+      "before": "13366040",
+      "change": "1272797",
+      "after": "14638837"
+    }
+  ],
+  "issuer_name": "네이버(주)",
+  "issuer_stock_code": "035420",
+  "outstanding_voting_shares": "158437008",
+  "reporter": "국민연금공단",
+  "shares": "14638837",
+  "shares_and_equivalents": "14638837",
+  "ratio_pct": "9.24",
+  "ratio_and_equivalents_pct": "9.24",
+  "base_date": "2025-03-13",
+  "previous_shares_and_equivalents": null,
+  "change_shares_and_equivalents": null,
+  "guaranteed": true,
+  "evidence_sha256": "9bb5e25455a5874e6a60db2408c89da3cc11abcd0569991aae22bbf04cb8cdb6"
+}

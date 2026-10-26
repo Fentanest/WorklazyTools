@@ -1,10 +1,11 @@
+import { fileURLToPath } from "node:url";
 // BentoPDF uses @bentopdf/pymupdf-wasm 0.11.16. Keep its Pyodide/wheel set
 // together and patch the published wrapper at this single, checked entrypoint.
 import fs from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
-const root = path.resolve(new URL("..", import.meta.url).pathname);
+const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const source = path.join(root, "node_modules", "@bentopdf", "pymupdf-wasm");
 const manifest = JSON.parse(await fs.readFile(path.join(source, "package.json"), "utf8"));
 const destination = path.join(root, "public", "vendor", "bento-pymupdf", manifest.version);

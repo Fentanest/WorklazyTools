@@ -39,7 +39,9 @@ async function withPagePair(before: OwnedPdf, after: OwnedPdf, mapping: PageMapp
       }
     } else page.visualComparison = ac ? 'deleted' : 'added';
     checkAbort(signal); page.status = 'complete';
+    const source = (item: typeof a, pageIndex: number | null) => { if (!item || pageIndex === null) return null; const viewport = item.page.getViewport({ scale: (96 / 72) * geometry.scaleFactor }); return { pageIndex, rotation: viewport.rotation, viewBox: [...viewport.viewBox], pdfToRendered: [...viewport.transform] }; };
     const preview: SelectedPreview | undefined = selected ? {
+      beforeSource: source(a, mapping.before), afterSource: source(b, mapping.after),
       before: ac ?? null, after: bc ?? null, overlay, beforeItems: a?.selectedItems ?? [], afterItems: b?.selectedItems ?? [], geometry,
       release() { closeCanvas(this.before); closeCanvas(this.after); closeCanvas(this.overlay); this.before = this.after = this.overlay = null; this.beforeItems.length = this.afterItems.length = 0; },
     } : undefined;

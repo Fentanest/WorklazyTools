@@ -1,3 +1,5 @@
+import { sniffDocumentFormat } from "../document-compare/documentFormat";
+import { documentCapabilities, documentProvenance } from "../document-compare/documentCapabilities";
 /// <reference lib="webworker" />
 
 import initRhwp, { HwpDocument } from "@rhwp/core";
@@ -12,6 +14,8 @@ import {
   type ComparisonTable,
 } from "../document-compare/documentComparison";
 import type { HwpCompareOptions, HwpWorkerPairResult } from "./hwpWorkerClient";
+import { isOutOfMemory, outOfMemoryMessage } from "../document-compare/memoryFailure";
+import { screenResult } from "../document-compare/screenResult";
 
 interface PairPayload {
   beforeName: string;
@@ -72,7 +76,11 @@ worker.onmessage = async (event: MessageEvent<{ pairs: PairPayload[]; options: H
       progress(start + size * 0.38, L(`[${index + 1}/${pairs.length}] ${pair.afterName} 문서 구조를 읽는 중…`, `[${index + 1}/${pairs.length}] Reading the structure of ${pair.afterName}…`));
       const after = parseDocument(pair.afterName, pair.afterBuffer, pair.afterPassword, options);
       progress(start + size * 0.72, L(`[${index + 1}/${pairs.length}] 문단과 표의 대응 관계를 분석하는 중…`, `[${index + 1}/${pairs.length}] Matching paragraphs and tables…`));
-      results.push({ result: compareDocumentModels(pair.beforeName, pair.afterName, before, after, options, currentLanguage) });
+      before.capabilities = documentCapabilities(sniffDocumentFormat(pair.beforeBuffer) === "hwpx" ? "hwpx" : "hwp",before); after.capabilities = documentCapabilities(sniffDocumentFormat(pair.afterBuffer) === "hwpx" ? "hwpx" : "hwp",after);
+      before.provenance = await documentProvenance(pair.beforeBuffer,pair.beforeBuffer);
+      after.provenance = await documentProvenance(pair.afterBuffer,pair.afterBuffer);
+      // Only the page's part of the manifest is kept: HWP has no tracked file to generate from it.
+      results.push({ result: screenResult(compareDocumentModels(pair.beforeName, pair.afterName, before, after, options, currentLanguage)) });
       progress(start + size, L(`[${index + 1}/${pairs.length}] HWP 비교 완료`, `[${index + 1}/${pairs.length}] HWP comparison complete`));
       await yieldToWorker();
     }
@@ -121,13 +129,14 @@ function parseDocument(name: string, buffer: ArrayBuffer, password: string | und
         if (displayText) {
           blocks.push({
             type: "paragraph",
+            nativeSource: {format:"hwp",story:"body",section,paragraph},
             text: displayText,
             format: options.formatting ? bodyFormat(document, section, paragraph, text.length) : "",
             location: L(`제${section + 1}구역 ${paragraph + 1}문단`, `Section ${section + 1}, paragraph ${paragraph + 1}`),
           });
         }
         for (const table of tablesByParagraph.get(key) ?? []) {
-          blocks.push({ type: "table", text: flattenTable(table), format: "", location: table.location, table });
+          blocks.push({ type: "table", nativeSource:{format:"hwp",story:"body",section:table.section,paragraph:table.paragraph,control:table.control}, text: flattenTable(table), format: "", location: table.location, table });
         }
       }
     }
@@ -135,6 +144,7 @@ function parseDocument(name: string, buffer: ArrayBuffer, password: string | und
     const headerFooter = options.metadata ? readHeaderFooters(document, options.formatting) : [];
     const notes = options.metadata ? readNotes(document, options.formatting) : [];
     const warnings = [
+      L("그리기 개체와 일부 고급 구조는 원문 위치를 모두 추적하지 못하며, 긴 문단의 서식은 표본 위치를 비교합니다.", "Drawing objects and some advanced structures lack complete source mapping; formatting in long paragraphs is sampled."),
       L("HWP/HWPX 의 검토 메모와 변경 추적 기록은 비교하지 않습니다. 해당 기록이 있는 문서는 변경 내용을 모두 적용한 사본으로 비교해 주세요.", "Review comments and tracked changes in HWP/HWPX files are not compared. For files with these records, compare copies with the changes accepted."),
     ];
     if (options.tables && tables.some((table) => table.grid.some((row) => row.some((cell) => /병합|merged/i.test(cell.location))))) {
@@ -336,6 +346,9 @@ function normalizeError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (/password|decrypt|encrypted|암호/i.test(message)) {
     return L("암호를 확인하거나 암호를 해제한 HWP 사본으로 다시 시도해 주세요.", "Check the password or retry with an unlocked HWP copy.");
+  }
+  if (isOutOfMemory(error)) {
+    return outOfMemoryMessage(currentLanguage === "en" ? "en" : "ko");
   }
   if (/memory|allocation|out of bounds|too large/i.test(message)) {
     return L("문서가 너무 커서 현재 브라우저에서 비교하지 못했습니다. 다른 탭을 닫고 다시 시도해 주세요.", "The document is too large for this browser session. Close other tabs and try again.");

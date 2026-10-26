@@ -1,3 +1,4 @@
+import { documentCapabilities } from "../document-compare/documentCapabilities";
 import docToText, { type LegacyWordModel, type LegacyWordParagraph, type LegacyWordRun } from "legacy-word-doc-reader";
 
 import type { WordCellComment, WordTableCell } from "../excel-merger/types";
@@ -35,6 +36,7 @@ export function extractLegacyDocModel(
       ]
     : [];
   return {
+    capabilities:documentCapabilities("doc",{blocks}),
     blocks,
     headerFooter,
     notes,
@@ -75,7 +77,7 @@ function bodyBlocks(
     tableRow = [];
   };
 
-  for (const paragraph of model.body ?? []) {
+  for (const [sourceParagraph,paragraph] of (model.body ?? []).entries()) {
     if (paragraph.kind === "cell" || paragraph.kind === "rowEnd") {
       const rowNumber = tableRows.length + 1;
       const columnNumber = tableRow.length + 1;
@@ -97,7 +99,7 @@ function bodyBlocks(
       options.formatting,
       commentRecords,
     );
-    blocks.push({ type: "paragraph", ...record });
+    blocks.push({ type: "paragraph", ...record, nativeSource:{format:"doc",story:"body",paragraph:sourceParagraph} });
   }
   flushTable();
   return blocks;

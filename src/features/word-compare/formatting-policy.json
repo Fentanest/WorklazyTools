@@ -1,0 +1,15 @@
+{
+  "version":"worklazy-formatting-2",
+  "enabled":{
+    "rPr":["b","i","u","strike","dstrike","caps","smallCaps","bCs","iCs","color","highlight","vertAlign","outline","shadow","emboss","imprint","spacing","kern","position","w","vanish","shd","sz","rFonts"],
+    "pPr":["pStyle","keepNext","keepLines","pageBreakBefore","widowControl","suppressLineNumbers","pBdr","shd","tabs","spacing","ind","jc","textDirection","textAlignment","contextualSpacing","mirrorIndents"],
+    "tblPr":["tblStyle","tblW","jc","tblCellSpacing","tblInd","tblBorders","shd","tblLayout","tblCellMar","tblLook","bidiVisual"],
+    "tblGrid":["gridCol"],
+    "trPr":["trHeight","cantSplit","tblHeader","jc","hidden","tblCellSpacing"],
+    "tcPr":["tcW","gridSpan","vMerge","tcBorders","shd","noWrap","tcMar","textDirection","tcFitText","vAlign","hideMark"],
+    "sectPr":["type","pgSz","pgMar","paperSrc","pgBorders","lnNumType","pgNumType","cols","formProt","vAlign","noEndnote","titlePg","textDirection","bidi","rtlGutter","docGrid"]
+  },
+  "toggles":["b","i","strike","dstrike","caps","smallCaps","bCs","iCs","outline","shadow","emboss","imprint","vanish","keepNext","keepLines","pageBreakBefore","widowControl","suppressLineNumbers","contextualSpacing","mirrorIndents","bidiVisual","cantSplit","tblHeader","hidden","noWrap","tcFitText","hideMark","formProt","noEndnote","titlePg","bidi","rtlGutter"],
+  "noiseAttributes":["{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rsidR","{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rsidRPr","{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rsidP","{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rsidRDefault","{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rsidSect","{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rsidDel","{http://schemas.openxmlformats.org/wordprocessingml/2006/main}rsidTr"],
+  "maskGroups":{"rPr":{"rFonts":"fontFamily","sz":"size","color":"color","highlight":"color","shd":"color"},"sectPr":{"pgNumType":"numbering","lnNumType":"numbering"}}
+}

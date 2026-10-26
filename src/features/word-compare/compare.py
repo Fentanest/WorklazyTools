@@ -1,4 +1,4 @@
-import difflib
+import hashlib
 import io
 import json
 import re
@@ -207,15 +207,45 @@ class _NumberingResolver:
         return pattern
 
 
+# Text the accepted view does not show: existing deletions, and property elements (a tab stop
+# in paragraph properties is also a w:tab).
+DELETED_TEXT_TAGS = {W + "del", W + "moveFrom"}
+TEXT_SKIPPED_TAGS = DELETED_TEXT_TAGS | {W + "pPr", W + "rPr", W + "sectPr", W + "tblPr", W + "trPr", W + "tcPr"}
+
+
 def _text(node):
+    """Accepted-view text of `node`, memoized within one extraction (the extractor reads trees only;
+    the entry keeps the node so its id cannot be reused by another element)."""
+    memo = _FACT_MEMO["text"]
+    if memo is not None:
+        entry = memo.get(id(node))
+        if entry is not None and entry[0] is node:
+            return entry[1]
+        value = _text_uncached(node)
+        memo[id(node)] = (node, value)
+        return value
+    return _text_uncached(node)
+
+
+_TEXT_TAG, _TAB_TAG, _BREAK_TAGS = W + "t", W + "tab", (W + "br", W + "cr")
+
+
+def _text_uncached(node):
     parts = []
-    for item in node.iter():
-        if item.tag == W + "t":
+    stack = [node]
+    while stack:
+        item = stack.pop()
+        tag = item.tag
+        if tag in TEXT_SKIPPED_TAGS:
+            continue
+        if tag == _TEXT_TAG:
             parts.append(item.text or "")
-        elif item.tag == W + "tab":
+        elif tag == _TAB_TAG:
             parts.append("\t")
-        elif item.tag in (W + "br", W + "cr"):
+        elif tag in _BREAK_TAGS:
             parts.append("\n")
+        else:
+            stack.extend(reversed(list(item)))
     return "".join(parts)
 
 
@@ -228,11 +258,492 @@ def _run_style(run):
         item = props.find(W + name)
         if item is not None:
             values.append(name + ":" + item.attrib.get(W + "val", "1"))
+    memo = _FACT_MEMO["styleJson"]
     for name in ("color", "highlight", "sz", "rFonts"):
         item = props.find(W + name)
         if item is not None:
-            values.append(name + ":" + json.dumps(item.attrib, sort_keys=True))
+            # The same few attribute sets repeat on every run: serialize each once per extraction.
+            key = tuple(item.attrib.items()) if memo is not None else None
+            encoded = memo.get(key) if memo is not None else None
+            if encoded is None:
+                encoded = json.dumps(item.attrib, sort_keys=True)
+                if memo is not None:
+                    memo[key] = encoded
+            values.append(name + ":" + encoded)
     return "|".join(values)
+
+
+def _normalized_property_fact(tree, property_name, policy):
+    """Normalize one source snapshot; never compare documents or choose edits."""
+    return _normalized_property_node(_PropertyTreeNode(tree) if tree else None, property_name, policy)
+
+
+class _PropertyTreeNode:
+    """Element-like view over a property_tree dict so both inputs share one normalizer."""
+    __slots__ = ("tag", "attrib", "text", "_children")
+    def __init__(self, tree):
+        self.tag, self.attrib, self.text, self._children = tree["name"], tree["attributes"], tree["text"], tree["children"]
+    def __iter__(self):
+        return (_PropertyTreeNode(child) for child in self._children)
+
+
+_POLICY_SETS = {}
+
+
+def _policy_sets(policy):
+    cached = _POLICY_SETS.get(id(policy))
+    if cached is None or cached[0] is not policy:
+        enabled = policy.get("enabled", {})
+        cached = (policy, set(policy.get("toggles", [])), set(policy.get("noiseAttributes", [])), {W + name + "Change" for name in enabled}, enabled)
+        _POLICY_SETS[id(policy)] = cached
+    return cached[1:]
+
+
+_FACT_MEMO = {"facts": None, "text": None, "styleJson": None}
+
+
+def _element_key(node):
+    return (node.tag, tuple(node.attrib.items()), node.text, tuple([_element_key(child) for child in node]) if len(node) else ())
+
+
+def _normalized_property_node(node, property_name, policy):
+    """`_normalized_property_fact` over an XML element (or None), memoized per distinct element
+    within one extraction (runs and paragraphs repeat the same few property sets)."""
+    memo = _FACT_MEMO["facts"]
+    if memo is None or node is None or not isinstance(node, ET.Element):
+        return _normalized_property_node_uncached(node, property_name, policy)
+    key = (id(policy), property_name, _element_key(node))
+    fact = memo.get(key)
+    if fact is None:
+        fact = memo[key] = _normalized_property_node_uncached(node, property_name, policy)
+    return fact
+
+
+def _normalized_property_node_uncached(node, property_name, policy):
+    """`_normalized_property_fact` over an XML element (or None), without building a snapshot tree."""
+    supported, unsupported = {}, {}
+    history = False
+    toggles, noise_attributes, change_names, enabled = _policy_sets(policy)
+    if node is None:
+        return {"supported": supported, "unsupported": unsupported, "history": history}
+    for name, value in node.attrib.items():
+        if name not in noise_attributes:
+            unsupported["@" + name] = [json.dumps(value, ensure_ascii=False)]
+    def canonical(item):
+        attributes = sorted((name, value) for name, value in item.attrib.items() if name not in noise_attributes)
+        local = item.tag[len(W):] if item.tag.startswith(W) else item.tag
+        if item.tag.startswith(W) and local in toggles:
+            value = item.attrib.get(W + "val", "true").lower()
+            if value in {"false", "off", "0"}:
+                return None
+            return [item.tag, [(name, value) for name, value in attributes if name != W + "val"], "on", [canonical(child) for child in item]]
+        children = [canonical(child) for child in item if child.tag not in change_names]
+        text = item.text or ""
+        return [item.tag, attributes, text if text.strip() else "", children]
+    enabled_here = enabled.get(property_name, [])
+    for child in node:
+        if child.tag == W + property_name + "Change":
+            history = True
+            continue
+        if property_name=="sectPr" and child.tag in {W+"headerReference",W+"footerReference"} or property_name=="pPr" and child.tag==W+"sectPr":continue
+        value = canonical(child)
+        child_text = child.text or ""
+        grid_leaf = property_name!='tblGrid' or child.tag!=W+'gridCol' or (not len(list(child)) and not child_text.strip() and set(child.attrib)-noise_attributes <= {W+'w'} and (W+'w' not in child.attrib or re.fullmatch(r'(?:[+]?[0-9]+|[0-9]+(?:\.[0-9]+)?(?:mm|cm|in|pt|pc|pi))',child.attrib[W+'w'])))
+        if property_name=='tblGrid' and grid_leaf and value is not None:
+            value[1]=[(name,str(int(v)) if name==W+'w' and re.fullmatch(r'[+]?[0-9]+',v) else v) for name,v in value[1]]
+        if value is None:
+            continue
+        local = child.tag[len(W):] if child.tag.startswith(W) else child.tag
+        target = supported if child.tag.startswith(W) and local in enabled_here and grid_leaf else unsupported
+        target.setdefault(child.tag, []).append(_compact_json(value))
+    return {"supported": supported, "unsupported": unsupported, "history": history}
+
+
+def _simple_vml_picture(node, archive=None, part=None):
+    """Bounded inline image shape (no controls, OLE, textbox or nested graph)."""
+    v='{urn:schemas-microsoft-com:vml}';o='{urn:schemas-microsoft-com:office:office}'
+    r='{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'
+    if node.tag!=W+'pict' or node.attrib or [n.tag for n in node]!=[v+'shapetype',v+'shape']:return False
+    definition,shape=list(node);type_id=definition.get('id','');shape_id=shape.get('id','')
+    if not all(re.fullmatch(r'[A-Za-z_][A-Za-z0-9_.-]*',value) for value in (type_id,shape_id)) or type_id==shape_id:return False
+    if definition.attrib!={'id':type_id,'coordsize':'21600,21600',o+'spt':'75','path':'m0,0l21600,0,21600,21600,0,21600xe'} or len(definition):return False
+    if set(shape.attrib)!={'id','type','style'} or shape.get('type')!='#'+type_id or [n.tag for n in shape]!=[v+'imagedata']:return False
+    styles={}
+    for declaration in shape.get('style','').strip().strip(';').split(';'):
+        pair=declaration.split(':')
+        if len(pair)!=2:return False
+        key,value=(p.strip() for p in pair)
+        if key in styles or key not in {'width','height'} or not re.fullmatch(r'(?:[0-9]+(?:\.[0-9]+)?)pt',value) or not 0<float(value[:-2])<10000:return False
+        styles[key]=value
+    if set(styles)!={'width','height'}:return False
+    image=shape[0]
+    if len(image) or set(image.attrib)-{r+'id',o+'title'} or not image.get(r+'id'):return False
+    if any((n.text or '').strip() or (n.tail or '').strip() for n in node.iter()):return False
+    if archive is None:return True
+    import posixpath
+    rel_path=posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
+    if rel_path not in archive.namelist() or '[Content_Types].xml' not in archive.namelist():return False
+    relationships=[n for n in _cached_xml(archive, rel_path) if n.get('Id')==image.get(r+'id')]
+    if len(relationships)!=1:return False
+    rel=relationships[0];target=rel.get('Target','')
+    if rel.get('Type')!=r[1:-1]+'/image' or rel.get('TargetMode','') not in ('','Internal') or not target or any(c in target for c in "\\:#?%"):return False
+    path=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
+    if path.startswith('../') or archive.namelist().count(path)!=1 or posixpath.join(posixpath.dirname(path),'_rels',posixpath.basename(path)+'.rels') in archive.namelist():return False
+    ct='{http://schemas.openxmlformats.org/package/2006/content-types}';types=_cached_xml(archive, '[Content_Types].xml')
+    overrides=[n.get('ContentType') for n in types if n.tag==ct+'Override' and n.get('PartName')=='/'+path]
+    defaults=[n.get('ContentType') for n in types if n.tag==ct+'Default' and n.get('Extension','').lower()==posixpath.splitext(path)[1].lstrip('.').lower()]
+    if (overrides or defaults)!=['image/png']:return False
+    data=archive.read(path)
+    if len(data)<24 or data[:8]!=b'\x89PNG\r\n\x1a\n' or data[12:16]!=b'IHDR' or int.from_bytes(data[16:20],'big')==0 or int.from_bytes(data[20:24],'big')==0:return False
+    root=_cached_xml(archive, part);ids=[n.get('id') for n in root.iter() if n.tag in {v+'shape',v+'shapetype'}]
+    pictures=[p for p in root.iter(W+'pict') if any(n.tag==v+'shape' and n.get('id')==shape_id for n in p)]
+    if len(pictures)!=1:return False
+    parents={child:parent for parent in root.iter() for child in parent};run=parents.get(pictures[0]);paragraph=parents.get(run)
+    return ids.count(type_id)==ids.count(shape_id)==1 and run is not None and run.tag==W+'r' and paragraph is not None and paragraph.tag==W+'p'
+
+
+def _stable_named_bookmark_context(root, part):
+    """Source-only shape check; correspondence is owned by existing decisions."""
+    if part!='word/document.xml':return None
+    starts=list(root.iter(W+'bookmarkStart'));ends=list(root.iter(W+'bookmarkEnd'))
+    links=[n for n in root.iter(W+'hyperlink') if n.get(W+'anchor') is not None]
+    if len(starts)!=1 or len(ends)!=1 or len(links)!=1:return None
+    start,end,link=starts[0],ends[0],links[0];name=start.get(W+'name','');ident=start.get(W+'id','')
+    if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]{0,39}',name) or not re.fullmatch(r'[0-9]+',ident):return None
+    if start.attrib!={W+'id':ident,W+'name':name} or end.attrib!={W+'id':ident} or len(start) or len(end):return None
+    if link.attrib!={W+'anchor':name}:return None
+    parents={child:parent for parent in root.iter() for child in parent};body=root.find(W+'body');host=parents.get(start);jump=parents.get(link)
+    if host is None or jump is None or host is jump or parents.get(host) is not body or parents.get(jump) is not body:return None
+    if any((n.text or '').strip() or (n.tail or '').strip() for n in (start,end,host,jump,link)):return None
+    if host.attrib or jump.attrib or not len(host) or host[0] is not start or host[-1] is not end or list(jump)!=[link]:return None
+    def plain_runs(nodes):
+        return bool(nodes) and all(n.tag==W+'r' and not n.attrib and not (n.text or '').strip() and not (n.tail or '').strip() and len(n)>0 and all(t.tag==W+'t' and not len(t) and not (t.tail or '').strip() and not set(t.attrib)-{'{http://www.w3.org/XML/1998/namespace}space'} and t.get('{http://www.w3.org/XML/1998/namespace}space','default') in ('default','preserve') for t in n) for n in nodes)
+    if not plain_runs(list(host)[1:-1]) or not plain_runs(list(link)) or not _text(host).strip() or not _text(link).strip():return None
+    return {'name':name,'host':host,'jump':jump,'link':link,'start':start,'end':end}
+
+
+# Property elements are facts of the paragraph, run, table, row, cell or style that owns them
+# (normalizedProperties), not sources of their own. A section break inside a paragraph's
+# properties is a source.
+PROPERTY_CONTAINER_TAGS = {W + name for name in ("pPr", "rPr", "tblPr", "trPr", "tcPr", "tblGrid", "tblPrEx")}
+
+
+# Paragraph content whose identity is a signature of its XML (and related package parts).
+OPAQUE_PARAGRAPH_TAGS = {W + name for name in ("drawing", "pict", "object", "hyperlink", "fldChar", "fldSimple", "instrText", "footnoteReference", "endnoteReference")}
+STYLE_PRUNE_BLOCKERS = {W + name for name in ("p", "fldSimple", "fldChar", "instrText")}
+# Property elements each source kind owns as normalized facts.
+SOURCE_KIND_PROPERTIES = {"p": ("pPr",), "r": ("rPr",), "tbl": ("tblPr", "tblGrid"), "tr": ("trPr",), "tc": ("tcPr",), "body": ("sectPr",), "style": ("pPr", "rPr")}
+# A paragraph whose object events are otherwise exportable is not when it holds one of these.
+EVENT_UNSUPPORTED_TAGS = {W + name for name in ("object", "fldChar", "fldSimple", "instrText", "ins", "del", "moveFrom", "moveTo", "pPrChange", "sectPrChange")}
+NOTE_REFERENCE_TAGS = {W + "footnoteReference", W + "endnoteReference"}
+
+
+_SOURCE_FACTS = {"cache": None}
+_PARSED_PARTS = {"parts": None, "xml": None}
+
+
+def _cached_xml(archive, name):
+    """Parsed `name`, shared within one extraction (the extractor only reads these trees)."""
+    cache = _PARSED_PARTS["xml"]
+    if cache is None:
+        return ET.fromstring(archive.read(name))
+    key = (id(archive), name)
+    root = cache.get(key)
+    if root is None:
+        root = cache[key] = ET.fromstring(archive.read(name))
+    return root
+
+
+def _parsed_part(archive, part):
+    """(root, source map) of `part` from this extraction's inventory pass, parsing it only when
+    the inventory did not cover it."""
+    parsed = _PARSED_PARTS["parts"]
+    if parsed is not None and part in parsed:
+        return parsed[part]
+    root = _cached_xml(archive, part)
+    return root, _source_paths(root, part, archive)
+_COMPACT_JSON = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"))
+_JSON_STRING = json.encoder.encode_basestring
+# Opaque paragraph items canonicalized by their text, and the tags the object event walk
+# distinguishes (see _source_paths).
+_TEXT_CANONICAL_TAGS = frozenset({W + "hyperlink", W + "fldSimple"})
+_PARAGRAPH_TAG = W + "p"
+_NOTE_REFERENCE_TAGS = frozenset({W + "footnoteReference", W + "endnoteReference"})
+_OBJECT_EVENT_TAGS = frozenset({W + "drawing", W + "pict", W + "hyperlink", "{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"})
+_ONE_CHARACTER_TAGS = frozenset({W + "tab", W + "br", W + "cr"})
+
+
+def _compact_json(value):
+    """`_COMPACT_JSON.encode(value)` for the nested lists and tuples of strings and None that
+    property facts hold, without the encoder set up on every call (thousands per document): the
+    same string escaping and separators. Any other value goes to the encoder."""
+    kind = type(value)
+    if kind is str:
+        return _JSON_STRING(value)
+    if kind is list or kind is tuple:
+        return "[" + ",".join([_compact_json(item) for item in value]) + "]"
+    if value is None:
+        return "null"
+    return _COMPACT_JSON.encode(value)
+
+
+def _source_paths(root, part, archive=None):
+    result = {}
+    offsets = {}
+    invalid_qname = False
+    rewrite = None
+    normalized_root = root
+    if archive is not None and "_qname_safe_parse" in globals():
+        data = archive.read(part)
+        try:
+            # Namespace-normalized attribute values for event identities: rewritten in place when
+            # every declaration is on the root, else from a namespace-aware parse.
+            rewrite = _qname_rewriter(data, root) if "_qname_rewriter" in globals() else None
+            if rewrite is None:
+                normalized_root = _qname_safe_parse(data, False)
+        except ValueError:
+            normalized_root = root; invalid_qname = True; rewrite = None
+    policy = json.loads(globals().get("WORKLAZY_FORMATTING_POLICY_JSON", "{}"))
+    def property_tree(node):
+        if node is None:
+            return None
+        return {"name": node.tag, "attributes": dict(node.attrib), "text": node.text or "", "children": [property_tree(child) for child in node]}
+    w_sect, w_style, w_p, w_r = W + "sectPr", W + "style", W + "p", W + "r"
+    def visit(node, path, paragraph=None, deleted=False):
+        tag = node.tag
+        if tag in PROPERTY_CONTAINER_TAGS:
+            for index, child in enumerate(node):
+                if child.tag == w_sect:
+                    visit(child, path + [index], paragraph)
+            return
+        reference = {"part": part, "path": path, "kind": tag.rsplit("}", 1)[-1]}
+        property_names = SOURCE_KIND_PROPERTIES.get(reference["kind"], ())
+        facts = _SOURCE_FACTS["cache"]
+        fact_key = (part, tuple(path))
+        cached = facts.get(fact_key) if facts is not None else None
+        if cached is not None:
+            reference["normalizedProperties"] = cached
+        elif tag==w_sect:
+            reference["normalizedProperties"]={"sectPr":_normalized_property_node(node,"sectPr",policy)}
+        if property_names:
+            # Raw snapshots are consumed only for table grids; every other property ships its normalized fact.
+            if reference["kind"] == "tbl":
+                reference["propertySnapshots"] = {"tblGrid": property_tree(node.find(W + "tblGrid"))}
+            if cached is None:
+                reference["normalizedProperties"] = {name: _normalized_property_node(node.find(W + name), name, policy) for name in property_names}
+        if facts is not None and cached is None and "normalizedProperties" in reference:
+            facts[fact_key] = reference["normalizedProperties"]
+        if tag == w_style:
+            reference["attributes"] = dict(node.attrib)
+            name = node.find(W + "name")
+            reference["label"] = name.get(W + "val", "") if name is not None else ""
+        if tag == w_p:
+            paragraph = path
+            offsets[fact_key[1]] = 0
+        if tag == w_p:
+            deleted = False
+        if tag == w_r and paragraph is not None:
+            owner = tuple(paragraph)
+            start = offsets[owner]
+            # Positions count the text `_text` reads for the paragraph: existing deletions add none.
+            offsets[owner] += 0 if deleted else len(_text(node))
+            reference["paragraphPath"] = paragraph
+            reference["textRange"] = [start, offsets[owner]]
+        if tag == w_p:
+            reference["rawText"] = _text(node)
+            opaque = [item for item in node.iter() if item.tag in OPAQUE_PARAGRAPH_TAGS]
+            if opaque:
+                def canonical(item):
+                    if item.tag in _TEXT_CANONICAL_TAGS:
+                        return (item.tag, sorted(item.attrib.items()), _text(item))
+                    return (item.tag, sorted(item.attrib.items()), item.text or "", [canonical(child) for child in item])
+                payload = json.dumps([canonical(item) for item in opaque], ensure_ascii=False).encode("utf-8")
+                if archive is not None:
+                    import posixpath
+                    relationship_path = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
+                    if relationship_path in archive.namelist():
+                        relationship_root = _cached_xml(archive, relationship_path)
+                        relationships = {item.get("Id"): item for item in relationship_root}
+                        for item in opaque:
+                            for descendant in item.iter():
+                                for attribute, value in descendant.attrib.items():
+                                    if attribute.startswith("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}") and value in relationships:
+                                        relationship = relationships[value]
+                                        payload += json.dumps(canonical(relationship), ensure_ascii=False).encode("utf-8")
+                                        if relationship.get("TargetMode") != "External":
+                                            target = relationship.get("Target", "")
+                                            target_path = target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), target))
+                                            if target_path in archive.namelist():
+                                                payload += archive.read(target_path)
+                reference["opaqueSignature"] = hashlib.sha256(payload).hexdigest()
+                # Text with its run properties, adjacent equal properties joined: equal exactly when the
+                # per-character (character, properties) sequences are equal, without per-character work.
+                property_runs = []
+                for run in node.iter(W + "r"):
+                    text = _text(run)
+                    if not text:
+                        continue
+                    run_properties = run.find(W + "rPr")
+                    canonical_properties = canonical(run_properties) if run_properties is not None else None
+                    if property_runs and property_runs[-1][1] == canonical_properties:
+                        property_runs[-1][0] += text
+                    else:
+                        property_runs.append([text, canonical_properties])
+                properties = node.find(W + "pPr")
+                copy_payload = (canonical(properties) if properties is not None else None, property_runs)
+                reference["copySignature"] = hashlib.sha256(json.dumps(copy_payload, ensure_ascii=False).encode("utf-8")).hexdigest()
+        result[id(node)] = reference
+        if style_part and path and not any(item.tag in STYLE_PRUNE_BLOCKERS for item in node.iter()):
+            # A style is consumed through its attributes, label and pPr/rPr facts; the rest of a
+            # style (and the document defaults and latent style table) is not a source. Content
+            # the paragraph and field passes below read keeps its sources.
+            return
+        deleted = deleted or tag in DELETED_TEXT_TAGS
+        for index, child in enumerate(node):
+            visit(child, path + [index], paragraph, deleted)
+    style_part = part == "word/styles.xml"
+    visit(root, [])
+    # XML positions and relationship identities are extraction facts, not pairs.
+    part_relationships = []
+    bookmark_context = []
+    def event_identity(node):
+        import posixpath
+        relationship_base="http://schemas.openxmlformats.org/officeDocument/2006/relationships/"
+        rels = {}
+        if archive is not None:
+            rel_path = posixpath.join(posixpath.dirname(part), "_rels", posixpath.basename(part) + ".rels")
+            # The part's relationships, parsed once for all of its events.
+            if not part_relationships:
+                part_relationships.append(list(_cached_xml(archive, rel_path)) if rel_path in archive.namelist() else [])
+            rels = {item.get("Id"): item for item in part_relationships[0]}
+        def leaf_hyperlink(destination):
+            if not destination or any(c in destination for c in "\\:#?%") or archive is None:return None
+            path=destination.lstrip('/') if destination.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),destination))
+            if path.startswith('../') or archive.namelist().count(path)!=1:return None
+            if posixpath.join(posixpath.dirname(path),'_rels',posixpath.basename(path)+'.rels') in archive.namelist():return None
+            if '[Content_Types].xml' not in archive.namelist():return None
+            types=_cached_xml(archive, '[Content_Types].xml');ct='{http://schemas.openxmlformats.org/package/2006/content-types}'
+            overrides=[n.get('ContentType') for n in types if n.tag==ct+'Override' and n.get('PartName')=='/'+path]
+            defaults=[n.get('ContentType') for n in types if n.tag==ct+'Default' and n.get('Extension','').lower()==posixpath.splitext(path)[1].lstrip('.').lower()]
+            if (overrides or defaults)!=['application/xml']:return None
+            data=archive.read(path)
+            try:root=ET.fromstring(data)
+            except ET.ParseError:return None
+            office=('http://schemas.openxmlformats.org/','urn:schemas-microsoft-com:','http://schemas.microsoft.com/office/')
+            if any(n.tag.startswith(tuple('{'+uri for uri in office)) or any(a.startswith('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}') for a in n.attrib) for n in root.iter()):return None
+            return data
+        named_anchor=node.tag==W+"hyperlink" and node.get(W+"anchor") is not None
+        if named_anchor and not bookmark_context:
+            # The context depends only on this part's tree: shape-check it once.
+            bookmark_context.append(_stable_named_bookmark_context(root,part))
+        named_context=bookmark_context[0] if named_anchor else None
+        supported = (not named_anchor or named_context is not None and named_context["link"] is node) and (node.tag!=W+"pict" or _simple_vml_picture(node,archive,part))
+        vml_picture=node.tag==W+"pict" and supported
+        has_image = False
+        target = node.get(W+"anchor","") if named_anchor else ""
+        def canonical_event(item):
+            nonlocal supported, target, has_image
+            attrs = []
+            for name, value in sorted(item.attrib.items()):
+                if rewrite is not None: value = rewrite(item, name, value)
+                if item.tag == "{http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing}docPr" and name == "id": continue
+                if name.startswith("xmlns:"):continue
+                if vml_picture and item.tag in {"{urn:schemas-microsoft-com:vml}shape","{urn:schemas-microsoft-com:vml}shapetype"}:
+                    if name=="id":continue
+                    if name=="type":value="#picture-type"
+                if name.startswith("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"):
+                    relationship = rels.get(value)
+                    if relationship is None: supported = False
+                    else:
+                        kind, mode, destination = relationship.get("Type", ""), relationship.get("TargetMode", ""), relationship.get("Target", "")
+                        if item.tag==W+"hyperlink" and kind!=relationship_base+"hyperlink":supported=False
+                        if item.tag in {"{http://schemas.openxmlformats.org/drawingml/2006/main}blip","{urn:schemas-microsoft-com:vml}imagedata"} and kind!=relationship_base+"image":supported=False
+                        if kind==relationship_base+"image":has_image=True
+                        if kind not in {relationship_base+"image",relationship_base+"hyperlink"}: supported = False
+                        if mode == "External": value = json.dumps([kind, mode, destination]); target = destination
+                        else:
+                            path = destination.lstrip("/") if destination.startswith("/") else posixpath.normpath(posixpath.join(posixpath.dirname(part), destination))
+                            if kind==relationship_base+"hyperlink":
+                                unique=sum(1 for rel in part_relationships[0] if rel.get('Id')==value)==1
+                                data=leaf_hyperlink(destination) if mode in ('','Internal') and unique else None
+                                if data is None:supported=False
+                                else:value=json.dumps([kind,hashlib.sha256(data).hexdigest(),'application/xml'])
+                            elif archive is None or path not in archive.namelist():supported=False
+                            else:value=json.dumps([kind,hashlib.sha256(archive.read(path)).hexdigest()])
+                attrs.append((name, value))
+            return (item.tag, attrs) if item.tag == W + "hyperlink" else (item.tag, attrs, item.text or "", [canonical_event(child) for child in item])
+        normalized = normalized_root
+        for index in result[id(node)]["path"]: normalized = list(normalized)[index]
+        value = canonical_event(normalized)
+        if node.tag == W + "hyperlink" and (named_anchor and not supported or node.find('.//' + W + 'drawing') is not None or any(child.tag!=W+"r" for child in node)): supported = False
+        if node.tag != W + "hyperlink" and not has_image:supported=False
+        if node.tag!=W+'pict' and node.find('.//'+W+'pict') is not None:supported=False
+        return hashlib.sha256(json.dumps(value, ensure_ascii=False).encode()).hexdigest(), supported, target
+    history_tags={W+name for name in policy.get("enabled",{}).get("rPr",[])+["rPr","lang","rStyle","szCs"]}
+    for paragraph in root.iter(W + "p"):
+        cursor = [0]; events = []
+        def event_walk(node):
+            if node is not paragraph and node.tag == _PARAGRAPH_TAG: return
+            # Positions count the text `_text` reads: no property elements or existing deletions.
+            if node.tag in TEXT_SKIPPED_TAGS: return
+            if node.tag in _NOTE_REFERENCE_TAGS:
+                kind="footnote" if node.tag==W+"footnoteReference" else "endnote"
+                if archive is None or not any(owner['kind']==kind for owner in _note_part_owners(archive)[0]):return
+                event={"kind":"note","start":cursor[0],"end":cursor[0],"signature":kind,"supported":True,"target":node.get(W+"id",""),"paragraphPath":result[id(paragraph)]["path"],"runPath":result[id(node)]["path"][:-1]}
+                result[id(node)]["objectEvent"]=event;events.append(event);return
+            if node.tag in _OBJECT_EVENT_TAGS:
+                start = cursor[0]
+                if node.tag == W + "hyperlink":
+                    for child in node: event_walk(child)
+                signature, supported, target = event_identity(node)
+                event = {"kind": "hyperlink" if node.tag == W + "hyperlink" else "drawing", "start": start, "end": cursor[0], "signature": signature, "supported": supported, "target": target, "paragraphPath": result[id(paragraph)]["path"], "runPath": result[id(node)]["path"][:-1]}
+                result[id(node)]["objectEvent"] = event; events.append(event)
+                return
+            if node.tag == _TEXT_TAG: cursor[0] += len(node.text or "")
+            elif node.tag in _ONE_CHARACTER_TAGS: cursor[0] += 1
+            else:
+                for child in node: event_walk(child)
+        event_walk(paragraph)
+        if invalid_qname: result[id(paragraph)]["unsupportedObjectQName"] = True
+        if not events: continue
+        event_paths=[result[id(node)]["path"] for node in paragraph.iter() if "objectEvent" in result.get(id(node), ())]
+        # A legal property-history snapshot on an image run is preserved with
+        # that revised run. Content/revision wrappers remain unsupported.
+        run_histories={id(change) for run in paragraph.iter(W+"r") for change in run.findall(W+"rPr/"+W+"rPrChange") if len(change)==1 and change[0].tag==W+"rPr" and all(child.tag in history_tags and not (child.text or "").strip() and not (child.tail or "").strip() for child in change[0].iter())}
+        unsupported = any(node.tag in EVENT_UNSUPPORTED_TAGS or (node.tag in NOTE_REFERENCE_TAGS and "objectEvent" not in result[id(node)]) or (node.tag==W+"rPrChange" and id(node) not in run_histories) or (node.tag==W+"pict" and not any(result[id(node)]["path"][:len(path)]==path for path in event_paths)) for node in paragraph.iter())
+        result[id(paragraph)]["objectEventsSupported"] = not unsupported and not invalid_qname and all(event["supported"] for event in events)
+    def classify(instruction):
+        command = instruction.strip().split(None, 1)[0].upper() if instruction.strip() else ""
+        if command in {"PAGE", "NUMPAGES", "SECTIONPAGES"}: return "pagination"
+        if command in {"DATE", "TIME", "CREATEDATE", "SAVEDATE", "PRINTDATE"}: return "automatic-date"
+        if command in {"TOC", "TOA", "INDEX"}: return "table-of-contents"
+        if command in {"REF", "PAGEREF", "SEQ", "LISTNUM"}: return "reference-numbering"
+        if command in {"DOCPROPERTY", "DOCVARIABLE", "MERGEFIELD"}: return "value"
+        return "other"
+    def reference(node):
+        return {"part": part, "path": result[id(node)]["path"]}
+    stack = []
+    for node in root.iter():
+        if node.tag == W + "fldSimple":
+            instruction = node.get(W + "instr", "")
+            result[id(node)]["field"] = {"kind": classify(instruction), "instruction": instruction, "cachedText": _text(node), "sources": [reference(node)]}
+        if node.tag == W + "fldChar":
+            kind = node.get(W + "fldCharType")
+            if kind == "begin": stack.append({"node": node, "instruction": "", "cachedText": "", "sources": [reference(node)], "separated": False})
+            elif kind == "separate" and stack: stack[-1]["separated"] = True
+            elif kind == "end" and stack:
+                field = stack.pop()
+                result[id(field["node"])]["field"] = {key: field[key] for key in ("instruction", "cachedText", "sources")}
+                result[id(field["node"])]["field"]["kind"] = classify(field["instruction"])
+        elif node.tag == W + "instrText" and stack and not stack[-1]["separated"]:
+            stack[-1]["instruction"] += node.text or ""
+            stack[-1]["sources"].append(reference(node))
+        elif node.tag == W + "t":
+            for field in stack:
+                if field["separated"]: field["cachedText"] += node.text or ""
+    for field in stack:
+        result[id(field["node"])]["field"] = {**{key: field[key] for key in ("instruction", "cachedText", "sources")}, "kind": "incomplete"}
+    return result
 
 
 def _paragraph_record(paragraph, section, location, numbering=None):
@@ -347,18 +858,20 @@ def _read_comments(archive, numbering):
     if "word/comments.xml" not in archive.namelist():
         return {}
 
-    comments_root = ET.fromstring(archive.read("word/comments.xml"))
+    comments_root, sources = _parsed_part(archive, "word/comments.xml")
     comments = {}
     for comment_index, comment in enumerate(comments_root.findall(W + "comment"), 1):
         comment_id = comment.attrib.get(W + "id", str(comment_index))
         paragraphs = list(comment.iter(W + "p"))
-        paragraph_records = [_paragraph_record(paragraph, "comment", "", numbering) for paragraph in paragraphs]
+        paragraph_records = [{**_paragraph_record(paragraph, "comment", "", numbering), "source": sources[id(paragraph)]} for paragraph in paragraphs]
         format_runs = []
         for index, record in enumerate(paragraph_records):
             if index:
                 format_runs.append({"text": "\n", "style": "__paragraph-break__"})
             format_runs.extend(_display_format_runs(record))
         comments[comment_id] = {
+            "source": sources[id(comment)],
+            "paragraphs": paragraph_records,
             "id": comment_id,
             "author": comment.attrib.get(W + "author", "").strip(),
             "text": "\n".join(_text(paragraph) for paragraph in paragraphs).strip(),
@@ -388,6 +901,140 @@ def _iter_story_blocks(container):
                 yield from _iter_story_blocks(content)
 
 
+def _note_part_owners(archive):
+    import posixpath
+    owners=[];errors=[];names=archive.namelist();base='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
+    rels=list(_cached_xml(archive, 'word/_rels/document.xml.rels')) if 'word/_rels/document.xml.rels' in names else []
+    types=list(_cached_xml(archive, '[Content_Types].xml')) if '[Content_Types].xml' in names else []
+    for kind in ('footnote','endnote'):
+        refs=[rel for rel in rels if rel.get('Type')==base+kind+'s'];fallback='word/'+kind+'s.xml'
+        if not refs:
+            if fallback in names:owners.append({'kind':kind,'part':fallback}) # legacy unreferenced fixtures
+            continue
+        if len(refs)!=1:errors.append('unsupported-note-part-path');continue
+        rel=refs[0];target=rel.get('Target','');part=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
+        mime='application/vnd.openxmlformats-officedocument.wordprocessingml.'+kind+'s+xml'
+        declarations=[n.get('ContentType') for n in types if n.get('PartName')=='/'+part]
+        if not rel.get('Id') or not target or not target.isascii() or any(c.isspace() for c in target) or any(c in target for c in '\\:#?%') or rel.get('TargetMode','') not in ('','Internal') or not part.startswith('word/') or names.count(part)!=1 or declarations!=[mime] or sum(r.get('Id')==rel.get('Id') for r in rels)!=1:
+            errors.append('unsupported-note-part-path');continue
+        if _cached_xml(archive, part).tag!=W+kind+'s':errors.append('unsupported-note-part-path');continue
+        owners.append({'kind':kind,'part':part,'rId':rel.get('Id'),'rawTarget':target})
+    if len({owner['part'] for owner in owners})!=len(owners):errors.append('unsupported-note-part-path')
+    return owners,errors
+
+def _note_package_facts(archive,inventory):
+    containers=[];owners,errors=_note_part_owners(archive)
+    main='word/_rels/document.xml.rels';relationships=_cached_xml(archive, main) if main in archive.namelist() else []
+    def content_signature(node,part):
+        import posixpath
+        relpath=posixpath.join(posixpath.dirname(part),'_rels',posixpath.basename(part)+'.rels')
+        rels={rel.get('Id'):rel for rel in _cached_xml(archive, relpath)} if relpath in archive.namelist() else {}
+        def canonical(item,root=False):
+            attrs=[]
+            for name,value in sorted(item.attrib.items()):
+                if root and name==W+'id' or name.startswith(W+'rsid') or item.tag.endswith('}docPr') and name=='id':continue
+                if name.startswith('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}'):
+                    rel=rels.get(value)
+                    if rel is not None:
+                        target=rel.get('Target','');path=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join(posixpath.dirname(part),target))
+                        value=[rel.get('Type'),rel.get('TargetMode',''),target if rel.get('TargetMode')=='External' else hashlib.sha256(archive.read(path)).hexdigest() if path in archive.namelist() else 'missing-target']
+                attrs.append([name,value])
+            return [item.tag,attrs,item.text or '',[canonical(child) for child in item if child.tag not in {W+name for name in ('pPr','rPr','tblPr','trPr','tcPr','sectPr')}]]
+        return hashlib.sha256(json.dumps(canonical(node,True),ensure_ascii=False).encode()).hexdigest()
+    for owner in owners:
+        kind,part=owner['kind'],owner['part']
+        ids=set()
+        for index,node in enumerate(_cached_xml(archive, part)):
+            if node.tag!=W+kind:continue
+            identity=node.get(W+'id','');type_name=node.get(W+'type','normal')
+            if type_name=='normal' and (identity in ids or not identity.lstrip('-').isdigit()):errors.append('invalid-note-id')
+            if type_name=='normal':ids.add(identity)
+            containers.append({'source':{'part':part,'path':[index]},'kind':kind,'id':identity,'type':type_name})
+            if type_name!='normal':
+                containers[-1]['contentSignature']=content_signature(node,part)
+                # Finite text/property redline shape: one plain paragraph with
+                # unchanged isolated terminal special-control runs.
+                paragraphs=list(node);controls=[];valid=len(paragraphs)==1 and paragraphs[0].tag==W+'p' and not paragraphs[0].attrib and set(node.attrib)<={W+'id',W+'type'}
+                if valid:
+                    seen_control=False
+                    for run in paragraphs[0]:
+                        if run.tag==W+'pPr':continue
+                        if run.tag!=W+'r' or run.attrib:valid=False;break
+                        children=[child for child in run if child.tag!=W+'rPr']
+                        if len(children)==1 and children[0].tag in {W+'separator',W+'continuationSeparator',W+'continuationNotice'} and not children[0].attrib and not list(children[0]) and not (children[0].text or '').strip():
+                            if run.find(W+'rPr') is not None:valid=False;break
+                            seen_control=True;controls.append(children[0].tag)
+                        elif seen_control or any(child.tag!=W+'t' for child in children):valid=False;break
+                if valid and identity.lstrip('-').isdigit() and type_name in {'separator','continuationSeparator'} and _text(node).strip() and controls==[W+type_name]:containers[-1]['specialRevisionShape']=controls
+
+    references=[{'source':source,'kind':source['objectEvent']['signature'],'id':source['objectEvent']['target']} for source in inventory if source.get('objectEvent',{}).get('kind')=='note']
+    for kind in ('footnote','endnote'):
+        if any(ref['kind']==kind for ref in references) and sum(rel.get('Type')=='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+kind+'s' for rel in relationships)!=1:errors.append('unsupported-note-part-path')
+    for ref in references:
+        if not any(note['kind']==ref['kind'] and note['id']==ref['id'] and note['type']=='normal' for note in containers):errors.append('missing-note-target')
+    return {'policy':'worklazy-note-facts-1','containers':containers,'references':references,'errors':sorted(set(errors)), 'parts':[owner['part'] for owner in owners],'owners':owners}
+
+def _story_package_facts(archive):
+    import posixpath
+    relns='http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
+    r='{'+relns[:-1]+'}';ct='{http://schemas.openxmlformats.org/package/2006/content-types}'
+    names=set(archive.namelist());errors=[];relationships={}
+    path='word/_rels/document.xml.rels'
+    if path in names:
+        for node in _cached_xml(archive, path):
+            rid=node.get('Id','')
+            if rid in relationships:errors.append('duplicate-main-relationship')
+            relationships[rid]=node
+    types=_cached_xml(archive, '[Content_Types].xml') if '[Content_Types].xml' in names else []
+    def content_type(part):
+        return next((node.get('ContentType') for node in types if node.tag==ct+'Override' and node.get('PartName')=='/'+part),None)
+    parts={}
+    for rid,node in relationships.items():
+        kind=node.get('Type','').removeprefix(relns)
+        if node.get('Type')!=relns+kind or kind not in ('header','footer'):continue
+        target=node.get('Target','');resolved=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
+        if node.get('TargetMode')=='External' or resolved not in names:errors.append('unresolved-story-target');continue
+        root=_cached_xml(archive, resolved)
+        if root.tag!=W+('hdr' if kind=='header' else 'ftr'):errors.append('invalid-story-root')
+        expected='application/vnd.openxmlformats-officedocument.wordprocessingml.'+kind+'+xml'
+        mime=content_type(resolved)
+        if mime!=expected:errors.append('invalid-story-content-type')
+        parts[resolved]={'part':resolved,'kind':kind,'sha256':hashlib.sha256(archive.read(resolved)).hexdigest(),'contentType':mime,'active':False}
+    # Keep conventional orphan parts as legacy comparison inputs; their source
+    # identity is never rewritten to an output/imported name.
+    for name in names:
+        match=re.fullmatch(r'word/(header|footer)\d+\.xml',name)
+        if match and name not in parts:parts[name]={'part':name,'kind':match.group(1),'sha256':hashlib.sha256(archive.read(name)).hexdigest(),'contentType':content_type(name),'active':False}
+    sections=[];bindings=[]
+    root=_cached_xml(archive, 'word/document.xml')
+    def visit(node,path,ancestors):
+        if not any(parent.tag in (W+'sectPrChange',W+'pPrChange') for parent in ancestors):
+            section={'part':'word/document.xml','path':path};sections.append({'source':section,'final':bool(ancestors and ancestors[-1].tag==W+'body'),'history':node.find(W+'sectPrChange') is not None,'activation':{'type':node.find(W+'type').get(W+'val','nextPage') if node.find(W+'type') is not None else 'nextPage','titlePage':node.find(W+'titlePg') is not None and node.find(W+'titlePg').get(W+'val','true').lower() not in ('false','off','0')}})
+            slots=set()
+            for index,child in enumerate(node):
+                if child.tag not in (W+'headerReference',W+'footerReference'):continue
+                kind='header' if child.tag==W+'headerReference' else 'footer';variant=child.get(W+'type','default');
+                if variant not in ('default','first','even'):errors.append('invalid-story-variant')
+                rid=child.get(r+'id','');rel=relationships.get(rid)
+                if (kind,variant) in slots:errors.append('duplicate-story-binding')
+                slots.add((kind,variant))
+                if rel is None or rel.get('Type')!=relns+kind or rel.get('TargetMode')=='External':errors.append('invalid-story-binding');continue
+                target=rel.get('Target','');part=target.lstrip('/') if target.startswith('/') else posixpath.normpath(posixpath.join('word',target))
+                if part not in parts:errors.append('unresolved-story-binding');continue
+                parts[part]['active']=True
+                bindings.append({'section':section,'reference':{'part':'word/document.xml','path':path+[index]},'kind':kind,'variant':variant,'ownerPart':'word/document.xml','rId':rid,'type':rel.get('Type'),'rawTarget':target,'targetMode':rel.get('TargetMode',''),'targetPart':part})
+    # Section properties in document order, with their ancestors and child path (only they are read).
+    parents={child:parent for parent in root.iter() for child in parent}
+    for node in root.iter(W+'sectPr'):
+        ancestors=[];path=[];child=node
+        while child in parents:
+            parent=parents[child];ancestors.append(parent);path.append(list(parent).index(child));child=parent
+        ancestors.reverse();path.reverse()
+        visit(node,path,ancestors)
+    settings=_cached_xml(archive, 'word/settings.xml') if 'word/settings.xml' in names else ET.Element(W+'settings')
+    even=settings.find(W+'evenAndOddHeaders')
+    return {'policy':'worklazy-story-facts-1','parts':sorted(parts.values(),key=lambda item:item['part']),'sections':sections,'bindings':bindings,'settings':{'evenAndOddHeaders':even is not None and even.get(W+'val','true').lower() not in ('false','off','0')},'errors':sorted(set(errors))}
+
 def _parse_document(data, include_tables, include_metadata):
     records = {
         "body": [],
@@ -398,12 +1045,25 @@ def _parse_document(data, include_tables, include_metadata):
         "document": [],
         "documentBlocks": [],
         "tables": [],
+        "sourceInventory": [],
     }
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        records["storyFacts"]=_story_package_facts(archive)
+        story_kinds={item["part"]:item["kind"] for item in records["storyFacts"]["parts"]}
+        note_parts={owner['part'] for owner in _note_part_owners(archive)[0]}
+        for part in archive.namelist():
+            if part in note_parts or part in story_kinds or re.fullmatch(r"word/(document|header\d+|footer\d+|footnotes|endnotes|comments|styles)\.xml", part):
+                part_root = _cached_xml(archive, part)
+                part_sources = _source_paths(part_root, part, archive)
+                if _PARSED_PARTS["parts"] is not None:
+                    _PARSED_PARTS["parts"][part] = (part_root, part_sources)
+                records["sourceInventory"].extend(part_sources.values())
         numbering = _NumberingResolver(archive)
         comments = _read_comments(archive, numbering.fresh()) if include_metadata else {}
         comment_locations = {}
-        root = ET.fromstring(archive.read("word/document.xml"))
+        root, sources = _parsed_part(archive, "word/document.xml")
+        if root.tag != W + "document":
+            raise ValueError(_l("지원하지 않는 Word 문서 형식입니다. 일반 DOCX로 다시 저장한 뒤 비교해 주세요.", "This Word XML format is not supported. Save it as a standard DOCX and compare again."))
         body = root.find(W + "body")
         paragraph_index = 0
         table_index = 0
@@ -412,11 +1072,12 @@ def _parse_document(data, include_tables, include_metadata):
                 if child.tag == W + "p":
                     paragraph_index += 1
                     record = _paragraph_record(child, "body", _l(f"본문 {paragraph_index}번째 문단", f"Body paragraph {paragraph_index}"), numbering)
+                    record["source"] = sources[id(child)]
                     comment_ids = _paragraph_comment_ids(child)
                     record["comments"] = [comments[item] for item in comment_ids if item in comments]
                     for comment_id in comment_ids:
                         comment_locations.setdefault(comment_id, record["location"])
-                    if record["text"] or record["format"] or record["comments"]:
+                    if record["text"] or record["format"] or record["comments"] or record.get("source", {}).get("opaqueSignature"):
                         records["body"].append(record)
                         records["document"].append(record)
                     records["documentBlocks"].append({"type": "paragraph", "record": record})
@@ -427,7 +1088,7 @@ def _parse_document(data, include_tables, include_metadata):
                         row_records = []
                         for cell_index, cell in enumerate(row.findall(W + "tc"), 1):
                             paragraphs = cell.findall(".//" + W + "p")
-                            paragraph_records = [_paragraph_record(p, "table", "", numbering) for p in paragraphs]
+                            paragraph_records = [{**_paragraph_record(p, "table", "", numbering), "source": sources[id(p)]} for p in paragraphs]
                             text = "\n".join(record["text"] for record in paragraph_records)
                             display_text = "\n".join(record["displayText"] for record in paragraph_records)
                             list_labels = "\n".join(record["listLabel"] for record in paragraph_records)
@@ -443,6 +1104,8 @@ def _parse_document(data, include_tables, include_metadata):
                                     if comment_id not in comment_ids:
                                         comment_ids.append(comment_id)
                             record = {
+                                "source": sources[id(cell)],
+                                "paragraphs": paragraph_records,
                                 "section": "table",
                                 "location": _l(f"표 {table_index} · {row_index}행 {cell_index}열", f"Table {table_index} · row {row_index}, column {cell_index}"),
                                 "text": text,
@@ -457,7 +1120,7 @@ def _parse_document(data, include_tables, include_metadata):
                             }
                             for comment_id in comment_ids:
                                 comment_locations.setdefault(comment_id, record["location"])
-                            if record["text"] or record["format"] or record["comments"]:
+                            if record["text"] or record["format"] or record["comments"] or record.get("source", {}).get("opaqueSignature"):
                                 records["table"].append(record)
                             row_records.append(record)
                         table_grid.append(row_records)
@@ -465,21 +1128,19 @@ def _parse_document(data, include_tables, include_metadata):
                     records["documentBlocks"].append({
                         "type": "table",
                         "tableIndex": table_index - 1,
+                        "source": sources[id(child)],
                     })
                 elif child.tag == W + "tbl":
                     for paragraph in child.iter(W + "p"):
                         numbering.label(paragraph)
 
         if include_metadata:
-            header_footer_paths = sorted(
-                name for name in archive.namelist()
-                if re.match(r"word/(header|footer)\d+\.xml$", name)
-            )
+            header_footer_paths = sorted(story_kinds)
             for path in header_footer_paths:
                 story_numbering = numbering.fresh()
-                metadata_root = ET.fromstring(archive.read(path))
+                metadata_root, metadata_sources = _parsed_part(archive, path)
                 file_name = path.split("/")[-1]
-                area = _l("머리말", "Header") if file_name.startswith("header") else _l("꼬리말", "Footer")
+                area = _l("머리말", "Header") if story_kinds[path]=="header" else _l("꼬리말", "Footer")
                 area_number = re.search(r"\d+", file_name)
                 label = f"{area} {area_number.group(0)}" if area_number else area
                 for index, paragraph in enumerate(metadata_root.iter(W + "p"), 1):
@@ -489,43 +1150,49 @@ def _parse_document(data, include_tables, include_metadata):
                         _l(f"{label} · {index}번째 문단", f"{label} · paragraph {index}"),
                         story_numbering,
                     )
-                    if record["text"] or record["format"]:
-                        records["headerFooter"].append(record)
+                    record["source"] = metadata_sources[id(paragraph)]
+                    records["headerFooter"].append(record)
 
             for comment_id, comment in comments.items():
                 author_label = f" · {comment['author']}" if comment["author"] else ""
                 anchor_location = comment_locations.get(comment_id, _l("연결 위치를 찾지 못한 문단", "Paragraph with unknown anchor"))
                 records["comment"].append({
+                    "commentId": comment_id,
+                    "source": comment.get("source"),
+                    "paragraphs": comment.get("paragraphs", []),
                     "section": "comment",
                     "location": _l(f"{anchor_location} · 메모 {comment_id}{author_label}", f"{anchor_location} · comment {comment_id}{author_label}"),
                     "text": comment["text"],
                     "format": comment["format"],
                 })
 
-            for path, note_name, element_name in (
-                ("word/footnotes.xml", _l("각주", "Footnote"), "footnote"),
-                ("word/endnotes.xml", _l("미주", "Endnote"), "endnote"),
-            ):
+            for owner in _note_part_owners(archive)[0]:
+                path=owner['part'];element_name=owner['kind'];note_name=_l('각주','Footnote') if element_name=='footnote' else _l('미주','Endnote')
                 if path not in archive.namelist():
                     continue
-                notes_root = ET.fromstring(archive.read(path))
+                notes_root, note_sources = _parsed_part(archive, path)
                 story_numbering = numbering.fresh()
                 for note_index, note in enumerate(notes_root.findall(W + element_name), 1):
                     note_id = note.attrib.get(W + "id", str(note_index))
+                    if note.get(W+"type","normal")!="normal" and not any(_text(p).strip() for p in note.iter(W+"p")):continue
                     try:
-                        if int(note_id) < 0:
+                        if int(note_id) < 0 and note.get(W+"type","normal")=="normal":
                             continue
                     except ValueError:
                         pass
+                    role=note.get(W+'type','normal')
+                    special_label={'separator':_l('구분선','separator'),'continuationSeparator':_l('연속 구분선','continuation separator'),'continuationNotice':_l('연속 알림','continuation notice')}.get(role)
+                    display_id=special_label or note_id
                     for paragraph_index, paragraph in enumerate(note.iter(W + "p"), 1):
                         record = _paragraph_record(
                             paragraph,
                             "note",
-                            _l(f"{note_name} {note_id} · {paragraph_index}번째 문단", f"{note_name} {note_id} · paragraph {paragraph_index}"),
+                            _l(f"{note_name} {display_id} · {paragraph_index}번째 문단", f"{note_name} {display_id} · paragraph {paragraph_index}"),
                             story_numbering,
                         )
-                        if record["text"] or record["format"]:
-                            records["note"].append(record)
+                        record["source"] = note_sources[id(paragraph)]
+                        records["note"].append(record)
+        records["noteFacts"]=_note_package_facts(archive,records["sourceInventory"])
         records["warnings"] = numbering.unresolved
     return records
 
@@ -538,6 +1205,8 @@ def _display_text(record):
 
 def _cell_payload(cell):
     return {
+        "source": cell.get("source"),
+        "paragraphs": [{**record, "rawText": record["text"], "text": _display_text(record)} for record in cell.get("paragraphs", [])],
         "text": _display_text(cell),
         "format": cell.get("format", ""),
         "formatRuns": _display_format_runs(cell),
@@ -554,7 +1223,134 @@ def _cell_payload(cell):
     }
 
 
+_EXTRACT_CACHE = []
+
+
+# Transport form of the model: the WordprocessingML namespace (in most property names) as one
+# control character, which JSON text never contains unescaped; the worker restores it before
+# parsing. See compactModelJson / restoreModelJson in word.worker.ts.
+MODEL_NAMESPACE_TOKEN = "\x01"
+
+
+def extract_document_model_compact(document_bytes, include_tables, include_metadata, language="ko"):
+    """UTF-8 bytes of the model in transport form (restoreModelTransport in modelTransport.ts):
+    bytes cross into JavaScript far faster than a long string does, and each shared object is
+    written once. An inventory entry's property facts are `{"$f":k}` into `$facts` (equal
+    properties share one memoized fact), and any other occurrence of an inventory entry is
+    `{"$src":index}`."""
+    model = _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)[1]
+    inventory = model["sourceInventory"]
+    positions = {id(ref): index for index, ref in enumerate(inventory)}
+    facts, fact_positions = [], {}
+    def fact_stub(fact):
+        index = fact_positions.get(id(fact))
+        if index is None:
+            index = fact_positions[id(fact)] = len(facts)
+            facts.append(fact)
+        return {"$f": index}
+    entries = []
+    for ref in inventory:
+        properties = ref.get("normalizedProperties")
+        entries.append({**ref, "normalizedProperties": {name: fact_stub(fact) for name, fact in properties.items()}} if properties else ref)
+    def strip(value):
+        kind = type(value)
+        if kind is dict:
+            index = positions.get(id(value))
+            if index is not None and inventory[index] is value:
+                return {"$src": index}
+            return {key: strip(item) for key, item in value.items()}
+        if kind is list:
+            return [strip(item) for item in value]
+        return value
+    transport = {key: strip(value) for key, value in model.items() if key != "sourceInventory"}
+    transport["sourceInventory"] = entries
+    transport["$facts"] = facts
+    return json.dumps(transport, ensure_ascii=False).replace(W, MODEL_NAMESPACE_TOKEN).encode("utf-8")
+
+
+# What creating the tracked DOCX reads from a model (tracked_docx.py _attach_source_inventory and
+# _validate_manifest); nothing else of it is needed once the screen result is out.
+TRACKED_MODEL_FIELDS = ("fields", "sourceRevision", "storyFacts", "noteFacts", "sourceInventory")
+
+
+def tracked_source_facts(document_bytes, include_tables, include_metadata, language="ko"):
+    """The tracked fields of the (memoized) model, compressed, so a batch can put them back after the
+    two-model cache has moved on (restore_tracked_source_facts) instead of extracting again. Pickle
+    keeps the shared objects shared and is several times faster than JSON here; the bytes never leave
+    this worker and are only read back by restore_tracked_source_facts."""
+    import pickle, zlib
+    entry = _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)
+    model = {key: entry[1][key] for key in TRACKED_MODEL_FIELDS if key in entry[1]}
+    return zlib.compress(pickle.dumps({"key": entry[0], "model": model}, protocol=pickle.HIGHEST_PROTOCOL), 1)
+
+
+def restore_tracked_source_facts(path, include_tables, include_metadata, language, packed):
+    """Cache the tracked fields saved by tracked_source_facts for the document at `path`, unless the
+    cache already holds its model or they were saved for other bytes or options. Only the tracked
+    generator reads such an entry; without one it extracts the document again."""
+    import pickle, zlib
+    with open(path, "rb") as source:
+        key = _extract_cache_key(source.read(), include_tables, include_metadata, language)
+    if any(entry[0] == key for entry in _EXTRACT_CACHE):
+        return False
+    if hasattr(packed, "to_py"):
+        packed = packed.to_py()
+    saved = pickle.loads(zlib.decompress(bytes(packed)))
+    if saved["key"] != key:
+        return False
+    _EXTRACT_CACHE.append([key, saved["model"], None, "tracked"])
+    del _EXTRACT_CACHE[:-2]
+    return True
+
+
+def keep_tracked_source_facts():
+    """Once every screen result is out, cached models keep only what the tracked generator reads (the
+    same objects, so the manifest's sources stay shared). The worker is not reused after its run."""
+    for entry in _EXTRACT_CACHE:
+        entry[1] = {key: entry[1][key] for key in TRACKED_MODEL_FIELDS if key in entry[1]}
+        entry[2] = None
+        entry[3] = "tracked"
+
+
 def extract_document_model(document_bytes, include_tables, include_metadata, language="ko"):
+    """Memoized `_extract_document_model`: the tracked-DOCX validator re-reads the same
+    input bytes the screen comparison just extracted, so the last two results are reused."""
+    entry = _extract_document_model_entry(document_bytes, include_tables, include_metadata, language)
+    if entry[2] is None:
+        entry[2] = json.dumps(entry[1], ensure_ascii=False)
+    return entry[2]
+
+
+def extract_document_model_parsed(document_bytes, include_tables, include_metadata, language="ko"):
+    """The memoized model object (read-only: shared by every caller). It holds only JSON types,
+    so it equals its own JSON round trip. Used by the tracked generator only, so an entry holding
+    just the tracked fields also serves it."""
+    return _extract_document_model_entry(document_bytes, include_tables, include_metadata, language, tracked=True)[1]
+
+
+def _extract_cache_key(data, include_tables, include_metadata, language):
+    return (hashlib.sha256(data).hexdigest(), bool(include_tables), bool(include_metadata), "en" if language == "en" else "ko")
+
+
+def _extract_document_model_entry(document_bytes, include_tables, include_metadata, language, tracked=False):
+    data = bytes(document_bytes)
+    key = _extract_cache_key(data, include_tables, include_metadata, language)
+    for entry in _EXTRACT_CACHE:
+        if entry[0] == key and (tracked or entry[3] == "full"):
+            global LANGUAGE
+            LANGUAGE = key[3]
+            return entry
+    entry = [key, _extract_document_model_object(data, include_tables, include_metadata, language), None, "full"]
+    _EXTRACT_CACHE.append(entry)
+    del _EXTRACT_CACHE[:-2]
+    return entry
+
+
+def _extract_document_model(document_bytes, include_tables, include_metadata, language="ko"):
+    return json.dumps(_extract_document_model_object(document_bytes, include_tables, include_metadata, language), ensure_ascii=False)
+
+
+def _extract_document_model_object(document_bytes, include_tables, include_metadata, language="ko"):
     """Return only the format-specific extraction model.
 
     Paragraph matching and result generation live in the shared TypeScript
@@ -562,7 +1358,21 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
     """
     global LANGUAGE
     LANGUAGE = "en" if language == "en" else "ko"
-    records = _parse_document(bytes(document_bytes), include_tables, include_metadata)
+    _SOURCE_FACTS["cache"] = {}
+    _PARSED_PARTS["parts"] = {}
+    _PARSED_PARTS["xml"] = {}
+    _FACT_MEMO["facts"] = {}
+    _FACT_MEMO["text"] = {}
+    _FACT_MEMO["styleJson"] = {}
+    try:
+        records = _parse_document(bytes(document_bytes), include_tables, include_metadata)
+    finally:
+        _SOURCE_FACTS["cache"] = None
+        _PARSED_PARTS["parts"] = None
+        _PARSED_PARTS["xml"] = None
+        _FACT_MEMO["facts"] = None
+        _FACT_MEMO["text"] = None
+        _FACT_MEMO["styleJson"] = None
 
     def comments_of(record):
         return [
@@ -576,6 +1386,10 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
 
     def record_of(record):
         return {
+            **({"commentId": record["commentId"]} if "commentId" in record else {}),
+            "source": record.get("source"),
+            "rawText": record.get("text", ""),
+            "paragraphs": [{**item, "rawText": item["text"], "text": _display_text(item)} for item in record.get("paragraphs", [])],
             "text": _display_text(record),
             "format": record.get("format", ""),
             "formatRuns": _display_format_runs(record),
@@ -604,6 +1418,7 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
         table = tables[table_index]
         blocks.append({
             "type": "table",
+            "source": block.get("source"),
             "text": " | ".join(
                 "\u241f".join(cell.get("text", "") for cell in row)
                 for row in table["grid"]
@@ -627,10 +1442,15 @@ def extract_document_model(document_bytes, include_tables, include_metadata, lan
         ))
 
     model = {
+        "fields": [source["field"] for source in records["sourceInventory"] if "field" in source],
+        "sourceRevision": hashlib.sha256(bytes(document_bytes)).hexdigest(),
+        "sourceInventory": records["sourceInventory"],
+        "storyFacts": records["storyFacts"],
+        "noteFacts": records["noteFacts"],
         "blocks": blocks,
         "headerFooter": [record_of(record) for record in records["headerFooter"]],
         "notes": [record_of(record) for record in records["note"]],
         "comments": [record_of(record) for record in records["comment"]],
         "warnings": warnings,
     }
-    return json.dumps(model, ensure_ascii=False)
+    return model

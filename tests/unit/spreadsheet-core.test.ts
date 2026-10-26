@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import ExcelJS from "exceljs";
+import JSZip from "jszip";
 import * as XLSX from "xlsx";
 
 import {
@@ -83,6 +84,34 @@ test("OOXML errors retain their type without changing scalar values or formula c
   assert.deepEqual([cells.get("E2")?.value, cells.get("E2")?.type], [true, "boolean"]);
   assert.deepEqual([cells.get("F2")?.value, cells.get("F2")?.type], [7, "number"]);
   assert.deepEqual([cells.get("G2")?.value instanceof Date, cells.get("G2")?.type], [true, "date"]);
+});
+
+test("OOXML packages that bind SpreadsheetML to a prefix (x:) parse like the default-namespace form", async () => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Data");
+  sheet.addRows([["ID", "이름", "Amount"], [1, "가나다", 1200.5], [2, "Beta", 30]]);
+  sheet.getCell("C4").value = { formula: "SUM(C2:C3)", result: 1230.5 };
+  workbook.definedNames.add("Data!$C$2:$C$3", "Amounts");
+  workbook.addWorksheet("Second").getCell("A1").value = "second sheet";
+  const plain = new Uint8Array(await workbook.xlsx.writeBuffer());
+  // The form .NET Open XML SDK writes: every SpreadsheetML element carries the x: prefix.
+  const zip = await JSZip.loadAsync(plain);
+  const main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+  let rewritten = 0;
+  for (const entry of Object.values(zip.files)) {
+    if (entry.dir || !entry.name.endsWith(".xml")) continue;
+    const xml = await entry.async("string");
+    if (!xml.includes(`xmlns="${main}"`)) continue;
+    zip.file(entry.name, xml.replace(`xmlns="${main}"`, `xmlns:x="${main}"`).replace(/<(\/?)([A-Za-z_][\w.-]*)(?=[\s/>])/gu, "<$1x:$2"));
+    rewritten += 1;
+  }
+  assert.ok(rewritten >= 3);
+  const prefixed = new Uint8Array(await zip.generateAsync({ type: "uint8array" }));
+  assert.match(await (await JSZip.loadAsync(prefixed)).file("xl/workbook.xml")!.async("string"), /<x:workbook /u);
+  const expected = await parseSpreadsheetInput("plain.xlsx", plain.slice().buffer);
+  const actual = await parseSpreadsheetInput("prefixed.xlsx", prefixed.slice().buffer);
+  assert.deepEqual(actual, expected);
+  assert.equal(actual.sheets[0].cells.find((cell) => cell.address === "B2")?.value, "가나다");
 });
 
 test("spreadsheet adapter uses SheetJS for BIFF8/XLSB and Papa Parse for CSV text", async () => {

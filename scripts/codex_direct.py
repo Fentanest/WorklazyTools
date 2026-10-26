@@ -8,7 +8,6 @@ API-key arguments, global permission changes, or automatic re-dispatch.
 from __future__ import annotations
 import argparse
 import contextlib
-import fcntl
 import hashlib
 import json
 import os
@@ -19,6 +18,11 @@ import subprocess
 import sys
 import time
 from typing import Any
+
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
 
 
 class DispatchError(RuntimeError):
@@ -76,6 +80,21 @@ def atomic_json(path: Path, data: Any) -> None:
 def locked(path: Path):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with path.open("a+") as fp:
+        if os.name == "nt":
+            # msvcrt.LK_LOCK gives up after ~10 s; keep waiting like flock does.
+            fp.seek(0)
+            while True:
+                try:
+                    msvcrt.locking(fp.fileno(), msvcrt.LK_LOCK, 1)
+                    break
+                except OSError:
+                    continue
+            try:
+                yield
+            finally:
+                fp.seek(0)
+                msvcrt.locking(fp.fileno(), msvcrt.LK_UNLCK, 1)
+            return
         fcntl.flock(fp, fcntl.LOCK_EX)
         try:
             yield
