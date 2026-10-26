@@ -1,9 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 
 import { PageHeader, SectionCard } from "../../../components/ui";
 import { UtilityPage } from "../../../components/UtilitySurface";
-import { Card } from "../../../components/ui/card";
 import {
   Sheet,
   SheetClose,
@@ -24,6 +23,7 @@ import "./foliotrace.css";
 import { dartFilingUrl } from "../data/dartLink";
 import {
   approxNumber,
+  compactKrw,
   eventRangeOf,
   exclusionReasonLabel,
   filingChangesForHoldings,
@@ -38,6 +38,7 @@ import {
   latestUnresolvedReasonLabel,
   quotePriceDetail,
   sortHoldings,
+  sumPercentText,
   topHoldings,
 } from "./holdings";
 import type { FilingChangeDirection, Lang, QualityFilter, SortKey } from "./holdings";
@@ -82,11 +83,7 @@ const STR = {
     filingComplete: "공시 목록 확인 완료",
     filingPartial: "일부 공시·정정 확인 중",
     filingUnverified: "공시 목록 확인 중",
-    methodLink: "계산 방법·출처는 하단 안내를 확인하세요",
     summaryValue: "공개 보유분 추정 평가금액",
-    summaryTracked: "추적 종목 수",
-    summaryPriced: "평가 가능 종목",
-    summaryEvents: "추적 기간 전체 공시",
     unavailable: "평가 불가",
     unavailableReasonComplete: "유효한 종가가 없어 평가할 수 없습니다.",
     unavailableReasonPartial: "수량·종목과 주식 종류·종가를 확인하지 못한 종목을 제외한 금액입니다.",
@@ -98,7 +95,6 @@ const STR = {
     historyDesc: "같은 계산 기준의 실제 기록이 두 번 이상 쌓이면 표시합니다.",
     historySingle: "같은 방식으로 계산한 기록이 더 쌓이면 추이를 보여 드립니다.",
     tableTitle: "종목 표",
-    tableDesc: "수량·지분율·종가·추정 금액·비중·접수일을 구분해 표시합니다.",
     tableUnavailable: "—는 확인된 평가 금액이 없다는 뜻입니다. 종목명 아래에서 제외 사유를 확인하세요.",
     tableChangeNote: "같은 종목의 직전 공시 숫자보다 크면 빨강, 작으면 파랑으로 표시합니다. 첫 확인·비교 불가 값은 기본색이며, 색이 실제 매매를 뜻하지는 않습니다.",
     changeUp: "직전 공시 수치보다 증가",
@@ -228,6 +224,35 @@ const STR = {
     loadErrorDesc: "페이지 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
     schemaErrorTitle: "자료를 표시할 수 없습니다",
     schemaErrorDesc: "게시된 자료를 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.",
+    priceBasisShort: "{date} 정규장 종가",
+    figuresLabel: "핵심 수치",
+    figExcluded: "확인되지 않은 종목 {n}개 제외",
+    figPriced: "평가한 종목",
+    figRatio: "비율 보정 {n}종목 포함",
+    figEvents: "반영한 공시",
+    figEventsUnit: "건",
+    topTitle: "상위 보유 종목",
+    concentration: "상위 {a}종목이 {pa}, 상위 {b}종목이 {pb}를 차지합니다.",
+    concentrationTop: "상위 {a}종목이 {pa}를 차지합니다.",
+    topMore: "상위 종목 더 보기",
+    eventsAll: "전체 {total}건",
+    eventsFullTitle: "공시 변화 전체 기록",
+    excludedTitle: "평가에서 뺀 {n}종목",
+    excludedFoot: "틀린 값을 보여 주지 않으려고 확인될 때까지 합계에서 뺍니다.",
+    excludedView: "목록에서 보기",
+    tableAll: "전체 보유 종목",
+    qualityRatio: "비율 보정",
+    searchPlaceholderShort: "종목명·코드",
+    colCloseShort: "종가",
+    colHoldingDate: "보유 기준일",
+    mQty: "주",
+    mOwn: "지분",
+    mWeight: "비중",
+    ratioLine: "비율 보정 · 공시 수량 {r} × {n}/{d}",
+    methodQuantity: "수량",
+    methodRatio: "비율 보정",
+    methodPrice: "가격과 비중",
+    detailValue: "추정 금액",
     formula: "공시에서 확인한 수량에 해당 거래일의 KRX 정규장 종가를 곱해 평가금액을 추정합니다. 비중은 같은 날 평가할 수 있는 종목의 금액 합계에서 차지하는 몫입니다.",
   },
   en: {
@@ -262,11 +287,7 @@ const STR = {
     filingComplete: "Filings checked: complete",
     filingPartial: "Filings checked: some receipts and corrections remain under review",
     filingUnverified: "Filings checked: in progress",
-    methodLink: "See the notes below for method and sources",
     summaryValue: "Estimated disclosed value",
-    summaryTracked: "Tracked securities",
-    summaryPriced: "Priced securities",
-    summaryEvents: "Filings across tracked period",
     unavailable: "Valuation unavailable",
     unavailableReasonComplete: "No valid closing prices, so nothing could be valued.",
     unavailableReasonPartial: "This total excludes securities whose quantity, share class, listed identity, or closing price could not be confirmed.",
@@ -278,7 +299,6 @@ const STR = {
     historyDesc: "Shown after at least two real records use the same calculation method.",
     historySingle: "A trend will appear when more values calculated the same way are available.",
     tableTitle: "Holdings table",
-    tableDesc: "Quantity, company ownership, close, estimated value, weight, and receipt date are shown separately.",
     tableUnavailable: "— means no verified valuation is available. See the exclusion reason under the security name.",
     tableChangeNote: "Reported numbers appear red when above the previous filing for the same security and blue when below it. First reports and incomparable values keep the usual color; colors do not establish a trade.",
     changeUp: "Higher than the previous filing",
@@ -408,6 +428,35 @@ const STR = {
     loadErrorDesc: "The page data could not be loaded. Please try again shortly.",
     schemaErrorTitle: "Could not display the records",
     schemaErrorDesc: "The published data could not be read. Please try again shortly.",
+    priceBasisShort: "{date} regular-session close",
+    figuresLabel: "Key figures",
+    figExcluded: "{n} unconfirmed securities excluded",
+    figPriced: "Securities valued",
+    figRatio: "Includes {n} ratio-adjusted",
+    figEvents: "Filings applied",
+    figEventsUnit: "",
+    topTitle: "Top holdings",
+    concentration: "The top {a} holdings make up {pa}; the top {b} make up {pb}.",
+    concentrationTop: "The top {a} holdings make up {pa}.",
+    topMore: "See more holdings",
+    eventsAll: "All {total}",
+    eventsFullTitle: "Full filing log",
+    excludedTitle: "{n} securities left out of the valuation",
+    excludedFoot: "To avoid showing wrong values, they stay out of the total until confirmed.",
+    excludedView: "View in the list",
+    tableAll: "All holdings",
+    qualityRatio: "Ratio-adjusted",
+    searchPlaceholderShort: "Name or code",
+    colCloseShort: "Close",
+    colHoldingDate: "Holding date",
+    mQty: "shares",
+    mOwn: "own.",
+    mWeight: "weight",
+    ratioLine: "Ratio-adjusted · reported {r} × {n}/{d}",
+    methodQuantity: "Quantity",
+    methodRatio: "Ratio adjustment",
+    methodPrice: "Price and weight",
+    detailValue: "Estimated value",
     formula: "We estimate value by multiplying the filed quantity by the KRX regular-session close for that date. Weight is its share of the total value we can price on the same day.",
   },
 } satisfies Record<Lang, Record<string, string>>;
@@ -473,6 +522,22 @@ function FilingChangeValue({ value, direction, upLabel, downLabel }: {
       {value}<span className="sr-only"> · {label}</span>
     </span>
   );
+}
+
+function subscribePhone(callback: () => void): () => void {
+  const query = window.matchMedia("(max-width: 640px)");
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
+
+/** True at phone width: the holdings table becomes a two-line list. */
+function useIsPhone(): boolean {
+  return useSyncExternalStore(subscribePhone, () => window.matchMedia("(max-width: 640px)").matches, () => false);
+}
+
+function ratioLineText(t: { ratioLine: string }, qa: NonNullable<Holding["quantityAdjustment"]>): string {
+  return t.ratioLine.replace("{r}", formatQty(qa.reportedQuantity))
+    .replace("{n}", qa.ratioNumerator).replace("{d}", qa.ratioDenominator);
 }
 
 export function FolioTracePage({ lang, view, onRefresh }: FolioTracePageProps) {
@@ -548,9 +613,33 @@ function ReadyView({
   );
 
   const topWeights = useMemo(() => topHoldings(snapshot.holdings), [snapshot.holdings]);
+  const top10 = useMemo(() => topHoldings(snapshot.holdings, 10), [snapshot.holdings]);
+  const isPhone = useIsPhone();
 
   // Bar widths only: approximate visual sizing, never financial text or ordering.
   const maxWeight = Math.max(0, ...topWeights.map((h) => approxNumber(h.portfolioWeightPercent)));
+  const concentrationNote = useMemo(() => {
+    const top2 = top10.length >= 2 ? sumPercentText(top10.slice(0, 2).map((h) => h.portfolioWeightPercent)) : null;
+    const all10 = top10.length >= 10 ? sumPercentText(top10.map((h) => h.portfolioWeightPercent)) : null;
+    if (top2 && all10) return t.concentration.replace("{a}", "2").replace("{pa}", top2).replace("{b}", "10").replace("{pb}", all10);
+    if (top2) return t.concentrationTop.replace("{a}", "2").replace("{pa}", top2);
+    return null;
+  }, [top10, t]);
+  const excludedGroups = useMemo(() => {
+    const groups = new Map<string, number>();
+    let total = 0;
+    for (const h of snapshot.holdings) {
+      if (h.estimatedValue !== null) continue;
+      total += 1;
+      const label = exclusionReasonLabel(h.valuationExclusionReason, lang) ?? t.statusExcluded;
+      groups.set(label, (groups.get(label) ?? 0) + 1);
+    }
+    return { total, rows: [...groups.entries()].sort((x, y) => y[1] - x[1]) };
+  }, [snapshot.holdings, lang, t]);
+  const ratioAdjustedPriced = useMemo(
+    () => snapshot.holdings.filter((h) => h.quantityAdjustment && h.estimatedValue !== null).length,
+    [snapshot.holdings],
+  );
 
   const eventRange = useMemo(() => eventRangeOf(snapshot.events), [snapshot.events]);
   const recentEvents = useMemo(
@@ -599,44 +688,113 @@ function ReadyView({
   const statusLabel = (s: ReturnType<typeof holdingStatus>) =>
     s === "included" ? t.statusIncluded : s === "excluded" ? t.statusExcluded : s === "exit" ? t.statusExit : t.statusUnresolved;
 
+  const recentSummary = recentEvents.slice(0, 6);
+  const eventDate = (event: FilingEvent) => (event.basisDate ?? event.receiptDate).slice(5).replace("-", ".");
+  const eventName = (event: FilingEvent) => currentNameByCorpCode.get(event.corpCode) ?? (event.stockCode
+    ? `${t.eventStockCode} ${event.stockCode}`
+    : `${t.eventCorpCode} ${event.corpCode}`);
+  const valueCompact = snapshot.estimatedValue === null ? null : compactKrw(snapshot.estimatedValue, lang, { decimals: 1 });
+  const unconfirmedCount = Math.max(0, snapshot.trackedCount - snapshot.pricedCount);
+  const qualityOptions: Array<[QualityFilter, string]> = [
+    ["all", t.qualityAll],
+    ["priced", t.qualityPriced],
+    ["unpriced", t.qualityUnpriced],
+    ["below-5", t.qualityBelow5],
+    ["ratio-adjusted", t.qualityRatio],
+  ];
+  const rowReasons = (h: Holding) => {
+    const reasons: string[] = [];
+    if (h.observationStatus) {
+      reasons.push(h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict :
+        h.observationStatus === "verified_scoped" ? t.rowScopedValue : t.rowVerifiedValue);
+    }
+    if (h.issuerScopeConflict) reasons.push(t.verifiedObservationConflict);
+    if (h.issuerScopeSource?.laterChangeDate) {
+      reasons.push(`${h.issuerScopeSource.laterChangeDate}: ${t.issuerScopeLaterChange}`);
+    }
+    const tracking = trackingStatusLabel(h);
+    if (tracking !== t.statusActiveRecord) reasons.push(tracking);
+    if (h.estimatedValue === null) reasons.push(exclusionReasonLabel(h.valuationExclusionReason, lang) ?? t.statusExcluded);
+    else if (holdingStatus(h) === "unresolved") reasons.push(statusLabel("unresolved"));
+    return [...new Set(reasons)];
+  };
+  const amountText = (h: Holding) => {
+    if (h.estimatedValue === null) return "—";
+    return compactKrw(h.estimatedValue, lang, { decimals: 2, mixed: true })?.text ?? formatKrw(h.estimatedValue, lang);
+  };
+
   return (
     <UtilityPage toolId="foliotrace" className="foliotrace-page">
       <PageHeader eyebrow={t.eyebrow} title={t.title} description={t.description}>
-        <button type="button" className="foliotrace-retry" onClick={onRefresh}>
-          {t.retry}
-        </button>
+        <div className="foliotrace-header-side">
+          <dl className="foliotrace-header-dates">
+            <dt>{t.detailPrice}</dt>
+            <dd className="foliotrace-num">
+              {snapshot.valuationTradeDate ? t.priceBasisShort.replace("{date}", snapshot.valuationTradeDate) : t.priceBasis}
+            </dd>
+            <dt>{t.checkedAt}</dt>
+            <dd className="foliotrace-num">{formatKstTimestamp(snapshot.filingsCheckedAt, lang) ?? "—"}</dd>
+            <dt>{t.generatedAt}</dt>
+            <dd className="foliotrace-num">{formatKstTimestamp(snapshot.generatedAt, lang)}</dd>
+          </dl>
+          <button type="button" className="foliotrace-retry" onClick={onRefresh}>
+            {t.retry}
+          </button>
+        </div>
       </PageHeader>
 
-      <div className="foliotrace-status-strip" role="status" aria-live="polite">
-        <span className="foliotrace-scope">
-          {entityName} · {scope}
-        </span>
-        <span>
-          {t.priceBasis}
-          {snapshot.valuationTradeDate ? ` · ${snapshot.valuationTradeDate}` : ""}
-        </span>
-        <span>
-          {t.checkedAt}: {formatKstTimestamp(snapshot.filingsCheckedAt, lang) ?? "—"} · {t.generatedAt}: {formatKstTimestamp(snapshot.generatedAt, lang)}
-          {snapshot.publishedAt && ` · ${t.publishedAt}: ${formatKstTimestamp(snapshot.publishedAt, lang)}`}
-        </span>
+      <section className="foliotrace-figures" aria-label={t.figuresLabel}>
+        <div className="foliotrace-figure foliotrace-figure-main">
+          <span className="foliotrace-figure-label">{t.summaryValue}</span>
+          <strong className="foliotrace-figure-value foliotrace-figure-value-xl foliotrace-num">
+            {valueCompact === null ? t.unavailable : (
+              <>{valueCompact.num}{valueCompact.unit && <span className="foliotrace-figure-unit">{lang === "ko" ? `${valueCompact.unit} 원` : valueCompact.unit}</span>}</>
+            )}
+          </strong>
+          <span className="foliotrace-figure-sub foliotrace-num">
+            {snapshot.estimatedValue !== null && <>{breakableValue(formatKrw(snapshot.estimatedValue, lang))}</>}
+            {snapshot.valuationCoverage === "unavailable"
+              ? ` ${t.unavailableReasonComplete}`
+              : unconfirmedCount > 0 ? ` · ${t.figExcluded.replace("{n}", String(unconfirmedCount))}` : ""}
+          </span>
+        </div>
+        <div className="foliotrace-figure">
+          <span className="foliotrace-figure-label">{t.figPriced}</span>
+          <strong className="foliotrace-figure-value foliotrace-num">
+            {snapshot.pricedCount}<span className="foliotrace-figure-unit"> / {snapshot.trackedCount}</span>
+          </strong>
+          <span className="foliotrace-figure-sub">
+            {ratioAdjustedPriced > 0 ? t.figRatio.replace("{n}", String(ratioAdjustedPriced)) : snapshot.valuationTradeDate ?? ""}
+          </span>
+        </div>
+        <div className="foliotrace-figure">
+          <span className="foliotrace-figure-label">{t.figEvents}</span>
+          <strong className="foliotrace-figure-value foliotrace-num">
+            {eventRange?.count ?? 0}{t.figEventsUnit && <span className="foliotrace-figure-unit">{t.figEventsUnit}</span>}
+          </strong>
+          <span className="foliotrace-figure-sub foliotrace-num">
+            {eventRange ? `${eventRange.from} ~ ${eventRange.to}` : `${t.lastChange}: ${snapshot.latestReceiptDate ?? "—"}`}
+          </span>
+        </div>
+      </section>
+
+      <div className="foliotrace-status-line" role="status" aria-live="polite">
         <span className={stale ? "foliotrace-badge-warn" : "foliotrace-badge-ok"}>{stale ? t.staleBadge : t.freshBadge}</span>
+        <span>{entityName} · {scope}</span>
         <span>
           {snapshot.portfolio.legacyCoverage === "verified"
             ? t.legacyVerified
             : snapshot.portfolio.legacyCoverage === "partial"
               ? t.legacyPartial
-              : t.legacyUnverified}{" "}
-          ·{" "}
+              : t.legacyUnverified}
+          {" · "}
           {snapshot.filingCoverage === "complete"
             ? t.filingComplete
             : snapshot.filingCoverage === "partial"
               ? t.filingPartial
               : t.filingUnverified}
         </span>
-        <span>{t.methodLink}</span>
       </div>
-
-      <p className="foliotrace-scope-note">{t.scopeNote}</p>
 
       {snapshot.historicalCoverage && (
         <div className="foliotrace-history-coverage" role="status">
@@ -671,61 +829,248 @@ function ReadyView({
         </div>
       )}
 
-      <div className="foliotrace-summary-grid">
-        <Card className="foliotrace-summary-card">
-          <span className="foliotrace-summary-label">{t.summaryValue}</span>
-          <strong className="foliotrace-summary-value foliotrace-num">
-            {snapshot.estimatedValue === null ? t.unavailable : breakableValue(formatKrw(snapshot.estimatedValue, lang))}
-          </strong>
-          <small>
-            {snapshot.valuationCoverage === "unavailable"
-              ? t.unavailableReasonComplete
-              : snapshot.valuationCoverage === "partial"
-                ? t.unavailableReasonPartial
-                : snapshot.valuationTradeDate ?? ""}
-          </small>
-        </Card>
-        <Card className="foliotrace-summary-card">
-          <span className="foliotrace-summary-label">{t.summaryTracked}</span>
-          <strong className="foliotrace-summary-value foliotrace-num">{snapshot.trackedCount}</strong>
-          <small>
-            {t.summaryPriced}: {snapshot.pricedCount}/{snapshot.trackedCount}
-          </small>
-        </Card>
-        <Card className="foliotrace-summary-card">
-          <span className="foliotrace-summary-label">{t.summaryEvents}</span>
-          <strong className="foliotrace-summary-value foliotrace-num">{eventRange?.count ?? 0}</strong>
-          <small>
-            {eventRange ? `${eventRange.from} ~ ${eventRange.to}` : `${t.lastChange}: ${snapshot.latestReceiptDate ?? "—"}`}
-          </small>
-        </Card>
+      <div className="foliotrace-columns">
+        <section className="foliotrace-block foliotrace-col-main" aria-labelledby="foliotrace-top-h">
+          <div className="foliotrace-block-head">
+            <h2 id="foliotrace-top-h" className="foliotrace-h2">{t.topTitle}</h2>
+            <span className="foliotrace-block-hint">{t.topWeightsDesc}</span>
+          </div>
+          {topWeights.length === 0 ? (
+            <p className="foliotrace-state-text">{t.noHoldings}</p>
+          ) : (
+            <ol className="foliotrace-bars">
+              {topWeights.map((h, index) => {
+                // Approximate ratio for bar sizing only; labels use exact strings.
+                const w = approxNumber(h.portfolioWeightPercent);
+                return (
+                  <li key={h.stockCode} className="foliotrace-bar-row">
+                    <span className="foliotrace-bar-rank foliotrace-num">{index + 1}</span>
+                    <span className="foliotrace-bar-name">
+                      {h.name} <span className="foliotrace-code-plain foliotrace-num">{h.stockCode}</span>
+                    </span>
+                    <span className="foliotrace-bar-track" role="img" aria-label={`${h.name} ${formatPct(h.portfolioWeightPercent)}`}>
+                      <span className="foliotrace-bar-fill" style={{ width: `${maxWeight > 0 ? (w / maxWeight) * 100 : 0}%` }} />
+                    </span>
+                    <span className="foliotrace-num foliotrace-bar-value">{formatPct(h.portfolioWeightPercent)}</span>
+                    <span className="foliotrace-num foliotrace-bar-amount">{amountText(h)}</span>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          {concentrationNote && <p className="foliotrace-note">{concentrationNote}</p>}
+          <a className="foliotrace-more-link foliotrace-more-phone" href="#foliotrace-holdings">{t.topMore}</a>
+        </section>
+
+        <aside className="foliotrace-col-side">
+          <section className="foliotrace-block" aria-labelledby="foliotrace-recent-h">
+            <div className="foliotrace-block-head">
+              <h2 id="foliotrace-recent-h" className="foliotrace-h2">{t.eventsTitle}</h2>
+              <a className="foliotrace-more-link" href="#foliotrace-events">
+                {t.eventsAll.replace("{total}", String(snapshot.events.length))}
+              </a>
+            </div>
+            {recentSummary.length === 0 ? (
+              <p className="foliotrace-state-text">{t.eventsEmpty}</p>
+            ) : (
+              <ul className="foliotrace-recent">
+                {recentSummary.map((event) => {
+                  const direction: FilingChangeDirection = event.kind === "increase" ? "up" : event.kind === "decrease" ? "down" : null;
+                  return (
+                    <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.kind}`}>
+                      <span className="foliotrace-recent-date foliotrace-num">{eventDate(event)}</span>
+                      <span className="foliotrace-recent-name">
+                        {eventName(event)}
+                        {direction === null && <small>{event.kind === "tracking-reentry" && event.source === "indirect-observation" ?
+                          t.eventIndirectReentry : EVENT_KIND[lang][event.kind]}</small>}
+                      </span>
+                      <span className="foliotrace-recent-value foliotrace-num">
+                        <FilingChangeValue
+                          value={event.companyOwnershipPercent === null ? "—" : observedPercent(event.companyOwnershipPercent, event.numericKind)}
+                          direction={direction} upLabel={t.changeUp} downLabel={t.changeDown} />
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+
+          {excludedGroups.total > 0 && (
+            <section className="foliotrace-panel foliotrace-excluded" aria-labelledby="foliotrace-excluded-h">
+              <h2 id="foliotrace-excluded-h" className="foliotrace-h3">{t.excludedTitle.replace("{n}", String(excludedGroups.total))}</h2>
+              <dl className="foliotrace-excluded-list foliotrace-num">
+                {excludedGroups.rows.map(([label, count]) => (
+                  <div key={label}><dt>{label}</dt><dd>{count}</dd></div>
+                ))}
+              </dl>
+              <p className="foliotrace-note">{t.excludedFoot}</p>
+              <a className="foliotrace-more-link" href="#foliotrace-holdings" onClick={() => { setQuality("unpriced"); setQuery(""); }}>
+                {t.excludedView}
+              </a>
+            </section>
+          )}
+        </aside>
       </div>
 
-      <SectionCard title={t.topWeights} description={t.topWeightsDesc}>
-        {topWeights.length === 0 ? (
-          <p className="foliotrace-state-text">{t.noHoldings}</p>
+      <section id="foliotrace-holdings" className="foliotrace-block" aria-labelledby="foliotrace-holdings-h">
+        <div className="foliotrace-block-head foliotrace-holdings-head">
+          <h2 id="foliotrace-holdings-h" className="foliotrace-h2">
+            {t.tableAll} <span className="foliotrace-count foliotrace-num">{snapshot.holdings.length}</span>
+          </h2>
+          {snapshot.holdings.length > 0 && (
+            <div className="foliotrace-controls">
+              <div className="foliotrace-pills" role="group" aria-label={t.qualityLabel}>
+                {qualityOptions.map(([key, label]) => (
+                  <button key={key} type="button" className="foliotrace-pill" aria-pressed={quality === key}
+                    onClick={() => setQuality(key)}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label className="foliotrace-search">
+                <span className="sr-only">{t.searchLabel}</span>
+                <input
+                  type="search"
+                  value={query}
+                  placeholder={t.searchPlaceholderShort}
+                  onChange={(e) => setQuery(e.target.value)}
+                  aria-label={t.searchLabel}
+                />
+              </label>
+              <label className="foliotrace-sort">
+                <span className="sr-only">{t.sortLabel}</span>
+                <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label={t.sortLabel}>
+                  <option value="value">{t.sortValue}</option>
+                  <option value="weight">{t.sortWeight}</option>
+                  <option value="ownership">{t.sortOwnership}</option>
+                  <option value="receipt">{t.sortReceipt}</option>
+                </select>
+              </label>
+              <button
+                type="button"
+                className="foliotrace-retry foliotrace-reset"
+                onClick={() => {
+                  setQuery("");
+                  setQuality("all");
+                  setSortKey("value");
+                }}
+              >
+                {t.resetFilters}
+              </button>
+            </div>
+          )}
+        </div>
+        {snapshot.holdings.length === 0 ? (
+          <>
+            <p className="foliotrace-state-text" role="status">
+              {t.noHoldings}
+            </p>
+            <p className="foliotrace-state-text">{t.noHoldingsDesc}</p>
+          </>
         ) : (
-          <ul className="foliotrace-bars">
-            {topWeights.map((h) => {
-              // Approximate ratio for bar sizing only; labels use exact strings.
-              const w = approxNumber(h.portfolioWeightPercent);
-              return (
-                <li key={h.stockCode} className="foliotrace-bar-row">
-                  <span className="foliotrace-bar-name">
-                    {h.name} <code className="foliotrace-code">{h.stockCode}</code>
-                  </span>
-                  <span className="foliotrace-bar-track" role="img" aria-label={`${h.name} ${formatPct(h.portfolioWeightPercent)}`}>
-                    <span className="foliotrace-bar-fill" style={{ width: `${maxWeight > 0 ? (w / maxWeight) * 100 : 0}%` }} />
-                  </span>
-                  <span className="foliotrace-num foliotrace-bar-value">{formatPct(h.portfolioWeightPercent)}</span>
-                </li>
-              );
-            })}
-          </ul>
+          <>
+            <p className="foliotrace-result-count" role="status" aria-live="polite">
+              {t.resultCount}: <span className="foliotrace-num">{filtered.length}</span> {t.unitCount}
+            </p>
+            {filtered.length === 0 ? (
+              <p className="foliotrace-state-text" role="status">
+                <strong>{t.searchNoResults}</strong> {t.searchNoResultsDesc}
+              </p>
+            ) : isPhone ? (
+              <ul className="foliotrace-mlist">
+                {filtered.map((h) => {
+                  const change = filingChanges.get(h);
+                  const reasons = rowReasons(h);
+                  return (
+                    <li key={h.stockCode}>
+                      <button type="button" className="foliotrace-mrow" onClick={() => setSelectedCode(h.stockCode)}
+                        aria-label={`${h.name} ${h.stockCode} ${t.detailButton}`}>
+                        <span className="foliotrace-mrow-name">{h.name} <span className="foliotrace-code-plain foliotrace-num">{h.stockCode}</span></span>
+                        <span className="foliotrace-mrow-value foliotrace-num">{amountText(h)}</span>
+                        <span className="foliotrace-mrow-sub foliotrace-num">
+                          <FilingChangeValue value={`${formatQty(h.quantity)}${lang === "ko" ? t.mQty : ` ${t.mQty}`}`}
+                            direction={change?.quantity ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
+                          {" · "}{t.mOwn}{" "}
+                          <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}
+                            direction={change?.ownership ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
+                        </span>
+                        <span className="foliotrace-mrow-weight foliotrace-num">{t.mWeight} {formatPct(h.portfolioWeightPercent)}</span>
+                        {h.quantityAdjustment && (
+                          <span className="foliotrace-mrow-note foliotrace-marker">{ratioLineText(t, h.quantityAdjustment)}</span>
+                        )}
+                        {reasons.map((reason) => <span key={reason} className="foliotrace-mrow-note">{reason}</span>)}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="foliotrace-table-wrap">
+                <table className="foliotrace-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">{t.colName}</th>
+                      <th scope="col" className="foliotrace-num">{t.colQuantity}</th>
+                      <th scope="col" className="foliotrace-num">{t.colOwnership}</th>
+                      <th scope="col" className="foliotrace-num">{t.colCloseShort}</th>
+                      <th scope="col" className="foliotrace-num">{t.colValue}</th>
+                      <th scope="col" className="foliotrace-num">{t.colWeight}</th>
+                      <th scope="col">{t.colHoldingDate}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map((h) => {
+                      const reasons = rowReasons(h);
+                      return (
+                        <tr key={h.stockCode} onClick={() => setSelectedCode(h.stockCode)}>
+                          <th scope="row">
+                            <button type="button" className="foliotrace-name-btn" onClick={() => setSelectedCode(h.stockCode)}
+                              aria-label={`${h.name} ${h.stockCode} ${t.detailButton}`}>
+                              {h.name}
+                            </button>{" "}
+                            <span className="foliotrace-code-plain foliotrace-num">{h.stockCode}</span>
+                            {h.quantityAdjustment && (
+                              <small className="foliotrace-row-reason foliotrace-marker" title={t.ratioMarkerTitle}>
+                                {ratioLineText(t, h.quantityAdjustment)}
+                              </small>
+                            )}
+                            {reasons.map((reason) => <small key={reason} className="foliotrace-row-reason">{reason}</small>)}
+                          </th>
+                          <td className="foliotrace-num">
+                            <FilingChangeValue value={formatQty(h.quantity)} direction={filingChanges.get(h)?.quantity ?? null}
+                              upLabel={t.changeUp} downLabel={t.changeDown} />
+                          </td>
+                          <td className="foliotrace-num">
+                            <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}
+                              direction={filingChanges.get(h)?.ownership ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
+                          </td>
+                          <td className="foliotrace-num" title={h.quote ? `${t.detailPrice}: ${h.quote.tradeDate}` : undefined}>
+                            {h.quote ? formatKrw(h.quote.close, lang) : "—"}
+                          </td>
+                          <td className="foliotrace-num foliotrace-strong" title={h.estimatedValue === null ? undefined : formatKrw(h.estimatedValue, lang)}>
+                            {amountText(h)}
+                          </td>
+                          <td className="foliotrace-num">{formatPct(h.portfolioWeightPercent)}</td>
+                          <td className="foliotrace-receipt-date" title={`${t.eventReceipt}: ${h.receiptDate}`}>{h.holdingDate ?? t.unknownDate}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="foliotrace-note">{t.tableUnavailable}</p>
+            <p className="foliotrace-note">{t.tableChangeNote}</p>
+          </>
         )}
-      </SectionCard>
+      </section>
 
-      <SectionCard title={t.historyTitle} description={t.historyDesc}>
+      <section className="foliotrace-block" aria-labelledby="foliotrace-history-h">
+        <div className="foliotrace-block-head">
+          <h2 id="foliotrace-history-h" className="foliotrace-h2">{t.historyTitle}</h2>
+          <span className="foliotrace-block-hint">{t.historyDesc}</span>
+        </div>
         {snapshot.history.length >= 2 ? (
           <ul className="foliotrace-history">
             {snapshot.history.map((h) => (
@@ -738,9 +1083,13 @@ function ReadyView({
         ) : (
           <p className="foliotrace-state-text">{t.historySingle}</p>
         )}
-      </SectionCard>
+      </section>
 
-      <SectionCard title={t.eventsTitle} description={eventsDescription}>
+      <section id="foliotrace-events" className="foliotrace-block" aria-labelledby="foliotrace-events-h">
+        <div className="foliotrace-block-head">
+          <h2 id="foliotrace-events-h" className="foliotrace-h2">{t.eventsFullTitle}</h2>
+          <span className="foliotrace-block-hint">{eventsDescription}</span>
+        </div>
         {recentEvents.length === 0 ? (
           <p className="foliotrace-state-text" role="status">
             {t.eventsEmpty} {t.lastChange}: {snapshot.latestReceiptDate ?? "—"}
@@ -749,13 +1098,10 @@ function ReadyView({
           <ul className="foliotrace-events">
             {recentEvents.map((event) => {
               const currentName = currentNameByCorpCode.get(event.corpCode);
-              const label = currentName ?? (event.stockCode
-                ? `${t.eventStockCode} ${event.stockCode}`
-                : `${t.eventCorpCode} ${event.corpCode}`);
               return (
                 <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}:${event.kind}:${event.basisDate ?? ""}`}>
                   <div className="foliotrace-event-heading">
-                    <strong>{label}</strong>
+                    <strong>{eventName(event)}</strong>
                     {currentName && event.stockCode && <code className="foliotrace-code">{event.stockCode}</code>}
                     <span>{event.basisDate ? `${t.eventBasis}: ${event.basisDate}` : `${t.eventReceipt}: ${event.receiptDate}`}</span>
                     <span>{event.kind === "tracking-reentry" && event.source === "indirect-observation" ?
@@ -783,163 +1129,30 @@ function ReadyView({
             })}
           </ul>
         )}
-      </SectionCard>
+      </section>
 
-      <SectionCard title={t.tableTitle} description={t.tableDesc}>
-        {snapshot.holdings.length === 0 ? (
-          <>
-            <p className="foliotrace-state-text" role="status">
-              {t.noHoldings}
+      <section className="foliotrace-method" aria-labelledby="foliotrace-method-h">
+        <h2 id="foliotrace-method-h" className="foliotrace-h3">{t.guideTitle}</h2>
+        <div className="foliotrace-method-cols">
+          <div><h3>{t.methodQuantity}</h3><p>{t.scopeNote}</p></div>
+          <div><h3>{t.methodRatio}</h3><p>{t.ratioGuide}</p></div>
+          <div>
+            <h3>{t.methodPrice}</h3>
+            <p>{t.formula}</p>
+            <p className="foliotrace-num">
+              {t.priceBasis}
+              {snapshot.valuationTradeDate ? ` · ${snapshot.valuationTradeDate}` : ""}
+              {snapshot.publishedAt && ` · ${t.publishedAt}: ${formatKstTimestamp(snapshot.publishedAt, lang)}`}
             </p>
-            <p className="foliotrace-state-text">{t.noHoldingsDesc}</p>
-          </>
-        ) : (
-          <>
-            <p className="foliotrace-state-text foliotrace-table-note">{t.tableUnavailable}</p>
-            <p className="foliotrace-state-text foliotrace-table-note">{t.tableChangeNote}</p>
-            <div className="foliotrace-controls">
-              <label className="foliotrace-field">
-                <span>{t.searchLabel}</span>
-                <input
-                  type="search"
-                  value={query}
-                  placeholder={t.searchPlaceholder}
-                  onChange={(e) => setQuery(e.target.value)}
-                  aria-label={t.searchLabel}
-                />
-              </label>
-              <label className="foliotrace-field">
-                <span>{t.qualityLabel}</span>
-                <select value={quality} onChange={(e) => setQuality(e.target.value as QualityFilter)} aria-label={t.qualityLabel}>
-                  <option value="all">{t.qualityAll}</option>
-                  <option value="priced">{t.qualityPriced}</option>
-                  <option value="unpriced">{t.qualityUnpriced}</option>
-                  <option value="below-5">{t.qualityBelow5}</option>
-                </select>
-              </label>
-              <label className="foliotrace-field">
-                <span>{t.sortLabel}</span>
-                <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)} aria-label={t.sortLabel}>
-                  <option value="value">{t.sortValue}</option>
-                  <option value="weight">{t.sortWeight}</option>
-                  <option value="ownership">{t.sortOwnership}</option>
-                  <option value="receipt">{t.sortReceipt}</option>
-                </select>
-              </label>
-              <button
-                type="button"
-                className="foliotrace-retry"
-                onClick={() => {
-                  setQuery("");
-                  setQuality("all");
-                  setSortKey("value");
-                }}
-              >
-                {t.resetFilters}
-              </button>
-            </div>
-            <p className="foliotrace-state-text" role="status" aria-live="polite">
-              {t.resultCount}: <span className="foliotrace-num">{filtered.length}</span> {t.unitCount}
-            </p>
-            {filtered.length === 0 ? (
-              <p className="foliotrace-state-text" role="status">
-                <strong>{t.searchNoResults}</strong> {t.searchNoResultsDesc}
-              </p>
-            ) : (
-              <div className="foliotrace-table-wrap">
-                <table className="foliotrace-table">
-                  <thead>
-                    <tr>
-                      <th scope="col">{t.colName}</th>
-                      <th scope="col" className="foliotrace-num">{t.colQuantity}</th>
-                      <th scope="col" className="foliotrace-num">{t.colOwnership}</th>
-                      <th scope="col" className="foliotrace-num">{t.colClose}</th>
-                      <th scope="col" className="foliotrace-num">{t.colValue}</th>
-                      <th scope="col" className="foliotrace-num">{t.colWeight}</th>
-                      <th scope="col">{t.colReceipt}</th>
-                      <th scope="col">{t.colStatus}</th>
-                      <th scope="col">{t.colDetail}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((h) => (
-                      <tr key={h.stockCode}>
-                        <th scope="row">
-                          {h.name} <code className="foliotrace-code">{h.stockCode}</code>
-                          <small className="foliotrace-row-reason">
-                            {t.rowBasis}: {h.holdingDate ?? t.unknownDate} · {h.evidence === "issuer-scope-observation" ? t.issuerScopeSource : h.evidence === "indirect-observation" ? t.rowIndirectSource :
-                              h.evidence === "legacy-import" ? (h.sourceKind === "year-end-list" ? t.rowYearEnd : t.eventLegacySource) : t.rowDirectSource}
-                          </small>
-                          {h.observationStatus && (
-                            <small className="foliotrace-row-reason">
-                              {h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict :
-                                h.observationStatus === "verified_scoped" ? t.rowScopedValue : t.rowVerifiedValue}
-                            </small>
-                          )}
-                          {h.issuerScopeConflict && (
-                            <small className="foliotrace-row-reason">{t.verifiedObservationConflict}</small>
-                          )}
-                          {h.issuerScopeSource?.laterChangeDate && (
-                            <small className="foliotrace-row-reason">
-                              {h.issuerScopeSource.laterChangeDate}: {t.issuerScopeLaterChange}
-                            </small>
-                          )}
-                          {h.estimatedValue === null && (
-                            <small className="foliotrace-row-reason">
-                              {exclusionReasonLabel(h.valuationExclusionReason, lang) ?? t.statusExcluded}
-                            </small>
-                          )}
-                        </th>
-                        <td className="foliotrace-num">
-                          <FilingChangeValue value={formatQty(h.quantity)} direction={filingChanges.get(h)?.quantity ?? null}
-                            upLabel={t.changeUp} downLabel={t.changeDown} />
-                          {h.quantityAdjustment && (
-                            <small className="foliotrace-row-reason" title={t.ratioTipKo.replace("{r}", formatQty(h.quantityAdjustment.reportedQuantity)).replace("{n}", h.quantityAdjustment.ratioNumerator).replace("{d}", h.quantityAdjustment.ratioDenominator)}>{t.ratioMarker}</small>
-                          )}
-                        </td>
-                        <td className="foliotrace-num">
-                          <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}
-                            direction={filingChanges.get(h)?.ownership ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
-                        </td>
-                        <td className="foliotrace-num">
-                          {h.quote ? `${formatKrw(h.quote.close, lang)} · ${h.quote.tradeDate}` : "—"}
-                        </td>
-                        <td className="foliotrace-num">{h.estimatedValue === null ? "—" : formatKrw(h.estimatedValue, lang)}</td>
-                        <td className="foliotrace-num">{formatPct(h.portfolioWeightPercent)}</td>
-                        <td className="foliotrace-receipt-date">{h.receiptDate}</td>
-                        <td>{trackingStatusLabel(h)}<small className="foliotrace-row-reason">{statusLabel(holdingStatus(h))}</small></td>
-                        <td>
-                          <button type="button" className="foliotrace-retry" onClick={() => setSelectedCode(h.stockCode)}>
-                            {t.detailButton}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </SectionCard>
+          </div>
+        </div>
+      </section>
 
-      <SectionCard title={t.guideTitle} description={t.formula}>
-        <ul className="foliotrace-guide">
-          <li>{t.description}</li>
-          <li>{t.scopeNote}</li>
-          <li>{t.ratioGuide}</li>
-          <li>
-            {t.priceBasis}
-            {snapshot.valuationTradeDate ? ` · ${snapshot.valuationTradeDate}` : ""}
-          </li>
-          <li>
-            {t.checkedAt}: {formatKstTimestamp(snapshot.filingsCheckedAt, lang) ?? "—"} · {t.generatedAt}: {formatKstTimestamp(snapshot.generatedAt, lang)}
-            {snapshot.publishedAt && ` · ${t.publishedAt}: ${formatKstTimestamp(snapshot.publishedAt, lang)}`}
-          </li>
-        </ul>
-      </SectionCard>
-
-      <SectionCard title={t.faqTitle} description={t.faqDesc}>
+      <section className="foliotrace-block" aria-labelledby="foliotrace-faq-h">
+        <div className="foliotrace-block-head">
+          <h2 id="foliotrace-faq-h" className="foliotrace-h2">{t.faqTitle}</h2>
+          <span className="foliotrace-block-hint">{t.faqDesc}</span>
+        </div>
         <div className="foliotrace-faq">
           {getFaqsForPath(lang, "foliotrace", "/tools/foliotrace").map((entry) => (
             <details key={entry.question}>
@@ -948,9 +1161,13 @@ function ReadyView({
             </details>
           ))}
         </div>
-      </SectionCard>
+      </section>
 
-      <SectionCard title={t.delistedTitle.replace("{count}", String(delistedItems.length))} description={t.delistedNote}>
+      <section className="foliotrace-block" aria-labelledby="foliotrace-delisted-h">
+        <div className="foliotrace-block-head">
+          <h2 id="foliotrace-delisted-h" className="foliotrace-h2 foliotrace-h2-sm">{t.delistedTitle.replace("{count}", String(delistedItems.length))}</h2>
+          <span className="foliotrace-block-hint">{t.delistedNote}</span>
+        </div>
         <ul className="foliotrace-delisted">
           {delistedItems.map((item) => (
             <li key={item.stockCode}>
@@ -967,7 +1184,7 @@ function ReadyView({
             </li>
           ))}
         </ul>
-      </SectionCard>
+      </section>
 
       <Sheet open={selected !== null} onOpenChange={(open) => { if (!open) setSelectedCode(null); }}>
         {selected && (
@@ -1020,6 +1237,10 @@ function ReadyView({
                   </div>
                 </>
               )}
+              <div>
+                <dt>{t.detailValue}</dt>
+                <dd className="foliotrace-num">{selected.estimatedValue === null ? "—" : breakableValue(formatKrw(selected.estimatedValue, lang))}</dd>
+              </div>
               <div>
                 <dt>{t.colOwnership}</dt>
                 <dd className="foliotrace-num">{observedPercent(selected.companyOwnershipPercent, selected.ownershipNumericKind)}</dd>

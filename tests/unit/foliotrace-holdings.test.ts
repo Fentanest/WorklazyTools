@@ -4,6 +4,7 @@ import test from "node:test";
 import type { FilingEvent, Holding } from "../../src/features/foliotrace/contracts.ts";
 import {
   approxNumber,
+  compactKrw,
   eventRangeOf,
   exclusionReasonLabel,
   filingChangesForHoldings,
@@ -19,6 +20,7 @@ import {
   quotePriceDetail,
   quoteSessionLabel,
   sortHoldings,
+  sumPercentText,
   topHoldings,
 } from "../../src/features/foliotrace/ui/holdings.ts";
 import { dartFilingUrl } from "../../src/features/foliotrace/data/dartLink.ts";
@@ -458,4 +460,14 @@ test("ratio-adjusted holdings get the new exclusion labels and stay neutral in f
 
 test("DART filing links use the public viewer shape the snapshot validator accepts", () => {
   assert.equal(dartFilingUrl("20260915000123"), "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260915000123");
+});
+
+test("compact KRW text and exact percent sums (redesign helpers)", () => {
+  assert.equal(compactKrw("350016593930338", "ko", { decimals: 1 })?.text, "350.0조");
+  assert.equal(compactKrw("99049900000000", "ko", { mixed: true })?.text, "99조 499억");
+  assert.equal(compactKrw("946500000000", "ko", { mixed: true })?.text, "9,465억");
+  assert.equal(compactKrw("350016593930338", "en", { decimals: 1 })?.text, "₩350.0T");
+  assert.equal(compactKrw(null, "ko"), null);
+  assert.equal(sumPercentText(["28.39", "21.04"]), "49.4%");
+  assert.equal(sumPercentText(["1", null]), null);
 });

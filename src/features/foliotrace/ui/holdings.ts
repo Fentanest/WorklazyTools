@@ -1,7 +1,7 @@
 import type { FilingEvent, Holding, Quote } from "../contracts";
 
 export type SortKey = "value" | "weight" | "ownership" | "receipt";
-export type QualityFilter = "all" | "priced" | "unpriced" | "below-5";
+export type QualityFilter = "all" | "priced" | "unpriced" | "below-5" | "ratio-adjusted";
 export type HoldingStatus = "included" | "excluded" | "exit" | "unresolved";
 export type Lang = "ko" | "en";
 
@@ -77,6 +77,54 @@ export function formatKrw(value: string | null, _lang: "ko" | "en"): string {
   const parsed = parseDecimal(value);
   if (parsed === null) return "—";
   return `₩${renderAmount(parsed)}`;
+}
+
+/**
+ * Compact KRW text built from the exact integer digits (truncated, never via Number).
+ * `mixed` renders Korean "99조 499억"; otherwise one unit with `decimals` digits ("350.0", "조").
+ * The exact amount is always shown elsewhere (title / key-figure sub line).
+ */
+export function compactKrw(
+  value: string | null, lang: Lang, options: { decimals?: number; mixed?: boolean } = {},
+): { num: string; unit: string; text: string } | null {
+  const parsed = parseDecimal(value);
+  if (parsed === null || parsed.neg) return null;
+  const int = parsed.int;
+  const decimals = options.decimals ?? 1;
+  const units: Array<[number, string]> = lang === "ko"
+    ? [[12, "조"], [8, "억"], [4, "만"]]
+    : [[12, "T"], [9, "B"], [6, "M"]];
+  const hit = units.find(([zeros]) => int.length > zeros);
+  if (!hit) return { num: groupInt(int), unit: "", text: `₩${groupInt(int)}` };
+  const [zeros, unit] = hit;
+  const head = int.slice(0, int.length - zeros);
+  const tail = int.slice(int.length - zeros);
+  if (lang === "ko" && options.mixed) {
+    if (unit === "조") {
+      const eok = tail.slice(0, 4).replace(/^0+(?=\d)/, "");
+      if (eok !== "0") {
+        const text = `${groupInt(head)}조 ${groupInt(eok)}억`;
+        return { num: text, unit: "", text };
+      }
+    }
+    return { num: groupInt(head), unit, text: `${groupInt(head)}${unit}` };
+  }
+  const frac = decimals > 0 ? `.${tail.slice(0, decimals).padEnd(decimals, "0")}` : "";
+  const num = `${groupInt(head)}${frac}`;
+  return { num, unit, text: lang === "ko" ? `${num}${unit}` : `₩${num}${unit}` };
+}
+
+/** Exact sum of percent strings (4 decimals, BigInt), rendered with 1 decimal (rounded half up). Null if any is missing. */
+export function sumPercentText(values: Array<string | null>): string | null {
+  let total = 0n;
+  for (const value of values) {
+    const parsed = parseDecimal(value);
+    if (parsed === null || parsed.neg) return null;
+    total += BigInt(parsed.int + parsed.frac.padEnd(4, "0").slice(0, 4));
+  }
+  const tenths = (total + 500n) / 1000n;
+  const whole = tenths / 10n;
+  return `${whole}.${tenths % 10n}%`;
 }
 
 export function formatPct(value: string | null): string {
@@ -340,6 +388,7 @@ export function filterHoldings(holdings: Holding[], query: string, quality: Qual
     if (quality === "priced" && s !== "included") return false;
     if (quality === "unpriced" && s === "included") return false;
     if (quality === "below-5" && s !== "exit" && !isBelowFivePercent(h)) return false;
+    if (quality === "ratio-adjusted" && !h.quantityAdjustment) return false;
     return true;
   });
 }

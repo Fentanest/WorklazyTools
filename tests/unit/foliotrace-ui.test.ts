@@ -87,10 +87,10 @@ test("user-facing copy avoids raw pipeline jargon", () => {
   }
 });
 
-test("long exact amounts wrap in cards/history; table keeps nowrap in its scroll container", () => {
+test("long exact amounts wrap in key figures/history; table keeps nowrap in its scroll container", () => {
   assert.match(
     cssSource,
-    /\.foliotrace-summary-card \.foliotrace-summary-value\s*\{[^}]*white-space:\s*normal/,
+    /\.foliotrace-figures \.foliotrace-figure-value,\s*\.foliotrace-figures \.foliotrace-figure-sub\s*\{[^}]*white-space:\s*normal/,
   );
   assert.match(
     cssSource,
@@ -107,9 +107,25 @@ test("source kind appears in details only, in general wording, and receipt-less 
     assert.ok(!pageSource.includes(banned), `internal name on screen: ${banned}`);
   }
   assert.match(pageSource, /selected\.sourceKind && \(/);
-  assert.equal((pageSource.match(/h\.sourceKind/g) ?? []).length, 1, "table rows only distinguish the year-end list");
+  assert.equal((pageSource.match(/h\.sourceKind/g) ?? []).length, 0, "dense table rows no longer carry the source kind (detail sheet only)");
   assert.match(pageSource, /hasReceiptNo\(selected\.receiptNo\)/);
   for (const label of ["공시 원문 판독", "Disclosure text reading", "연말 기준 보유 목록", "Year-end holdings list"]) {
     assert.ok(pageSource.includes(label), label);
   }
+});
+
+test("redesigned layout: key figures, two columns, phone list, pill filters, dark-safe colors", () => {
+  for (const marker of ["foliotrace-figures", "foliotrace-columns", "foliotrace-excluded", "foliotrace-pills",
+    "foliotrace-mlist", "foliotrace-method-cols", "compactKrw", "sumPercentText", "useIsPhone"]) {
+    assert.ok(pageSource.includes(marker), marker);
+  }
+  assert.match(pageSource, /aria-pressed=\{quality === key\}/);
+  assert.match(pageSource, /<button type="button" className="foliotrace-name-btn"/);
+  assert.match(cssSource, /@media \(max-width: 640px\)/);
+  assert.match(cssSource, /@media \(max-width: 900px\)/);
+  assert.match(cssSource, /min-height:\s*44px/);
+  // every hard-coded change color has a dark counterpart
+  assert.match(cssSource, /:root\[data-theme\^="dark-"\] \.foliotrace-change-up/);
+  assert.match(cssSource, /:root\[data-theme\^="dark-"\] \.foliotrace-change-down/);
+  assert.deepEqual(cssSource.match(/#[0-9a-fA-F]{3,8}\b(?![^{]*\{)/g) ?? [], []);
 });
