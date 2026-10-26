@@ -987,7 +987,6 @@ function ReadyView({
                   return (
                     <li key={h.stockCode}>
                       <button type="button" className="foliotrace-mrow" onClick={() => setSelectedCode(h.stockCode)}
-                        aria-label={`${h.name} ${h.stockCode} ${t.detailButton}`}
                         title={`${observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)} · ${formatPct(h.portfolioWeightPercent)}`}>
                         <span className="foliotrace-mrow-name">{h.name} <span className="foliotrace-code-plain foliotrace-num">{h.stockCode}</span></span>
                         <span className="foliotrace-mrow-value foliotrace-num">{amountText(h)}</span>
@@ -1142,7 +1141,7 @@ function ReadyView({
           <div>
             <h3>{t.methodPrice}</h3>
             <p>{t.formula}</p>
-            <p className="foliotrace-num">
+            <p>
               {t.priceBasis}
               {snapshot.valuationTradeDate ? ` · ${snapshot.valuationTradeDate}` : ""}
               {snapshot.publishedAt && ` · ${t.publishedAt}: ${formatKstTimestamp(snapshot.publishedAt, lang)}`}
