@@ -2,21 +2,27 @@ import type { SpreadsheetBookData, SpreadsheetCellData, SpreadsheetSheetData } f
 import { alignSequenceWithBudget, type SequenceAlignmentPair } from "../../utils/sequenceAlignment.ts";
 import {
   cellText,
-  compareSpreadsheetCells,
   normalizeComparableText,
   normalizedCellIdentity,
   normalizeKeyPart,
 } from "./normalization.ts";
+import { compareCellsWithStringDates,stringDatePolicy } from "./stringDates.ts";
+import { headerPairsReordered, uniqueHeaderPairs } from "./headerColumns.ts";
+import { restoreRecordIdentity } from "./recordIdentity.ts";
 import { isReconcileConfigValid, type ReconcileConfig } from "./reconcileConfig.ts";
 import type {
   ExcelCompareDuplicateRecord,
   ExcelComparePairOptions,
+  ExcelComparePreviewCell,
+  ExcelComparePreviewSheet,
   ExcelCompareRecord,
   ExcelCompareStandardRecord,
   ExcelCompareSummary,
 } from "./types.ts";
 
 export interface ExcelCompareEngineResult {
+  runId?: string;
+  originalSheets?: { left: ExcelComparePreviewSheet; right: ExcelComparePreviewSheet };
   records: ExcelCompareRecord[];
   summary: ExcelCompareSummary;
   warnings: string[];
@@ -65,12 +71,35 @@ export function compareSpreadsheetPair(
     : options.mode === "key"
       ? compareByKey(leftBook, rightBook, left, right, options, warnings, checkCanceled)
       : compareByReconciliation(left, right, options, warnings, checkCanceled);
+  if (records.some((item) => item.reason.includes("STRING_DATE_PARSE_FAILED"))) warnings.push("STRING_DATE_PARSE_FAILED");
+  // randomUUID exists only in secure contexts; plain-http previews still need a run id.
+  const runId = globalThis.crypto?.randomUUID?.() ?? `run-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  restoreRecordIdentity(records, runId, options);
   return {
+    runId,
+    originalSheets: { left: previewSheet(leftSheet), right: previewSheet(rightSheet) },
     records,
     summary: summarize(records),
     warnings,
-    parameters: comparisonParameters(leftBook, rightBook, options),
+    parameters: [["runId", runId], ...comparisonParameters(leftBook, rightBook, options)],
   };
+}
+
+/** What the result grid shows of a compared sheet, built fresh (the parsed book is not shared):
+ * every cell's address, value and display facts, without lineage, merges or tables. */
+function previewSheet(sheet: SpreadsheetSheetData): ExcelComparePreviewSheet {
+  return { name: sheet.name, rowCount: sheet.rowCount, columnCount: sheet.columnCount, cells: sheet.cells.map(previewCell) };
+}
+
+function previewCell(cell: SpreadsheetCellData): ExcelComparePreviewCell {
+  const result: ExcelComparePreviewCell = { row: cell.row, column: cell.column, address: cell.address, type: cell.type, value: cell.value instanceof Date ? new Date(cell.value.getTime()) : cell.value };
+  if (cell.formula !== undefined) result.formula = cell.formula;
+  if (cell.cachedValue !== undefined) result.cachedValue = cell.cachedValue instanceof Date ? new Date(cell.cachedValue.getTime()) : cell.cachedValue;
+  if (cell.cacheState !== undefined) result.cacheState = cell.cacheState;
+  if (cell.displayValue !== undefined) result.displayValue = cell.displayValue;
+  if (cell.numberFormat !== undefined) result.numberFormat = cell.numberFormat;
+  if (cell.style !== undefined) result.style = structuredClone(cell.style);
+  return result;
 }
 
 function compareByPosition(
@@ -343,8 +372,39 @@ function compareByReconciliation(
 }
 
 function alignColumns(left: SheetIndex, right: SheetIndex, options: ExcelComparePairOptions, checkCanceled: () => void) {
+  if (options.columnMapping?.length) {
+    const mapping = options.columnMapping;
+    const leftUsed = new Set<number>();
+    const rightUsed = new Set<number>();
+    for (const pair of mapping) {
+      if (!Number.isInteger(pair.leftColumn) || !Number.isInteger(pair.rightColumn)
+        || pair.leftColumn < 1 || pair.leftColumn > left.sheet.columnCount
+        || pair.rightColumn < 1 || pair.rightColumn > right.sheet.columnCount
+        || leftUsed.has(pair.leftColumn) || rightUsed.has(pair.rightColumn)) throw new Error("COLUMN_MAPPING_INVALID");
+      leftUsed.add(pair.leftColumn); rightUsed.add(pair.rightColumn);
+    }
+    return { budgetFallback: false, pairs: [
+      ...mapping.map((pair) => ({ beforeIndex: pair.leftColumn - 1, afterIndex: pair.rightColumn - 1 })),
+      ...Array.from({ length: left.sheet.columnCount }, (_, i) => i + 1).filter((i) => !leftUsed.has(i)).map((i) => ({ beforeIndex: i - 1, afterIndex: null })),
+      ...Array.from({ length: right.sheet.columnCount }, (_, i) => i + 1).filter((i) => !rightUsed.has(i)).map((i) => ({ beforeIndex: null, afterIndex: i - 1 })),
+    ] };
+  }
   const leftItems = Array.from({ length: left.sheet.columnCount }, (_, index) => axisItem(index + 1, columnContent(left, index + 1, options.left.headerRow, options)));
   const rightItems = Array.from({ length: right.sheet.columnCount }, (_, index) => axisItem(index + 1, columnContent(right, index + 1, options.right.headerRow, options)));
+  // Moved columns: an order-keeping alignment cannot pair crossing columns, so headers that appear
+  // once on each side pair by name when they cross; the remaining columns keep the order-keeping
+  // alignment among themselves (duplicate or empty headers that did not move still pair).
+  const headers = (index: SheetIndex, headerRow: number) => Array.from({ length: index.sheet.columnCount }, (_, column) => headerRow >= 1 ? cellText(getCell(index, headerRow, column + 1)) : "");
+  const named = uniqueHeaderPairs(headers(left, options.left.headerRow), headers(right, options.right.headerRow));
+  if (headerPairsReordered(named)) {
+    const leftUsed = new Set(named.map((pair) => pair.leftColumn - 1)), rightUsed = new Set(named.map((pair) => pair.rightColumn - 1));
+    const restLeft = leftItems.filter((_, index) => !leftUsed.has(index)), restRight = rightItems.filter((_, index) => !rightUsed.has(index));
+    const rest = alignAxis(restLeft, restRight, options.alignmentCellBudget, checkCanceled);
+    return { budgetFallback: rest.budgetFallback, pairs: [
+      ...named.map((pair) => ({ beforeIndex: pair.leftColumn - 1, afterIndex: pair.rightColumn - 1 })),
+      ...rest.pairs.map((pair) => ({ beforeIndex: pair.beforeIndex === null ? null : restLeft[pair.beforeIndex].index - 1, afterIndex: pair.afterIndex === null ? null : restRight[pair.afterIndex].index - 1 })),
+    ] };
+  }
   return alignAxis(leftItems, rightItems, options.alignmentCellBudget, checkCanceled);
 }
 
@@ -396,9 +456,9 @@ function compareRowPair(
       if (leftCell) records.push(record("removed", rows.beforeIndex, null, leftColumn, null, key, cellText(leftCell), "", "CELL", "REMOVED", displayKey));
       continue;
     }
-    const comparison = compareSpreadsheetCells(leftCell, rightCell, options.normalization, compareStyles);
+    const comparison = compareCellsWithStringDates(leftCell, rightCell, options, compareStyles);
     const reason = [...comparison.changes, ...comparison.notes].join("+");
-    records.push(record(comparison.equal ? "matched" : "changed", rows.beforeIndex, rows.afterIndex, leftColumn, rightColumn, key, comparison.leftText, comparison.rightText, comparison.changes.join("+"), reason || "MATCHED", displayKey));
+    records.push({ ...record(comparison.equal ? "matched" : "changed", rows.beforeIndex, rows.afterIndex, leftColumn, rightColumn, key, comparison.leftText, comparison.rightText, comparison.changes.join("+"), reason || "MATCHED", displayKey), dateNormalization: comparison.dateNormalization });
   }
   return records;
 }
@@ -566,7 +626,7 @@ function roundAmount(value: number, unit: number) {
 }
 
 function reconciliationRecord(status: ExcelCompareStandardRecord["status"], left: Array<{ row: number; amountText: string; partner: string }>, right: Array<{ row: number; amountText: string; partner: string }>, reason: string) {
-  return record(status, left[0]?.row ?? null, right[0]?.row ?? null, null, null, left[0]?.partner ?? right[0]?.partner ?? "", left.map((item) => item.amountText).join(" + "), right.map((item) => item.amountText).join(" + "), "RECONCILIATION", reason);
+  return { ...record(status, left[0]?.row ?? null, right[0]?.row ?? null, null, null, left[0]?.partner ?? right[0]?.partner ?? "", left.map((item) => item.amountText).join(" + "), right.map((item) => item.amountText).join(" + "), "RECONCILIATION", reason), sourceRows: { left: [...new Set(left.map((item) => item.row))], right: [...new Set(right.map((item) => item.row))] } };
 }
 
 function rowText(index: SheetIndex, row: number) {
@@ -609,9 +669,19 @@ function comparisonParameters(left: SpreadsheetBookData, right: SpreadsheetBookD
   const normalization = options.normalization;
   const key = options.mode === "key" ? options.key : undefined;
   const reconcile = options.mode === "reconcile" ? options.reconcile : undefined;
+  const datePolicy=stringDatePolicy(options);
   const dateActive = reconcile?.leftDateColumn !== undefined && reconcile.rightDateColumn !== undefined;
   return [
     ["mode", options.mode],
+    ["stringDateMode", datePolicy.requestedMode],
+    ["stringDateRequestedMode",datePolicy.requestedMode],
+    ["stringDateAppliedMode",datePolicy.appliedMode],
+    ["stringDatePolicyActive",String(datePolicy.active)],
+    ["stringDateInactiveReason",datePolicy.inactiveReason],
+    ["stringDateScope",options.mode==="reconcile"?"INACTIVE: requested string-date policy retained; reconciliation date parsing and tolerances unchanged":"selected non-formula string pairs; VALUE only; keys/anchors/reconciliation unchanged"],
+    ["stringDateLeftColumns", parameterColumns(options.stringDates?.leftColumns)],
+    ["stringDateRightColumns", parameterColumns(options.stringDates?.rightColumns)],
+    ["columnMapping", options.mode === "reconcile" ? UNUSED_PARAMETER : options.columnMapping?.length ? JSON.stringify(options.columnMapping) : "AUTO"],
     ["leftFormat", left.format],
     ["rightFormat", right.format],
     ["leftDateSystem", left.date1904 ? "1904" : "1900"],

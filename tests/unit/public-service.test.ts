@@ -8,8 +8,10 @@ const noMarkers = { redactor: false, office: false, excel: false };
 
 test("public tools are eligible by readiness, not an old tool-type ad or analytics blacklist", () => {
   for (const route of [
+    "/ko/tools/text-compare/", "/en/tools/text-compare/",
+    "/ko/tools/image-compare/", "/en/tools/image-compare/", "/ko/tools/folder-compare/", "/en/tools/folder-compare/",
     "/ko/tools/pdf-editor/", "/ko/tools/pdf-compare/", "/ko/tools/document-compare/",
-    "/ko/tools/hwp-editor/", "/ko/tools/excel-merger/", "/ko/tools/audio-studio/",
+    "/ko/tools/hwp-editor/", "/en/tools/hwp-editor/", "/ko/tools/excel-merger/", "/ko/tools/audio-studio/",
   ]) {
     assert.equal(documentReadiness(route, noMarkers, false), "ready", route);
     assert.ok(safeAnalyticsPage(route), route);
@@ -27,7 +29,6 @@ test("public tools are eligible by readiness, not an old tool-type ad or analyti
   assert.equal(documentReadiness("/ko/tools/excel-merger/xls-preserve/", { ...noMarkers, excel: true }, true, "", "https://worklazy.net/worklazytools/service-worker.js", "/worklazytools/"), "ready");
   assert.equal(documentReadiness("/ko/tools/office-editor/", noMarkers, false), "navigation");
   assert.equal(documentReadiness("/ko/tools/office-editor/", noMarkers, false, "?guide=1"), "ready");
-  assert.equal(documentReadiness("/en/tools/hwp-editor/", noMarkers, false), "navigation");
 });
 
 test("browser URL and router path use the same deployment-base coordinates", () => {
@@ -46,7 +47,10 @@ test("analytics metadata accepts only known routes and fixed parameters", () => 
   assert.equal(safeAnalyticsPage("/en/tools/", "?category=documents")?.path, "/en/tools/");
   assert.equal(safeAnalyticsPage("/ko/tools/", "?category=media&q=secret.pdf"), null);
   assert.equal(safeAnalyticsPage("/ko/tools/", "?category=secret.pdf"), null);
-  assert.equal(safeAnalyticsPage("/en/tools/hwp-editor/"), null);
+  assert.deepEqual(safeAnalyticsPage("/en/tools/hwp-editor/"), {
+    path: "/en/tools/hwp-editor/", title: "Worklazy Tools · tools · hwp-editor",
+  });
+  assert.equal(safeAnalyticsPage("/en/tools/hwp-editor/", "?file=secret.hwp"), null);
   assert.equal(safeAnalyticsPage("/ko/tools/pdf-editor/", "", "#secret"), null);
   assert.equal(safeAnalyticsPage("/ko/tools/office-editor/", "?guide=1")?.path, "/ko/tools/office-editor/");
   assert.equal(safeAnalyticsPage("/ko/tools/excel-merger/xls-preserve/", "?formula=1&format=0")?.path, "/ko/tools/excel-merger/xls-preserve/");

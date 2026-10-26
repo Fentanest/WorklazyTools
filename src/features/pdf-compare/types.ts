@@ -24,7 +24,9 @@ export interface PairComparison {
 }
 export interface ComparisonResult { runId: number; pairs: PairComparison[]; canceled: boolean }
 export interface CompareProgress { pairIndex: number; pairCount: number; completedPages: number; totalPages: number }
+export interface PdfPreviewSource { pageIndex: number; rotation: number; viewBox: number[]; pdfToRendered: number[] }
 export interface SelectedPreview {
   before: HTMLCanvasElement | null; after: HTMLCanvasElement | null; overlay: HTMLCanvasElement | null;
+  beforeSource: PdfPreviewSource | null; afterSource: PdfPreviewSource | null;
   beforeItems: SelectedTextItem[]; afterItems: SelectedTextItem[]; geometry: RenderGeometry; release(): void;
 }

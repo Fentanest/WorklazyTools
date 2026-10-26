@@ -33,6 +33,7 @@ const HOME_TOOL_IDS_EN = [
   "image-studio",
   "document-redactor",
   "document-compare",
+  "hwp-editor",
   "office-editor",
   "text-tools",
   "qr-studio",

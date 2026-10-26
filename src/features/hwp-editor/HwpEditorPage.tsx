@@ -2,6 +2,8 @@ import { FileInput } from "../../components/FileDropProvider";
 import { Download, FileCheck2, FileText, FolderOpen, RefreshCw, X } from "lucide-react";
 import { createEditor, type HmlSaveState, type RhwpEditor } from "@rhwp/editor";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TranslationResources } from "../../i18n/resources";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -16,8 +18,11 @@ import { cn } from "../../lib/utils";
 import { useFocusMode } from "../../components/AppShell";
 
 type ExportFormat = "hwp" | "hwpx" | "hml";
+type ProgressMessageKey = `hwpEditor.${keyof TranslationResources["features"]["hwpEditor"]}`;
+type ProgressTranslate = (key: ProgressMessageKey, options?: Record<string, string | number>) => string;
 
 export function HwpEditorPage() {
+  const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]);
   const [editorReady, setEditorReady] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
@@ -30,6 +35,24 @@ export function HwpEditorPage() {
   const editorPromiseRef = useRef<Promise<RhwpEditor> | undefined>(undefined);
   const progress = useOperationProgress();
   const file = files[0];
+  // Retain translation inputs for the current operation when the locale changes.
+  const progressCopyRef = useRef(new Map<string, { key: ProgressMessageKey; options?: Record<string, string | number> }>());
+  const progressT: ProgressTranslate = (key, options) => {
+    const message = i18n.t(key, { ...options, ns: "features" });
+    progressCopyRef.current.set(message, { key, options });
+    return message;
+  };
+  const localizeProgress = (message: string) => {
+    const copy = progressCopyRef.current.get(message);
+    if (!copy) return message;
+    const options = copy.key === "hwpEditor.downloadStarted"
+      ? { ...copy.options, verification: copy.options?.verification ? t("hwpEditor.verified") : "" }
+      : copy.options;
+    return t(copy.key, options);
+  };
+  // Locale changes update labels without destroying the open document.
+  const initializationRef = useRef({ t, i18n, progress, progressT });
+  initializationRef.current = { t, i18n, progress, progressT };
 
   const setFocusMode = useFocusMode();
   useEffect(() => {
@@ -40,8 +63,9 @@ export function HwpEditorPage() {
   useEffect(() => {
     let disposed = false;
     const initialize = async () => {
-      if (!containerRef.current) throw new Error("편집기 표시 영역을 찾지 못했습니다.");
-      progress.start("공식 rhwp 편집기를 준비하는 중…");
+      if (!containerRef.current) throw new Error(initializationRef.current.t("hwpEditor.missingContainer"));
+      progressCopyRef.current.clear();
+      initializationRef.current.progress.start(initializationRef.current.progressT("hwpEditor.preparing"));
       const editor = await createEditor(containerRef.current, {
         studioUrl: getRhwpStudioUrl(),
         renderer: "canvas2d",
@@ -52,19 +76,19 @@ export function HwpEditorPage() {
       });
       if (disposed) {
         editor.destroy();
-        throw new DOMException("편집기 화면이 닫혔습니다.", "AbortError");
+        throw new DOMException(initializationRef.current.t("hwpEditor.closed"), "AbortError");
       }
-      editor.element.title = "rhwp HWP 문서 편집기";
+      editor.element.title = initializationRef.current.t("hwpEditor.frameTitle");
       editorRef.current = editor;
       setEditorReady(true);
-      progress.succeed("HWP 편집기를 사용할 수 있습니다.");
+      initializationRef.current.progress.succeed(initializationRef.current.progressT("hwpEditor.ready"));
       return editor;
     };
 
     editorPromiseRef.current = initialize();
     editorPromiseRef.current.catch((error) => {
       if (!disposed && !(error instanceof DOMException && error.name === "AbortError")) {
-        progress.fail(normalizeEditorError(error));
+        initializationRef.current.progress.fail(normalizeEditorError(error, initializationRef.current.progressT, initializationRef.current.i18n.resolvedLanguage === "en"));
       }
     });
 
@@ -74,16 +98,21 @@ export function HwpEditorPage() {
       editorRef.current = undefined;
       editorPromiseRef.current = undefined;
     };
-  }, [progress.fail, progress.start, progress.succeed]);
+  }, []);
+
+  useEffect(() => {
+    if (editorRef.current) editorRef.current.element.title = t("hwpEditor.frameTitle");
+  }, [t]);
 
   const getEditor = async () => {
     const editor = editorRef.current ?? await editorPromiseRef.current;
-    if (!editor) throw new Error("편집기가 아직 준비되지 않았습니다.");
+    if (!editor) throw new Error(progressT("hwpEditor.notReady"));
     return editor;
   };
 
   const openDocument = async (nextFile: File) => {
-    progress.start(`${nextFile.name} 파일을 편집기에서 여는 중…`);
+    progressCopyRef.current.clear();
+    progress.start(progressT("hwpEditor.opening", { name: nextFile.name }));
     try {
       const editor = await getEditor();
       const result = await editor.loadFile(await nextFile.arrayBuffer(), nextFile.name, {
@@ -98,9 +127,9 @@ export function HwpEditorPage() {
       } catch {
         setHmlSaveState(undefined);
       }
-      progress.succeed(`${result.pageCount}페이지 문서를 편집기에서 열었습니다.`);
+      progress.succeed(progressT("hwpEditor.opened", { count: result.pageCount }));
     } catch (error) {
-      progress.fail(normalizeEditorError(error));
+      progress.fail(normalizeEditorError(error, progressT, i18n.resolvedLanguage === "en"));
     }
   };
 
@@ -114,7 +143,8 @@ export function HwpEditorPage() {
   const exportDocument = async (format: ExportFormat) => {
     if (!documentOpen || exporting) return;
     setExporting(format);
-    progress.start(`${format.toUpperCase()} 파일을 만드는 중…`);
+    progressCopyRef.current.clear();
+    progress.start(progressT("hwpEditor.exporting", { format: format.toUpperCase() }));
     try {
       const editor = await getEditor();
       if (format === "hml") {
@@ -122,7 +152,7 @@ export function HwpEditorPage() {
         setHmlSaveState(state);
         if (!state.hmlSavable) {
           const reasons = state.blockers.map((item) => item.message).filter(Boolean).slice(0, 3).join(" · ");
-          throw new Error(reasons || "이 문서는 HML 형식으로 저장할 수 없습니다.");
+          throw new Error(reasons || progressT("hwpEditor.hmlUnavailable"));
         }
       }
 
@@ -130,9 +160,9 @@ export function HwpEditorPage() {
       if (format === "hwp") {
         const verification = await editor.exportHwpVerify();
         if (!verification.recovered || verification.pageCountBefore !== verification.pageCountAfter) {
-          throw new Error("HWP 저장 자체 검증에서 페이지 구조가 일치하지 않아 다운로드를 중단했습니다.");
+          throw new Error(progressT("hwpEditor.verificationFailed"));
         }
-        verificationMessage = " · 재열기 검증 완료";
+        verificationMessage = t("hwpEditor.verified");
       }
 
       const bytes = format === "hwp"
@@ -140,16 +170,16 @@ export function HwpEditorPage() {
         : format === "hwpx"
           ? await editor.exportHwpx()
           : await editor.exportHml();
-      const outputName = `${stripExtension(documentName || "worklazy-document")}-편집.${format}`;
+      const outputName = `${stripExtension(documentName || "worklazy-document")}-${t("hwpEditor.editedSuffix")}.${format}`;
       downloadBlob(new Blob([copyArrayBuffer(bytes)], { type: mimeTypeFor(format) }), outputName);
       try {
         await editor.notifySaved(outputName);
       } catch {
         // 구버전 Studio는 저장 완료 통지를 지원하지 않을 수 있다. 다운로드 결과는 유효하다.
       }
-      progress.succeed(`${outputName} 다운로드를 시작했습니다${verificationMessage}.`);
+      progress.succeed(progressT("hwpEditor.downloadStarted", { name: outputName, verification: verificationMessage }));
     } catch (error) {
-      progress.fail(normalizeEditorError(error));
+      progress.fail(normalizeEditorError(error, progressT, i18n.resolvedLanguage === "en"));
     } finally {
       setExporting(undefined);
     }
@@ -168,44 +198,44 @@ export function HwpEditorPage() {
       className={documentOpen ? "relative z-20 m-0 flex h-dvh w-full max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[820px]:p-0" : undefined}
     >
       {!documentOpen && <>
-        <PageHeader eyebrow="HWP EDITOR" title="HWP·HWPX 문서 편집" description="공식 rhwp Studio의 메뉴·도구 모음·서식·표 편집 기능을 그대로 사용하고 다시 HWP·HWPX로 저장하세요.">
+        <PageHeader eyebrow="HWP EDITOR" title={t("hwpEditor.title")} description={t("hwpEditor.description")}>
           <PrivacyBanner compact />
         </PageHeader>
 
-        <SectionCard step={1} title="문서 열기" description="파일을 선택하면 아래 편집기에 바로 열립니다. 암호가 있으면 편집기 안에서 입력할 수 있습니다.">
-          <FileDropZone files={files} onFiles={selectFiles} accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" hint="HWP·HWPX·HML · 선택 즉시 편집기에서 열기" accent="orange" />
+        <SectionCard step={1} title={t("hwpEditor.openTitle")} description={t("hwpEditor.openDescription")}>
+          <FileDropZone files={files} onFiles={selectFiles} accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" hint={t("hwpEditor.dropHint")} accent="orange" />
           <FileList files={files} onRemove={() => setFiles([])} accent="orange" />
           {file && editorReady && (
             <div className="mt-[11px] flex flex-wrap items-center gap-2 max-[620px]:[&>*]:w-full">
-              <PrimaryButton accent="orange" loading={progress.status === "running"} onClick={() => void openDocument(file)}><RefreshCw size={18} /> 다시 열기</PrimaryButton>
+              <PrimaryButton accent="orange" loading={progress.status === "running"} onClick={() => void openDocument(file)}><RefreshCw size={18} /> {t("hwpEditor.reopen")}</PrimaryButton>
             </div>
           )}
         </SectionCard>
 
-        <OperationProgress {...progress} accent="blue" title="HWP 편집기 로그" />
+        <OperationProgress {...progress} message={localizeProgress(progress.message)} logs={progress.logs.map((entry) => ({ ...entry, message: localizeProgress(entry.message) }))} accent="blue" title={t("hwpEditor.logTitle")} />
       </>}
 
-      <SectionCard step={2} title="문서 편집기" description={documentOpen ? `${documentName || "문서"} · ${pageCount}페이지` : "편집기가 준비되면 파일을 선택하거나 편집기 안의 파일 → 열기를 이용하세요."} className={documentOpen ? "!m-0 flex h-full flex-col !gap-0 overflow-hidden !rounded-2xl !border-0 !bg-card !p-0 shadow-xl [backdrop-filter:none] [&>.ui-section-heading]:hidden max-[820px]:!rounded-none" : "!mt-0 mb-[15px]"}>
+      <SectionCard step={2} title={t("hwpEditor.editorTitle")} description={documentOpen ? t("hwpEditor.documentSummary", { name: documentName || t("hwpEditor.document"), count: pageCount }) : t("hwpEditor.editorHint")} className={documentOpen ? "!m-0 flex h-full flex-col !gap-0 overflow-hidden !rounded-2xl !border-0 !bg-card !p-0 shadow-xl [backdrop-filter:none] [&>.ui-section-heading]:hidden max-[820px]:!rounded-none" : "!mt-0 mb-[15px]"}>
         {documentOpen && <div className="flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-3 bg-card py-[7px] pr-2.5 pl-[13px] min-[821px]:pr-[133px] max-[620px]:min-h-[94px] max-[620px]:flex-col max-[620px]:items-stretch max-[620px]:gap-1.5 max-[620px]:p-[7px]" data-testid="hwp-focus-toolbar">
           <div className="flex min-w-0 items-center gap-[9px] text-orange-600 max-[620px]:min-h-[31px] max-[620px]:px-1 dark:text-orange-300" data-testid="hwp-focus-document">
             <FileText size={18} />
-            <span className="flex min-w-0 flex-col gap-0.5"><strong className="max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground max-[620px]:max-w-60">{documentName || "HWP 문서"}</strong><small aria-live="polite" className={cn("text-xs tabular-nums text-muted-foreground", progressToneClass)}>{pageCount}페이지 · {progress.status === "running" || progress.status === "error" ? progress.message : "브라우저에서 편집 중"}</small></span>
+            <span className="flex min-w-0 flex-col gap-0.5"><strong className="max-w-[360px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-foreground max-[620px]:max-w-60">{documentName || t("hwpEditor.hwpDocument")}</strong><small aria-live="polite" className={cn("text-xs tabular-nums text-muted-foreground", progressToneClass)}>{t("hwpEditor.pageCount", { count: pageCount })} · {progress.status === "running" || progress.status === "error" ? localizeProgress(progress.message) : t("hwpEditor.editing")}</small></span>
           </div>
           <div className="flex max-w-full flex-wrap items-center gap-1.5" data-testid="hwp-focus-actions">
-            <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" onClick={() => setDocumentOpen(false)}><X size={16} /> 도구 화면</Button>
-            <label className="relative inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-secondary px-[11px] text-[13px] font-bold whitespace-nowrap text-secondary-foreground transition-colors hover:bg-muted"><FolderOpen size={16} /> 다른 문서
+            <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" onClick={() => setDocumentOpen(false)}><X size={16} /> {t("hwpEditor.toolScreen")}</Button>
+            <label className="relative inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-secondary px-[11px] text-[13px] font-bold whitespace-nowrap text-secondary-foreground transition-colors hover:bg-muted"><FolderOpen size={16} /> {t("hwpEditor.anotherDocument")}
               <FileInput className="sr-only" data-testid="hwp-focus-open" type="file" accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" onChange={(event) => { const next = Array.from(event.currentTarget.files || []); event.currentTarget.value = ""; selectFiles(next); }} />
             </label>
-            <Button className="h-9 rounded-xl bg-orange-700 px-[11px] text-[13px] font-bold text-white shadow-md shadow-orange-700/20 hover:bg-orange-800" data-testid="hwp-save" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwp")}><Download size={16} /> {exporting === "hwp" ? "저장 중…" : "HWP 저장"}</Button>
+            <Button className="h-9 rounded-xl bg-orange-700 px-[11px] text-[13px] font-bold text-white shadow-md shadow-orange-700/20 hover:bg-orange-800" data-testid="hwp-save" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwp")}><Download size={16} /> {exporting === "hwp" ? t("hwpEditor.saving") : t("hwpEditor.saveHwp")}</Button>
             <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" disabled={Boolean(exporting)} onClick={() => void exportDocument("hwpx")}><Download size={16} /> HWPX</Button>
             <Button className="h-9 rounded-xl px-[11px] text-[13px] font-bold" variant="secondary" type="button" disabled={Boolean(exporting) || hmlSaveState?.hmlSavable === false} onClick={() => void exportDocument("hml")}><Download size={16} /> HML</Button>
           </div>
         </div>}
         {!documentOpen && <div className="mb-[11px] flex items-start gap-[9px] rounded-xl bg-orange-500/10 px-3 py-2.5 text-orange-700 dark:text-orange-300">
           <FileCheck2 className="mt-px shrink-0" size={18} />
-          <span className="flex flex-col gap-[3px]"><strong className="text-[13px] text-foreground">이 사이트에 포함된 공식 rhwp Studio</strong><small className="text-[13px] leading-5 text-muted-foreground">버전이 고정된 편집기·WASM·글꼴을 Worklazy Tools의 정적 자산에서 불러오며, 선택한 파일은 브라우저 내부 MessageChannel로 전달됩니다.</small></span>
+          <span className="flex flex-col gap-[3px]"><strong className="text-[13px] text-foreground">{t("hwpEditor.studioTitle")}</strong><small className="text-[13px] leading-5 text-muted-foreground">{t("hwpEditor.studioDescription")}</small></span>
         </div>}
-        <div data-file-drop-frame-scope ref={containerRef} className={cn("h-[clamp(680px,78vh,980px)] w-full overflow-hidden rounded-2xl border border-border bg-[#f4f5f7] shadow-[0_16px_42px_rgba(30,35,50,.12)] empty:relative empty:bg-[linear-gradient(145deg,var(--muted),var(--card))] empty:after:absolute empty:after:inset-0 empty:after:grid empty:after:place-items-center empty:after:text-sm empty:after:font-bold empty:after:text-muted-foreground empty:after:content-['rhwp_편집기를_불러오는_중…'] [&>iframe]:block [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0 [&>iframe]:bg-white max-[620px]:h-[max(620px,78vh)] max-[620px]:rounded-lg dark:border-white/15 dark:shadow-[0_20px_50px_rgba(0,0,0,.38)]", documentOpen && "h-auto min-h-0 flex-1 rounded-none border-0 border-t border-border shadow-none max-[620px]:h-auto max-[620px]:rounded-none")} data-testid="hwp-editor-shell" aria-label="HWP 문서 편집기" />
+        <div data-file-drop-frame-scope ref={containerRef} className={cn("h-[clamp(680px,78vh,980px)] w-full overflow-hidden rounded-2xl border border-border bg-[#f4f5f7] shadow-[0_16px_42px_rgba(30,35,50,.12)] empty:relative empty:bg-[linear-gradient(145deg,var(--muted),var(--card))] empty:after:absolute empty:after:inset-0 empty:after:grid empty:after:place-items-center empty:after:text-sm empty:after:font-bold empty:after:text-muted-foreground empty:after:content-[attr(data-loading-label)] [&>iframe]:block [&>iframe]:h-full [&>iframe]:w-full [&>iframe]:border-0 [&>iframe]:bg-white max-[620px]:h-[max(620px,78vh)] max-[620px]:rounded-lg dark:border-white/15 dark:shadow-[0_20px_50px_rgba(0,0,0,.38)]", documentOpen && "h-auto min-h-0 flex-1 rounded-none border-0 border-t border-border shadow-none max-[620px]:h-auto max-[620px]:rounded-none")} data-loading-label={t("hwpEditor.loading")} data-testid="hwp-editor-shell" aria-label={t("hwpEditor.editorLabel")} />
         {documentOpen && <RhwpVersionNotice mode="editor" compact />}
       </SectionCard>
 
@@ -240,10 +270,10 @@ function downloadBlob(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 15_000);
 }
 
-function normalizeEditorError(error: unknown) {
+function normalizeEditorError(error: unknown, t: ProgressTranslate, english: boolean) {
   const message = error instanceof Error ? error.message : String(error);
-  if (/timeout|initialization|connect/i.test(message)) return "공식 rhwp 편집기를 불러오지 못했습니다. 네트워크 연결이나 콘텐츠 차단 설정을 확인해 주세요.";
-  if (/password|비밀번호|암호/i.test(message)) return "암호를 확인한 뒤 문서를 다시 열어 주세요.";
-  if (/unsaved|저장되지|cancel/i.test(message)) return "현재 문서의 미저장 변경 확인 과정에서 열기를 취소했습니다.";
-  return message || "HWP 편집 작업에 실패했습니다.";
+  if (/timeout|initialization|connect/i.test(message)) return t("hwpEditor.connectionError");
+  if (/password|비밀번호|암호/i.test(message)) return t("hwpEditor.passwordError");
+  if (/unsaved|저장되지|cancel/i.test(message)) return t("hwpEditor.unsavedError");
+  return message && !(english && /[가-힣]/.test(message)) ? message : t("hwpEditor.operationError");
 }

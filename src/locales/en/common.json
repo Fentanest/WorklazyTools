@@ -151,6 +151,7 @@
     "iosInstructions": "Tap the Share button in Safari, then choose 'Add to Home Screen'."
   },
   "recovery": {
+    "reloading": "Reloading…",
     "goHome": "Go Home",
     "toolFailed": "This tool could not be loaded. Refresh to try again.",
     "retry": "Try again",

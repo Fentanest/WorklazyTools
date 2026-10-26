@@ -1,0 +1,13 @@
+.excel-layout-controls > label { min-width:0; max-width:100%; }
+.excel-layout-controls select { max-width:100%; }
+.excel-worksheet-layout { display:grid; gap:.75rem; align-items:start; grid-template-columns:minmax(0,1fr); }
+.excel-worksheet-layout > [data-pane] { min-width:0; }
+@media (min-width:900px) {
+ .excel-worksheet-layout { grid-template-areas:var(--worksheet-areas); grid-template-columns:var(--worksheet-columns); }
+ .excel-worksheet-layout > [data-pane=left] { grid-area:left; }
+ .excel-worksheet-layout > [data-pane=right] { grid-area:right; }
+ .excel-worksheet-layout > [data-pane=changes] { grid-area:changes; align-self:stretch; }
+}
+@media (min-width:900px) and (max-width:1099px) {
+ .excel-worksheet-layout[data-layout=threeColumns] { grid-template-areas:"left" "right" "changes"; grid-template-columns:minmax(0,1fr); }
+}

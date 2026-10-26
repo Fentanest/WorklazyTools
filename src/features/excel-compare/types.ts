@@ -57,10 +57,17 @@ export interface ExcelComparePairOptions {
     allowGroupedMatches: boolean;
     roundingUnit: number;
   };
+  /** One-based source columns; omitted columns remain explicit additions/removals. */
+  stringDates?: { mode: import("./stringDates.ts").StringDateMode; leftColumns: number[]; rightColumns: number[] };
+  columnMapping?: Array<{ leftColumn: number; rightColumn: number }>;
   alignmentCellBudget?: number;
 }
 
 interface ExcelCompareRecordBase {
+  dateNormalization?: { left: import("./stringDates.ts").ParsedStringDate; right: import("./stringDates.ts").ParsedStringDate };
+  recordId?: string;
+  matchingReason?: string;
+  sourceRows?: { left: number[]; right: number[] };
   leftRow: number | null;
   rightRow: number | null;
   leftColumn: number | null;
@@ -117,10 +124,19 @@ export interface ExcelComparePairResult {
   summary: ExcelCompareSummary;
   records: ExcelCompareRecord[];
   warnings: string[];
+  reportError?:"COMPARISON_XLSX_TEXT_UNSUPPORTED"|"REPORT_GENERATION_FAILED";
   reportBuffer: ArrayBuffer;
   reportByteLength: number;
   reportName: string;
+  runId?: string;
+  parameters?: Array<[string, string]>;
+  originalSheets?: { left: ExcelComparePreviewSheet; right: ExcelComparePreviewSheet };
 }
+
+/** A cell as the result grid shows it (address, value and display facts; no lineage). */
+export type ExcelComparePreviewCell = Pick<import("../spreadsheet-core/inputAdapter.ts").SpreadsheetCellData, "row" | "column" | "address" | "type" | "value" | "formula" | "cachedValue" | "cacheState" | "displayValue" | "numberFormat" | "style">;
+/** A compared sheet as the result grid browses it: every cell, without merges, lineage or tables. */
+export interface ExcelComparePreviewSheet { name: string; rowCount: number; columnCount: number; cells: ExcelComparePreviewCell[] }
 
 export interface ExcelCompareInspection {
   fileName: string;

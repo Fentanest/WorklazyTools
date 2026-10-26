@@ -1,0 +1,10 @@
+{
+  "version": "4.13.0-dev",
+  "origin": "Recovered Diffchecker distribution, out/opencv/v4.13.0-dev; approved selective browser port R/S/T",
+  "files": [
+    { "name": "opencv.js", "bytes": 128047, "sha256": "5930cd64d2f8f0fa6c572aae761837d95dd8d5b67c972c6a8a9daa37aa63795f" },
+    { "name": "opencv_js.wasm", "bytes": 8355721, "sha256": "8f4e4ff34715a0efc28262ca60248f93ab48b720b33378926321d8eb0dc448bd" }
+  ],
+  "generation": "node scripts/vendor-comparison-assets.mjs",
+  "runtime": "same-origin, checksum verified, CPU WASM, one-shot classic Worker; no user images transmitted"
+}

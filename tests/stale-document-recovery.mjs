@@ -60,18 +60,16 @@ try {
         if (persistent) { server.state.fault = "404"; server.state.asset = ({ "audio-studio": "AudioStudioPage-", "hwp-editor": "HwpEditorPage-", "image-studio": "ImageStudioPage-", "data-converter": "DataConverterPage-", "document-compare": "DocumentComparePage-" })[tool]; }
         record.swappedAt = Date.now();
         await page.evaluate((target) => { history.pushState({}, "", target); window.dispatchEvent(new PopStateEvent("popstate")); }, `/${language}/tools/${tool}/`);
-        const redirected = language === "en" && tool === "hwp-editor";
-        if (control && !redirected) {
+        if (control) {
           await page.waitForFunction(() => document.querySelector("#root")?.childElementCount === 0, { timeout: 20000 });
           record.outcome = "blank-no-auto-recovery";
         } else {
-          await page.waitForFunction(({ tool, redirected }) => Boolean(document.querySelector("[data-route-error], #startup-help:not([hidden])")) || Boolean(document.querySelector(redirected ? ".tools-index-page" : `[data-tool-page="${tool}"]`)), { tool, redirected }, { timeout: 600000 });
-          record.outcome = await page.evaluate(({ tool, redirected, expectedEntry }) => {
+          await page.waitForFunction(({ tool }) => Boolean(document.querySelector("[data-route-error], #startup-help:not([hidden])")) || Boolean(document.querySelector(`[data-tool-page="${tool}"]`)), { tool }, { timeout: 600000 });
+          record.outcome = await page.evaluate(({ tool, expectedEntry }) => {
             if (document.querySelector("[data-route-error]")) return "route-guidance";
             if (document.querySelector("#startup-help:not([hidden])")) return "entry-guidance";
-            if (redirected) return "expected-language-redirect";
             return document.querySelector('script[type="module"][src]')?.getAttribute("src") === expectedEntry && document.querySelector(`[data-tool-page="${tool}"]`) ? "latest-tool-ready" : "old-document";
-          }, { tool, redirected, expectedEntry });
+          }, { tool, expectedEntry });
         }
         record.finishedAt = Date.now();
         await page.waitForTimeout(1000);
@@ -80,9 +78,9 @@ try {
         record.final = await page.evaluate(() => ({ entry: document.querySelector('script[type="module"][src]')?.getAttribute("src"), build: document.documentElement.dataset.recoveryBuild, rootChildren: document.querySelector("#root")?.childElementCount, mainText: document.querySelector("#main-content")?.innerText || "", text: document.body.innerText, controller: navigator.serviceWorker.controller?.scriptURL, isolated: crossOriginIsolated, caches: null }));
         record.final.caches = await page.evaluate(() => caches.keys());
         assert.ok(record.seconds <= 600); assert.ok(record.reloads <= 1);
-        if (!redirected) assert.ok(record.responses.some((item) => item.status === 404 && item.url.endsWith(".js")), "old lazy hash really returned 404");
-        if (control && !redirected) { assert.equal(record.reloads, 0); assert.equal(record.final.rootChildren, 0); }
-        else if (!redirected) {
+        assert.ok(record.responses.some((item) => item.status === 404 && item.url.endsWith(".js")), "old lazy hash really returned 404");
+        if (control) { assert.equal(record.reloads, 0); assert.equal(record.final.rootChildren, 0); }
+        else {
           assert.ok(["latest-tool-ready", "route-guidance", "entry-guidance"].includes(record.outcome));
           if (storageThrows || persistent) assert.equal(record.outcome, "route-guidance");
           if (storageThrows) assert.equal(record.reloads, 0);

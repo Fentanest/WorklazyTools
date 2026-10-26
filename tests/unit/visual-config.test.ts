@@ -73,25 +73,27 @@ test("visual regression scenario manifest covers every available tool and state 
     availableToolIds,
   );
 
-  const hwpBottom = bottomScenarios.find(({ toolId }) => toolId === "hwp-editor");
-  assert.deepEqual(new Set(hwpBottom?.profiles.map(({ locale }) => locale)), new Set(["ko"]));
-  assert.ok(hwpBottom?.localeNotApplicableReason);
-  const hwpRedirect = visualRegressionScenarios.find(({ stateType, toolId }) => stateType === "redirect" && toolId === "hwp-editor");
-  assert.deepEqual(new Set(hwpRedirect?.profiles.map(({ locale }) => locale)), new Set(["en"]));
-  assert.ok(hwpRedirect?.actions.some(({ type }) => type === "assert-path"));
+  const hwpScenarios = toolScenarios.filter(({ toolId }) => toolId === "hwp-editor");
+  assert.deepEqual(hwpScenarios.map(({ stateType }) => stateType), ["initial", "bottom", "interaction"]);
+  for (const scenario of hwpScenarios) {
+    assert.deepEqual(new Set(scenario.profiles.map(({ locale }) => locale)), new Set(["ko", "en"]));
+    assert.equal(scenario.localeNotApplicableReason, null);
+  }
+  assert.ok(!visualRegressionScenarios.some(({ stateType, toolId }) => stateType === "redirect" && toolId === "hwp-editor"));
 
   const names = visualRegressionScenarios.flatMap((scenario) => scenario.profiles.map((profile) => (
     `${scenario.routeId}__${scenario.stateId}__${profile.locale}__${profile.theme}__${profile.viewport}.png`
   )));
   assert.equal(new Set(names).size, names.length, "stateId must prevent scenario captures from overwriting each other");
-  // MCAL-7 adds four initial and two bottom captures without reducing prior coverage.
-  assert.equal(names.length, 300);
+  // Measured merged scenarios: calendar +6, comparison tools +21, HWP English net +3.
+  assert.equal(names.length, 324);
   const calendarScenarios = toolScenarios.filter(({ toolId }) => toolId === "market-calendar");
   assert.deepEqual(calendarScenarios.map(({ stateType }) => stateType), ["initial", "bottom"]);
   assert.ok(calendarScenarios.every(({ readySelector, assertSelector }) => (
     readySelector === "[data-tool-page='market-calendar']" && assertSelector === readySelector
   )));
   assert.equal(calendarScenarios.find(({ stateType }) => stateType === "bottom")?.bottomTargetSelector, "[data-tool-page='market-calendar'] > :last-child");
+  assert.equal(visualRegressionScenarios.filter(({ toolId }) => toolId === "text-compare").flatMap(({ profiles }) => profiles).length, 7);
   assert.equal(visualRegressionScenarios.filter(({ toolId }) => toolId === "product-banner").flatMap(({ profiles }) => profiles).length, 7);
   // Pinned scope additions (not copied historical totals): 4 desktop-1920
   // captures and 4 mint-family captures; unpublished video captures are excluded.
@@ -108,8 +110,10 @@ test("visual regression scenario manifest covers every available tool and state 
     ].filter((name) => !names.includes(name)),
     [],
   );
-  assert.equal(qaCaptureScenarios.length, 98);
-  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 772);
+  assert.equal(qaCaptureScenarios.length, 107);
+  assert.equal(qaCaptureScenarios.flatMap(({ profiles }) => profiles).length, 856);
+  for (const toolId of ["image-compare", "folder-compare"]) assert.deepEqual(qaCaptureScenarios.filter(item => item.toolId === toolId).map(({ stateType }) => stateType), ["initial", "bottom", "interaction"]);
+  assert.deepEqual(qaCaptureScenarios.filter(({ toolId }) => toolId === "text-compare").map(({ stateType }) => stateType), ["initial", "bottom", "interaction"]);
   const b1QaScenarios = qaCaptureScenarios.filter(({ toolId }) => [
     "text-formatter", "work-calculator", "payroll-calculator", "security-tools", "image-privacy", "text-tools",
   ].includes(toolId));
@@ -134,7 +138,7 @@ test("visual regression scenario manifest covers every available tool and state 
     "data-converter", "timezone-calculator", "text-merger", "hwp-editor", "office-editor",
   ].includes(toolId));
   assert.equal(b2QaScenarios.length, 15);
-  assert.equal(b2QaScenarios.flatMap(({ profiles }) => profiles).length, 108);
+  assert.equal(b2QaScenarios.flatMap(({ profiles }) => profiles).length, 120);
   assert.deepEqual(new Set(b2QaScenarios.map(({ stateType }) => stateType)), new Set(["initial", "bottom", "interaction"]));
   const b3QaScenarios = qaCaptureScenarios.filter(({ toolId }) => ["document-compare", "excel-cleaner"].includes(toolId));
   assert.equal(b3QaScenarios.length, 11);

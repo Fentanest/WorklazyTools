@@ -6,6 +6,7 @@ import { chromium, devices } from "playwright";
 import puppeteer from "puppeteer-core";
 import { availableToolRoutes } from "./tool-registry-routes.mjs";
 import { startRecoveryServer } from "./recovery-server.mjs";
+import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
 
 const output = path.resolve(process.env.RECOVERY_OUTPUT || "/tmp/worklazy-s0/recovery");
 await fs.mkdir(output, { recursive: true });
@@ -27,7 +28,7 @@ async function attempt(name, profile, action, { storageThrows = false } = {}) {
   server.state.delay = 0; server.state.transform = null; server.state.htmlRoot = null;
   const requestStart = server.state.requests.length;
   const context = await browser.newContext({ ...(profile === "android" ? devices["Pixel 7"] : { viewport: { width: 1365, height: 900 } }), locale: "en-US", serviceWorkers: "allow" });
-  const record = { name, profile, start: new Date().toISOString(), network: [], storage: [], navigations: [], errors: [], external: [], helpShown: [] };
+  const record = { name, profile, start: new Date().toISOString(), network: [], storage: [], navigations: [], documents: [], errors: [], external: [], helpShown: [], routeErrors: [], recovering: [] };
   await context.exposeBinding("recordRecovery", (_, event) => { (record[event.kind] ||= []).push(event); });
   await context.addInitScript(({ storageThrows }) => {
     localStorage.setItem("worklazy_privacy_consent_v2", "denied");
@@ -43,9 +44,16 @@ async function attempt(name, profile, action, { storageThrows = false } = {}) {
       return originalRemove.call(this, key);
     };
     if (storageThrows) Object.defineProperty(window, "sessionStorage", { get() { throw new Error("RAW_STORAGE_SECRET"); } });
+    window.addEventListener("DOMContentLoaded", () => window.recordRecovery({ kind: "documents", path: location.pathname, type: performance.getEntriesByType("navigation")[0]?.type }));
+    let errorSeen = false; let recoverySeen = false;
     new MutationObserver(() => {
       const help = document.querySelector("#startup-help:not([hidden])");
       if (help && !help.dataset.observed) { help.dataset.observed = "true"; window.recordRecovery({ kind: "helpShown", time: Date.now() }); }
+      if (!errorSeen && (document.querySelector("[data-route-error]") || /\/error\/$/.test(location.pathname) || /This tool could not be loaded|도구를 불러오지 못했습니다/.test(document.body?.innerText || ""))) {
+        errorSeen = true; window.recordRecovery({ kind: "routeErrors", path: location.pathname });
+      }
+      const recovery = document.querySelector("[data-route-recovering]");
+      if (recovery && !recoverySeen) { recoverySeen = true; window.recordRecovery({ kind: "recovering", text: recovery.querySelector("p")?.textContent, role: recovery.getAttribute("role") }); }
     }).observe(document, { subtree: true, attributes: true, childList: true });
   }, { storageThrows });
   const page = await context.newPage();
@@ -87,12 +95,13 @@ async function navigate(page, target) {
   await page.evaluate((target) => { history.pushState({}, "", target); window.dispatchEvent(new PopStateEvent("popstate")); }, target);
 }
 async function assertBoundary(page) {
-  await page.locator("[data-route-error]").waitFor();
-  assert.doesNotMatch(await page.locator("[data-route-error]").innerText(), /RAW_|Worker|worker|chunk|청크|런타임|runtime|Error:|TypeError|stack/);
-  assert.equal(await page.locator("[data-route-error]").getAttribute("role"), "alert");
-  await page.waitForFunction(() => document.activeElement?.matches("[data-route-error]"));
+  // S5 renders the terminal screen in a separate document outside AppShell.
+  await page.waitForURL(/\/error\/$/);
+  await page.getByRole("heading", { name: "This tool could not be loaded. Refresh to try again.", exact: true }).waitFor();
+  assert.doesNotMatch(await page.locator("body").innerText(), /RAW_|Worker|worker|chunk|청크|런타임|runtime|Error:|TypeError|stack/);
 }
-const automaticReloads = (record) => record.network.filter((item) => item.mainDocument).length - 1;
+// Error-page and home navigations are not reloads.
+const automaticReloads = (record) => record.documents.filter((item) => item.type === "reload").length;
 
 try {
   for (const profile of profiles) {
@@ -105,10 +114,60 @@ try {
         assert.equal(record.storage.filter((item) => item.action === "set").length, 1);
         assert.equal(record.storage.filter((item) => item.action === "remove").length, 0, "(b) no clearing before success");
         assert.ok(await page.evaluate(() => Object.keys(sessionStorage).some((key) => key.startsWith("worklazy_tool_reload:"))), "guard remains on (d) retry failure");
-        record.boundaryDom = await page.locator("[data-route-error]").innerText();
+        record.boundaryDom = await page.locator("body").innerText();
         await page.screenshot({ path: path.join(output, `${profile}-A-repeat-${fault}-boundary.png`) });
         await navigate(page, "/en/tools/text-tools/"); await page.locator('[data-tool-page="text-tools"]').waitFor();
         assert.equal(await page.locator("[data-route-error]").count(), 0, "route navigation resets boundary");
+      });
+      for (const withoutPreloadEvent of [false, true]) await attempt(withoutPreloadEvent ? "A-lazy-without-preload-event" : "A-delayed-first-failure", profile, async ({ page, record, cdp }) => {
+        if (withoutPreloadEvent) await page.addInitScript(() => {
+          const dispatch = window.dispatchEvent;
+          window.dispatchEvent = function (event) { return event.type === "vite:preloadError" ? true : dispatch.call(this, event); };
+        });
+        await cdp.send("Network.emulateNetworkConditions", { offline: false, latency: 150, downloadThroughput: -1, uploadThroughput: -1 });
+        let failures = 0;
+        await page.route("**/assets/AudioStudioPage-*.js", async (route) => {
+          if (failures++ === 0) await route.abort("failed"); else await route.continue();
+        });
+        await page.goto(`${server.url}/en/tools/audio-studio/`, { waitUntil: "domcontentloaded" });
+        await page.locator('[data-tool-page="audio-studio"]').waitFor();
+        await page.waitForFunction(() => !Object.keys(sessionStorage).some((key) => key.startsWith("worklazy_tool_reload:")));
+        assert.equal(automaticReloads(record), 1);
+        assert.equal(record.routeErrors.length, 0, "no transient error copy or error document");
+        // A fast reload can replace the document before the observer reports this transient state.
+        if (record.recovering.length > 0) {
+          assert.ok(record.recovering.every((item) => item.role === "status" && item.text === "Reloading…"));
+        }
+      });
+      if (profile === "desktop") await attempt("A-cancelled-reload-home", profile, async ({ page, record }) => {
+        await home(page);
+        // Match AppShell's unsaved-work guard, with real browser activation.
+        await page.evaluate(() => window.addEventListener("beforeunload", (event) => event.preventDefault()));
+        await page.click("body");
+        let failures = 0;
+        await page.route("**/assets/AudioStudioPage-*.js", async (route) => {
+          if (failures++ === 0) await route.abort("failed"); else await route.continue();
+        });
+        const confirmation = page.waitForEvent("dialog").then(async (dialog) => {
+          assert.equal(dialog.type(), "beforeunload");
+          await dialog.dismiss();
+        });
+        await navigate(page, "/en/tools/audio-studio/");
+        await confirmation;
+        const recovery = page.locator("[data-route-recovering]");
+        await recovery.waitFor();
+        assert.equal(await recovery.getAttribute("role"), "status");
+        assert.equal(record.routeErrors.length, 0);
+        assert.equal(automaticReloads(record), 0, "cancelled reload leaves the current document");
+        assert.equal(record.storage.filter((item) => item.action === "set").length, 1, "no repeated automatic attempt");
+        const homeButton = recovery.getByRole("button", { name: "Go Home", exact: true });
+        assert.equal(await homeButton.count(), 1, "cancelled recovery must offer an exit");
+        await page.screenshot({ path: path.join(output, "desktop-A-cancelled-reload-home-recovering.png") });
+        page.once("dialog", (next) => void next.accept());
+        await homeButton.click();
+        await page.locator(".home-page").waitFor();
+        assert.equal(new URL(page.url()).pathname, "/en/");
+        assert.equal(automaticReloads(record), 0, "manual home does not retry the failed tool");
       });
       await attempt("A-storage-throws", profile, async ({ page, record }) => {
         await home(page); server.state.fault = "404";
@@ -134,13 +193,13 @@ try {
         const removed = record.storage.filter((item) => item.action === "remove");
         assert.equal(removed.length, 1); assert.ok(removed[0].ready); assert.equal(removed[0].loading, false);
       });
-      await attempt("A-manual-retry", profile, async ({ page, record }) => {
+      await attempt("A-manual-home", profile, async ({ page, record }) => {
         await home(page); server.state.fault = "404";
         await navigate(page, "/en/tools/audio-studio/"); await assertBoundary(page);
         server.state.fault = "";
-        await page.locator("[data-route-error] button").click();
-        await assertBoundary(page);
-        assert.equal(automaticReloads(record), 2, "one automatic plus explicit button reload");
+        await page.getByRole("button", { name: "Go Home", exact: true }).click();
+        await page.locator(".home-page").waitFor();
+        assert.equal(automaticReloads(record), 1, "D3 returns home without another reload");
       });
     }
     if (!only || only === "B") {
@@ -232,6 +291,7 @@ try {
         await page.getByText("The file could not be transferred. Download it and open it here.", { exact: true }).first().waitFor();
         assert.doesNotMatch(await page.locator("#main-content").innerText(), /RAW_CONSTRUCTOR_SECRET/);
       });
+      if (VIDEO_STUDIO_PUBLIC) {
       const videoFile = path.join(output, "recovery.mp4");
       execFileSync("ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "color=c=blue:s=160x90:d=1", "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", videoFile]);
       for (const stage of ["probe", "processor"]) await attempt(`C-video-${stage}`, profile, async ({ page }) => {
@@ -268,12 +328,16 @@ try {
         await page.getByText("This browser cannot transfer files between tools in memory. Download the file and open it manually in Audio Studio.", { exact: true }).first().waitFor();
         assert.doesNotMatch(await page.locator("#main-content").innerText(), /RAW_CONSTRUCTOR_SECRET/);
       });
+      }
     }
     if (!only || only === "normal") {
       for (const language of ["ko", "en"]) for (const tool of availableToolRoutes) await attempt(`normal-${language}-${tool.toolId}`, profile, async ({ page, record }) => {
         await page.goto(`${server.url}/${language}${tool.path.replace(/\/$/, "")}/`);
-        if (language === "en" && tool.toolId === "hwp-editor") await page.locator(".tools-index-page").waitFor();
-        else if (tool.toolId === "excel-merger") await page.locator(".ui-page-header").waitFor();
+        if (tool.toolId === "excel-merger") await page.locator(".ui-page-header").waitFor();
+        else if (tool.toolId === "office-editor") {
+          await page.waitForURL(/\/tools\/office-editor\/app\/$/);
+          await page.locator('[data-tool-page="office-editor-app"]').waitFor();
+        }
         else await page.locator(`[data-tool-page="${tool.toolId}"]`).waitFor();
         assert.equal(await page.locator("[data-route-error]").count(), 0);
         assert.equal(record.helpShown.length, 0);
@@ -299,12 +363,18 @@ try {
           assert.equal(record.errors.length, 0);
         }, { storageThrows: true });
       }
-      await attempt("isolation-lazy-failure", profile, async ({ page, record }) => {
-        server.state.fault = "404"; server.state.asset = "OfficeEditorAppPage-";
+      await attempt("isolation-lazy-failure", profile, async ({ page, record, cdp }) => {
         await page.goto(`${server.url}/en/tools/office-editor/app/`);
         await page.waitForFunction(() => crossOriginIsolated);
+        await page.locator('[data-tool-page="office-editor-app"]').waitFor();
+        const preparationReloads = automaticReloads(record);
+        // Force the injected fault past the warm-up's positive HTTP cache.
+        await cdp.send("Network.clearBrowserCache");
+        server.state.fault = "404"; server.state.asset = "OfficeEditorAppPage-";
+        await page.reload({ waitUntil: "domcontentloaded" });
         await assertBoundary(page);
-        assert.equal(automaticReloads(record), 1, "only the document preparation owner reloads");
+        assert.equal(automaticReloads(record) - preparationReloads, 2, "one explicit reload plus one owner chunk retry");
+        assert.equal(record.storage.filter((item) => item.action === "set" && item.value.startsWith("chunk:")).length, 1);
         assert.equal(record.storage.filter((item) => item.key.startsWith("worklazy_tool_reload:")).length, 0);
         assert.equal(record.external.length, 0);
       });

@@ -383,6 +383,39 @@
         "Opening and closing times",
         "U.S. hours in Korea time"
       ]
+    },
+    "text-compare": {
+      "title": "Text Compare",
+      "shortTitle": "Text Compare",
+      "description": "Find line, word and character changes between two texts, copy selected changes and save your result.",
+      "eyebrow": "TEXT COMPARISON",
+      "highlights": [
+        "Line, word and character comparison",
+        "Literal ignore rules",
+        "Copy selected changes"
+      ]
+    },
+    "image-compare": {
+      "title": "Image Compare",
+      "shortTitle": "Image Compare",
+      "description": "Inspect color, opacity and recognized-text differences, and review alignment suggestions.",
+      "eyebrow": "IMAGE COMPARISON",
+      "highlights": [
+        "Nine comparison views",
+        "Review alignment suggestions",
+        "Compare recognized text"
+      ]
+    },
+    "folder-compare": {
+      "title": "Folder & ZIP Compare",
+      "shortTitle": "Folder Compare",
+      "description": "Compare file contents in two folders or ZIP archives, then inspect selected pairs with existing tools.",
+      "eyebrow": "READ-ONLY FILE COMPARISON",
+      "highlights": [
+        "Verify file contents",
+        "Verified rename candidates",
+        "Document, sheet and image details"
+      ]
     }
   }
 }

@@ -33,6 +33,9 @@ export interface PairState {
   secondaryRight: number[];
   duplicatePolicy: DuplicateKeyPolicy;
   reconcile: NonNullable<ExcelComparePairOptions["reconcile"]>;
+  stringDateMode?: import("./stringDates.ts").StringDateMode;
+  stringDateColumns?: { left: Record<string, number[]>; right: Record<string, number[]> };
+  columnMapping?: ExcelComparePairOptions["columnMapping"];
   unassignedFileCount: number;
 }
 
@@ -52,6 +55,8 @@ export function assignPairFiles<T>(slots: { left?: T; right?: T }, files: readon
 export function swapPairSides(pair: PairState): PairState {
   return {
     ...pair,
+    stringDateColumns: pair.stringDateColumns ? { left: pair.stringDateColumns.right, right: pair.stringDateColumns.left } : undefined,
+    columnMapping: pair.columnMapping?.map(({ leftColumn, rightColumn }) => ({ leftColumn: rightColumn, rightColumn: leftColumn })),
     left: pair.right,
     right: pair.left,
     leftInspection: pair.rightInspection,
@@ -123,8 +128,8 @@ export function selectPairSheet(pair: PairState, side: "left" | "right", sheetNa
   const inspection = side === "left" ? pair.leftInspection : pair.rightInspection;
   const sheet = inspection?.sheets.find((candidate) => candidate.name === sheetName);
   const selection = selections[sheetName] ?? (sheet ? suggestedSelection(sheet) : { row: 1, source: "fallback" as const });
-  if (side === "left") return { ...pair, leftSheet: sheetName, leftHeaderRow: selection.row, leftHeaderInput: String(selection.row) };
-  return { ...pair, rightSheet: sheetName, rightHeaderRow: selection.row, rightHeaderInput: String(selection.row) };
+  if (side === "left") return { ...pair, columnMapping: undefined, leftSheet: sheetName, leftHeaderRow: selection.row, leftHeaderInput: String(selection.row) };
+  return { ...pair, columnMapping: undefined, rightSheet: sheetName, rightHeaderRow: selection.row, rightHeaderInput: String(selection.row) };
 }
 
 export function selectManualHeader(pair: PairState, side: "left" | "right", row: number): PairState {

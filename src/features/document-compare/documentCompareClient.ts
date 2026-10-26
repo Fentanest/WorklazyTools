@@ -1,8 +1,9 @@
-import type { WordCompareOptions, WordWorkerPairResult } from "../word-compare/wordWorkerClient";
-import { compareWordFilePairs } from "../word-compare/wordWorkerClient";
-import type { HwpCompareOptions } from "../hwp-compare/hwpWorkerClient";
-import { compareHwpFilePairs } from "../hwp-compare/hwpWorkerClient";
-import { sniffDocumentFormat, validateDocumentPairFormats, type DocumentPairFormat } from "./documentFormat";
+import { normalizeFormattingMask, defaultFormattingMask } from "./formattingMask.ts";
+import type { WordComparisonEvents, WordCompareOptions, WordWorkerPairResult } from "../word-compare/wordWorkerClient.ts";
+import { compareWordFilePairs } from "../word-compare/wordWorkerClient.ts";
+import type { HwpCompareOptions } from "../hwp-compare/hwpWorkerClient.ts";
+import { compareHwpFilePairs } from "../hwp-compare/hwpWorkerClient.ts";
+import { sniffDocumentFormat, validateDocumentPairFormats, type DocumentPairFormat } from "./documentFormat.ts";
 
 export interface DocumentFilePair {
   beforeFile: File;
@@ -24,12 +25,14 @@ export async function compareDocumentFilePairs(
   onProgress?: (progress: number, message: string) => void,
   language: "ko" | "en" = "ko",
   signal?: AbortSignal,
+  events?: WordComparisonEvents,
 ) {
   const inspected = await inspectPairs(pairs, language, signal);
   const indexedResults = new Map<number, WordWorkerPairResult>();
   const groups = [
-    { family: "word" as const, pairs: inspected.filter((pair) => pair.formats.family === "word") },
-    { family: "hwp" as const, pairs: inspected.filter((pair) => pair.formats.family === "hwp") },
+    { family: "word" as const, native: false, pairs: inspected.filter((pair) => pair.formats.trackedDocxEligible) },
+    { family: "word" as const, native: true, pairs: inspected.filter((pair) => pair.formats.family === "word" && !pair.formats.trackedDocxEligible) },
+    { family: "hwp" as const, native: true, pairs: inspected.filter((pair) => pair.formats.family === "hwp") },
   ].filter((group) => group.pairs.length);
   let completed = 0;
 
@@ -38,10 +41,27 @@ export async function compareDocumentFilePairs(
     const base = (completed / pairs.length) * 100;
     const share = (group.pairs.length / pairs.length) * 100;
     const progress = (value: number, message: string) => onProgress?.(base + (value / 100) * share, message);
+    const applied = formattingScopeForPair(!group.native,options);
+    // A native pair with a narrowed formatting mask says the mask applies to DOCX only (once, before it is shown).
+    const warned = new WeakSet<object>();
+    const nativeWarning = (result: WordWorkerPairResult["result"]) => {
+      if (!group.native || warned.has(result) || !Object.values(normalizeFormattingMask(options.formattingMask)).some(enabled=>!enabled)) return;
+      warned.add(result);
+      result.warnings.push(language === "en" ? "Detailed formatting groups apply to DOCX pairs only. This pair uses the full native formatting scope when formatting is enabled." : "세부 서식 선택은 DOCX 쌍에만 적용됩니다. 이 문서 쌍은 서식 비교를 켜면 기존의 전체 서식 범위로 비교합니다.");
+    };
+    // Events carry the caller's pair index; screen results of groups without a separate tracked pass arrive with the group.
+    const forward: WordComparisonEvents | undefined = events && {
+      onScreen: (index, result) => { nativeWarning(result); events.onScreen?.(group.pairs[index].index, result); },
+      onTracked: (index, buffer, warnings) => events.onTracked?.(group.pairs[index].index, buffer, warnings),
+    };
     const results = group.family === "word"
-      ? await compareWordFilePairs(group.pairs.map(({ beforeFile, afterFile }) => ({ beforeFile, afterFile })), options, progress, language, signal)
-      : await compareHwpFilePairs(group.pairs.map(({ beforeFile, afterFile, beforePassword, afterPassword }) => ({ beforeFile, afterFile, beforePassword, afterPassword })), options, progress, language, signal);
-    results.forEach((result, resultIndex) => indexedResults.set(group.pairs[resultIndex].index, result));
+      ? await compareWordFilePairs(group.pairs.map(({ beforeFile, afterFile }) => ({ beforeFile, afterFile })), applied, progress, language, signal, forward)
+      : await compareHwpFilePairs(group.pairs.map(({ beforeFile, afterFile, beforePassword, afterPassword }) => ({ beforeFile, afterFile, beforePassword, afterPassword })), applied, progress, language, signal);
+    results.forEach((result, resultIndex) => {
+      nativeWarning(result.result);
+      indexedResults.set(group.pairs[resultIndex].index, result);
+      if (group.family === "hwp") events?.onScreen?.(group.pairs[resultIndex].index, result.result);
+    });
     completed += group.pairs.length;
   }
   return pairs.map((_, index) => indexedResults.get(index)!);
@@ -77,4 +97,9 @@ export async function inspectPairs(
 
 function cancelled(language: "ko" | "en") {
   return new DOMException(language === "en" ? "Document comparison was cancelled." : "문서 비교를 취소했습니다.", "AbortError");
+}
+
+export function formattingScopeForPair(docxPair:boolean, options:DocumentCompareOptions):DocumentCompareOptions {
+  const requested=normalizeFormattingMask(options.formattingMask);
+  return {...options,formattingMask:docxPair?requested:{...defaultFormattingMask},requestedFormattingMask:docxPair?undefined:requested};
 }

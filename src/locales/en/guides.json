@@ -164,7 +164,13 @@
       {
         "title": "Results and Precautions",
         "paragraphs": [
-          "Read the original text alongside the change indicators to verify if it represents an actual meaning change. Indicators might appear due to internal structure or formatting differences. Automated handling may be difficult if similar types of content repeat."
+          "Read the original text alongside the change indicators to verify if it represents an actual meaning change. Indicators might appear due to internal structure or formatting differences. Automated handling may be difficult if similar types of content repeat.",
+          "When table comparison is on, column additions and deletions in paired tables are tracked even if column widths and layout are excluded. Remaining columns use revised widths, while restored deleted columns keep their original widths. Some merged-cell or offset-row layout changes cannot yet be exported with tracked changes.",
+          "In our checks, LibreOffice did not recognize some table revisions for Accept/Reject. Review the result beside the originals in your chosen editor.",
+          "Headers and footers are compared across stable sections, including shared parts and sections linked to a previous one. Shared content is compared once. Tracked export is limited when section breaks are moved, split or merged, or when header/footer sharing and inheritance change. Excluded headers, footers and document information stay as in the revised file.",
+          "Excluded tables and their note anchors stay as revised. Footnote and endnote content is compared when an included body reference establishes the correspondence. Tracked export is unavailable when a table note has no established correspondence.",
+          "A single whole-paragraph bookmark in plain body text and its unchanged named jump are preserved when both stay in place. Partial ranges, moved, added, removed, renamed or complex bookmark contexts are refused for export.",
+          "Supported single-level decimal numbered lists inside footnotes and endnotes, and their image/link resources, are preserved through the document’s actual part relationships. Tracked export is unavailable when a note part moves and its link changes cannot preserve both versions. Turning off Other document areas keeps the revised notes."
         ]
       },
       {
@@ -196,7 +202,7 @@
       },
       "faq_3": {
         "q": "Does tracked Word output work for DOC?",
-        "a": "No. It is limited to pairs where both files are DOCX."
+        "a": "No. It is limited to pairs where both files are DOCX. Some document structures cannot be represented safely in a tracked file; the on-screen comparison and supported reports remain available."
       },
       "new_faq_4": {
         "q": "Can the exact same text be marked as a change?",
@@ -1342,6 +1348,26 @@
         "paragraphs": [
           "Example data: Left has 10 P-01 / 20 P-02, Right has 25 P-02 / 10 P-01. By linking based on the product code, even with a different order, you can easily verify that P-01 has the same quantity and P-02 has changed."
         ]
+      },
+      {
+        "title": "Column mapping and cell views",
+        "paragraphs": [
+          "Enable manual column mapping to choose original column numbers. Date-string comparison defaults to off and applies only to plain string values in both selected columns. It supports US/EU or ISO dates with optional HH:mm:ss; date-only and timed values remain distinct. Keys, reconciliation and formulas are unchanged. Grid hiding and reversal preserve original addresses. Full-report and visible-record exports are separate.",
+          "The worksheet grids include headers and unchanged cells. Each pane shows up to 40 rows and 12 columns, with controls for the starting position. Choose original or changed to hide source rows or columns. Paging changes only the preview window; export includes all records selected by filters and hiding."
+        ]
+      },
+      {
+        "title": "Worksheet layouts and active date settings",
+        "paragraphs": [
+          "Choose a single pane, changes docked left/right/top/bottom, a split with a selected source, or three columns/rows. Narrow screens stack panes with scrolling inside each table. Adjust split size with arrow keys. Switching layout never reruns comparison.",
+          "Date-string normalization applies only to selected-column value comparison. It is inactive in reconciliation; the screen and Parameters sheet distinguish requested settings from applied policy."
+        ]
+      },
+      {
+        "title": "When a comparison finishes without a report",
+        "paragraphs": [
+          "XLSX export stops if a cell is too long or contains text the export cannot preserve. Text is not replaced or truncated, and comparison results stay on screen. If any report in a batch fails, the combined ZIP is unavailable; completed individual reports remain downloadable."
+        ]
       }
     ],
     "faq": {
@@ -1683,6 +1709,20 @@
         "paragraphs": [
           "If a revision adds a cover, the first body page may need to be matched with page 2 instead of page 1. When document structures differ, use manual page matching and verify that each pair contains corresponding content before comparing."
         ]
+      },
+      {
+        "title": "Suggested pages and views",
+        "paragraphs": [
+          "Find suggested matches by page appearance, then review and apply them. Blank or ambiguous pages remain unpaired. Suggestions support 32 MB and 200 pages per file; existing page-number and manual comparison remain available.",
+          "The slider reveals original and revised pages together. Color difference shows differences before the sensitivity filter, while displayed counts retain the selected sensitivity."
+        ]
+      },
+      {
+        "title": "Read text in scanned pages",
+        "paragraphs": [
+          "Select a page to recognize and compare text from its visible image separately. Choose a recognition language and run text recognition. Large pages may use a smaller recognition image or exceed the processing limit.",
+          "Raw recognition text, word positions and review notes stay separate. Correct misread text and enable corrected transcripts to use it in the text comparison. Extracted PDF text, pixel differences and the existing PDF report above stay unchanged."
+        ]
       }
     ],
     "faq": {
@@ -1700,7 +1740,7 @@
       },
       "new_faq_3": {
         "q": "If the text result from a scanned PDF is empty, does it mean there is no content?",
-        "a": "No. If the text shapes are embedded in an image, there might be no text for the PDF to extract. Check the visual comparison, and if you need searchable text, use the PDF OCR tool separately."
+        "a": "No. Text stored as an image may have no extractable text. Review the page image and its separate recognition comparison. Use the PDF OCR tool if you need a searchable PDF file."
       },
       "new_faq_4": {
         "q": "What should I check first if all pages look different?",
@@ -2427,6 +2467,163 @@
       "source": {
         "q": "Can I see U.S. market hours in Korea time?",
         "a": "Yes. NYSE and Nasdaq sessions show both New York and Korea time. Calendar dates follow the exchange’s local date, and a different date in Korea is shown when needed."
+      }
+    }
+  },
+  "textCompare": {
+    "title": "Text comparison guide",
+    "description": "Find line, word and character changes between two texts, copy selected changes and save your result.",
+    "blocks": [
+      {
+        "title": "How to compare",
+        "items": [
+          "Paste text or open a file on each side.",
+          "Choose the comparison unit and optional ignore settings.",
+          "Select Compare and inspect the highlighted original and revised text.",
+          "Copy selected lines using the arrows, then save a TXT file."
+        ]
+      },
+      {
+        "title": "Spaces and line endings",
+        "paragraphs": [
+          "Ignoring spaces applies within lines. Normalizing line endings excludes CRLF versus LF differences from comparison while retaining the original text. For a notice with a changed deadline, inspect the date line before copying the revision."
+        ]
+      },
+      {
+        "title": "File size and downloads",
+        "paragraphs": [
+          "Choose files up to 4 MB each. UTF-8 and UTF-16 with a BOM are supported. Large or highly repetitive text can use less detailed highlighting or reach a processing limit. Select the download encoding and BOM option, and check important content in the saved file. Each input supports up to 200,000 lines."
+        ]
+      },
+      {
+        "title": "New files, reset and undo",
+        "paragraphs": [
+          "Opening a new file starts fresh undo history while keeping comparison settings. Reset inputs and settings clears both inputs, settings and history. Original files stay unchanged.",
+          "Trim lines and remove empty lines combines both operations into one undoable step. Line operations use LF/CRLF endings; sorting follows character-code order and keeps duplicates."
+        ]
+      }
+    ],
+    "faq": {
+      "privacy": {
+        "q": "Are my files or text sent to a server?",
+        "a": "Comparison and download preparation run in your browser. Your input text and file contents are not sent to a server."
+      },
+      "ignore": {
+        "q": "Do ignore rules delete original text?",
+        "a": "No. They exclude text only from comparison. Original characters remain available in the result, downloads and copied changes."
+      },
+      "units": {
+        "q": "How do fine detail, word and character comparison differ?",
+        "a": "Word comparison highlights changed words. Fine detail also checks characters inside replacements, while character comparison keeps emoji and combining characters together. Large sections may use line-level comparison."
+      },
+      "save": {
+        "q": "Will the original file be overwritten?",
+        "a": "No. Copied changes and transformations affect the editors. Save TXT downloads a new file."
+      }
+    }
+  },
+  "imageCompare": {
+    "title": "Image comparison guide",
+    "description": "Inspect color, opacity and recognized-text differences, and review alignment suggestions.",
+    "blocks": [
+      {
+        "title": "How to compare",
+        "items": [
+          "Choose original and revised PNG, JPEG or WebP files.",
+          "Set opacity and sensitivity options, then compare.",
+          "Choose split, fade, slider or another view.",
+          "If positions differ, review an alignment suggestion before applying it."
+        ]
+      },
+      {
+        "title": "Resolution and changed regions",
+        "paragraphs": [
+          "Large images may use a smaller comparison resolution. Check the working dimensions and scale: small changes can be missed, and original files remain unchanged. If a processing limit is reached, resize or crop the images before selecting them again.",
+          "Keep up to three region scans. A bounding rectangle’s area differs from its changed-pixel count. Radius and area settings use original units; the applied working values are shown separately."
+        ]
+      },
+      {
+        "title": "Review recognized text",
+        "paragraphs": [
+          "Recognized text can differ from the actual document. Check it against the image even when scores are high. Raw recognition, corrected text and review notes remain separate; corrections affect comparison only when you opt in.",
+          "Recognition uses a white background and the current alignment, up to 400,000 working pixels. If retained region scans prevent recognition, remove unnecessary scan results and try again."
+        ]
+      },
+      {
+        "title": "Review alignment before applying",
+        "paragraphs": [
+          "Automatic alignment is a suggestion. Repeated patterns or sparse content can produce an unintended match. Inspect the preview before applying or rejecting it. Do not directly compare counts calculated at different working resolutions."
+        ]
+      },
+      {
+        "title": "Undo settings and compare transparency",
+        "paragraphs": [
+          "Undo and redo changes to comparison settings and alignment. Restoring a step compares the original files again and clears previous recognition results and edited transcripts. Choosing a new file preserves comparison settings and starts a new history. Reset settings restores the defaults.",
+          "Alpha threshold is inactive on white or black backgrounds. Its saved value applies again with a transparent background."
+        ]
+      }
+    ],
+    "faq": {
+      "privacy": {
+        "q": "Are images uploaded to a server?",
+        "a": "No. Comparison and text recognition run in your browser without uploading original images."
+      },
+      "zero": {
+        "q": "Do zero changed pixels mean identical original files?",
+        "a": "No. Counts use the chosen sensitivity, opacity and working resolution. Also check image sizes, added or removed coverage and any resolution reduction."
+      },
+      "ocr": {
+        "q": "Can recognition errors appear as changes?",
+        "a": "Yes. Compare recognized words with the source crops and, if needed, use corrected text. Recognition scores do not guarantee correctness."
+      }
+    }
+  },
+  "folderCompare": {
+    "title": "Folder and ZIP comparison guide",
+    "description": "Compare file contents in two folders or ZIP archives, then inspect selected pairs with existing tools.",
+    "blocks": [
+      {
+        "title": "How to compare",
+        "items": [
+          "Choose a folder or ZIP on each side. Originals are not changed.",
+          "Review path-matching options and start comparison.",
+          "Inspect files with different contents and files present on only one side.",
+          "Select individual pairs for document, spreadsheet, image or text comparison."
+        ]
+      },
+      {
+        "title": "File contents versus detailed comparison",
+        "paragraphs": [
+          "File-content comparison reads the actual contents to completion. Files can look the same while storing different data. Detailed comparison uses the existing document, Excel, PDF, image and text tools without changing the file-content result.",
+          "Excel details compare only the selected sheets and headers by position. Other sheets are excluded. For images, check overlapping, added and removed coverage together with the working resolution."
+        ]
+      },
+      {
+        "title": "Limits and supported inputs",
+        "paragraphs": [
+          "The entire job allows up to 50,000 entries, 1 GiB of expanded content and 256 MiB per entry. ZIP directory reads also have a 2 MiB limit. Detailed comparison allows 4 MiB per text file or 16 MiB per other file, plus each tool’s own limits.",
+          "Empty folders, permissions and filesystem metadata are not fully compared. Encrypted ZIP entries and symbolic links are unsupported. Word and HWP comparisons require matching document families."
+        ]
+      },
+      {
+        "title": "Rename candidates",
+        "paragraphs": [
+          "Only byte-verified identical contents form rename-candidate groups. Duplicate contents are not arbitrarily paired. No filesystem names or locations are changed. Additional rereads are bounded to 3 GiB and 10,000 byte verifications."
+        ]
+      }
+    ],
+    "faq": {
+      "writes": {
+        "q": "Can comparison change original files?",
+        "a": "No. It is read-only: files are not copied, edited, deleted, synchronized or renamed."
+      },
+      "cancel": {
+        "q": "Does cancellation discard completed results?",
+        "a": "Completed results remain. Unfinished entries are labeled canceled or unknown. Results from an older selection cannot replace a new job."
+      },
+      "same": {
+        "q": "Why can bytes differ when detailed comparison shows no changes?",
+        "a": "Stored metadata or content outside the selected tool’s scope can differ. Check the detailed tool’s scope and warnings."
       }
     }
   }

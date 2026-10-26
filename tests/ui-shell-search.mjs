@@ -78,9 +78,9 @@ try {
       // Native language select preserves search/hash and normalizes HWP.
       await page.goto(`${baseUrl}/ko/tools/hwp-editor/?category=documents&q=pdf#sample`, { waitUntil: "networkidle" });
       await page.selectOption("[data-testid='desktop-sidebar'] select[data-ui-component='language-switcher'], [data-testid='app-topbar'] select[data-ui-component='language-switcher']", "en");
-      assert.equal(new URL(page.url()).pathname, "/en/tools");
+      assert.equal(new URL(page.url()).pathname, "/en/tools/hwp-editor");
       assert.ok(page.url().includes("category=documents") && page.url().includes("q=pdf") && page.url().includes("#sample"));
-      passed.push(`${language} HWP english fallback normalizes slash and preserves search/hash`);
+      passed.push(`${language} HWP English route normalizes slash and preserves search/hash`);
 
       // Sidebar display groups list real tools, never a category=other link.
       await page.goto(`${baseUrl}/${language}/tools/`, { waitUntil: "networkidle" });

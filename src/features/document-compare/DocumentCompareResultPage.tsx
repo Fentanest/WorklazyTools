@@ -46,7 +46,7 @@ export function DocumentCompareResultPage() {
   useEffect(() => {
     const onDownloadClick = (event: MouseEvent) => {
       const anchor = (event.target as Element | null)?.closest?.("a[download]");
-      if (anchor) setSaved(true);
+      if (anchor && !anchor.hasAttribute("data-original-file")) setSaved(true);
     };
     document.addEventListener("click", onDownloadClick, true);
     return () => document.removeEventListener("click", onDownloadClick, true);

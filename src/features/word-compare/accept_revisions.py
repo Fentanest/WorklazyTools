@@ -1,3 +1,4 @@
+import posixpath
 import copy
 import difflib
 import io
@@ -11,6 +12,7 @@ WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 WORD_2010_NS = "http://schemas.microsoft.com/office/word/2010/wordml"
 WORD_2012_NS = "http://schemas.microsoft.com/office/word/2012/wordml"
 W = "{" + WORD_NS + "}"
+MC = "{http://schemas.openxmlformats.org/markup-compatibility/2006}"
 W14 = "{" + WORD_2010_NS + "}"
 W15 = "{" + WORD_2012_NS + "}"
 
@@ -49,6 +51,8 @@ REMOVED_RECORD_TAGS = PROPERTY_CHANGE_TAGS | REMOVED_RANGE_MARKERS | {
     W + "numberingChange",
 }
 DELETED_WRAPPERS = {W + "del", W + "moveFrom"}
+EMPTIED_WRAPPERS = {W + "hyperlink", W + "fldSimple", W + "smartTag", W + "customXml"}
+WRAPPER_PROPERTIES = {W + "fldData", W + "smartTagPr", W + "customXmlPr"}
 INSERTED_WRAPPERS = {W + "ins", W + "moveTo"}
 COMMENT_MARKERS = {W + "commentRangeStart", W + "commentRangeEnd"}
 
@@ -65,8 +69,10 @@ def _attribute_by_local_name(element, name, default=None):
 
 
 def _parse_xml(data):
+    declared = {}
     for _, namespace in ET.iterparse(io.BytesIO(data), events=("start-ns",)):
         prefix, uri = namespace
+        declared.setdefault(prefix, uri)
         try:
             ET.register_namespace(prefix or "", uri)
         except ValueError:
@@ -79,6 +85,11 @@ def _parse_xml(data):
         for attribute_name in list(element.attrib):
             if attribute_name.endswith("}Ignorable"):
                 element.attrib.pop(attribute_name, None)
+        # A Choice's Requires names prefixes too and cannot be dropped: declare them on it.
+        if element.tag == MC + "Choice":
+            for prefix in element.get("Requires", "").split():
+                if prefix in declared:
+                    element.set("xmlns:" + prefix, declared[prefix])
     return root
 
 
@@ -102,6 +113,34 @@ def _remove_paragraph_mark(paragraph, kind):
             run_properties.remove(marker)
 
 
+def _fully_deleted_supported_paragraph(paragraph):
+    # Terminal deleted-mark rule: every payload is explicitly inside deletion.
+    # Anchors, surviving objects, section boundaries and history stay protected.
+    protected = PROPERTY_CHANGE_TAGS | COMMENT_MARKERS | {W+"commentReference",W+"bookmarkStart",W+"bookmarkEnd",W+"permStart",W+"permEnd"}
+    saw_payload = False
+    def run_payload(run):
+        nonlocal saw_payload
+        if run.tag==W+"hyperlink":return bool(len(run)) and all(run_payload(child) for child in run)
+        if run.tag!=W+"r":return False
+        for item in run:
+            if any(node.tag in protected for node in item.iter()):return False
+            if item.tag==W+"rPr":continue
+            if item.tag in {W+"delText",W+"delInstrText",W+"fldChar",W+"tab",W+"br",W+"cr",W+"sym",W+"softHyphen",W+"noBreakHyphen",W+"lastRenderedPageBreak",W+"footnoteReference",W+"endnoteReference",W+"drawing","{http://schemas.openxmlformats.org/markup-compatibility/2006}AlternateContent"}:saw_payload=True
+            else:return False
+        return True
+    for child in paragraph:
+        if child.tag==W+"pPr":
+            # Paragraph property history is accepted with the paragraph; a section break is not.
+            if any(node.tag==W+"sectPr" for node in child.iter()):return False
+        elif child.tag==W+"hyperlink":
+            if not len(child) or any(part.tag!=W+"del" or not len(part) or not all(run_payload(run) for run in part) for part in child):return False
+        elif child.tag!=W+"del" or not len(child) or not all(run_payload(run) for run in child):return False
+    return saw_payload
+
+
+BETWEEN_BLOCK_MARKERS = {W + name for name in ("bookmarkStart", "bookmarkEnd", "commentRangeStart", "commentRangeEnd", "permStart", "permEnd", "proofErr", "moveFromRangeStart", "moveFromRangeEnd", "moveToRangeStart", "moveToRangeEnd")}
+
+
 def _merge_deleted_paragraph_marks(parent):
     for child in list(parent):
         _merge_deleted_paragraph_marks(child)
@@ -113,8 +152,38 @@ def _merge_deleted_paragraph_marks(parent):
             index += 1
             continue
 
-        next_paragraph = parent[index + 1] if index + 1 < len(parent) else None
+        # Range markers between paragraphs (bookmarks, comment ranges) do not stop the join.
+        following = index + 1
+        while following < len(parent) and parent[following].tag in BETWEEN_BLOCK_MARKERS:
+            following += 1
+        next_paragraph = parent[following] if following < len(parent) else None
         if next_paragraph is None or next_paragraph.tag != W + "p":
+            # OfficeDev RevisionProcessor terminal paragraph rule: no following
+            # block (body sectPr is not a block), or the following block is a table.
+            terminal = next_paragraph is None or next_paragraph.tag in {W + "tbl", W + "sectPr"}
+            # Also at the end of a block content control that keeps another block.
+            container = parent.tag == W + "body" or (parent.tag == W + "sdtContent" and any(child is not paragraph and child.tag in {W + "p", W + "tbl", W + "sdt"} for child in parent))
+            if container and terminal and _fully_deleted_supported_paragraph(paragraph):
+                parent.remove(paragraph)
+                continue
+            # An empty paragraph whose mark was inserted and then deleted (the separator kept
+            # between a replaced table's two versions) never existed in either version.
+            if _has_paragraph_mark(paragraph, "ins") and all(child.tag == W + "pPr" for child in paragraph):
+                parent.remove(paragraph)
+                continue
+            # The deleted last mark of a block content control: its remaining content (a field's
+            # end character, say) joins the previous paragraph, as Word does.
+            previous = index - 1
+            while previous >= 0 and parent[previous].tag in BETWEEN_BLOCK_MARKERS:
+                previous -= 1
+            if parent.tag == W + "sdtContent" and next_paragraph is None and previous >= 0 and parent[previous].tag == W + "p":
+                target = parent[previous]
+                for child in list(paragraph):
+                    if child.tag != W + "pPr":
+                        paragraph.remove(child)
+                        target.append(child)
+                parent.remove(paragraph)
+                continue
             _remove_paragraph_mark(paragraph, "del")
             index += 1
             continue
@@ -140,9 +209,16 @@ def _cell_is_deleted(cell):
 
 
 def _preserved_comment_anchors(node):
+    # Like Word, a bookmark wholly inside the deleted content goes with it; one whose other end
+    # lies outside keeps this endpoint at the deletion point.
+    starts = {element.get(W + "id") for element in node.iter() if element.tag == W + "bookmarkStart"}
+    ends = {element.get(W + "id") for element in node.iter() if element.tag == W + "bookmarkEnd"}
+    enclosed = starts & ends
     anchors = []
     for element in node.iter():
         if element.tag in COMMENT_MARKERS:
+            anchors.append(copy.deepcopy(element))
+        elif element.tag in (W + "bookmarkStart", W + "bookmarkEnd") and element.get(W + "id") not in enclosed:
             anchors.append(copy.deepcopy(element))
         elif element.tag == W + "r":
             references = [copy.deepcopy(child) for child in element if child.tag == W + "commentReference"]
@@ -160,6 +236,17 @@ def _accept_tree(parent):
     index = 0
     while index < len(parent):
         child = parent[index]
+
+        # A formerly populated table whose every row is explicitly deleted has
+        # no surviving container only for the fully accounted direct-row shape.
+        # Row wrappers (e.g. SDT/customXml) may hold live rows or other content;
+        # leave their container intact. Never prune a source zero-row table.
+        if child.tag==W+'tbl':
+            rows=child.findall(W+'tr')
+            if (rows and all(node.tag in {W+'tblPr', W+'tblGrid', W+'tr'} for node in child)
+                    and all(_row_is_deleted(row) for row in rows)):
+                parent.remove(child)
+                continue
 
         if child.tag == W + "tr" and _row_is_deleted(child):
             parent.remove(child)
@@ -185,12 +272,50 @@ def _accept_tree(parent):
             parent.remove(child)
             continue
 
+        held_deletion = child.tag in EMPTIED_WRAPPERS and any(node.tag in DELETED_WRAPPERS for node in child)
         _accept_tree(child)
+        # A hyperlink or simple field cannot sit inside w:del, so a deleted one is written as a
+        # wrapper around deleted runs. Like Word, drop the wrapper once accepting empties it.
+        if held_deletion and all(node.tag in WRAPPER_PROPERTIES for node in child):
+            parent.remove(child)
+            continue
         index += 1
+
+
+def _remove_deleted_field_results(root):
+    """Like Word, accepting the deletion of a field's begin, separator and end characters also
+    removes its displayed result, even where the result runs themselves are not marked deleted."""
+    fields, orphans, parents = [], [], {}
+    def visit(node, deleted):
+        for child in node:
+            parents[child] = node
+            inside = deleted or child.tag in DELETED_WRAPPERS
+            if child.tag == W + "r":
+                kinds = [item.get(W + "fldCharType") for item in child if item.tag == W + "fldChar"]
+                if not kinds and fields and fields[-1]["separated"] and not inside:
+                    fields[-1]["result"].append(child)
+                for kind in kinds:
+                    if kind == "begin":
+                        fields.append({"deleted": inside, "separated": False, "result": []})
+                    elif kind == "separate" and fields:
+                        fields[-1]["separated"] = True
+                        fields[-1]["deleted"] = fields[-1]["deleted"] and inside
+                    elif kind == "end" and fields:
+                        field = fields.pop()
+                        if field["deleted"] and inside and field["separated"]:
+                            orphans.extend(field["result"])
+                continue
+            visit(child, inside)
+    visit(root, False)
+    for run in orphans:
+        parent = parents.get(run)
+        if parent is not None and run in list(parent):
+            parent.remove(run)
 
 
 def _accept_xml(data, is_settings=False):
     root = _parse_xml(data)
+    _remove_deleted_field_results(root)
     _merge_deleted_paragraph_marks(root)
     _accept_tree(root)
     if is_settings:
@@ -199,6 +324,39 @@ def _accept_xml(data, is_settings=False):
                 if child.tag == W + "trackRevisions":
                     parent.remove(child)
     return _serialize_xml(root)
+
+
+# Element names `_accept_xml` acts on, with any prefix (Unicode names included). A part without one
+# of them only round-trips through parse and serialization, so it is kept byte for byte.
+_REVISION_MARKUP = re.compile(
+    r"<(?:[^\s<>/:!?\"'=]+:)?(?:ins|del|moveFrom|moveTo|cellIns|cellDel|cellMerge|numberingChange|trackRevisions"
+    r"|rPrChange|pPrChange|tblPrChange|tblPrExChange|tblGridChange|trPrChange|tcPrChange|sectPrChange"
+    r"|moveFromRangeStart|moveFromRangeEnd|moveToRangeStart|moveToRangeEnd"
+    r"|customXmlInsRangeStart|customXmlInsRangeEnd|customXmlDelRangeStart|customXmlDelRangeEnd)[\s/>]"
+)
+_XML_DECLARED_ENCODING = re.compile(rb"^\s*<\?xml[^>]*\bencoding\s*=\s*[\"']([A-Za-z0-9._-]+)[\"']")
+# A document type declaration can define entities that expand into revision elements when parsed.
+_DOCUMENT_TYPE = re.compile(rb"<!(?:DOCTYPE|ENTITY)", re.IGNORECASE)
+
+
+def _without_revision_markup(data):
+    """True only when the part is certainly UTF-8 (no BOM other than UTF-8's, a UTF-8 or absent
+    encoding declaration, valid UTF-8 without NUL, no DOCTYPE or entity declaration) and has no revision
+    element. Anything else (UTF-16, other encodings, undecodable bytes, entities that could expand into
+    elements) goes through the full accept path."""
+    if data.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in data:
+        return False
+    body = data[3:] if data.startswith(b"\xef\xbb\xbf") else data
+    if _DOCUMENT_TYPE.search(body):
+        return False
+    declared = _XML_DECLARED_ENCODING.match(body)
+    if declared and declared.group(1).decode("ascii").lower().replace("_", "-") not in ("utf-8", "utf8"):
+        return False
+    try:
+        text = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return not _REVISION_MARKUP.search(text)
 
 
 def _is_accept_part(name):
@@ -220,13 +378,25 @@ def accept_tracked_document(input_path, output_path):
     """Accept every supported OOXML revision while preserving comment objects."""
     replacements = {}
     with zipfile.ZipFile(input_path, "r") as archive:
+        stories=set()
+        if "word/_rels/document.xml.rels" in archive.namelist():
+            for rel in ET.fromstring(archive.read("word/_rels/document.xml.rels")):
+                if rel.get("Type") in {"http://schemas.openxmlformats.org/officeDocument/2006/relationships/"+kind for kind in ("header","footer","footnotes","endnotes")} and rel.get("TargetMode")!="External":
+                    target=rel.get("Target","");stories.add(target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join("word",target)))
         for info in archive.infolist():
-            if _is_accept_part(info.filename):
+            if _is_accept_part(info.filename) or info.filename in stories:
+                data = archive.read(info.filename)
+                if _without_revision_markup(data):
+                    continue
                 replacements[info.filename] = _accept_xml(
-                    archive.read(info.filename),
+                    data,
                     is_settings=info.filename == "word/settings.xml",
                 )
-    _copy_archive(input_path, output_path, replacements)
+    if replacements:
+        _copy_archive(input_path, output_path, replacements)
+    else:
+        import shutil
+        shutil.copyfile(input_path, output_path)
     return sum(1 for name in replacements if name != "word/settings.xml")
 
 

@@ -41,9 +41,9 @@ export function alignSequenceWithBudget<T>(
     largestSegmentCells = Math.max(largestSegmentCells, cells);
     if (cells > (options.cellBudget ?? 12_000_000)) {
       budgetFallback = true;
-      pairs.push(...(options.fallback ?? positionFallback)(before, after, beforeStart, anchor.beforeIndex, afterStart, anchor.afterIndex));
+      for (const pair of (options.fallback ?? positionFallback)(before, after, beforeStart, anchor.beforeIndex, afterStart, anchor.afterIndex)) pairs.push(pair);
     } else {
-      pairs.push(...dynamicAlignRange(before, after, beforeStart, anchor.beforeIndex, afterStart, anchor.afterIndex, options));
+      for (const pair of dynamicAlignRange(before, after, beforeStart, anchor.beforeIndex, afterStart, anchor.afterIndex, options)) pairs.push(pair);
     }
     if (anchor.beforeIndex < before.length && anchor.afterIndex < after.length) pairs.push(anchor);
     previousBefore = anchor.beforeIndex;
@@ -88,7 +88,9 @@ function positionsBySignature<T>(items: T[], signatureOf: (item: T) => string) {
   items.forEach((item, index) => {
     const signature = signatureOf(item);
     if (!signature) return;
-    positions.set(signature, [...(positions.get(signature) ?? []), index]);
+    const existing = positions.get(signature);
+    if (existing) existing.push(index);
+    else positions.set(signature, [index]);
   });
   return positions;
 }

@@ -6,3 +6,5 @@ declare module "*.py?raw" {
   const source: string;
   export default source;
 }
+
+declare const __COMPARISON_PORT_PUBLIC__: boolean;

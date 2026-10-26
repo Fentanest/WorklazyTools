@@ -46,6 +46,9 @@ export const socialImages = {
 
 const socialImageSlugByPath: Record<string, string> = {
   "/tools/market-calendar": "market-calendar",
+  "/tools/image-compare": "image-compare",
+  "/tools/folder-compare": "folder-compare",
+  "/tools/text-compare": "text-compare",
   "/tools/product-banner": "product-banner",
   "/tools/foliotrace": "foliotrace",
   "/tools/document-redactor": "document-redactor",
@@ -105,6 +108,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
   "/tools/market-calendar": { title: "주식시장 휴장일·거래시간 | KRX·NYSE·Nasdaq 달력 | Worklazy Tools", description: "KRX·NXT·NYSE·Nasdaq의 2026·2027년 휴장일과 조기폐장, 개장·마감 시간을 날짜별로 확인하세요. 미국 시장은 한국 시간도 함께 보여줍니다." },
   "/tools/product-banner": { title: "알리익스프레스 광고 배너 만들기 - Excel·CSV로 HTML·iframe 생성 | Worklazy Tools", description: "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 HTML·iframe 광고 배너를 만들거나, 배너 주소를 iframe 코드로 변환하세요. 파일과 주소는 브라우저에서 처리합니다.", application: { name: "알리익스프레스 광고 배너 만들기", featureList: ["Excel·CSV 입력", "5종 디자인", "HTML·iframe 코드", "편집용 JSON"] } },
   "/tools/foliotrace": { title: "FolioTrace | 국민연금 공개 공시 추적", description: "국민연금의 국내주식 연말 보유 목록과 이후 DART 공시를 근거로 공개 추적 범위를 살펴봅니다. 실제 계좌 잔고나 전체 자산을 뜻하지 않습니다." },
+  "/tools/image-compare": { title: "이미지 비교 - 픽셀·정렬·인식 글자 차이 | Worklazy Tools", description: "PNG·JPEG·WebP의 픽셀과 투명도 차이를 브라우저에서 비교하세요. 정렬 후보, 변경 영역, 인식 글자와 정정 비교를 지원합니다.", application: { name: "이미지 비교", featureList: ["아홉 가지 보기", "정렬 후보의 미리보기와 적용", "변경 영역 검사", "원본을 보존하는 작업 해상도", "로컬 글자 인식과 정정 비교"] } },
+  "/tools/folder-compare": { title: "폴더·ZIP 비교 - 파일 내용과 이름 변경 후보 | Worklazy Tools", description: "두 폴더나 ZIP을 읽기 전용으로 비교하세요. 파일 내용 확인, 검증된 이름 변경 후보와 문서·Excel·PDF·이미지·텍스트 상세 비교를 제공합니다.", application: { name: "폴더·ZIP 비교", featureList: ["파일 내용 분할 읽기 비교", "중복 경로 보존", "읽기 전용 폴더·ZIP 입력", "검증된 이름 변경 후보", "선택한 파일 쌍의 상세 비교"] } },
+  "/tools/text-compare": { title: "텍스트 비교 - 줄·단어·글자 차이 확인 | Worklazy Tools", description: "두 글과 TXT 파일의 차이를 브라우저에서 비교하세요. 무시 규칙, 변경 줄 복사, 되돌리기와 UTF-8·UTF-16 저장을 지원합니다.", application: { name: "텍스트 비교", featureList: ["줄·단어·글자 비교", "원문을 보존하는 무시 규칙", "선택 변경 적용과 되돌리기", "UTF-8·UTF-16 저장"] } },
   "/tools/document-redactor": {title: "PDF·이미지 개인정보 가리기 - 직접 영역 선택 | Worklazy Tools", description: "PDF와 이미지 파일에서 민감한 개인정보 영역을 검정색으로 가리고 안전하게 사본을 저장하세요.", application: {name: "개인정보 가리기", featureList: ["직접 영역 선택", "검정 픽셀 마스킹", "모든 PDF 페이지 재생성", "PNG 이미지 저장", "결과 확인"]}},
   "/": {
     title: "무료 문서·PDF·이미지·오디오 업무 도구 | Worklazy Tools",
@@ -368,6 +374,9 @@ export const seoByPath: Record<string, SeoDefinition> = {
 
 const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "market-calendar": "Stock Market Calendar | Worklazy Tools",
+  "image-compare": "Image Compare - Pixels, Alignment and Recognized Text | Worklazy Tools",
+  "folder-compare": "Folder and ZIP Compare - Verify File Contents and Rename Candidates | Worklazy Tools",
+  "text-compare": "Text Compare - Find Line, Word and Character Differences | Worklazy Tools",
   "product-banner": "AliExpress Ad Banner Builder - Excel to HTML & Iframe | Worklazy Tools",
   "foliotrace": "FolioTrace | NPS Disclosed Holdings",
   "document-redactor": "Redact PDF & Images - Blackout Private Info | Worklazy Tools",
@@ -472,6 +481,9 @@ for (const mode of ["image-to-pdf", "pdf-to-image"]) {
 
 export const toolSlugByPath: Record<string, keyof typeof enTools.items> = {
   "/tools/market-calendar": "market-calendar",
+  "/tools/image-compare": "image-compare",
+  "/tools/folder-compare": "folder-compare",
+  "/tools/text-compare": "text-compare",
   "/tools/document-markdown": "document-markdown",
   "/tools/pdf-converter": "pdf-converter",
   "/tools/product-banner": "product-banner",

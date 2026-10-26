@@ -45,8 +45,11 @@ export function assertStaticFaqHtml(html, { filePath = "static output", expected
 }
 
 async function main() {
-const { VIDEO_STUDIO_PUBLIC } = await import("../src/app/publicServiceConfig.mjs");
+const { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonPathPublished } = await import("../src/app/publicServiceConfig.mjs");
 
+const comparisonPublication=JSON.parse(await fs.readFile('dist/comparison-publication.json','utf8'));
+if(comparisonPublication.enabled!==COMPARISON_PORT_PUBLIC)throw new Error('Comparison publication flag differs from built artifact.');
+if(!COMPARISON_PORT_PUBLIC){const sitemap=await fs.readFile('dist/sitemap.xml','utf8');for(const id of COMPARISON_TOOL_IDS)if(sitemap.includes(`/tools/${id}/`))throw new Error('Unpublished comparison route in sitemap.');}
 const pyodideVersion = JSON.parse(await fs.readFile("node_modules/pyodide/package.json", "utf8")).version;
 const packageJson = JSON.parse(await fs.readFile("package.json", "utf8"));
 // The Markdown worker has no network fallback: every selected wheel must ship.
@@ -78,12 +81,15 @@ const routes = ["tools/product-banner",
   "tools/hwp-editor", "tools/office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["tools/video-studio", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio"] : []), "tools/audio-studio", "tools/audio-studio/trim", "tools/image-studio",
   "tools/image-studio/resize", "tools/image-studio/mosaic", "tools/image-studio/watermark",
   "tools/pdf-editor/merge", "tools/pdf-editor/split", "tools/pdf-editor/delete", "tools/pdf-editor/rotate", "tools/pdf-editor/ocr",
-  "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
+  "tools/image-compare", "tools/folder-compare", "tools/text-compare", "tools/text-merger", "tools/text-tools", "tools/text-formatter", "tools/work-calculator",
   "tools/document-redactor", "tools/timezone-calculator", "tools/payroll-calculator", "tools/image-privacy",
   "tools/security-tools", "tools/qr-studio", "tools/qr-studio/bulk", "tools/data-converter",
   "about", "privacy", "terms", "contact", "licenses",
-];
+].filter(route=>isComparisonPathPublished(route));
 const socialSlugByRoute = {
+  "tools/image-compare": "image-compare",
+  "tools/folder-compare": "folder-compare",
+  "tools/text-compare": "text-compare",
   "tools/document-markdown": "document-markdown",
   "tools/pdf-converter/document-to-pdf": "document-to-pdf", "tools/pdf-converter/pdf-to-document": "pdf-to-document", "tools/pdf-converter/pdf-to-document/ocr": "pdf-editor-ocr",
   "tools/pdf-converter": "pdf-converter", "tools/pdf-converter/image-to-pdf": "image-to-pdf", "tools/pdf-converter/pdf-to-image": "pdf-to-image",
@@ -104,9 +110,16 @@ const socialSlugByRoute = {
 
 for (const language of ["ko", "en"]) {
 for (const route of routes) {
-  if (language === "en" && route === "tools/hwp-editor") continue;
   const filePath = path.join("dist", language, route, "index.html");
   const html = await fs.readFile(filePath, "utf8");
+  if (route === "tools/hwp-editor") {
+    for (const [locale, target] of [["ko", "ko"], ["en", "en"], ["x-default", "en"]]) {
+      if (!html.includes(`hreflang="${locale}" href="https://worklazy.net/${target}/tools/hwp-editor/"`)) {
+        throw new Error(`${filePath}: HWP hreflang ${locale} must point to its matching editor.`);
+      }
+    }
+    console.log(`HWP static coverage: ${language}/tools/hwp-editor/ (metadata, paired hreflang, assets).`);
+  }
   if (route === "tools/document-redactor") assertRedactorStatic(html);
   if (route === "tools/pdf-converter/document-to-pdf") {
     if (!html.includes('name="worklazy-office-isolation"') || !html.includes('src="./coi-serviceworker.js"')) throw new Error(`${filePath}: missing Office isolation bootstrap`);
@@ -438,7 +451,7 @@ if (sitemap.includes("/tools/office-editor/app/") || sitemap.includes("/tools/ex
 if (!VIDEO_STUDIO_PUBLIC && sitemap.includes("/tools/video-studio/")) throw new Error("sitemap.xml contains unpublished Video Studio routes.");
 for (const route of routes) {
   if (route && !sitemap.includes(`/ko/${route}/`)) throw new Error(`sitemap.xml is missing ko/${route}.`);
-  if (route && route !== "tools/hwp-editor" && !sitemap.includes(`/en/${route}/`)) throw new Error(`sitemap.xml is missing en/${route}.`);
+  if (route && !sitemap.includes(`/en/${route}/`)) throw new Error(`sitemap.xml is missing en/${route}.`);
 }
 if (!sitemap.includes('xmlns:xhtml=') || !sitemap.includes('hreflang="x-default"')) throw new Error("sitemap.xml is missing multilingual alternate links.");
 

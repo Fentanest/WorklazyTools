@@ -160,8 +160,48 @@ export function spreadsheetHeaders(sheet: SpreadsheetSheetData, headerRow: numbe
   });
 }
 
-async function parseOoxml(data: Uint8Array, format: "xlsx" | "xlsm", signal?: AbortSignal): Promise<SpreadsheetBookData> {
-  const archive = await JSZip.loadAsync(data);
+const OOXML_PACKAGE_NAMESPACES = [
+  "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+  "http://schemas.openxmlformats.org/package/2006/relationships",
+  "http://schemas.openxmlformats.org/package/2006/content-types",
+];
+
+/** Prefix bound to a package namespace on the root element, as .NET Open XML SDK writes
+ * (`<x:workbook xmlns:x="...spreadsheetml/2006/main">`), when the root has no default namespace. */
+function prefixedRoot(xml: string) {
+  const root = /<([A-Za-z_][\w.-]*):[A-Za-z_][\w.-]*\b([^>]*)>/u.exec(xml.replace(/^(?:\s|<\?[\s\S]*?\?>|<!--[\s\S]*?-->)*/u, ""));
+  if (!root || root.index !== 0 || /\sxmlns\s*=/u.test(root[2])) return undefined;
+  const namespace = new RegExp(`\\sxmlns:${root[1]}\\s*=\\s*["']([^"']*)["']`, "u").exec(root[2])?.[1];
+  return namespace && OOXML_PACKAGE_NAMESPACES.includes(namespace) ? root[1] : undefined;
+}
+
+function unprefixPart(xml: string) {
+  const prefix = prefixedRoot(xml);
+  if (!prefix) return xml;
+  return xml
+    .replace(new RegExp(`(\\s)xmlns:${prefix}(\\s*=)`, "u"), "$1xmlns$2")
+    .replace(new RegExp(`<(/?)${prefix}:`, "gu"), "<$1");
+}
+
+/** ExcelJS and the readers below expect the default-namespace form; rewrite packages that bind
+ * the SpreadsheetML/package namespaces to a prefix. Ordinary Excel files are left untouched. */
+async function unprefixOoxmlPackage(archive: JSZip, data: Uint8Array) {
+  const probes = await Promise.all(["xl/workbook.xml", "[Content_Types].xml", "_rels/.rels", "xl/_rels/workbook.xml.rels"]
+    .map((name) => archive.file(name)?.async("string")));
+  if (!probes.some((xml) => xml !== undefined && prefixedRoot(xml))) return data;
+  const parts = Object.values(archive.files).filter((entry) => !entry.dir && /\.(?:xml|rels)$/iu.test(entry.name));
+  for (const entry of parts) {
+    const xml = await entry.async("string");
+    const rewritten = unprefixPart(xml);
+    if (rewritten !== xml) archive.file(entry.name, rewritten);
+  }
+  return archive.generateAsync({ type: "uint8array" });
+}
+
+async function parseOoxml(source: Uint8Array, format: "xlsx" | "xlsm", signal?: AbortSignal): Promise<SpreadsheetBookData> {
+  const archive = await JSZip.loadAsync(source);
+  const data = await unprefixOoxmlPackage(archive, source);
+  throwIfAborted(signal);
   const [themeXml, workbookXml] = await Promise.all([
     archive.file("xl/theme/theme1.xml")?.async("string"),
     archive.file("xl/workbook.xml")?.async("string"),

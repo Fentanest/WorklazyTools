@@ -1,5 +1,5 @@
 import { VIDEO_DIRECT_PATHS } from "../src/features/video-studio/videoDirectPaths.ts";
-import { VIDEO_STUDIO_PUBLIC } from "../src/app/publicServiceConfig.mjs";
+import { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonToolPublished } from "../src/app/publicServiceConfig.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -16,10 +16,11 @@ const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData
 
 const toolRoutes = ["product-banner",
   "foliotrace", "market-calendar",
+  "text-compare", "image-compare", "folder-compare",
   "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "pdf-converter", "document-markdown", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
   "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
   "document-redactor", "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
-];
+].filter(id=>isComparisonToolPublished(id));
 const pdfRoutes = ["pdf-converter/image-to-pdf", "pdf-converter/pdf-to-image", "pdf-converter/document-to-pdf", "pdf-converter/pdf-to-document", "pdf-converter/pdf-to-document/ocr", "pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark", "pdf-editor/stamp"];
 const pageRoutes = ["about", "privacy", "terms", "contact", "licenses"];
 const videoChildRoutes = VIDEO_STUDIO_PUBLIC ? VIDEO_DIRECT_PATHS.slice(1).map(route => route.slice(1)) : [];
@@ -30,10 +31,11 @@ const officeAppRoute = "tools/office-editor/app";
 const excelPreserveRoute = "tools/excel-merger/xls-preserve";
 const retiredCompareRoutes = ["tools/word-compare", "tools/hwp-compare"];
 
+if(!COMPARISON_PORT_PUBLIC){for(const prefix of ['',...languages])for(const id of COMPARISON_TOOL_IDS)await fs.rm(path.join(outputDirectory,prefix,'tools',id),{recursive:true,force:true});}
+await fs.writeFile(path.join(outputDirectory,'comparison-publication.json'),JSON.stringify({enabled:COMPARISON_PORT_PUBLIC,tools:COMPARISON_TOOL_IDS})+'\n');
 const generated = [];
 for (const language of languages) {
   for (const route of localizedRoutes) {
-    if (language === "en" && route === "tools/hwp-editor") continue;
     const page = makePage(language, route);
     const routeUrl = absolute(language, route);
     const canonicalRoute = canonicalSeoPath(`/${route}`).replace(/^\//, "");
@@ -144,7 +146,7 @@ function makePage(language, route) {
 
 function renderPage(template, page, canonical) {
   const alternateKo = absolute("ko", page.route);
-  const alternateEn = absolute("en", page.route === "tools/hwp-editor" ? "tools" : page.route);
+  const alternateEn = absolute("en", page.route);
   const image = new URL(page.socialImage.path, siteUrl).href;
   const locale = page.language === "ko" ? "ko_KR" : "en_US";
   const inLanguage = page.language === "ko" ? "ko-KR" : "en-US";

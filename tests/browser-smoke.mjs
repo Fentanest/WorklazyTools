@@ -23,7 +23,7 @@ const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "worklazytools-test-"));
 try {
   const fixtures = await createFixtures(tempDir);
   const browser = await puppeteer.launch({
-    executablePath: "/usr/bin/google-chrome",
+    executablePath: process.env.CHROME_PATH || "/usr/bin/google-chrome",
     headless: true,
     protocolTimeout: 300_000,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
@@ -35,6 +35,8 @@ try {
     await page.evaluateOnNewDocument(() => {
       Object.defineProperty(Crypto.prototype, "randomUUID", { configurable: true, value: undefined });
     });
+    // Leaving a page with results raises the app's unsaved-work prompt; the smoke moves on.
+    page.on("dialog", (dialog) => { if (dialog.type() === "beforeunload") void dialog.accept(); });
     const pageErrors = [];
     const outboundWrites = [];
     page.on("pageerror", (error) => {
@@ -956,9 +958,13 @@ async function testWordCompare(page, fixtures, tempDir) {
     const input = document.querySelector("[data-testid='document-revision-author'] input");
     return { checked: toggle?.getAttribute("aria-checked"), inputDisabled: input instanceof HTMLInputElement && input.disabled };
   });
-  if (defaultAuthorOption.checked !== "false" || !defaultAuthorOption.inputDisabled) {
-    throw new Error(`Revision-author rewrite was not disabled by default: ${JSON.stringify(defaultAuthorOption)}`);
+  // Accepting existing revisions first is the default since 2026-10-25 (user decision).
+  if (defaultAuthorOption.checked !== "true" || defaultAuthorOption.inputDisabled) {
+    throw new Error(`Revision-author rewrite was not enabled by default: ${JSON.stringify(defaultAuthorOption)}`);
   }
+  // This comparison checks the history-preserving mode (existing revisions kept with their authors);
+  // the default accept-first mode is checked by testWordUnifiedRevisionAuthor.
+  await clickSetting(page, "변경 내용 작성자 통일");
 
   await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await waitForResult(page, 240_000);
@@ -1032,11 +1038,16 @@ async function testWordCompare(page, fixtures, tempDir) {
   if (await page.$$('[data-testid="document-page-view"] [role="columnheader"]').then((items) => items.length) !== 2) {
     throw new Error("Full before/after document page columns were not rendered.");
   }
-  const documentFlow = await page.$$eval('[data-testid="document-page-view"] [role="row"][data-document-kind]', (items) => items.map((item) => ({
+  const allRows = await page.$$eval('[data-testid="document-page-view"] [role="row"][data-document-kind]', (items) => items.map((item) => ({
     table: item.hasAttribute("data-table-block"),
     blockCount: item.querySelectorAll("[role='cell']").length,
     height: Math.round(item.getBoundingClientRect().height),
+    // Shared style definition changes follow the body as "스타일 …" / "문서 설정" format rows (D1).
+    styleDefinition: item.dataset.documentKind === "format" && Array.from(item.querySelectorAll("[role='cell']")).every((cell) => /^(?:스타일 |문서 설정)/u.test((cell.textContent || "").trim())),
   })));
+  const firstStyleRow = allRows.findIndex((item) => item.styleDefinition);
+  if (firstStyleRow >= 0 && allRows.slice(firstStyleRow).some((item) => !item.styleDefinition)) throw new Error(`Style definition rows must follow the document body: ${JSON.stringify(allRows)}`);
+  const documentFlow = (firstStyleRow >= 0 ? allRows.slice(0, firstStyleRow) : allRows).map(({ styleDefinition: _style, ...item }) => item);
   if (documentFlow.length !== 4 || !documentFlow.at(-1)?.table || documentFlow.some((item) => item.blockCount !== 2)) {
     throw new Error(`Document flow was not preserved as three paragraphs and one table: ${JSON.stringify(documentFlow)}`);
   }
@@ -1162,9 +1173,7 @@ async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
   await dropFiles(page, "[data-ui-part=drop-target]", [fixtures.revisionsAfterDocx], 1);
   await clickSetting(page, "Excel 보고서");
   const input = await page.$("[data-testid='document-revision-author'] input");
-  if (!input || !await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input was not rendered disabled while rewriting was off.");
-  await clickSetting(page, "변경 내용 작성자 통일");
-  if (await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input did not become enabled.");
+  if (!input || await input.evaluate((element) => element.disabled)) throw new Error("The revision-author input was not enabled while rewriting is on by default.");
   await replaceInputValue(page, input, "Unified Reviewer");
   await page.click("[data-testid='document-action-bar'] [data-ui-component='primary-button']");
   await waitForResult(page, 240_000);
@@ -1178,7 +1187,8 @@ async function testWordUnifiedRevisionAuthor(page, fixtures, tempDir) {
 }
 
 async function waitForResult(page, timeout = 180_000) {
-  await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running")
+  // Document comparison shows results first and fills tracked DOCX links in afterwards.
+  await page.waitForFunction(() => !document.querySelector(".ui-operation-progress.ui-status-running") && !document.querySelector("[data-tracked-status='pending']")
     && (document.querySelector(":is(.result-download,[data-testid='excel-result-download'],[data-testid='pdf-download'])") || document.querySelector("[data-testid='document-result-card']") || document.querySelector(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])") || document.querySelector("[data-tool-page='document-compare'] [role='alert']")), { timeout });
   const error = await page.$(":is(.error-banner,[data-testid='excel-merge-error'],[data-testid='pdf-error'])") || await page.$("[data-tool-page='document-compare'] [role='alert']");
   if (error) throw new Error(await error.evaluate((element) => element.textContent || "Unknown UI error"));
@@ -1709,9 +1719,16 @@ async function assertTrackedDocument(trackedPath, beforePath, afterPath, require
   ]);
 
   const expectedMarkers = ["<w:ins", "<w:del", "<w:delText", "<w:rPrChange"];
-  if (requireTableAxes) expectedMarkers.push("<w:cellIns");
   for (const marker of expectedMarkers) {
     if (!trackedDocument.includes(marker)) throw new Error(`Tracked DOCX is missing ${marker}. ${trackedDocument.slice(0, 1800)}`);
+  }
+  // The added column is tracked either per cell or, as Word keeps cell widths of a reshaped table
+  // only that way, as the whole original table deleted and the revised one inserted (row marks).
+  if (requireTableAxes) {
+    const deletedRow = /<w:trPr>(?:(?!<\/w:trPr>).)*<w:del\b/su, insertedRow = /<w:trPr>(?:(?!<\/w:trPr>).)*<w:ins\b/su;
+    if (!trackedDocument.includes("<w:cellIns") && !(deletedRow.test(trackedDocument) && insertedRow.test(trackedDocument))) {
+      throw new Error(`Tracked DOCX does not track the table axis change. ${trackedDocument.slice(0, 1800)}`);
+    }
   }
   if (!trackedDocument.includes('w:author="Worklazy Tools"')) throw new Error("Tracked changes have no revision author.");
   if (!settings.includes("<w:revisionView")) {
