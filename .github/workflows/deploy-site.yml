@@ -1,5 +1,5 @@
 name: Deploy site
-run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'deploy' && 'Site deploy (dispatched)' || 'Validate site build (no deploy)') || 'Site deploy on main push' }}
+run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'deploy' && 'Site deploy (dispatched)' || 'Validate site build (no deploy)') || (github.event_name == 'schedule' && 'Site deploy (daily data refresh)' || 'Site deploy on main push') }}
 
 # Replacement for deploy-pages.yml (FolioTrace operations plan P3-3). This workflow collects nothing: it never calls DART, holds no
 # DART key and writes no repository state. It fetches the FolioTrace public data from the private repository
@@ -13,11 +13,15 @@ run-name: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'deplo
 # workflow has no pull-request trigger, so untrusted fork code never reaches that machine. Artifacts and logs are kept 1 day.
 # Cutover steps: docs/foliotrace-delivery-and-deploy.md.
 #
-# Inert until cutover: a main push deploys only when the repository variable FOLIOTRACE_DEPLOY_V2 is 'true' (otherwise skipped).
+# Daily refresh also runs independently of FolioTrace delivery, using default main code and published data HEADs.
+# Inert until cutover: main pushes and scheduled runs deploy only when FOLIOTRACE_DEPLOY_V2 is 'true' (otherwise skipped).
 # A dispatched run is explicit and not gated: mode=validate (default) never touches Pages, mode=deploy publishes.
 on:
   push:
     branches: [main]
+  schedule:
+    # 07:00 KST, leaving an hour after the 06:00 market-calendar start.
+    - cron: '0 22 * * *'
   workflow_dispatch:
     inputs:
       runner:
@@ -51,7 +55,7 @@ permissions:
 
 jobs:
   build:
-    # Main push deploys only after cutover (variable gate). A dispatched run is always explicit and never gated.
+    # Main push and schedule deploy only after cutover. A dispatched run is always explicit and never gated.
     if: github.event_name == 'workflow_dispatch' || vars.FOLIOTRACE_DEPLOY_V2 == 'true'
     runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.runner == 'github-hosted' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64","235"]') }}
     steps:
@@ -180,7 +184,7 @@ jobs:
 
   deploy:
     needs: build
-    if: github.event_name == 'push' || inputs.mode == 'deploy'
+    if: github.event_name == 'push' || github.event_name == 'schedule' || inputs.mode == 'deploy'
     permissions:
       contents: read
       pages: write
