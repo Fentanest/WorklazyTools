@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generation_id": "20261027T210001.556305Z",
-  "created_at": "2026-10-27T21:40:24.258703+00:00",
-  "source_manifest_sha256": "aaf7f7678c6187123774153c3b338913b6f4395ebdef60cb37d7516a65a102cf",
+  "generation_id": "20261028T210000.345824Z",
+  "created_at": "2026-10-28T21:31:25.051766+00:00",
+  "source_manifest_sha256": "fa97d3f03fe07ecbf75b93e0697ea09a9b4c7938a560ca71cc6125465d458edb",
   "files": [
     {
       "path": "calendar-2026.json",
@@ -23,9 +23,9 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "d29330a51cf4d2bb6c5c127d2ea09aaba8a36a08c9d9bab900e3d5f1886d8681",
-      "last_checked_at": "2026-10-27T21:10:26.725727+00:00",
-      "validity": "valid",
-      "reason": null,
+      "last_checked_at": "2026-10-28T21:07:06.700296+00:00",
+      "validity": "stale",
+      "reason": "judge_unavailable_or_invalid",
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -34,9 +34,9 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "7638ec018fa03360a52509bb2d5b92bc2ebac5119bef7888cf5dccdab63de075",
-      "last_checked_at": "2026-10-27T21:10:26.725727+00:00",
-      "validity": "valid",
-      "reason": null,
+      "last_checked_at": "2026-10-28T21:07:06.700296+00:00",
+      "validity": "stale",
+      "reason": "judge_unavailable_or_invalid",
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -45,9 +45,9 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "2280e8a2581c1e4577e9a9300593fa0cad57b51e4c32102b39b338ff3270085e",
-      "last_checked_at": "2026-10-27T21:10:26.725727+00:00",
-      "validity": "valid",
-      "reason": null,
+      "last_checked_at": "2026-10-28T21:07:06.700296+00:00",
+      "validity": "stale",
+      "reason": "judge_unavailable_or_invalid",
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -56,9 +56,9 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-27T21:10:26.725727+00:00",
-      "validity": "valid",
-      "reason": null,
+      "last_checked_at": "2026-10-28T21:07:06.700296+00:00",
+      "validity": "stale",
+      "reason": "judge_unavailable_or_invalid",
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -67,9 +67,9 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "7901a67ba8ec5e9c7148551eb5cc1735bedeb9cf70ad1d74fbfe369e7c9c76b8",
-      "last_checked_at": "2026-10-27T21:10:26.725727+00:00",
-      "validity": "valid",
-      "reason": null,
+      "last_checked_at": "2026-10-28T21:07:06.700296+00:00",
+      "validity": "stale",
+      "reason": "judge_unavailable_or_invalid",
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -78,15 +78,15 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-27T21:10:26.725727+00:00",
+      "last_checked_at": "2026-10-28T21:07:06.700296+00:00",
       "validity": "held",
-      "reason": "nasdaq-2027-annual",
+      "reason": "nasdaq-2027-annual; judge_unavailable_or_invalid",
       "unpublished": true,
       "unpublished_evidence": [
         {
           "source_id": "nasdaq-holiday-schedule",
-          "fetched_at": "2026-10-27T21:00:59.328257+00:00",
-          "raw_sha256": "d73a30f7d71c1e2f5a1a533dfbf8bbfbc0706348a6b8dedd08af4b269284d835",
+          "fetched_at": "2026-10-28T21:01:09.089892+00:00",
+          "raw_sha256": "540bf0594417ed3622c212c2377ec1cb0e5dd44e771d4e428d64b01f852b683f",
           "rule": "D12-nasdaq-holiday-schedule-year-absent-v1"
         }
       ]
@@ -96,9 +96,9 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-10-27T21:10:26.725727+00:00",
-      "validity": "valid",
-      "reason": null,
+      "last_checked_at": "2026-10-28T21:07:06.700296+00:00",
+      "validity": "stale",
+      "reason": "judge_unavailable_or_invalid",
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -107,9 +107,9 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "c3dc345f2bf23cd37d290c7437e2298ac42752ae53044edf4e466c4aaccc743f",
-      "last_checked_at": "2026-10-27T21:10:26.725727+00:00",
-      "validity": "valid",
-      "reason": null,
+      "last_checked_at": "2026-10-28T21:07:06.700296+00:00",
+      "validity": "stale",
+      "reason": "judge_unavailable_or_invalid",
       "unpublished": false,
       "unpublished_evidence": []
     }
