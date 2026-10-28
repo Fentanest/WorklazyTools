@@ -2,7 +2,7 @@
 
 ## 2026-10-28 — 거래 달력 독립 일일 배포 예약 (구현·국소 검사, 미커밋·미배포)
 
-FolioTrace collection 중단 시 calendar의 검증된 data branch 갱신도 사이트에 반영되지 않던 경로를 `deploy-site.yml`의 07:00 KST 예약으로 분리했다. 승인 지시서는 `solmc-market-calendar.md` Task 2이며 기준은 `ff1b772`, 작업 브랜치는 `deploy-trigger-20261028`다. data-branch push는 체크아웃 ref·main 검사 변경이 필요하고 publisher dispatch는 토큰 권한·재시도 연결이 늘어 기존 기본 main 배포 경로를 재사용하는 예약을 선택했다. 기존 변수 게이트는 자동 예약에도 적용하고, 명시 dispatch의 validate/deploy·Pages 동시성·최신 main 검사를 유지했다. 전체 사이트 재배포이며 데이터 전용 브랜치 코드를 실행하지 않는다.
+FolioTrace collection 중단 시 calendar의 검증된 data branch 갱신도 사이트에 반영되지 않던 경로를 `deploy-site.yml`의 07:30 KST 예약으로 분리했다. 소유자 결정으로 정상일(10/19–10/28) calendar 데이터 반영 06:20–06:41 뒤 약 50분 여유를 두고 08:31 FolioTrace 실행과 간격을 확보하도록 시각을 변경했다. 승인 지시서는 `solmc-market-calendar.md` Task 2이며 기준은 `ff1b772`, 작업 브랜치는 `deploy-trigger-20261028`다. data-branch push는 체크아웃 ref·main 검사 변경이 필요하고 publisher dispatch는 토큰 권한·재시도 연결이 늘어 기존 기본 main 배포 경로를 재사용하는 예약을 선택했다. 기존 변수 게이트는 자동 예약에도 적용하고, 명시 dispatch의 validate/deploy·Pages 동시성·최신 main 검사를 유지했다. 전체 사이트 재배포이며 데이터 전용 브랜치 코드를 실행하지 않는다.
 
 `python3 -m unittest discover -s tests/market_calendar -p test_deploy_schedule.py -v`: 실제 exit 0, 3 tests. 설치된 PyYAML로 YAML을 읽고 자동 실행 gate true/false, dispatch 두 모드, main 변경 거부·동시성·calendar branch 입력을 확인했다. actionlint는 설치돼 있지 않다. 검사는 모의 조건 대조이며 GitHub 실행·권한·실제 사이트 신선도를 증명하지 않는다. 최종 통합의 build/unit/static 검증과 운영의 공개 manifest·파일 해시 확인은 담당자에게 이월한다. `.git` 읽기 전용·작업 지시서 금지에 따라 commit·push·workflow dispatch·서비스 시작은 하지 않았다. 상세 명령·diff·제약은 지정 scratch의 `solmc-REPORT.md`에 기록한다. — Codx
 

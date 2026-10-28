@@ -21,7 +21,7 @@ class DeployScheduleTest(unittest.TestCase):
 
     def test_daily_schedule_builds_default_main_and_uses_existing_pages_queue(self):
         workflow = self.workflow
-        self.assertEqual(workflow['on']['schedule'], [{'cron': '0 22 * * *'}])
+        self.assertEqual(workflow['on']['schedule'], [{'cron': '30 22 * * *'}])
         self.assertEqual(workflow['on']['push']['branches'], ['main'])
         self.assertNotIn('pull_request', workflow['on'])
         self.assertEqual(workflow['concurrency'], {'group': 'pages', 'cancel-in-progress': 'false'})

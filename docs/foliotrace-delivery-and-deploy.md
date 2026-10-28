@@ -34,12 +34,12 @@
 
 ### 독립 일일 예약 (market-calendar 배포 공백 수리)
 
-- `.github/workflows/deploy-site.yml`의 `0 22 * * *`는 매일 **07:00 KST(전날 22:00 UTC)**다. 06:00 calendar 시작 후 한 시간 여유를 두며, FolioTrace 전달 완료 여부와 무관하게 실행된다. 수집·판정·공개 관문을 우회하지 않고 이미 발행된 데이터만 읽는다.
+- `.github/workflows/deploy-site.yml`의 `30 22 * * *`는 매일 **07:30 KST(전날 22:30 UTC)**다. 소유자 결정으로 07:30으로 옮겼다. 정상일(10/19–10/28) calendar 데이터 반영 시각 06:20–06:41 뒤 약 50분 여유를 두고 08:31 FolioTrace 실행과 간격을 확보한다. FolioTrace 전달 완료 여부와 무관하게 실행된다. 수집·판정·공개 관문을 우회하지 않고 이미 발행된 데이터만 읽는다.
 - 예약은 기본 브랜치 main의 코드·워크플로를 빌드한다. `market-calendar-data`는 별도 체크아웃으로 읽으므로 데이터 전용 브랜치의 코드를 실행하지 않는다. main push에서 이미 허용한 코드와 동일한 검증·빌드·시험을 거친 **전체 사이트 재배포**다. calendar 파일만 교체하는 방식은 아니다.
 - `FOLIOTRACE_DEPLOY_V2 == 'true'`일 때만 자동 빌드·배포한다. 기존 명시 dispatch의 게이트 예외와 mode=validate/deploy 의미는 유지한다. 예약 표시 이름은 `Site deploy (daily data refresh)`다.
 - 기존 `pages` 그룹(`cancel-in-progress: false`)으로 오케스트레이터 호출과 동시 배포를 막는다. 예약 빌드 중 main이 바뀌면 최신 main 검사로 낡은 빌드를 배포하지 않는다. 새 secret·토큰·publisher의 Actions 권한은 필요하지 않다.
 - 선택 이유: 데이터 branch push 트리거는 기본 event ref 체크아웃과 main 가드를 추가로 바꿔야 하고, publisher dispatch는 별도 Actions 토큰 권한·재시도·중복 처리 연결을 늘린다. 예약은 기존 기본 main 실행 경로를 그대로 재사용한다.
-- 한계: GitHub 예약은 정시 실행·복구를 보장하지 않는다. calendar가 07:00 이후 끝나면 다음 예약 또는 기존 수동 dispatch가 필요하다. 데이터 변경 없는 날에도 재배포할 수 있다. 기존 calendar fallback 때문에 workflow 성공만으로 신선도 회복을 판단하지 않고, 실제 공개 manifest의 generation·scope.last_checked_at 및 파일 해시를 확인한다. 러너 정지·FolioTrace 공개 데이터 검증 실패는 여전히 배포를 막는다.
+- 한계: GitHub 예약은 정시 실행·복구를 보장하지 않는다. calendar가 07:30 이후 끝나면 다음 예약 또는 기존 수동 dispatch가 필요하다. 데이터 변경 없는 날에도 재배포할 수 있다. 기존 calendar fallback 때문에 workflow 성공만으로 신선도 회복을 판단하지 않고, 실제 공개 manifest의 generation·scope.last_checked_at 및 파일 해시를 확인한다. 러너 정지·FolioTrace 공개 데이터 검증 실패는 여전히 배포를 막는다.
 - 국소 검사: `python3 -m unittest discover -s tests/market_calendar -p test_deploy_schedule.py -v` (설치된 PyYAML 사용). workflow YAML 파싱과 예약·게이트·dispatch 모드·최신 main·동시성·calendar 체크아웃을 오프라인으로 대조한다. GitHub 실행을 뜻하지 않는다.
 
 ### 시작용 토큰

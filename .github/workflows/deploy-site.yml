@@ -20,8 +20,9 @@ on:
   push:
     branches: [main]
   schedule:
-    # 07:00 KST, leaving an hour after the 06:00 market-calendar start.
-    - cron: '0 22 * * *'
+    # 07:30 KST: normal data landed at 06:20–06:41 KST (10/19–10/28), leaving about 50 minutes.
+    # This stays clear of the 08:31 KST FolioTrace run (owner decision).
+    - cron: '30 22 * * *'
   workflow_dispatch:
     inputs:
       runner:
