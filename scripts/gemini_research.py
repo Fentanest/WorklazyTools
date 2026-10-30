@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the existing agy subscription connection with Gemini (model optional, see agent-ops-config).
 
-The process is synchronous so its output can feed Jev and a subsequent agy
+The process is synchronous so its output can feed a subsequent agy
 invocation. An outer harness may run this helper asynchronously, but must
 collect its terminal result before starting a dependent stage.
 """
@@ -16,7 +16,7 @@ import sys
 import time
 
 from codex_direct import DispatchError, atomic_json, digest, repo_root, state_home
-from jev_client import JevError, reject_secrets
+from secret_scan import SensitiveContentError, reject_secrets
 
 HEADER = """조사 작업이다. 제품 코드·테스트·설정 수정, 커밋·push·배포는 금지한다.
 셸·git 읽기·검색·조사 스크립트·공식 자료 조회는 사용할 수 있다.
@@ -84,7 +84,7 @@ def execute(root: Path, prompt_file: Path, task_id: str, seconds: int = 900) -> 
     for filename, raw_output in (("stdout.md", stdout), ("stderr.log", stderr)):
         text = raw_output.decode("utf-8", errors="replace")
         try: reject_secrets(text)
-        except JevError:
+        except SensitiveContentError:
             text = "SENSITIVE_OUTPUT_REDACTED; inspect the source of the disclosure without reproducing the value\n"
             status = "sensitive_output_blocked"
         path = folder / filename; path.write_text(text, encoding="utf-8"); os.chmod(path, 0o600)
@@ -94,7 +94,7 @@ def execute(root: Path, prompt_file: Path, task_id: str, seconds: int = 900) -> 
         os.chmod(native, 0o600)
         try:
             reject_secrets(native.read_text(encoding="utf-8", errors="replace"))
-        except JevError:
+        except SensitiveContentError:
             native.write_text("SENSITIVE_NATIVE_LOG_REDACTED\n", encoding="utf-8")
             status = "sensitive_output_blocked"
     record = {"task_id": task_id, "model": model or "agy-default", "workspace": str(root), "status": status,
@@ -116,8 +116,8 @@ def main() -> int:
         result = execute(repo_root(args.repo), Path(args.prompt_file).expanduser().resolve(), args.task_id, args.timeout)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0 if result["status"] == "process_exited" else 2
-    except (DispatchError, JevError, OSError, ValueError) as error:
-        msg = str(error) if isinstance(error, (DispatchError, JevError)) else "INVALID_INPUT_OR_LOCAL_IO"
+    except (DispatchError, SensitiveContentError, OSError, ValueError) as error:
+        msg = str(error) if isinstance(error, (DispatchError, SensitiveContentError)) else "INVALID_INPUT_OR_LOCAL_IO"
         print(json.dumps({"status": "blocked", "error": msg}, ensure_ascii=False)); return 2
 
 

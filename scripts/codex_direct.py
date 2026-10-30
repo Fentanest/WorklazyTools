@@ -295,7 +295,9 @@ def dispatch(root: Path, request: dict, config: dict, plugin_arg: str | None = N
         raise DispatchError("LINKED_WORKTREE_REQUIRED")
     if role == "review" and execution == "verification" and request.get("isolated_verification_workspace") is not True:
         raise DispatchError("ISOLATED_REVIEW_WORKSPACE_REQUIRED")
-    model = config["models"][role]
+    # This is the Codex companion path. Muse (the primary implementer) runs in OpenCode via herdr,
+    # so a Codex implementation job uses the configured Codex fallback implementer (Sol).
+    model = config["models"]["implementation_fallback"] if role == "implementation" and config["models"].get("implementation_fallback") else config["models"][role]
     if request.get("model", model) != model:
         raise DispatchError("ROLE_MODEL_CONFLICT")
     plugin = find_plugin(plugin_arg)

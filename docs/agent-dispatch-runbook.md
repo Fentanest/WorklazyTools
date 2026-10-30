@@ -10,17 +10,21 @@
 
 | 역할 | `--kind` | `--` 뒤 인자 |
 |---|---|---|
-| Sol / Astra / Luna | `codex` | `-C "$WT" -m <gpt-6.1-sol / gpt-6-astra / gpt-6-luna> --dangerously-bypass-approvals-and-sandbox` |
-| Gemini | `agy` | `--add-dir "$WT" --model gemini-3.8-flash-high --dangerously-skip-permissions` |
-| Muse | `opencode` | `--auto "$WT"` — 모델은 `~/.config/opencode/opencode.jsonc`의 `model`(2026-10-26 기준 `opencode-go/muse-spark-1.3-contributor`). 실제 ID를 `muse_runtime_id`에 기록한다 |
+| Muse(주 구현) | `opencode` | `--auto "$WT"` — 모델은 `~/.config/opencode/opencode.jsonc`의 `model`(`opencode-go/muse-spark-1.3-contributor`). Muse는 codex로 띄울 수 없다. 실제 ID를 `muse_runtime_id`와 대조한다 |
+| Sol(보조 구현)·Astra(검수) | `codex` | `-C "$WT" -m <gpt-6.1-sol / gpt-6-astra> --dangerously-bypass-approvals-and-sandbox` |
+| Luna | `codex` | `-C "$WT" -m gpt-6.1-luna --dangerously-bypass-approvals-and-sandbox` |
+| Gemini | `agy` | `--add-dir "$WT" --model gemini-4-argon-high --dangerously-skip-permissions` |
 | Claude 작업자 | `claude` | `--model sonnet --dangerously-skip-permissions` |
 
-- 권한 플래그는 질문을 없앨 뿐 역할 범위를 넓히지 않는다. 비밀값·실주문·운영 데이터/서비스·push·배포·다른 worktree 금지는 작업서와 사후 검사(`git status --short`, `find <경로> -newer <marker>`)로 지킨다.
-- 총괄 Claude가 Claude Code 자동 모드 분류기에 막히면("Create Unsafe Agents" 등) 우회하지 말고 사용자에게 알린다. 상시 허용은 사용자가 `~/.claude/settings.json`에 둔다: `permissions.allow`의 `Bash(herdr *)`와 `autoMode.allow`의 herdr 협업 위임 문구.
+- 권한 플래그와 아래 「최대 허용」 범위를 따른다(2026-10-31). 남기는 금지는 아래 목록뿐이며 작업서와 사후 검사(`git status --short`, `find <경로> -newer <marker>`)로 지킨다.
+**권한 범위 — 최대 허용(2026-10-31 사용자 지시 「권한은 최대한 허락하는 쪽으로 모두 맞추고」).** 위 플래그로 띄운 작업자는 작업서의 일을 끝내는 데 필요한 명령을 질문 없이 실행한다.
+- 허용: 자기 worktree·작업 브랜치의 파일 쓰기와 커밋(총괄 대리 커밋이 기본이 아니다), 네트워크, 작업 공간 안 패키지·도구 설치, docker·`sudo`, 운영 데이터·로그·컨테이너 상태 읽기, 시험용 일회용 서비스·컨테이너 기동과 정리, 작업서가 지정한 운영 단계(출고·재적재·스냅샷·기기 시험 등)의 실행.
+- 남기는 금지(되돌릴 수 없거나 바깥에 영향이 가는 것만): 비밀값·토큰 출력·전송, 실주문·실결제·주문 API, 사용자 승인 없는 원격 push·출고·스토어 업로드, 운영 데이터 삭제·수동 수정(작업서가 지정한 운영 단계 제외), 다른 작업의 worktree 쓰기, 전역 설정(`~/.claude`·`~/.codex`·셸 rc 등) 변경, 여러 에이전트가 함께 쓰는 공용 서비스(adb 서버·운영 Redis 등) 재시작.
+- 지킨 여부는 작업서의 사후 검사(`git status --short`, `find <경로> -newer <marker>`, 운영 기록)로 확인한다.
 
 ### 절차
 
-총괄 Claude 자신이 herdr 페인 안에서 실행 중이어야 한다(`test "$HERDR_ENV" = 1`). 아니면 바깥에서 사용자의 herdr 세션을 조작하지 말고, herdr 안에서 Claude를 다시 열어 달라고 요청한다. 명령 문법의 정본은 설치된 `herdr agent`·`herdr pane` 도움말이다.
+총괄 Claude 자신이 herdr 페인 안에서 실행 중이어야 한다(`test "$HERDR_ENV" = 1`). 하나라도 어기면 소환하지 않는다: `HERDR_ENV` 미설정·`herdr pane list` 실패·대상 worktree 미마운트·모델 ID 불일치. 아니면 바깥에서 사용자의 herdr 세션을 조작하지 말고, herdr 안에서 Claude를 다시 열어 달라고 요청한다. 명령 문법의 정본은 설치된 `herdr agent`·`herdr pane` 도움말이다. 모든 소환은 `--current --cwd "$WT" --no-focus`, 이름 유일, ID는 JSON에서만 취득한다.
 
 ```bash
 WT=/절대/경로/작업-worktree; NAME=sol-search      # 이름: [a-z][a-z0-9_-]{0,31}, 살아 있는 에이전트끼리 유일
@@ -53,9 +57,9 @@ herdr agent read "$NAME" --source recent-unwrapped --lines 200
 
 | 유형 | 모델·용도 | 실제 권한 |
 |---|---|---|
-| 조사/순수 원문 대조 | Gemini, 한도 초과 조사 대체 Luna, 순수 계획 판독 Astra | 원문 읽기·검색·허용 조사 스크립트. 제품 수정 없음 |
+| 조사/순수 원문 대조 | Gemini, 한도 초과 조사 대체 Luna(`gpt-6.1-luna`), 순수 계획 판독 Astra | 원문 읽기·검색·허용 조사 스크립트. 제품 수정 없음. Luna의 DART 원문·판정·검증물 열람 금지 |
 | 격리 검수 재현 | Astra | 검수 worktree의 임시 빌드·테스트·보고 쓰기. 제품 원본·커밋·push·배포 금지 |
-| 구현 | Sol 또는 Muse | 승인된 자기 구현 worktree의 제품 수정·국소 검사·보존 커밋 |
+| 구현 | Muse(주) 또는 Sol(보조) | 승인된 자기 구현 worktree의 제품 수정·국소 검사·보존 커밋. Muse 우선 배정 |
 
 쓰기 sandbox와 제품 구현 허가는 별개다. 검수에 필요한 쓰기를 막아 증거가 0개인 상태를 정상 검수로 만들지 않는다. 반대로 `--write`를 주고 ‘수정하지 마’라는 프롬프트만으로 운영·다른 worktree까지 보호됐다고 주장하지 않는다.
 
@@ -101,11 +105,11 @@ python3 scripts/codex_direct.py --repo "$WORKTREE" cancel "$JOB"
 
 발주 예약은 실제 호출 전 저장하고 잡 ID·실제 실행값은 직후 보존한다. 응답을 잃어 발주 여부가 불명확한 경우 자동 재시도하지 않는다. 같은 worktree의 살아 있는 잡과 미확정 예약을 먼저 확인한다. 원인이 확인된 실패도 취소·종료·diff 보존 뒤에만 재발주한다.
 
-## 3. Gemini — `gemini-3.8-flash-high` 고정, 셸 허용, 결과 회수
+## 3. Gemini — `gemini-4-argon-high` 고정, 셸 허용, 결과 회수
 
 기본은 §0의 herdr 대화형 agy(`--kind agy`, `--dangerously-skip-permissions`)다. 아래 `agy -p`·`scripts/gemini_research.py`는 herdr를 쓸 수 없을 때의 대체 경로다. 대체 경로에서도 셸이 필요한 조사는 `--dangerously-skip-permissions`를 붙인다(인쇄 모드의 권한 질문 자동 거부로 빈 출력이 되는 것을 막는다, 2026-10-26 사용자 승인).
 
-Gemini 모델은 `gemini-3.8-flash-high`로 고정한다(2026-10-17 사용자 지시). 값은 `docs/agent-ops-config.json`의 `models.gemini`이며 `scripts/gemini_research.py`가 `--model`로 넘긴다. 모델 ID는 `agy models`로 대조한다. 실제 사용 모델을 기록한다. `--mode plan`은 기본값으로 쓰지 않는다. 모델에 따라 `--effort`를 거부하므로 붙이지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
+Gemini 모델은 `gemini-4-argon-high`로 고정한다(2026-10-30 사용자 지시). 값은 `docs/agent-ops-config.json`의 `models.gemini`이며 `scripts/gemini_research.py`가 `--model`로 넘긴다. 모델 ID는 `agy models`로 대조한다. 실제 사용 모델을 기록한다. `--mode plan`은 기본값으로 쓰지 않는다. 모델에 따라 `--effort`를 거부하므로 붙이지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
 
 **메모리 상한 필수(2026-10-13 사고):** agy는 작업 폴더의 git 미추적 파일마다 diff를 만든다. 대용량 미추적 운영 데이터가 있는 폴더를 `--add-dir`로 주면 수십 GB까지 커져 시스템 전체 OOM이 나고 편집기·Claude 세션까지 죽는다. 항상 `systemd-run --user --scope --collect -p MemoryMax=8G -p MemorySwapMax=0`으로 감싸고, 저장소 전체 대신 필요한 범위의 작은 폴더를 준다. 운영 데이터 폴더(`artifacts/`)는 로컬 `.git/info/exclude`로 미추적 목록에서 뺀다.
 
@@ -133,16 +137,14 @@ agy --add-dir "$WORKTREE" --dangerously-skip-permissions \
 
 - Gemini 내부에서 반환값이 필요한 셸/도구 호출은 전경으로 수행하거나 같은 턴에서 명시적으로 wait·결과 조회를 끝낸다. 완료 전에 출력만 약속하고 종료하지 않는다.
 - 외부 실행기가 agy 프로세스를 비동기로 관리하는 것은 허용한다. 다만 종료/로그/결과 파일을 확인한 뒤에만 다음 단계를 호출한다. 단순 PID 생존이나 로그 정체는 성공 증명이 아니다.
-- 수집 → Jev → 부족한 자료 재수집은 **외부의 명시적인 순차 단계**로 연결한다. 첫 agy 호출의 실제 결과를 저장하고 `agent_ops.py check` 결과를 읽은 후, 필요 항목과 기존 증거 경로를 다음 agy 호출에 전달한다. 인쇄 모드의 가상의 ‘다음 턴’에 의존하지 않는다.
+- 수집 → 부족한 자료 재수집은 **외부의 명시적인 순차 단계**로 연결한다. 첫 agy 호출의 실제 결과를 저장하고 `agent_ops.py check` 결과를 읽은 후, 필요 항목과 기존 증거 경로를 다음 agy 호출에 전달한다. 인쇄 모드의 가상의 ‘다음 턴’에 의존하지 않는다.
 - 결과가 완결됐는데 agy가 유휴 상태로 남는 경우는 실제 최종 산출물을 확인한 뒤 소유한 실행만 종료한다. 출력 0바이트·타임아웃·부분 출력은 미확인이다. 회수되지 않은 내부 배경 작업을 완료로 간주하지 않는다.
 
 셸·git 읽기·검색·조사 스크립트는 허용한다. 과거 ‘셸 전면 금지’·특정 allowlist 개수·일괄 짧은 인자 제한은 폐기한다. 비밀값·실주문·운영 데이터/서비스 변경·다른 작업트리 변경 금지는 유지한다. 실제 환경 거부는 stderr·현재 설정·해당 대화 로그로 진단하고, 고칠 수 있는 원인을 고친 뒤 Gemini로 재실행한다. 한도 초과가 아닌 오류를 Luna 전환으로 처리하지 않는다.
 
-## 4. Jev 연결과 정식 검수 발주
+## 4. 정식 검수 발주
 
-실제 REST 전송 코드는 `scripts/jev_client.py`에 있다. 공식 SDK/OpenAPI 기준으로 `POST https://api.typesafe.ai/v1/systemone`에 `model/state/questions`와 Bearer 인증을 보낸다. 응답의 model·answers·choice/probabilities·usage를 검증한다. 키는 `TYPESAFE_API_KEY`에서만 읽는다. 자세한 실행·입력·예외 처리는 `docs/agent-ops-guide.md`다.
-
-`check`는 짧은 1차 결과와 누적/보충/수리/검수 필요를 반환한다. `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비하고 `dispatch-review`를 실행한다. `--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다. 담당 모델은 Astra로 고정되며 정식 검수 결과는 `finish-review`로 회수한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
+`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비하고 `dispatch-review`를 실행한다. `--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다. 담당 모델은 Astra로 고정되며 정식 검수 결과는 `finish-review`로 회수한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
 
 이 코드 설치는 전역 Stop hook·MCP·새 daemon을 설치하지 않는다. 구현 종료/영역 전환 단계가 해당 명령을 실제 호출해야 작동한다. 기존 플러그인의 자동 review gate가 켜져 있으면 건별 중복 검수가 발생할 수 있으므로 현재 설정을 확인해 이번 묶음 정책과 충돌하는지 기록한다. 관련 설정을 조용히 바꾸거나 CI 필수 검사와 혼동하지 않는다.
 
@@ -150,7 +152,7 @@ agy --add-dir "$WORKTREE" --dangerously-skip-permissions \
 
 기본은 §0의 herdr 대화형 OpenCode(`--kind opencode`, `--auto`)다. herdr 페인에서는 같은 에이전트 이름에 `agent prompt`를 보내 세션을 잇고, 이전 세션을 다시 열 때는 `--` 뒤에 `-s "$SESSION_ID"`를 준다. 아래 `opencode run`은 herdr를 쓸 수 없을 때의 대체 경로다.
 
-Muse Spark 1.3은 Sol과 함께 정식 구현자다. MyTradingDesk에는 이 실행기를 추가하지 않는다. Muse의 실제 provider/model ID는 호스트 `opencode models`에서 확인해 작업지시서와 `docs/agent-ops-config.json`의 `muse_runtime_id`에 기록한다. 표시 이름으로 ID를 추정하거나 Codex 명령의 모델 문자열만 바꾸지 않는다. 기존 OpenCode·구독 연결을 유지한다.
+Muse Spark 1.3은 Sol과 함께 정식 구현자이며 Muse 우선 배정이다. MyTradingDesk에는 이 실행기를 추가하지 않는다. Muse의 실제 provider/model ID는 호스트 `opencode models`에서 확인해 작업지시서와 `docs/agent-ops-config.json`의 `muse_runtime_id`에 기록한다. 표시 이름으로 ID를 추정하거나 Codex 명령의 모델 문자열만 바꾸지 않는다. 기존 OpenCode·구독 연결을 유지한다.
 
 같은 작업·같은 worktree의 정상 후속은 실제 세션 ID로 `-s`를 우선 사용한다. 바로 전 세션이 확실할 때만 `-c`를 사용한다. 같은 worktree 안의 대안·실험에만 `--fork`를 쓰고 부모/자식 ID와 목적을 기록한다. 새 worktree에는 fork를 강제하지 말고 새 세션과 인계 요약을 사용한다. 세션 분기는 파일 격리나 구현 허가가 아니다.
 

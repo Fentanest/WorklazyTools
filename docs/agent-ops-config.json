@@ -1,17 +1,15 @@
 {
   "schema_version": 1,
   "project": "WorklazyTools",
-  "policy_version": "2026-09-22",
+  "policy_version": "2026-10-30",
   "models": {
-    "gemini": "gemini-3.8-flash-high",
-    "implementation": "gpt-6.1-sol",
+    "gemini": "gemini-4-argon-high",
+    "implementation": "muse-spark-1.3-contributor",
+    "implementation_fallback": "gpt-6.1-sol",
     "review": "gpt-6-astra",
-    "research": "gpt-6-luna",
-    "muse_runtime_id": null
-  },
-  "jev": {
-    "model": "jev-latest",
-    "support_probability_floor": 0.8
+    "research": "gpt-6.1-luna",
+    "terra": "gpt-6.1-terra",
+    "muse_runtime_id": "opencode-go/muse-spark-1.3-contributor"
   },
   "review": {
     "max_tasks": 5,
@@ -58,7 +56,7 @@
       "reason": "agent_authority_or_review_control"
     },
     {
-      "glob": "scripts/jev_client.py",
+      "glob": "scripts/secret_scan.py",
       "reason": "agent_authority_or_review_control"
     },
     {

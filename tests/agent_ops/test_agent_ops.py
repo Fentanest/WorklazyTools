@@ -15,95 +15,27 @@ ROOT = Path(__file__).resolve().parents[2]
 # When installed: repo/tests/agent_ops/test_agent_ops.py -> repo/scripts.
 SCRIPTS = ROOT / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
-from jev_client import JevClient, JevError, choice, SUPPORT, MAX_BODY_BYTES, reject_secrets, NoRedirect
+from secret_scan import SensitiveContentError, reject_secrets
 import agent_ops as ops
 import codex_direct as cd
 import gemini_research as gr
 
 
-def answer(label, labels):
-    others = max(1, len(labels)-1)
-    return {'type':'choice', 'choice':label, 'confidence':.98,
-            'probabilities':{k:(.98 if k==label else .02/others) for k in labels}}
-
-
-class MockTransport:
-    def __init__(self, verdict='supported', impact='local', coverage='supported', area='same'):
-        self.verdict, self.impact, self.coverage, self.area = verdict, impact, coverage, area
-        self.calls=[]
-    def __call__(self, method, url, headers, body, timeout):
-        self.calls.append((method, url, dict(headers), body, timeout))
-        if method=='GET':
-            return {'models':[{'name':'jev-1.13','description':'fixture','release_date':'2026-09-15'}]}
-        payload=json.loads(body)
-        answers={}
-        for k,q in payload['questions'].items():
-            selected=self.coverage if k=='coverage' else self.impact if k=='impact' else self.area if k=='boundary' else self.verdict
-            answers[k]=answer(selected,q['criteria'])
-        return {'model':'jev-1.13','answers':answers,'usage':{'input_tokens':120,'output_tokens':5}}
-
-
-class JevProtocolTests(unittest.TestCase):
-    def setUp(self):
-        self.env=patch.dict(os.environ,{'TYPESAFE_API_KEY':'unit-test-key'},clear=False);self.env.start()
-    def tearDown(self):self.env.stop()
-    def test_official_endpoint_and_bearer(self):
-        t=MockTransport();c=JevClient(transport=t);r=c.smoke()
-        self.assertEqual(r['live_api'],'passed');m,u,h,b,_=t.calls[0]
-        self.assertEqual(u,'https://api.typesafe.ai/v1/systemone');self.assertEqual(m,'POST')
-        self.assertEqual(h['Authorization'],'Bearer unit-test-key')
-        self.assertEqual(set(json.loads(b)),{'model','state','questions'})
-    def test_models_endpoint(self):
-        t=MockTransport();self.assertEqual(JevClient(transport=t).models()[0]['name'],'jev-1.13')
-        self.assertEqual(t.calls[0][1],'https://api.typesafe.ai/v1/models')
-    def test_missing_key(self):
-        with patch.dict(os.environ,{'TYPESAFE_API_KEY':''}):
-            with self.assertRaisesRegex(JevError,'MISSING_TYPESAFE'):JevClient(transport=MockTransport()).smoke()
-    def test_invalid_key_no_value_echo(self):
-        with patch.dict(os.environ,{'TYPESAFE_API_KEY':'DO NOT SHOW THIS'}):
-            with self.assertRaises(JevError) as ex:JevClient(transport=MockTransport()).smoke()
-            self.assertNotIn('DO NOT',str(ex.exception))
-    def test_key_in_body_refused_before_network(self):
-        t=MockTransport()
-        with self.assertRaisesRegex(JevError,'SENSITIVE'):JevClient(transport=t).system_one('unit-test-key',{'a':choice('?',SUPPORT)})
-        self.assertFalse(t.calls)
+class SecretScanTests(unittest.TestCase):
     def test_private_key_blocked(self):
-        with self.assertRaises(JevError):reject_secrets('-----BEGIN PRIVATE KEY----- abc')
-    def test_oversize_not_truncated(self):
-        t=MockTransport()
-        with self.assertRaisesRegex(JevError,'TOO_LARGE'):JevClient(transport=t).system_one('x'*MAX_BODY_BYTES,{'a':choice('?',SUPPORT)})
-        self.assertFalse(t.calls)
-    def test_no_missing_answer_pass(self):
-        with self.assertRaisesRegex(JevError,'MISSING_OR_EXTRA'):
-            JevClient(transport=lambda *x:{'model':'jev-1.13','answers':{},'usage':{'input_tokens':1,'output_tokens':1}}).smoke()
-    def test_invalid_probabilities(self):
-        t=MockTransport()
-        def bad(*a):
-            r=t(*a);r['answers']['smoke']['probabilities']['supported']=float('nan');return r
-        with self.assertRaisesRegex(JevError,'PROBABILITY'):JevClient(transport=bad).smoke()
-    def test_probability_sum(self):
-        t=MockTransport()
-        def bad(*a):
-            r=t(*a);r['answers']['smoke']['probabilities']['supported']=.2;return r
-        with self.assertRaisesRegex(JevError,'INCONSISTENT'):JevClient(transport=bad).smoke()
-    def test_pinned_model_mismatch(self):
-        with self.assertRaisesRegex(JevError,'PINNED_MODEL'):JevClient('jev-1.12',transport=MockTransport()).smoke()
-    def test_wrong_usage_rejected(self):
-        t=MockTransport()
-        def bad(*a):r=t(*a);r['usage']['input_tokens']='120';return r
-        with self.assertRaisesRegex(JevError,'INVALID_USAGE'):JevClient(transport=bad).smoke()
-    def test_nonjev_provider_not_allowed(self):
-        with self.assertRaises(JevError):JevClient('other-model')
-    def test_timeout_validation(self):
-        with self.assertRaises(JevError):JevClient(timeout=0)
-    def test_response_redirect_refused(self):
-        with self.assertRaisesRegex(JevError,'REDIRECT'):NoRedirect().redirect_request(None,None,302,'',{},'https://elsewhere.example')
-    def test_transport_exception_redacted(self):
-        def bad(*a):raise OSError('unit-test-key')
-        with self.assertRaises(JevError) as ex:JevClient(transport=bad).smoke()
-        self.assertNotIn('unit-test-key',str(ex.exception))
-    def test_wrong_smoke_label(self):
-        with self.assertRaisesRegex(JevError,'SMOKE'):JevClient(transport=MockTransport(verdict='contradicted')).smoke()
+        with self.assertRaises(SensitiveContentError):reject_secrets('-----BEGIN PRIVATE KEY----- abc')
+    def test_token_shapes_blocked(self):
+        for text in ('ghp_'+'a'*30,'AKIA'+'A'*16,'Authorization: Bearer abcdefghijklmnop','password="abcdefghijklmnop1234"'):
+            with self.assertRaises(SensitiveContentError):reject_secrets(text)
+    def test_error_does_not_echo_value(self):
+        with self.assertRaises(SensitiveContentError) as ex:reject_secrets('ghp_'+'z'*30)
+        self.assertNotIn('zzzz',str(ex.exception))
+    def test_plain_text_allowed(self):
+        reject_secrets('Return 2 from search.')
+    def test_no_model_client_left(self):
+        self.assertFalse((SCRIPTS/'jev_client.py').exists())
+        for name in ('agent_ops.py','gemini_research.py','codex_direct.py'):
+            self.assertNotIn('jev',(SCRIPTS/name).read_text().lower())
 
 
 class RepoFixture(unittest.TestCase):
@@ -111,7 +43,7 @@ class RepoFixture(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)/'repo';self.root.mkdir()
         self.git('init','-q');self.git('config','user.email','fixture@example.invalid');self.git('config','user.name','Fixture')
         (self.root/'docs').mkdir();(self.root/'src').mkdir()
-        self.config={'schema_version':1,'project':'Fixture','models':{'gemini':'gemini-3.1-pro','implementation':'gpt-6-sol','review':'gpt-6-astra','research':'gpt-6-luna'},'jev':{'model':'jev-latest','support_probability_floor':.8},'review':{'max_tasks':5,'max_lines':800},'line_count_exclude_globs':['vendor/**'],'high_risk_paths':[{'glob':'src/orders.py','reason':'order_safety'}]}
+        self.config={'schema_version':1,'project':'Fixture','models':{'gemini':'gemini-4-argon-high','implementation':'gpt-6-sol','review':'gpt-6-astra','research':'gpt-6.1-luna'},'review':{'max_tasks':5,'max_lines':800},'line_count_exclude_globs':['vendor/**'],'high_risk_paths':[{'glob':'src/orders.py','reason':'order_safety'}]}
         self.write_config()
         (self.root/'src/search.py').write_text('def search():\n    return 1\n')
         (self.root/'plan.md').write_text('# Approved plan\nReturn 2 from search.\n')
@@ -122,76 +54,64 @@ class RepoFixture(unittest.TestCase):
             'requirements':[{'id':'R1','text':'Return 2 from search.','evidence':[{'path':'src/search.py','start_line':1,'end_line':2}]}],
             'tests':[],'no_tests_reason':'Synthetic protocol fixture; the real tests are this suite.'}
         (self.root/'src/search.py').write_text('def search():\n    return 2\n')
-        self.env=patch.dict(os.environ,{'TYPESAFE_API_KEY':'unit-test-key'},clear=False);self.env.start()
-    def tearDown(self):self.env.stop();self.temp.cleanup()
+    def tearDown(self):self.temp.cleanup()
     def git(self,*args):
         p=subprocess.run(['git',*args],cwd=self.root,text=True,capture_output=True,check=True);return p.stdout.strip()
     def write_config(self):(self.root/'docs/agent-ops-config.json').write_text(json.dumps(self.config))
-    def client(self,**kw):return JevClient(transport=MockTransport(**kw))
 
 
 class EvidenceAndQueueTests(RepoFixture):
-    def test_supported_accumulates(self):
-        r=ops.check_task(self.root,self.task,self.client());self.assertEqual(r['action'],'continue_accumulating')
+    def test_pinned_evidence_accumulates(self):
+        r=ops.check_task(self.root,self.task);self.assertEqual(r['action'],'continue_accumulating')
         self.assertEqual(r['status'],'implementation_done_review_pending');self.assertTrue(r['not_a_formal_review'])
+    def test_requirement_never_marked_supported(self):
+        r=ops.check_task(self.root,self.task)
+        self.assertEqual([a['verdict'] for a in r['requirements']],['not_assessed'])
+        self.assertEqual(r['requirements'][0]['evidence'][0]['path'],'src/search.py')
     def test_repeated_check_deduplicates(self):
-        t=MockTransport();c=JevClient(transport=t)
-        ops.check_task(self.root,self.task,c);n=len(t.calls)
-        r=ops.check_task(self.root,self.task,c);self.assertTrue(r['deduplicated']);self.assertEqual(len(t.calls),n)
+        ops.check_task(self.root,self.task)
+        r=ops.check_task(self.root,self.task);self.assertTrue(r['deduplicated'])
     def test_changed_bytes_recheck(self):
-        t=MockTransport();c=JevClient(transport=t);ops.check_task(self.root,self.task,c);n=len(t.calls)
+        ops.check_task(self.root,self.task)
         (self.root/'src/search.py').write_text('def search():\n    return 3\n')
-        ops.check_task(self.root,self.task,c);self.assertGreater(len(t.calls),n)
+        r=ops.check_task(self.root,self.task);self.assertNotIn('deduplicated',r)
     def test_commit_same_bytes_does_not_invalidate(self):
-        t=MockTransport();c=JevClient(transport=t);ops.check_task(self.root,self.task,c);n=len(t.calls)
+        ops.check_task(self.root,self.task)
         self.git('add','src/search.py');self.git('commit','-qm','preserve')
-        r=ops.check_task(self.root,self.task,c);self.assertTrue(r['deduplicated']);self.assertEqual(len(t.calls),n)
+        r=ops.check_task(self.root,self.task);self.assertTrue(r['deduplicated'])
     def test_plan_hash_mutation_blocks(self):
         (self.root/'plan.md').write_text('Changed approval\nReturn 1\n')
-        with self.assertRaisesRegex(ops.OpsError,'APPROVED_PLAN_CHANGED'):ops.check_task(self.root,self.task,self.client())
+        with self.assertRaisesRegex(ops.OpsError,'APPROVED_PLAN_CHANGED'):ops.check_task(self.root,self.task)
     def test_requirement_weaken_in_place_blocks(self):
-        ops.check_task(self.root,self.task,self.client());task=copy.deepcopy(self.task);task['requirements'][0]['text']='Anything is fine'
-        with self.assertRaisesRegex(ops.OpsError,'CONTRACT_CHANGED'):ops.check_task(self.root,task,self.client())
+        ops.check_task(self.root,self.task);task=copy.deepcopy(self.task);task['requirements'][0]['text']='Anything is fine'
+        with self.assertRaisesRegex(ops.OpsError,'CONTRACT_CHANGED'):ops.check_task(self.root,task)
     def test_plan_only_no_implementation_record(self):
         self.task['request_mode']='plan-only'
-        with self.assertRaisesRegex(ops.OpsError,'plan-only'):ops.check_task(self.root,self.task,self.client())
-    def test_contradiction_requests_narrow_repair(self):
-        r=ops.check_task(self.root,self.task,self.client(verdict='contradicted'));self.assertEqual(r['action'],'repair_or_run_required_tests')
-    def test_insufficient_requests_evidence(self):
-        r=ops.check_task(self.root,self.task,self.client(verdict='insufficient'));self.assertEqual(r['action'],'collect_evidence')
-    def test_coverage_not_assumed_from_implementer(self):
-        r=ops.check_task(self.root,self.task,self.client(coverage='contradicted'));self.assertEqual(r['action'],'collect_evidence')
-    def test_unknown_impact_not_green(self):
-        r=ops.check_task(self.root,self.task,self.client(impact='unknown'));self.assertEqual(r['action'],'collect_evidence')
-    def test_shared_impact_early_review(self):
-        r=ops.check_task(self.root,self.task,self.client(impact='shared_or_high_risk'));self.assertEqual(r['action'],'review_required')
-    def test_hard_risk_not_overridden_by_model(self):
+        with self.assertRaisesRegex(ops.OpsError,'plan-only'):ops.check_task(self.root,self.task)
+    def test_hard_risk_path_flags_review(self):
         (self.root/'src/orders.py').write_text('order=1\n')
-        r=ops.check_task(self.root,self.task,self.client());self.assertIn('order_safety',r['review_reasons'])
+        r=ops.check_task(self.root,self.task);self.assertIn('order_safety',r['review_reasons'])
     def test_five_tasks_not_five_commits(self):
         for i in range(5):
             task=copy.deepcopy(self.task);task['task_id']=f'T{i}'
-            r=ops.check_task(self.root,task,self.client())
+            r=ops.check_task(self.root,task)
         self.assertEqual(r['action'],'review_required');self.assertEqual(r['pending_tasks'],5)
     def test_line_count_triggers(self):
         (self.root/'src/search.py').write_text('def search():\n    return 2\n'+'# explanation\n'*801)
-        r=ops.check_task(self.root,self.task,self.client());self.assertIn('line_limit',r['review_reasons'])
+        r=ops.check_task(self.root,self.task);self.assertIn('line_limit',r['review_reasons'])
     def test_vendor_count_exclusion_not_risk_waiver(self):
         (self.root/'vendor').mkdir();(self.root/'vendor/x.js').write_text('x\n'*900)
         n,excluded=ops.substantive_lines(self.root,self.base,self.config)
         self.assertLess(n,800);self.assertIn('vendor/x.js',excluded)
     def test_final_boundary_always_review(self):
-        ops.check_task(self.root,self.task,self.client())
+        ops.check_task(self.root,self.task)
         self.assertEqual(ops.boundary(self.root,'B1','final')['action'],'review_required')
-    def test_same_area_can_continue(self):
-        ops.check_task(self.root,self.task,self.client())
-        r=ops.boundary(self.root,'B1','area','same feature',self.client(area='same'));self.assertEqual(r['action'],'continue_accumulating')
-    def test_different_area_closes(self):
-        ops.check_task(self.root,self.task,self.client())
-        r=ops.boundary(self.root,'B1','area','another feature',self.client(area='different'));self.assertEqual(r['action'],'review_required')
-    def test_unknown_area_does_not_waive_review(self):
-        ops.check_task(self.root,self.task,self.client())
-        self.assertEqual(ops.boundary(self.root,'B1','area','?',self.client(area='unknown'))['action'],'review_required')
+    def test_announced_area_change_closes_batch(self):
+        ops.check_task(self.root,self.task)
+        r=ops.boundary(self.root,'B1','area','another feature');self.assertEqual(r['action'],'review_required')
+    def test_area_change_needs_description(self):
+        ops.check_task(self.root,self.task)
+        with self.assertRaisesRegex(ops.OpsError,'NEXT_AREA_DESCRIPTION'):ops.boundary(self.root,'B1','area','  ')
     def test_env_file_never_read(self):
         (self.root/'.env').write_text('danger')
         with self.assertRaisesRegex(ops.OpsError,'SENSITIVE_PATH'):ops.read_source(self.root,'.env')
@@ -211,14 +131,14 @@ class EvidenceAndQueueTests(RepoFixture):
         self.task['requirements'][0]['id']='impact'
         with self.assertRaisesRegex(ops.OpsError,'RESERVED'):ops.validate_task(self.root,self.task)
     def test_gemini_model_not_pinned(self):
-        for value in ('gemini-3.8-flash-high',None):
+        for value in ('gemini-4-argon-high',None):
             self.config['models']['gemini']=value;self.write_config();ops.load_config(self.root)
         self.config['models']['gemini']='';self.write_config()
         with self.assertRaisesRegex(ops.OpsError,'INVALID_GEMINI_MODEL'):ops.load_config(self.root)
-    def test_missing_required_test_prevents_api_spend(self):
+    def test_missing_required_test_requests_repair(self):
         self.task['tests']=[{'id':'u1','input_paths':['src/search.py']}]
-        t=MockTransport();r=ops.check_task(self.root,self.task,JevClient(transport=t))
-        self.assertFalse(t.calls);self.assertEqual(r['action'],'repair_or_run_required_tests')
+        r=ops.check_task(self.root,self.task)
+        self.assertEqual(r['action'],'repair_or_run_required_tests')
     def test_actual_test_receipt(self):
         self.task['tests']=[{'id':'u1','input_paths':['src/search.py']}]
         receipt=ops.run_test(self.root,self.task,'u1',[sys.executable,'-c','print("Ran 2 tests")'],'unit',10)
@@ -238,11 +158,11 @@ class EvidenceAndQueueTests(RepoFixture):
         r=ops.run_test(self.root,self.task,'u1',[sys.executable,'-c','print("Ran 2 tests")'],'unit',10)
         Path(r['log_path']).unlink();self.assertEqual(ops.valid_tests(self.root,self.task)[1],['u1'])
     def test_state_outside_tracked_source(self):
-        ops.check_task(self.root,self.task,self.client())
+        ops.check_task(self.root,self.task)
         self.assertTrue((cd.state_home(self.root)/'reviews.json').is_file())
         self.assertNotIn('agent-ops',self.git('status','--porcelain'))
     def test_review_requires_separate_worktree(self):
-        ops.check_task(self.root,self.task,self.client());ops.boundary(self.root,'B1','final')
+        ops.check_task(self.root,self.task);ops.boundary(self.root,'B1','final')
         with self.assertRaisesRegex(ops.OpsError,'SEPARATE'):ops.dispatch_review(self.root,'B1',str(self.root))
 
 
@@ -293,21 +213,21 @@ class DispatchContractTests(RepoFixture):
     def test_gemini_model_optional(self):
         cmd=gr.build_argv(self.root,'abc',90,Path('/log'))
         self.assertNotIn('--model',cmd);self.assertNotIn('--mode',cmd);self.assertNotIn('--effort',cmd)
-        cmd=gr.build_argv(self.root,'abc',90,Path('/log'),'gemini-3.8-flash-high')
-        self.assertEqual(cmd[cmd.index('--model')+1],'gemini-3.8-flash-high')
+        cmd=gr.build_argv(self.root,'abc',90,Path('/log'),'gemini-4-argon-high')
+        self.assertEqual(cmd[cmd.index('--model')+1],'gemini-4-argon-high')
     def test_gemini_runs_memory_capped(self):
         cmd=gr.build_argv(self.root,'abc',90,Path('/log'))
         self.assertEqual(cmd[:3],['systemd-run','--user','--scope']);self.assertIn('MemoryMax=8G',cmd)
         self.assertLess(cmd.index('MemoryMax=8G'),cmd.index('agy'))
     def test_gemini_shell_allowed(self):
         self.assertIn('셸·git 읽기·검색',gr.HEADER);self.assertIn('운영',gr.HEADER)
-    def test_no_plaintext_key_in_generated_config(self):
-        self.assertNotIn('unit-test-key',(self.root/'docs/agent-ops-config.json').read_text())
+    def test_config_has_no_model_api_section(self):
+        self.assertNotIn('jev',(self.root/'docs/agent-ops-config.json').read_text())
     def test_unknown_plugin_does_not_guess(self):
         with self.assertRaisesRegex(cd.DispatchError,'PLUGIN_ROOT_NOT_UNIQUE'):cd.find_plugin(str(self.root/'missing'))
     def test_finished_report_does_not_authorize_deployment(self):
         # Exercise finish on a fixed candidate and a valid report, without a paid runtime.
-        ops.check_task(self.root,self.task,self.client());ops.boundary(self.root,'B1','final')
+        ops.check_task(self.root,self.task);ops.boundary(self.root,'B1','final')
         self.git('add','.');self.git('commit','-qm','candidate');candidate=self.git('rev-parse','HEAD')
         review=Path(self.temp.name)/'review';self.git('worktree','add','--detach',str(review),candidate)
         fake={'status':'running','job_id':'task-fixture-1','key':'dispatch-key'}
@@ -378,13 +298,18 @@ else{console.log(fs.readFileSync(file,'utf8'));}
         request=self.req('implementation','implementation',work)
         r=cd.dispatch(self.root,request,self.config,str(self.plugin))
         self.assertTrue(r['write']);self.assertEqual(r['model'],'gpt-6-sol');self.assertEqual(r['workspace'],str(work))
+    def test_codex_implementation_uses_codex_fallback_not_muse(self):
+        self.config['models'].update(implementation='muse-spark-1.3-contributor',implementation_fallback='gpt-6-sol')
+        work=Path(self.temp.name)/'implementation2';self.git('worktree','add','-b','impl2',str(work),self.base)
+        r=cd.dispatch(self.root,self.req('implementation','implementation',work),self.config,str(self.plugin))
+        self.assertEqual(r['model'],'gpt-6-sol')
     def test_failed_or_missing_plugin_no_fake_success(self):
         with self.assertRaises(cd.DispatchError):cd.dispatch(self.root,self.req(),self.config,str(self.plugin/'missing'))
 
 
 class ReviewLifecycleTests(RepoFixture):
     def setup_review(self):
-        ops.check_task(self.root,self.task,self.client());ops.boundary(self.root,'B1','final')
+        ops.check_task(self.root,self.task);ops.boundary(self.root,'B1','final')
         self.git('add','.');self.git('commit','-qm','candidate');candidate=self.git('rev-parse','HEAD')
         review=Path(self.temp.name)/'review';self.git('worktree','add','--detach',str(review),candidate)
         with patch.object(ops,'dispatch',return_value={'status':'running','job_id':'task-lifecycle-1','key':'fake-dispatch'}):
@@ -400,7 +325,7 @@ class ReviewLifecycleTests(RepoFixture):
     def test_new_task_during_old_review_stays_pending(self):
         _,rec,_=self.setup_review()
         t2=copy.deepcopy(self.task);t2['task_id']='T2'
-        ops.check_task(self.root,t2,self.client())
+        ops.check_task(self.root,t2)
         with patch.object(ops,'inspect_job',return_value={'execution_terminal':True,'native_status':'completed'}):
             result=ops.finish_review(self.root,'B1','task-lifecycle-1')
         self.assertEqual(result['remaining_tasks'],1)
@@ -418,18 +343,17 @@ class ReviewLifecycleTests(RepoFixture):
         with patch.object(ops,'inspect_job',return_value={'execution_terminal':True,'native_status':'completed'}):
             with self.assertRaisesRegex(ops.OpsError,'TARGET_MISMATCH'):ops.finish_review(self.root,'B1','task-lifecycle-1')
     def test_dirty_candidate_not_auto_reset(self):
-        ops.check_task(self.root,self.task,self.client());ops.boundary(self.root,'B1','final')
+        ops.check_task(self.root,self.task);ops.boundary(self.root,'B1','final')
         review=Path(self.temp.name)/'review';self.git('worktree','add','--detach',str(review),self.base)
         with self.assertRaisesRegex(ops.OpsError,'COMMITTED_CANDIDATE'):ops.dispatch_review(self.root,'B1',str(review))
         self.assertIn('return 2',(self.root/'src/search.py').read_text())
 
 class PolicyRegressionTests(RepoFixture):
-    def test_cached_answer_still_honors_new_final_boundary(self):
-        transport=MockTransport();client=JevClient(transport=transport)
-        ops.check_task(self.root,self.task,client);n=len(transport.calls)
+    def test_cached_assessment_still_honors_new_final_boundary(self):
+        ops.check_task(self.root,self.task)
         ops.boundary(self.root,'B1','final')
-        r=ops.check_task(self.root,self.task,client)
-        self.assertEqual(r['action'],'review_required');self.assertEqual(len(transport.calls),n)
+        r=ops.check_task(self.root,self.task)
+        self.assertEqual(r['action'],'review_required');self.assertTrue(r['deduplicated'])
     def test_test_kind_cannot_be_switched_to_bypass_zero_count(self):
         self.task['tests']=[{'id':'u1','input_paths':['src/search.py'],'kind':'unit'}]
         with self.assertRaisesRegex(ops.OpsError,'TEST_KIND_CONFLICT'):
@@ -443,14 +367,15 @@ class PolicyRegressionTests(RepoFixture):
     def test_rust_multiple_binaries_do_not_look_like_zero_tests(self):
         text='test result: ok. 14 passed; 0 failed; 1 ignored;\ntest result: ok. 0 passed; 0 failed; 0 ignored;'
         self.assertEqual(ops.test_count(text,['cargo','test']),14)
-    def test_snapshot_change_during_api_is_unverified(self):
-        t=MockTransport();changed=[False]
-        def transport(*a):
-            res=t(*a)
-            if not changed[0]:
-                (self.root/'src/search.py').write_text('def search():\n    return 4\n');changed[0]=True
+    def test_snapshot_change_during_assessment_is_unverified(self):
+        original=ops.excerpt
+        def mutating(root,spec):
+            res=original(root,spec)
+            if spec['path']=='src/search.py':  # evidence read, after the source snapshot
+                (self.root/'src/search.py').write_text('def search():\n    return 4\n')
             return res
-        r=ops.check_task(self.root,self.task,JevClient(transport=transport))
+        with patch.object(ops,'excerpt',side_effect=mutating):
+            r=ops.check_task(self.root,self.task)
         self.assertIn('source_changed_during_assessment',r['errors']);self.assertEqual(r['action'],'collect_evidence')
 
 if __name__ == '__main__':
