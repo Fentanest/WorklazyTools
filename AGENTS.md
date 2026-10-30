@@ -48,3 +48,7 @@ Claude가 herdr 페인에 대화형 세션(Codex·OpenCode)으로 띄우며 사�
 ## 최종 반영·보고
 
 임시 통합 후보를 만든 뒤 유효한 묶음 검수·최종 필수 검사·Claude 감사 판정·실행 권한을 갖추어 지정 통합 담당이 반영한다. 각 브랜치 통과를 통합 후보 통과로 바꾸지 않는다. 배포는 `docs/PUBLISHING_CHECKLIST.md`의 적용 범위와 공통 배포 조건를 따른다. 커밋·원격 반영·실제 배포를 구분한다. 관련 변경·재사용·이월·미확인·결함·후속을 간결히 보고한다. 서명은 Claude·Codx·Muse·Gemini다.
+
+## 팀 정본(`.team/`) 갱신
+
+팀 정본은 `/home/better0101/projects/worklazytools/.team/`(`ledger.md`·`decisions.md`·`HANDOFF.md`)이다. 갱신은 총괄, 부재 시 대리 총괄(deputy)만 한다. 발주·회수·검수 판정·설치/출고·사용자 결정마다 `ledger.md`·`decisions.md`를 즉시 고치고, 인계·세션 종료·재시작 전에는 `HANDOFF.md` 맨 위 현황을 교체한다. 구현·검수·조사 담당자는 `.team/`을 직접 고치지 않고 보고서로만 알린다. 자동 갱신이 아니므로 재개 시 `.team/`과 실제 상태를 먼저 대조한다.
