@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generation_id": "20261030T232813.205238Z",
-  "created_at": "2026-10-30T23:55:59.721294+00:00",
-  "source_manifest_sha256": "3656974068d5022df2e2f04a15c4bfbeeee112beef7be79956a5031efb047957",
+  "generation_id": "20261031T210001.521264Z",
+  "created_at": "2026-10-31T21:30:56.294297+00:00",
+  "source_manifest_sha256": "60e90bf95452bd66bf6df63b1638cdbbbbcc0d70b44514071bfa6a87676cd7dd",
   "files": [
     {
       "path": "calendar-2026.json",
@@ -13,8 +13,8 @@
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "f84deba00fa4c216f7be481a95866378c2f5d29aa39bb95c86ac526d43130c22",
-      "source_sha256": "5072741d9b1ce5ee06953230a2ecfdbcfeee8cd5f5d2031e695f03b8c21ff236"
+      "sha256": "145cf557cd5cad8b8ceddb5314d9720d2430f81c5f72df8785934e16d3271336",
+      "source_sha256": "3e0e3309ea6233b6d5c69362bd2e4bff2c1b941978f5f1e4ab2629b71c8b5ec9"
     }
   ],
   "scopes": [
@@ -23,7 +23,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "d29330a51cf4d2bb6c5c127d2ea09aaba8a36a08c9d9bab900e3d5f1886d8681",
-      "last_checked_at": "2026-10-30T23:30:47.254909+00:00",
+      "last_checked_at": "2026-10-31T21:03:11.182970+00:00",
       "validity": "stale",
       "reason": "collection:krx-kospi-2026-exam; collection:krx-kospi-2026-year_end; collection:krx-kospi-2026-temporary_change; collection:krx-kosdaq-2026-exam; collection:krx-kosdaq-2026-year_end; collection:krx-kosdaq-2026-temporary_change",
       "unpublished": false,
@@ -34,7 +34,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "7638ec018fa03360a52509bb2d5b92bc2ebac5119bef7888cf5dccdab63de075",
-      "last_checked_at": "2026-10-30T23:30:47.254909+00:00",
+      "last_checked_at": "2026-10-31T21:03:11.182970+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -45,7 +45,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "2280e8a2581c1e4577e9a9300593fa0cad57b51e4c32102b39b338ff3270085e",
-      "last_checked_at": "2026-10-30T23:30:47.254909+00:00",
+      "last_checked_at": "2026-10-31T21:03:11.182970+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -56,7 +56,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "380236367aa3afe4174e2c58ad8d11cddd50999d23392979e0a0f45315e7cc15",
-      "last_checked_at": "2026-10-30T23:30:47.254909+00:00",
+      "last_checked_at": "2026-10-31T21:03:11.182970+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -67,7 +67,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "7901a67ba8ec5e9c7148551eb5cc1735bedeb9cf70ad1d74fbfe369e7c9c76b8",
-      "last_checked_at": "2026-10-30T23:30:47.254909+00:00",
+      "last_checked_at": "2026-10-31T21:03:11.182970+00:00",
       "validity": "stale",
       "reason": "collection:krx-kospi-2027-year_open; collection:krx-kospi-2027-exam; collection:krx-kospi-2027-year_end; collection:krx-kospi-2027-temporary_change; collection:krx-kospi-2027-special_closure; collection:krx-kosdaq-2027-year_open; collection:krx-kosdaq-2027-exam; collection:krx-kosdaq-2027-year_end; collection:krx-kosdaq-2027-temporary_change; collection:krx-kosdaq-2027-special_closure",
       "unpublished": false,
@@ -78,15 +78,15 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-10-30T23:30:47.254909+00:00",
+      "last_checked_at": "2026-10-31T21:03:11.182970+00:00",
       "validity": "held",
       "reason": "nasdaq-2027-annual",
       "unpublished": true,
       "unpublished_evidence": [
         {
           "source_id": "nasdaq-holiday-schedule",
-          "fetched_at": "2026-10-30T23:29:09.731498+00:00",
-          "raw_sha256": "8f48a261e5f1414294238227dc58e48e002b657342d8be5442fba551b57967d8",
+          "fetched_at": "2026-10-31T21:01:14.672266+00:00",
+          "raw_sha256": "4ccfd24d2912111ce75f15505509ba65c23e91a763586a60fe31b9be7ef80f8d",
           "rule": "D12-nasdaq-holiday-schedule-year-absent-v1"
         }
       ]
@@ -96,7 +96,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-10-30T23:30:47.254909+00:00",
+      "last_checked_at": "2026-10-31T21:03:11.182970+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -107,7 +107,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "c3dc345f2bf23cd37d290c7437e2298ac42752ae53044edf4e466c4aaccc743f",
-      "last_checked_at": "2026-10-30T23:30:47.254909+00:00",
+      "last_checked_at": "2026-10-31T21:03:11.182970+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
