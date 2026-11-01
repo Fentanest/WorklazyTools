@@ -568,6 +568,8 @@ if (!sitemap.includes('xmlns:xhtml=') || !sitemap.includes('hreflang="x-default"
   for (const language of ["ko", "en"]) {
     const rssPath = path.join("dist", language, "rss.xml");
     const rss = await fs.readFile(rssPath, "utf8");
+    // R1: feeds carry no dates, so the same input always yields identical bytes.
+    if (rss.includes("<pubDate>") || rss.includes("<lastBuildDate>")) throw new Error(`${rssPath} must not contain pubDate or lastBuildDate.`);
     const rssDocument = new JSDOM(rss, { contentType: "text/xml" }).window.document;
     if (rssDocument.querySelector("parsererror")) throw new Error(`${rssPath} is not well-formed XML.`);
     const items = [...rssDocument.querySelectorAll("channel > item")];
@@ -575,8 +577,10 @@ if (!sitemap.includes('xmlns:xhtml=') || !sitemap.includes('hreflang="x-default"
     const itemLinks = items.map((item) => item.querySelector("link")?.textContent?.trim() ?? "");
     if (itemLinks.some((link) => !link)) throw new Error(`${rssPath} has an item without a link.`);
     if (new Set(itemLinks).size !== itemLinks.length) throw new Error(`${rssPath} has duplicate item links.`);
+    // R2: compare against this language's sitemap loc set, not the whole sitemap.
+    const langLocSet = new Set([...locSet].filter((loc) => loc.startsWith(`https://worklazy.net/${language}/`)));
     for (const link of itemLinks) {
-      if (!locSet.has(link)) throw new Error(`${rssPath} item ${link} is not in sitemap.xml.`);
+      if (!langLocSet.has(link)) throw new Error(`${rssPath} item ${link} is not in the ${language} sitemap set.`);
     }
     const guids = items.map((item) => item.querySelector("guid")?.textContent?.trim() ?? "");
     if (guids.some((guid, index) => guid !== itemLinks[index])) throw new Error(`${rssPath} guid must equal the canonical item link.`);

@@ -217,19 +217,30 @@ jobs:
       # participating engines (Bing, Naver, Yandex, Seznam, Yep); Google does
       # not use IndexNow. Only public canonical sitemap URLs are sent.
       # Validate-mode and PR runs never reach this job, so they never submit.
+      # R3: the IndexNow-only steps are isolated with their own failure
+      # allowance and short timeouts, so a notification preparation failure
+      # after a successful deploy never turns the deploy job red. The actual
+      # Deploy step above has no continue-on-error: its failure still fails
+      # the job and the submit step below is skipped via the outcome gates.
       - name: Checkout submit script and key (IndexNow only)
+        id: indexnow-checkout
         if: steps.deployment.conclusion == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
           persist-credentials: false
       - name: Setup Node for IndexNow submission
+        id: indexnow-node
         if: steps.deployment.conclusion == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
         uses: actions/setup-node@v4
         with:
           node-version: 22
       - name: Submit sitemap URLs to IndexNow
-        if: steps.deployment.conclusion == 'success'
+        if: steps.deployment.conclusion == 'success' && steps.indexnow-checkout.outcome == 'success' && steps.indexnow-node.outcome == 'success'
         # A submission failure must not fail the deployment.
         continue-on-error: true
         timeout-minutes: 2

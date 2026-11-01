@@ -1,7 +1,6 @@
 import { VIDEO_DIRECT_PATHS } from "../src/features/video-studio/videoDirectPaths.ts";
 import { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonToolPublished, isComparisonPathPublished } from "../src/app/publicServiceConfig.mjs";
 import { createHash } from "node:crypto";
-import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -172,7 +171,9 @@ for (const legacy of [{ from: "privacy-policy", target: absolute("ko", "privacy"
 // self-canonical, indexable, public entries in `generated` are included, with
 // title/description taken from the same SEO source and link/guid canonical.
 // No root /rss.xml: the two languages stay separate, matching the hreflang design.
-const rssPubDate = getRssPubDate();
+// R1: no item pubDate and no channel lastBuildDate. Item-level modification
+// evidence does not exist in this static build, so dates are omitted entirely
+// and the same input always produces byte-identical feeds.
 for (const language of languages) {
   const items = generated
     .filter((entry) => entry.language === language)
@@ -181,7 +182,7 @@ for (const language of languages) {
       const definition = getSeoDefinition(language, pathname);
       return { title: definition.title, description: definition.description, link: entry.canonical };
     });
-  await fs.writeFile(path.join(outputDirectory, language, "rss.xml"), createRssFeed(language, items, rssPubDate));
+  await fs.writeFile(path.join(outputDirectory, language, "rss.xml"), createRssFeed(language, items));
 }
 console.log(`Generated ${generated.length} localized crawlable pages for ${siteUrl}`);
 
@@ -398,26 +399,12 @@ function staticBody(page) {
   return `<main class="seo-static-fallback"><nav aria-label="${isKo ? "주요 페이지" : "Primary pages"}"><a href="/${page.language}/">${isKo ? "홈" : "Home"}</a><a href="/${page.language}/tools/">${isKo ? "모든 도구" : "All tools"}</a></nav><p class="eyebrow">WORKLAZY TOOLS</p><h1>${escapeHtml(page.heading)}</h1><p>${escapeHtml(page.description)}</p>${sections ? `<ul>${sections}</ul>` : ""}${blocks}${faq ? `<section><h2>${isKo ? "자주 묻는 질문" : "Frequently asked questions"}</h2>${faq}</section>` : ""}${related}${hub}</main>`;
 }
 
-// Item pubDate uses the repository HEAD commit time (VCS evidence shared by all
-// items; per-page modification history does not exist in this static build).
-// Build time is never stamped on items. Without git evidence, items omit pubDate.
-function getRssPubDate() {
-  try {
-    const iso = execSync("git log -1 --format=%cI", { cwd: sourceRoot, encoding: "utf8" }).trim();
-    const time = new Date(iso);
-    if (Number.isNaN(time.getTime())) return null;
-    return { iso, utc: time.toUTCString() };
-  } catch {
-    return null;
-  }
-}
-
-function createRssFeed(language, items, pubDate) {
+function createRssFeed(language, items) {
   const home = absolute(language, "");
   const channelDescription = getSeoDefinition(language, "/").description;
   const rows = items.map(({ title, description, link }) =>
-    `    <item><title>${escapeXml(title)}</title><link>${escapeXml(link)}</link><guid>${escapeXml(link)}</guid><description>${escapeXml(description)}</description>${pubDate ? `<pubDate>${pubDate.utc}</pubDate>` : ""}</item>`).join("\n");
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>${escapeXml(`Worklazy Tools (${language})`)}</title>\n    <link>${escapeXml(home)}</link>\n    <description>${escapeXml(channelDescription)}</description>\n    <language>${language === "ko" ? "ko-kr" : "en-us"}</language>\n    <lastBuildDate>${escapeXml(new Date().toUTCString())}</lastBuildDate>\n${rows}\n  </channel>\n</rss>\n`;
+    `    <item><title>${escapeXml(title)}</title><link>${escapeXml(link)}</link><guid>${escapeXml(link)}</guid><description>${escapeXml(description)}</description></item>`).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>${escapeXml(`Worklazy Tools (${language})`)}</title>\n    <link>${escapeXml(home)}</link>\n    <description>${escapeXml(channelDescription)}</description>\n    <language>${language === "ko" ? "ko-kr" : "en-us"}</language>\n${rows}\n  </channel>\n</rss>\n`;
 }
 
 function createSitemap(entries) {
