@@ -27,7 +27,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/document-compare": "워드·한글 문서 비교 - 수정 전후 차이 확인 | Worklazy Tools",
       "/tools/pdf-compare": "PDF 파일 비교 - 화면·텍스트 변경사항 확인 | Worklazy Tools",
       "/tools/excel-compare": "엑셀 파일 비교 - 값·수식·기준 항목별 차이 | Worklazy Tools",
-      "/tools/excel-cleaner": "엑셀 데이터 정리 - 중복 제거·공백 제거·빈 행 삭제 | Worklazy Tools",
+      "/tools/excel-cleaner": "엑셀 데이터 정리 - 중복 제거·앞뒤 공백 제거·빈 행 삭제 | Worklazy Tools",
       "/tools/document-generator": "워드 문서 일괄 생성 - 엑셀 명단으로 메일머지 | Worklazy Tools",
       "/tools/office-editor": "워드·엑셀·PPT 온라인 편집 - 설치 없이 열기·저장 | Worklazy Tools",
       "/tools/text-merger": "텍스트 파일 합치기 - TXT·메모 순서대로 병합 | Worklazy Tools",
@@ -43,7 +43,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/document-compare": "Compare Word & HWP Documents - Track Changes | Worklazy Tools",
       "/tools/pdf-compare": "PDF Compare | Visual and Extracted Text Differences",
       "/tools/excel-compare": "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files",
-      "/tools/excel-cleaner": "Excel Data Cleaner | Clean XLSX, XLS & CSV Files",
+      "/tools/excel-cleaner": "Excel Data Cleaner - Remove Duplicates, Trim Spaces & Delete Blank Rows | Worklazy Tools",
       "/tools/document-generator": "Word Mail Merge | Template-based Bulk Document Generator",
       "/tools/office-editor": "Online Office Editor - Word, Excel & PowerPoint | Worklazy Tools",
       "/tools/text-merger": "Merge Text Files - Combine TXT & Notes | Worklazy Tools",
@@ -143,6 +143,17 @@ test("moved image conversion URLs canonicalize to the converter and expose local
       assert.ok(definition.application);
       assert.ok(definition.faq?.length);
       assert.equal(definition.application.name, getSeoDefinition(language, `/tools/pdf-editor/${mode}`).application?.name);
+    }
+  }
+});
+
+test("alias image-conversion FAQs equal the representative Q/A content (S5 regression)", () => {
+  for (const mode of ["image-to-pdf", "pdf-to-image"] as const) {
+    for (const language of ["ko", "en"] as const) {
+      const representative = getSeoDefinition(language, `/tools/pdf-converter/${mode}`).faq ?? [];
+      const alias = getSeoDefinition(language, `/tools/pdf-editor/${mode}`).faq ?? [];
+      assert.ok(representative.length >= 3, `${language} ${mode} needs 3+ FAQs`);
+      assert.deepEqual(alias.map((item) => [item.question, item.answer]), representative.map((item) => [item.question, item.answer]));
     }
   }
 });

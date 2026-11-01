@@ -195,6 +195,9 @@ for (const route of routes) {
     for (const href of relatedHrefs) {
       const targetFile = path.join("dist", href.replace(/^\//, ""), "index.html");
       if (!await fs.stat(targetFile).then(() => true, () => false)) throw new Error(`${filePath} links to missing static page ${href}.`);
+      // I4: related targets must pass the comparison publication judgment.
+      const targetRoute = href.replace(/^\/ko\/|^\/en\//, "").replace(/\/$/, "");
+      if (!isComparisonPathPublished(`/${targetRoute}`)) throw new Error(`${filePath} links to unpublished comparison route ${href}.`);
     }
   }
 }

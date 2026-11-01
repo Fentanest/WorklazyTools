@@ -137,7 +137,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
     },
   },
   "/tools/excel-cleaner": {
-    title: "엑셀 데이터 정리 - 중복 제거·공백 제거·빈 행 삭제 | Worklazy Tools",
+    title: "엑셀 데이터 정리 - 중복 제거·앞뒤 공백 제거·빈 행 삭제 | Worklazy Tools",
     description: "엑셀(Excel)·CSV 파일에 공백 제거, 빈 행 삭제, 중복 정리 등 28종 규칙을 순서대로 적용하여 데이터를 깔끔하게 정리하세요.",
     application: {
       name: "엑셀 정리",
@@ -217,7 +217,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/pdf-editor/split": {
     title: "PDF 분할·페이지 추출 - 필요한 구간 저장 | Worklazy Tools",
-    description: "PDF를 필요한 페이지 범위로 나누거나(자르기) 일부만 추출해 저장하세요.",
+    description: "PDF를 페이지 범위별로 나누거나 필요한 페이지만 추출해 저장하세요.",
     application: { name: "PDF 분할", featureList: ["나누기 위치 선택", "범위별 저장", "최초 전체 범위", "브라우저 처리"] },
   },
   "/tools/pdf-editor/delete": {
@@ -382,7 +382,7 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "document-redactor": "Redact PDF & Images - Blackout Private Info | Worklazy Tools",
   "excel-merger": "Excel Merger - Combine Files & Merge Sheets | Worklazy Tools",
   "excel-compare": "Compare Excel Files - Find Differences in Values & Formulas | Worklazy Tools",
-  "excel-cleaner": "Excel Data Cleaner - Remove Duplicates, Spaces & Blank Rows | Worklazy Tools",
+  "excel-cleaner": "Excel Data Cleaner - Remove Duplicates, Trim Spaces & Delete Blank Rows | Worklazy Tools",
   "document-generator": "Batch Word Document Generator - Excel to Word Mail Merge | Worklazy Tools",
   "pdf-editor": "PDF Editor - Reorder, Merge, Split & Convert | Worklazy Tools",
   "document-markdown": "Document to Markdown - MarkItDown | Worklazy Tools",
@@ -414,7 +414,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools": { title: "All Free Browser Tools | Worklazy Tools", description: "Browse free tools for documents, media, text, data, work planning, Korean payroll, privacy and sharing." },
   "/tools/excel-merger": { title: "Excel Merger | Combine XLSX, XLS & CSV Files", description: "Combine XLSX, XLS, XLSB, XLSM and CSV files into one XLSX with separate formula and formatting controls for XLSX and XLS input.", application: { name: "Excel Merger", featureList: ["XLSX, XLS, XLSB, XLSM and CSV merging", "Separate-sheet, vertical and horizontal layouts", "Empty-area cleanup", "Independent XLSX formula and formatting preservation", "Independent XLS formula and formatting preservation", "Encrypted input and output"] } },
   "/tools/excel-compare": { title: "Excel Compare | Compare XLSX, XLS, XLSB & CSV Files", description: "Check a suggested header, compare Excel and CSV pairs by position, keys or reconciliation rules, and download a nine-sheet XLSX report.", application: { name: "Excel Compare", featureList: ["XLSX, XLSM, XLS, XLSB, SpreadsheetML and CSV", "Suggested header selection and manual changes", "Position, key and reconciliation matching", "Grouped left and right rows for duplicate keys", "Formula and cached-value comparison", "XLSX and XLSM formatting comparison", "Nine-sheet report per pair", "ZIP for multiple successful pairs"] } },
-  "/tools/excel-cleaner": { title: "Excel Data Cleaner | Clean XLSX, XLS & CSV Files", description: "Apply 28 ordered structure, text, row-filter, and value-conversion rules to Excel and CSV files, then download cleaned XLSX, CSV, reports, and ZIP results.", application: { name: "Excel Data Cleaner", featureList: ["Multiple Excel and CSV files", "13 structure rules", "7 text rules", "3 row-filter rules", "5 value-conversion rules", "Formula-reference updates and safe fallback", "XLSX, CSV, and ZIP results"] } },
+  "/tools/excel-cleaner": { title: "Excel Data Cleaner - Remove Duplicates, Trim Spaces & Delete Blank Rows | Worklazy Tools", description: "Apply 28 ordered structure, text, row-filter, and value-conversion rules to Excel and CSV files, then download cleaned XLSX, CSV, reports, and ZIP results.", application: { name: "Excel Data Cleaner", featureList: ["Multiple Excel and CSV files", "13 structure rules", "7 text rules", "3 row-filter rules", "5 value-conversion rules", "Formula-reference updates and safe fallback", "XLSX, CSV, and ZIP results"] } },
   "/tools/document-generator": { title: "Word Mail Merge | Template-based Bulk Document Generator", description: "Replace variables in a Word template with Excel data to automatically generate hundreds of individual documents at once, just like Mail Merge.", application: { name: "Template-based Bulk Document Generator", featureList: ["Word Mail Merge", "DOCX template variables", "Multiple Excel and CSV files", "Sheet and header-row selection", "Sample DOCX", "Individual files, ZIP and XLSX reports"] } },
   "/tools/pdf-compare": { title: "PDF Compare | Visual and Extracted Text Differences", description: "Compare before-and-after PDF pairs by page, inspect rendered pixel and extracted-text differences, and download XLSX or ZIP reports in your browser.", application: { name: "PDF Compare", featureList: ["Multiple PDF pairs", "Page-number and manual mapping", "Rendered pixel comparison", "Extracted text comparison", "Added and deleted pages", "XLSX and ZIP reports"] } },
   "/tools/qr-studio/bulk": { title: "Bulk QR Code Generator - Excel & CSV | Worklazy Tools", description: "Create a massive number of QR codes all at once using data lists from Excel or CSV files.", application: { name: "Bulk QR Generator", featureList: ["Excel and CSV row mapping", "Seven standard payload types", "Header templates", "Logo and transparent PNG", "Read-back verification", "Incremental ZIP", "A4 and Letter label PDF", "XLSX manifest and failures"] } },
@@ -432,7 +432,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/pdf-editor/rotate": { title: "Rotate PDF - Change Page Orientation | Worklazy Tools", description: "Select PDF pages that are facing the wrong way, rotate them to the correct orientation, and save the file.", application: { name: "Rotate PDF", featureList: ["Select pages to rotate", "Correct orientation", "First-task guidance", "No automatic rotation"] } },
   "/tools/pdf-editor/ocr": { title: "Scanned PDF OCR - Make PDFs Searchable | Worklazy Tools", description: "Recognize Korean and English text in scanned PDFs and save a PDF you can search and copy from. Existing text is kept.", application: { name: "Scanned PDF OCR", featureList: ["Recognize scanned pages as needed", "Korean and English", "Searchable PDF", "Browser processing"] } },
   "/tools/image-studio/resize": { title: "Resize Image - Change Photo Pixels & Ratio | Worklazy Tools", description: "Adjust your photos to exact pixel dimensions while maintaining the original aspect ratio.", application: { name: "Resize Image", featureList: ["Exact pixel size", "Keep aspect ratio", "Size panel opens directly", "Browser processing"] } },
-  "/tools/image-studio/mosaic": { title: "Image Mosaic - Blur Specific Areas | Worklazy Tools", description: "Select and apply a mosaic blur to personal information or sensitive areas you want to hide in a photo.", application: { name: "Image Mosaic", featureList: ["Selected-area mosaic", "Effect panel opens directly", "Browser processing"] } },
+  "/tools/image-studio/mosaic": { title: "Image Mosaic - Blur Specific Areas | Worklazy Tools", description: "Pick areas such as faces or license plates and apply a mosaic or blur.", application: { name: "Image Mosaic", featureList: ["Selected-area mosaic", "Effect panel opens directly", "Browser processing"] } },
   "/tools/image-studio/watermark": { title: "Add Image Watermark - Text & Copyright | Worklazy Tools", description: "Easily insert text watermarks into your photos to indicate copyright or source information.", application: { name: "Image Watermark", featureList: ["Text watermark", "Text panel opens directly", "No automatic insertion", "Browser processing"] } },
   "/tools/video-studio/trim": { title: "Trim Video - Save Specific Sections as MP4 | Worklazy Tools", description: "Select only the specific sections you need from a video file, cut out the unwanted parts, and save it as an MP4.", application: { name: "Trim Video", featureList: ["Section selection", "MP4 output", "Section guidance", "Browser processing"] } },
   "/tools/video-studio/merge": { title: "Merge Video - Combine Multiple Videos | Worklazy Tools", description: "Arrange several video files in order and merge them into a single MP4 video file.", application: { name: "Merge Video", featureList: ["Combine multiple videos", "Group order", "MP4 output", "Browser processing"] } },

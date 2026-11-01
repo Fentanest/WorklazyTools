@@ -1,5 +1,5 @@
 import { VIDEO_DIRECT_PATHS } from "../src/features/video-studio/videoDirectPaths.ts";
-import { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonToolPublished } from "../src/app/publicServiceConfig.mjs";
+import { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonToolPublished, isComparisonPathPublished } from "../src/app/publicServiceConfig.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -203,6 +203,8 @@ function linkDescription(language, targetPath) {
 function relatedLinkItems(language, pathname) {
   return relatedToolsFor(pathname)
     .filter((target) => canonicalSeoPath(target) === target)
+    // I4: related links pass the same publication judgment as the static pages.
+    .filter((target) => isComparisonPathPublished(target))
     .filter((target) => {
       if (!VIDEO_STUDIO_PUBLIC && target.startsWith("/tools/video-studio")) return false;
       if (target === "/tools/office-editor/app" || target === "/tools/excel-merger/xls-preserve") return false;

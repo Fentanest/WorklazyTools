@@ -32,9 +32,14 @@ for(const row of rows){
  assert.ok(routes.has(row.path),`Missing React route ${row.path}`);
  const routeText=routes.get(row.path);
  if(row.redirectTo){
-  // T4: legacy redirect rows assert the exact redirect destination, not a purpose render.
+  // T4: legacy redirect rows assert the exact redirect destination, its live
+  // destination route, and the destination feature — not a purpose render.
   assert.ok(routeText.includes('LocalizedNavigate'),`Legacy redirect must use LocalizedNavigate ${row.path}`);
   assert.ok(routeText.includes(`to="${row.redirectTo}"`),`Wrong redirect destination ${row.path}`);
+  assert.ok(routes.has(row.redirectTo),`Redirect destination route is missing ${row.redirectTo}`);
+  const destinationText=routes.get(row.redirectTo);
+  if(row.path==='/tools/pdf-editor/ocr')assert.ok(destinationText.includes('purpose: "ocr"'),`Redirect destination lacks OCR feature ${row.redirectTo}`);
+  else if(row.path==='/tools/pdf-editor/convert')assert.ok(destinationText.includes('mode="pdf-to-document"'),`Redirect destination lacks converter feature ${row.redirectTo}`);
   assert.equal(row.redirectTarget,`/ko${row.redirectTo}`);
   assert.equal(row.sitemap,false);
   assert.ok(row.canonical === row.redirectTo,`Redirect canonical must be its destination ${row.path}`);
@@ -63,6 +68,10 @@ if (!process.argv.includes('--core')) {
     if(row.videoPublic && !VIDEO_STUDIO_PUBLIC){
       const slug=row.path.slice(1);
       assert.ok(!sitemap.includes(`/ko/${slug}/`) && !sitemap.includes(`/en/${slug}/`),`Sitemap must not contain unpublished ${slug}.`);
+      // I1: unpublished video must also leave no localized static document.
+      for(const language of row.locales){
+        assert.ok(await fs.stat(path.join(root, 'dist', language, slug, 'index.html')).then(() => false, () => true),`Unpublished video static document remains ${language}/${slug}.`);
+      }
       continue;
     }
     const slug = row.path.slice(1);

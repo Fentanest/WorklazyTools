@@ -28,6 +28,22 @@ const confirm=async choice=>{await page.locator('[data-testid="direct-entry-conf
 const check=name=>{report.checks.push(name);console.log('PASS',name);};
 try{
  if (process.env.DIRECT_ENTRY_SKIP_MATRIX !== '1') for(const lang of ['ko','en']) for(const row of rows.filter(row=>VIDEO_STUDIO_PUBLIC || row.owner!=='video-studio')){
+  if(row.redirectTo){
+    // Legacy redirect rows: the alias must land on the converter destination
+    // and the destination must render its feature (not the stale direct-entry selectors).
+    await page.goto(`${base}/${lang}${row.path}/`);
+    await page.waitForURL(`**${lang}${row.redirectTo}*`);
+    if(row.purpose==='ocr'){
+      await page.locator('[data-direct-purpose="ocr"]').waitFor();
+      const checked=await page.locator('.pdf-format-grid [role=radio]').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('aria-checked')));
+      assert.equal(checked.filter(value=>value==='true').length,1);
+    } else {
+      await page.locator('.pdf-format-grid').waitFor();
+      assert.equal(await page.locator('.pdf-format-grid [role=radio]').nth(0).getAttribute('aria-checked'),'true');
+    }
+    report.direct.push(`${lang}:${row.path}`);
+    continue;
+  }
   await page.goto(`${base}/${lang}${row.path}/`);
   await page.locator(row.readySelector).waitFor();
   if(row.owner==='pdf-organize') { const expected=row.purpose==='split'?1:0;assert.equal(await page.locator('.pdf-output-mode-list [role=radio]').nth(expected).getAttribute('aria-checked'),'true'); }
@@ -35,7 +51,7 @@ try{
   if(row.owner==='pdf-convert') assert.equal(await page.locator('.pdf-format-grid [role=radio]').nth(row.purpose==='ocr'?3:0).getAttribute('aria-checked'),'true');
   report.direct.push(`${lang}:${row.path}`);
  }
- if (report.direct.length) { assert.equal(report.direct.length,VIDEO_STUDIO_PUBLIC?28:22); check(`${report.direct.length} public native direct entries render`); }
+ if (report.direct.length) { assert.equal(report.direct.length,VIDEO_STUDIO_PUBLIC?36:30); check(`${report.direct.length} public native direct entries render`); }
  if(selected.has('video-unavailable')) for(const lang of ['ko','en']) for(const suffix of ['', 'trim/', 'merge/', 'extract-audio/', 'unknown/child/']) {
   await page.goto(`${base}/${lang}/tools/video-studio/${suffix}`);
   assert.equal(await page.locator('.video-studio-page').count(),0);

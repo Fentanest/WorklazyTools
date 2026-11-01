@@ -144,7 +144,7 @@
     "sitemap": false,
     "static": true,
     "redirectTarget": "/ko/tools/pdf-converter/pdf-to-document",
-    "readySelector": "[data-direct-purpose=\"convert\"]",
+    "readySelector": ".pdf-format-grid",
     "postLoadAssertions": {
       "format": "docx",
       "ocrMode": "auto"
@@ -398,7 +398,8 @@
       "en": "/en/tools/pdf-editor/page-numbers",
       "x-default": "/en/tools/pdf-editor/page-numbers"
     },
-    "socialSlug": "pdf-page-numbers"
+    "socialSlug": "pdf-page-numbers",
+    "readySelector": "[data-testid=\"pdf-finish-ready\"][data-pdf-finish-tab=\"page-numbers\"]"
   },
   {
     "path": "/tools/pdf-editor/header-footer",
@@ -418,7 +419,8 @@
       "en": "/en/tools/pdf-editor/header-footer",
       "x-default": "/en/tools/pdf-editor/header-footer"
     },
-    "socialSlug": "pdf-header-footer"
+    "socialSlug": "pdf-header-footer",
+    "readySelector": "[data-testid=\"pdf-finish-ready\"][data-pdf-finish-tab=\"header-footer\"]"
   },
   {
     "path": "/tools/pdf-editor/watermark",
@@ -438,7 +440,8 @@
       "en": "/en/tools/pdf-editor/watermark",
       "x-default": "/en/tools/pdf-editor/watermark"
     },
-    "socialSlug": "pdf-watermark"
+    "socialSlug": "pdf-watermark",
+    "readySelector": "[data-testid=\"pdf-finish-ready\"][data-pdf-finish-tab=\"watermark\"]"
   },
   {
     "path": "/tools/pdf-editor/stamp",
@@ -458,6 +461,7 @@
       "en": "/en/tools/pdf-editor/stamp",
       "x-default": "/en/tools/pdf-editor/stamp"
     },
-    "socialSlug": "pdf-stamp"
+    "socialSlug": "pdf-stamp",
+    "readySelector": "[data-testid=\"pdf-finish-ready\"][data-pdf-finish-tab=\"stamp\"]"
   }
 ]

@@ -1139,7 +1139,8 @@
     "pathFaqs": {
       "/tools/image-studio/resize": [
         "faq_6",
-        "faq_7"
+        "faq_7",
+        "new_faq_14"
       ],
       "/tools/image-studio/mosaic": [
         "faq_8",
@@ -2061,7 +2062,7 @@
       },
       "faq_25": {
         "q": "Does a stamp image need a transparent background?",
-        "a": "Yes. A white-background image can stamp a white box as well. Prepare a transparent PNG and check the preview."
+        "a": "No. Both PNG and JPG images can be placed. A white-background image can stamp a white box as well, so use a transparent PNG when you want no background."
       }
     },
     "pathFaqs": {
@@ -2575,6 +2576,20 @@
         "title": "What does Pending mean?",
         "paragraphs": [
           "The schedule is not confirmed or is not available yet. Check the official notice linked in the date details before trading."
+        ]
+      },
+      {
+        "title": "How do I check hours by market?",
+        "paragraphs": [
+          "Choose KRX, NXT, NYSE or Nasdaq in the venue selector to see that market’s trading hours for the date.",
+          "Calendar dates follow the exchange’s local date, and U.S. sessions show both New York and Korea time."
+        ]
+      },
+      {
+        "title": "Where can I check the sources?",
+        "paragraphs": [
+          "The date details link the official notice for that schedule together with its quote.",
+          "Check the refresh time and guidance on the screen before trading."
         ]
       }
     ],
