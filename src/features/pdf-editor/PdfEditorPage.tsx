@@ -13,6 +13,7 @@ import { ToolReady } from "../../components/RouteErrorBoundary";
 import { useGuardedNavigate } from "../../components/AppShell";
 import { holdAutoReload, release } from "../../app/chunkRecovery";
 import { clearUnsavedWork, grantOneShotSafeTarget, isDevTestEnvironment, setUnsavedWork } from "../../app/toolState";
+import { isPdfWorkerLoadable, resetPdfDisplayModule } from "./pdfPreview";
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
 import { localizedPath, stripLanguagePrefix } from "../../i18n/languages";
 import { useAppLanguage } from "../../i18n/routing";
@@ -20,7 +21,6 @@ import { isLocalQaBuild } from "../../components/localQa";
 import { PdfConvertPanel } from "./PdfConvertPanel";
 import { PdfOrganizePanel, type PdfOrganizeOutputMode, type PdfOrganizeProducedResult } from "./PdfOrganizePanel";
 import { PDF_EDITOR_SAFE_PATHS } from "./pdfUi";
-import { resetPdfDisplayModule } from "./pdfPreview";
 import type { PdfFinishPreset, PdfToolMode } from "./types";
 
 /** Fresh lazy handle per retry: React caches a rejected lazy import. */
@@ -400,6 +400,13 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
   // requestInsert is stable; read the latest failure through a ref.
   const failedAttemptRef = useRef<number | null>(null);
   failedAttemptRef.current = failedAttempt;
+  const failedKindRef = useRef<"worker" | "content" | null>(null);
+  // G3-2: epoch cap reached — in-page recovery is impossible (the poisoned
+  // module cannot be replaced), so offer the explicit reload path instead
+  // of a futile retry. The result stays guarded + downloadable throughout.
+  const [reloadRequired, setReloadRequired] = useState(false);
+  const reloadRequiredRef = useRef(false);
+  reloadRequiredRef.current = reloadRequired;
   const [boundaryKey, setBoundaryKey] = useState(0);
   const [LazyFinish, setLazyFinish] = useState(createLazyFinishPanel);
   // R1 flake fix: the suggestion chip must not flash while an auto intake
@@ -447,6 +454,8 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
       acquireHold();
       setTimedOut(false);
       setFailedAttempt(null);
+      failedKindRef.current = null;
+      setReloadRequired(false);
       armAckTimerFor(handoffSlot.generation, handoffSlot.attempt);
     }
     setLazyFinish(createLazyFinishPanel());
@@ -540,40 +549,70 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     handoffSlot = null;
     setIntake(null);
     setFailedAttempt(null);
+    failedKindRef.current = null;
     setTimedOut(false);
+    setReloadRequired(false);
     releaseHold();
     setSlotTick((tick) => tick + 1);
   }, []);
 
-  const handleFailed = useCallback((generation: number) => {
+  const handleFailed = useCallback((generation: number, isWorkerFailure: boolean) => {
     const slot = handoffSlot;
     if (!slot || slot.generation !== generation) return;
     clearAckTimer();
     // The result stays; hold is released; the chip offers retry/download.
     releaseHold();
+    // G3-2: remember whether the runtime (reset-worthy) or the content
+    // (reset-futile) failed, so retry spends a fresh epoch only when the
+    // former could actually be poisoned.
+    failedKindRef.current = isWorkerFailure ? "worker" : "content";
     setFailedAttempt(slot.attempt);
     setSlotTick((tick) => tick + 1);
   }, []);
 
   const requestInsert = useCallback(() => {
-    const slot = handoffSlot;
-    if (!slot) return;
-    // R1: a failed attempt may have poisoned the pdfjs module (worker
-    // failure disables workers page-wide); reset it before re-inspecting.
-    if (failedAttemptRef.current !== null) resetPdfDisplayModule();
-    // F1: bump the attempt first, then arm the deadline bound to the new
-    // attempt — an old arm must never outlive the handoff it was made for.
-    slot.attempt += 1;
-    slot.auto = false;
-    // R1: (re)inserting re-acquires the hold and a fresh ack deadline —
-    // the intake window is protected again until ack / failure / timeout.
-    acquireHold();
-    armAckTimerFor(slot.generation, slot.attempt);
-    setTimedOut(false);
-    setFailedAttempt(null);
-    setIntake({ blob: slot.blob, name: slot.name, generation: slot.generation, attempt: slot.attempt });
-    setSlotTick((tick) => tick + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void (async () => {
+      const slot = handoffSlot;
+      if (!slot || reloadRequiredRef.current) return;
+      // G3-2: a failed attempt may have poisoned the pdfjs module (worker
+      // failure disables workers page-wide); reset it before re-inspecting —
+      // but only when the failure implicates the runtime. Content failures
+      // (corrupt/encrypted bytes) must not burn epochs, and a fresh epoch is
+      // only worth spending while the worker is actually reachable (otherwise
+      // the preflight fails fast with no poisoning and no accumulation).
+      if (failedAttemptRef.current !== null && failedKindRef.current !== "content") {
+        let reachable = false;
+        try {
+          reachable = await isPdfWorkerLoadable();
+        } catch {
+          reachable = false;
+        }
+        if (reachable && !resetPdfDisplayModule()) {
+          // G3-2 cap: no fresh runtime is available in-page. Stop here with
+          // explicit reload guidance instead of a dead retry loop. The guard
+          // effect below keeps the result protected until download/reload.
+          clearAckTimer();
+          setReloadRequired(true);
+          setSlotTick((tick) => tick + 1);
+          return;
+        }
+      }
+      // F1: bump the attempt first, then arm the deadline bound to the new
+      // attempt — an old arm must never outlive the handoff it was made for.
+      slot.attempt += 1;
+      slot.auto = false;
+      // R1: (re)inserting re-acquires the hold and a fresh ack deadline —
+      // the intake window is protected again until ack / failure / timeout.
+      acquireHold();
+      armAckTimerFor(slot.generation, slot.attempt);
+      setTimedOut(false);
+      setFailedAttempt(null);
+      failedKindRef.current = null;
+      setReloadRequired(false);
+      setIntake({ blob: slot.blob, name: slot.name, generation: slot.generation, attempt: slot.attempt });
+      setSlotTick((tick) => tick + 1);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    })();
   }, []);
 
   const discardSlot = useCallback(() => {
@@ -581,7 +620,9 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     handoffSlot = null;
     setIntake(null);
     setFailedAttempt(null);
+    failedKindRef.current = null;
     setTimedOut(false);
+    setReloadRequired(false);
     releaseHold();
     setSlotTick((tick) => tick + 1);
   }, []);
@@ -617,7 +658,9 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     releaseHold();
     setIntake(null);
     setFailedAttempt(null);
+    failedKindRef.current = null;
     setTimedOut(false);
+    setReloadRequired(false);
     setSlotTick((tick) => tick + 1);
     return lastOrganizePath ?? localizedPath(language, "/tools/pdf-editor");
   }, [language]);
@@ -631,7 +674,7 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     if (slotUrl) URL.revokeObjectURL(slotUrl);
   }, [slotUrl]);
   const isSuggestion = adoptKind === "suggest" && !!slot && !intake && failedAttempt === null && !timedOut;
-  const showChip = !!slot && (failedAttempt !== null || timedOut || isSuggestion);
+  const showChip = !!slot && (failedAttempt !== null || timedOut || isSuggestion || reloadRequired);
   const chipFailed = failedAttempt !== null || timedOut;
 
   return (
@@ -640,19 +683,27 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
         <section className="mb-4 rounded-2xl border border-border bg-card p-4" data-testid="pdf-handoff-chip" aria-live="polite">
           <strong className="text-sm text-foreground">{featureMessage(language, "pdf.messages.PdfEditorPage.retainedResultTitle")}</strong>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-            {isSuggestion
-              ? featureMessage(language, "pdf.finish.suggestionHint")
-              : chipFailed
-                ? featureMessage(language, "pdf.messages.PdfEditorPage.retainedResultFailed")
-                : featureMessage(language, "pdf.messages.PdfEditorPage.retainedResultWaiting")}
+            {reloadRequired
+              ? featureMessage(language, "pdf.messages.PdfEditorPage.engineReloadRequired")
+              : isSuggestion
+                ? featureMessage(language, "pdf.finish.suggestionHint")
+                : chipFailed
+                  ? featureMessage(language, "pdf.messages.PdfEditorPage.retainedResultFailed")
+                  : featureMessage(language, "pdf.messages.PdfEditorPage.retainedResultWaiting")}
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {(failedAttempt !== null || timedOut || !intake) && (
-              <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs font-bold" data-testid="pdf-handoff-retry" onClick={requestInsert}>
-                {isSuggestion
-                  ? featureMessage(language, "pdf.finish.suggestionInsert")
-                  : featureMessage(language, "pdf.messages.PdfEditorPage.retryIntake")}
+            {reloadRequired ? (
+              <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs font-bold" data-testid="pdf-handoff-reload" onClick={() => window.location.reload()}>
+                {featureMessage(language, "pdf.messages.PdfEditorPage.reloadPage")}
               </Button>
+            ) : (
+              (failedAttempt !== null || timedOut || !intake) && (
+                <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs font-bold" data-testid="pdf-handoff-retry" onClick={requestInsert}>
+                  {isSuggestion
+                    ? featureMessage(language, "pdf.finish.suggestionInsert")
+                    : featureMessage(language, "pdf.messages.PdfEditorPage.retryIntake")}
+                </Button>
+              )
             )}
             {slotUrl && (
               <a

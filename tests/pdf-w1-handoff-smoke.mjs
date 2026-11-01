@@ -153,8 +153,15 @@ async function run() {
   // production subset, where the injected-timeout case cannot run: the
   // product correctly ignores the override there, so its fixed short
   // timings never fire).
+  // W1_ONLY="case-substring,...": run only matching cases.
   const skipped = (process.env.W1_SKIP || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const only = (process.env.W1_ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
   const skipCase = (name) => {
+    if (name === "timeout-injection-probe") return false;
+    if (only.length > 0 && !only.some((s) => name.includes(s))) {
+      results.push({ case: name, skipped: `W1_ONLY=${process.env.W1_ONLY}` });
+      return true;
+    }
     if (skipped.some((s) => name.includes(s))) {
       results.push({ case: name, skipped: `W1_SKIP=${process.env.W1_SKIP}` });
       console.log(`skip ${name} (W1_SKIP)`);
@@ -199,7 +206,7 @@ async function run() {
     const T = () => TIME_SCALE;
 
     // R1: delayed chunk keeps the hold; leaving stays guarded; ack completes.
-    {
+    if (!skipCase("R1-delayed-chunk-hold")) {
       const { page, context } = await newPage(browser, { ackTimeoutMs: 30000 * T(), timeoutMs: 120000 });
       let finishHits = 0;
       let failChunk = false;
@@ -257,7 +264,7 @@ async function run() {
 
     // F1: an old timer from before the round trip must not release the new
     // handoff's hold. Abort the chunk after the old deadline, before the new.
-    {
+    if (!skipCase("F1-old-timer-takeover")) {
       const { page, context } = await newPage(browser, { ackTimeoutMs: 5000, timeoutMs: 120000 });
       let chunkMode = "hold";
       let releaseChunk = () => {};
@@ -319,7 +326,7 @@ async function run() {
     }
 
     // F1: the re-armed deadline fires (new handoff stays protected until then).
-    {
+    if (!skipCase("F1-new-deadline-armed")) {
       const { page, context } = await newPage(browser, { ackTimeoutMs: 5000, timeoutMs: 120000 });
       await page.route("**/PdfFinishPanel*", async (route) => {
         await new Promise((resolve) => setTimeout(resolve, 40000 * T()));
@@ -355,7 +362,7 @@ async function run() {
     // variant is untestable by construction. Timer ownership across a round
     // trip is covered failure-type-agnostically by F1-old-timer-takeover
     // above (the ack timer only sees the import outcome, never its cause).
-    {
+    if (!skipCase("F1-css-preload-failure")) {
       const { page, context } = await newPage(browser, { timeoutMs: 120000 });
       let cssPatched = false;
       let cssHits = 0;
@@ -453,7 +460,7 @@ async function run() {
 
     // R1/F4: real corrupt intake bytes fail the inspection; hold is released,
     // the valid result stays downloadable; un-corrupting + retry acks.
-    {
+    if (!skipCase("R1-corrupt-intake-failure-retry")) {
       const { page, context } = await newPage(browser, { noCache: true });
       await context.addInitScript(() => { globalThis.__w1corruptIntake = true; });
       let patched = 0;
@@ -496,10 +503,13 @@ async function run() {
       await context.close();
     }
 
-    // F4: blocked-worker retries must not accumulate pdfjs runtimes.
-    {
+    // F4/G3-2a: blocked-worker retries must not accumulate pdfjs runtimes.
+    // The GET preflight fails before touching pdfjs, so no epoch is minted
+    // while the worker is down; recovery after unblock mints exactly one.
+    if (!skipCase("F4-no-epoch-accumulation")) {
       const { page, context } = await newPage(browser, { noCache: true, timeoutMs: 120000 });
       const cdp = await context.newCDPSession(page);
+      await cdp.send("Performance.enable").catch(() => undefined);
       let blockWorker = false;
       const epochUrls = new Set();
       page.on("request", (request) => {
@@ -525,11 +535,9 @@ async function run() {
         await page.waitForTimeout(650);
         await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 30000 });
       }
+      assert.equal(epochUrls.size, 0, `F4: blocked retries must not mint pdfjs epochs (saw ${epochUrls.size})`);
       await cdp.send("HeapProfiler.collectGarbage").catch(() => undefined);
       const heapAfter = await heapUsed();
-      // The worker preflight fails before touching pdfjs, so no fresh runtime
-      // is needed for these retries; the cap bounds the pathological remainder.
-      assert.ok(epochUrls.size <= 1, `F4: blocked retries must not accumulate pdfjs runtimes (saw ${epochUrls.size})`);
       blockWorker = false;
       await page.locator("[data-testid='pdf-handoff-retry']").click();
       await page.waitForFunction(
@@ -538,12 +546,135 @@ async function run() {
         { timeout: 120000 },
       );
       assert.equal(await page.locator("[data-testid='pdf-handoff-chip']").count(), 0, "F4: recovery after unblock acks");
+      assert.equal(epochUrls.size, 1, `F4: recovery mints exactly one fresh epoch (saw ${epochUrls.size})`);
       results.push({ case: "F4-no-epoch-accumulation", epochModuleUrls: [...epochUrls], heapBefore, heapAfter });
       await context.close();
     }
 
+    // G3-1: a HEAD-blocked worker script must not reject a runnable PDF.
+    // The GET probe uses the same URL the loader fetches, so blocking HEAD
+    // alone changes nothing: the intake still opens.
+    if (!skipCase("G3-1-head-blocked-worker-opens")) {
+      const { page, context } = await newPage(browser, { timeoutMs: 120000 });
+      await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
+      await page.route("**/pdf.worker.min*", (route) =>
+        route.request().method() === "HEAD" ? route.abort() : route.continue(),
+      );
+      const navigations = [];
+      page.on("request", (request) => {
+        if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigations.push(request.url());
+      });
+      await clickHandoff(page);
+      await page.waitForFunction(
+        () => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready",
+        null,
+        { timeout: 120000 },
+      );
+      assert.equal(await page.locator("[data-testid='pdf-handoff-chip']").count(), 0, "G3-1: HEAD-blocked worker still opens");
+      assert.deepEqual(navigations, [], "G3-1: no document navigation");
+      results.push({ case: "G3-1-head-blocked-worker-opens" });
+      await context.close();
+    }
+
+    // G3-2: import-blocked worker poisons runtimes up to the cap, then the
+    // explicit reload path appears instead of a dead retry loop. Only the
+    // real worker *import* (script) is blocked; the GET preflight (fetch)
+    // passes, so every retry genuinely poisons exactly one epoch.
+    if (!skipCase("G3-2-cap-offers-reload")) {
+      const { page, context } = await newPage(browser, { noCache: true, timeoutMs: 180000 });
+      let blockImport = false;
+      const epochUrls = new Set();
+      page.on("request", (request) => {
+        if (/w1-pdfjs=/.test(request.url())) epochUrls.add(request.url());
+      });
+      await page.route("**/pdf.worker.min*", (route) => {
+        if (blockImport && route.request().resourceType() === "script") return route.abort();
+        return route.continue();
+      });
+      const navigations = [];
+      const dialogs = [];
+      page.on("request", (request) => {
+        if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigations.push(request.url());
+      });
+      page.on("dialog", async (dialog) => {
+        dialogs.push(dialog.type());
+        await dialog.dismiss().catch(() => undefined);
+      });
+      await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
+      navigations.length = 0;
+      blockImport = true;
+      await clickHandoff(page);
+      await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 120000 });
+      // Eight futile retries: the probe passes each time, so each retry mints
+      // exactly one epoch before failing on the blocked import. A retry
+      // click that lands while the previous intake is still pending would
+      // skip its reset (no failed attempt yet), so iterations are spaced
+      // beyond a full cycle; the chip-visible wait then confirms that
+      // cycle's failure before the next click.
+      for (let i = 0; i < 8; i += 1) {
+        await page.locator("[data-testid='pdf-handoff-retry']").click();
+        await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ state: "visible", timeout: 60000 });
+        await page.waitForTimeout(2500);
+      }
+      assert.equal(epochUrls.size, 8, `G3-2: eight poisoned retries mint eight epochs (saw ${epochUrls.size})`);
+      // Ninth retry: the cap refuses a fresh runtime, so the reload guidance
+      // replaces the dead retry button instead.
+      await page.locator("[data-testid='pdf-handoff-retry']").click();
+      await page.locator("[data-testid='pdf-handoff-reload']").waitFor({ timeout: 30000 });
+      assert.equal(await page.locator("[data-testid='pdf-handoff-retry']").count(), 0, "G3-2: dead retry is not offered past the cap");
+      // The retained result stays downloadable + parsed while reload is pending.
+      assert.equal(await readUnload(page), true, "G3-2: guard stays until the result is saved");
+      await downloadAndParse(page, () => page.locator("[data-testid='pdf-handoff-download']").click(), "G3-2-cap-reload-download", 1);
+      await waitUnload(page, false); // downloading the retained result counts as saved
+      assert.deepEqual(navigations, [], "G3-2: no document navigation");
+      assert.deepEqual(dialogs, [], "G3-2: no native dialog");
+      results.push({ case: "G3-2-cap-offers-reload", epochs: epochUrls.size });
+      await context.close();
+    }
+
+    // G3-3: a navigate-action leave must not leave a skip token that swallows
+    // the next Back. Real UI plus a synthetic competing click (modal blocks
+    // pointer input, but dispatched clicks still run the capture handler).
+    // Scope note: on production builds this flow passes with and without the
+    // fix (no persistent cross-route entry exists here to arm the stale
+    // skip), so it characterizes the healthy path; the discriminating
+    // check is the dev guard-persistent probe in the report, which keeps a
+    // persistent entry exactly like the reviewer's condition.
+    if (!skipCase("G3-3-guard-next-back-dialog")) {
+      const { page, context } = await newPage(browser);
+      await page.goto(`${baseUrl}/en/tools/text-merger/`, { waitUntil: "networkidle" });
+      await page.locator("[data-ui-component='tool-guide']").waitFor();
+      await page.locator("textarea:not([readonly])").first().fill("guard-persistent");
+      await page.waitForTimeout(500);
+      // Back with unsaved edits → guard dialog (consumes the guard entry).
+      await page.evaluate(() => window.history.back());
+      await page.locator("[data-testid='unsaved-work-dialog']").waitFor({ state: "visible" });
+      // Competing programmatic navigation swaps the pending action to a Link
+      // navigation while the dialog is open.
+      await page.evaluate(() => {
+        const anchor = document.createElement("a");
+        anchor.href = "/en/tools/pdf-editor/merge";
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+      });
+      await page.locator("[data-testid='unsaved-leave']").click();
+      await page.locator(".pdf-tool-page input[type=file]").first().waitFor({ timeout: 60000 });
+      // The sanctioned leave must not leave the dialog hanging open.
+      await page.locator("[data-testid='unsaved-work-dialog']").waitFor({ state: "hidden", timeout: 15000 });
+      // Give the destination real work so the next Back has something to guard.
+      await page.locator(".pdf-tool-page input[type=file]").first().setInputFiles(fileInput([{ name: "A.pdf", buffer: onePagePdf }]));
+      await page.waitForFunction(() => document.querySelectorAll(".pdf-page-card").length === 1, { timeout: 120000 });
+      // The next Back must guard again (no stale skip token).
+      await page.evaluate(() => window.history.back());
+      await page.locator("[data-testid='unsaved-work-dialog']").waitFor({ state: "visible", timeout: 15000 });
+      await page.locator("[data-testid='unsaved-stay']").click();
+      results.push({ case: "G3-3-guard-next-back-dialog" });
+      await context.close();
+    }
+
     // R2: produced-but-unsaved finish output stays guarded; saving releases it.
-    {
+    if (!skipCase("R2-unsaved-output-guarded")) {
       const { page, context } = await newPage(browser);
       await page.goto(`${baseUrl}/en/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
       await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles(fileInput([{ name: "A.pdf", buffer: onePagePdf }]));
@@ -563,7 +694,7 @@ async function run() {
     }
 
     // R2: cancel preserves the completed output under the same guard rule.
-    {
+    if (!skipCase("R2-cancel-preserved-output-guarded")) {
       const { page, context } = await newPage(browser);
       const cdp = await context.newCDPSession(page);
       await cdp.send("Emulation.setCPUThrottlingRate", { rate: 20 });
@@ -596,7 +727,7 @@ async function run() {
     }
 
     // R3: output-setting edits and new inputs invalidate the retained result.
-    {
+    if (!skipCase("R3-setting-and-input-invalidation")) {
       const { page, context } = await newPage(browser);
       await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
       await page.locator("input[placeholder='e.g. INTERNAL REVIEW']").fill("NEW WATERMARK");
@@ -613,7 +744,7 @@ async function run() {
     }
 
     // R4: convert is outside the preservation boundary; slot and guard die.
-    {
+    if (!skipCase("R4-convert-boundary")) {
       const { page, context } = await newPage(browser);
       await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
       await page.evaluate(() => {
@@ -639,7 +770,7 @@ async function run() {
     }
 
     // R6+N2 (ko+en): format- and destination-true messages; ZIP card rules.
-    for (const language of ["ko", "en"]) {
+    if (!skipCase("R6-zip")) for (const language of ["ko", "en"]) {
       const { page, context } = await newPage(browser);
       const dialogText = () => page.locator("[data-testid='unsaved-work-dialog'] p").innerText();
       await page.goto(`${baseUrl}/${language}/tools/pdf-editor/split/`, { waitUntil: "networkidle" });
@@ -672,7 +803,7 @@ async function run() {
     }
 
     // F2: suggestion-chip download is a save (real download, parsed, guard off), payload kept for insert.
-    {
+    if (!skipCase("F2-chip-download-is-save")) {
       const { page, context } = await newPage(browser);
       await produceMerged(page, [{ name: "C.pdf", buffer: twoPagePdf, pages: 2 }]);
       await page.locator("[data-pdf-nav-mode='finish']").click();
@@ -697,7 +828,7 @@ async function run() {
     // keeps the payload for reuse. The round trip drops the input files
     // (only the result survives via the handoff slot), so after the save
     // nothing guards and home is free.
-    {
+    if (!skipCase("N2-retained-download-is-save")) {
       const { page, context } = await newPage(browser);
       await produceMerged(page, [{ name: "C.pdf", buffer: twoPagePdf, pages: 2 }]);
       await page.locator("[data-pdf-nav-mode='finish']").click();
@@ -724,7 +855,7 @@ async function run() {
     // the true remount-abort path is covered by the dev probe in the report;
     // here the same user-visible outcome is asserted on the preview build,
     // with registry/hold checks only where dev hooks exist.)
-    {
+    if (!skipCase("F3-auto-intake-acks")) {
       const { page, context } = await newPage(browser);
       await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
       await clickHandoff(page);
@@ -743,7 +874,7 @@ async function run() {
     }
 
     // finish->organize reopening keeps the preset route without re-confirming.
-    {
+    if (!skipCase("preset-restore-split-no-reconfirm")) {
       const { page, context } = await newPage(browser);
       await page.goto(`${baseUrl}/en/tools/pdf-editor/split/`, { waitUntil: "networkidle" });
       await page.locator("[data-ui-component='tool-guide']").waitFor();

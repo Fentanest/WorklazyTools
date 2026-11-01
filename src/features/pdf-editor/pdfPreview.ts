@@ -5,6 +5,9 @@ import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import type { PdfTextCell, PdfTextDocument, PdfTextLine, PdfTextPage, WorkerProgress } from "./types";
 import type { AppLanguage } from "../../i18n/languages";
 import { featureMessage } from "../../i18n/featureMessages";
+import { isWorkerSetupFailure, pdfDisplayEpoch } from "./pdfDisplayEpoch";
+export { MAX_PDF_DISPLAY_EPOCHS } from "./pdfDisplayEpoch";
+export { isWorkerSetupFailure };
 import { throwIfAborted, yieldBeforeResultRegistration, yieldToEventLoop } from "../../utils/cooperativeCancel.ts";
 import { waitWithAbort, settleOwnedPdfLoad } from "../../utils/pdfOwnedDocument.ts";
 import { waitForPdfRender } from "./pdfRenderLifecycle";
@@ -16,30 +19,20 @@ type PdfDisplayModule = typeof import("pdfjs-dist");
 
 let pdfDisplayModulePromise: Promise<PdfDisplayModule> | undefined;
 let passwordExceptionConstructor: PdfDisplayModule["PasswordException"] | undefined;
-/** Epoch for the pdfjs display module (R1: retry-after-failure resets it). */
-let pdfDisplayModuleEpoch = 0;
-
-function pdfDisplayModuleUrl(): string {
-  if (pdfDisplayModuleEpoch === 0) return pdfDisplayUrl;
-  const separator = pdfDisplayUrl.includes("?") ? "&" : "?";
-  return `${pdfDisplayUrl}${separator}w1-pdfjs=${pdfDisplayModuleEpoch}`;
-}
 
 /**
  * Drop the cached pdfjs display module so the next load fetches a fresh copy
- * (R1/F4). pdfjs permanently disables workers page-wide after a single worker
- * load failure (and caches the failed fake-worker setup), so a retry after a
- * transient outage can never recover without this reset. The per-File
- * document cache is untouched: failed loads already evict themselves.
- * Best-effort dereference of the previous module's exception class so the
- * old runtime can be collected; returns false once the epoch cap is hit.
+ * (R1/F4). pdfjs caches a failed fake-worker setup on the module instance,
+ * so a retry after a transient worker outage can never recover without this
+ * reset. The per-File document cache is untouched: failed loads already
+ * evict themselves. Returns false once the epoch cap is hit — callers must
+ * NOT retry the dead runtime again and must offer the supported recovery
+ * path instead (G3-2).
  */
-export const MAX_PDF_DISPLAY_EPOCHS = 8;
 export function resetPdfDisplayModule(): boolean {
-  if (pdfDisplayModuleEpoch >= MAX_PDF_DISPLAY_EPOCHS) return false;
+  if (!pdfDisplayEpoch.reset()) return false;
   pdfDisplayModulePromise = undefined;
   passwordExceptionConstructor = undefined;
-  pdfDisplayModuleEpoch += 1;
   return true;
 }
 
@@ -52,7 +45,7 @@ export function isPdfDisplayLoadError(error: unknown): error is PdfDisplayLoadEr
 }
 
 function loadPdfDisplayModule() {
-  pdfDisplayModulePromise ??= (import(/* @vite-ignore */ pdfDisplayModuleUrl()) as Promise<PdfDisplayModule>).then((module) => {
+  pdfDisplayModulePromise ??= (import(/* @vite-ignore */ pdfDisplayEpoch.url(pdfDisplayUrl)) as Promise<PdfDisplayModule>).then((module) => {
     module.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
     passwordExceptionConstructor = module.PasswordException;
     return module;
@@ -68,6 +61,9 @@ export async function openOwnedPdfDocument(
   throwIfAborted(signal, "PDF loading cancelled");
   let pdfDisplayModule: PdfDisplayModule;
   try {
+    if (!(await waitWithAbort(isPdfWorkerLoadable(signal), signal))) {
+      throw new PdfDisplayLoadError(featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable"));
+    }
     pdfDisplayModule = await waitWithAbort(loadPdfDisplayModule(), signal);
   } catch (error) {
     if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
@@ -117,23 +113,23 @@ const THUMBNAIL_RENDER_CONCURRENCY = 3;
 let activeThumbnailRenders = 0;
 
 /**
- * F4: probe the pdfjs worker script before touching pdfjs. A failed worker
- * fetch permanently disables pdfjs workers page-wide (fake-worker fallback
- * plus a cached failed setup), so a blind getDocument during an outage
- * poisons every later inspection. Failing fast here keeps pdfjs pristine and
- * makes retries free until the worker is reachable again.
+ * G3-1: probe the exact worker script the pdfjs loader will fetch, with a
+ * plain GET. A HEAD probe rejects runnable setups (403/abort/offline SW
+ * without HEAD handling) while missing real GET failures; the GET result
+ * matches what getDocument itself would hit, so failing here means the
+ * worker genuinely cannot load (no false rejection) and proceeding would
+ * only poison the shared module. Unreachability returns false (callers
+ * raise PdfDisplayLoadError); only aborts throw.
  */
-async function isPdfWorkerReachable(signal?: AbortSignal): Promise<boolean> {
+export async function isPdfWorkerLoadable(signal?: AbortSignal): Promise<boolean> {
   try {
     if (typeof location === "undefined" || !/^https?:$/.test(location.protocol)) return true;
   } catch {
     return true;
   }
   try {
-    const response = await fetch(pdfWorkerUrl, { method: "HEAD", signal });
-    // Some static hosts reject HEAD: let the GET path decide then.
-    if (!response.ok && response.status !== 405 && response.status !== 501) return false;
-    return true;
+    const response = await fetch(pdfWorkerUrl, { signal });
+    return response.ok;
   } catch (error) {
     if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
     return false;
@@ -144,7 +140,7 @@ export async function getPdfDocument(file: File, language: AppLanguage = "ko", s
   throwIfAborted(signal, "PDF loading cancelled");
   const cached = documentCache.get(file);
   if (cached) return waitWithAbort(cached.promise, signal);
-  if (!(await waitWithAbort(isPdfWorkerReachable(signal), signal))) {
+  if (!(await waitWithAbort(isPdfWorkerLoadable(signal), signal))) {
     throw new PdfDisplayLoadError(featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable"));
   }
   let pdfDisplayModule: PdfDisplayModule;

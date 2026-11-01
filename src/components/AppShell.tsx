@@ -97,8 +97,16 @@ export function AppShell() {
   // Cleared on stay and whenever the pathname actually changes.
   const leavingRef = useRef(false);
 
+  // Whether the pending guard action performs a history.back() (whose popstate
+  // must be swallowed) as opposed to a navigate()/arbitrary perform (whose
+  // completion produces no popstate, so no skip token may be left behind —
+  // a stale skip would silently eat the user's next Back, G3-3). Valid only
+  // while pendingActionRef is non-null; cleared together with it.
+  const pendingIsBackRef = useRef(false);
+
   const closeGuardStay = useCallback(() => {
     pendingActionRef.current = null;
+    pendingIsBackRef.current = false;
     leavingRef.current = false;
     setGuardOpen(false);
     if (hasUnsavedWork() && !guardEntryRef.current) {
@@ -111,7 +119,9 @@ export function AppShell() {
   const confirmGuardLeave = useCallback(() => {
     if (leavingRef.current) return;
     const action = pendingActionRef.current;
+    const actionIsBack = pendingIsBackRef.current;
     pendingActionRef.current = null;
+    pendingIsBackRef.current = false;
     setGuardOpen(false);
     if (!action) return;
     leavingRef.current = true;
@@ -124,12 +134,16 @@ export function AppShell() {
       skipPopRef.current = true;
       leaveAfterPopRef.current = action;
       window.history.back();
-    } else {
+    } else if (actionIsBack) {
       // Swallow the popstate our own back() produces below. The destination
       // commits and re-pushes its guard entry before that popstate arrives;
       // without this it would be consumed as a fresh Back press, reopening
       // the dialog on arrival (same pattern as the branch above).
       skipPopRef.current = true;
+      action();
+    } else {
+      // A navigate()/perform completion produces no popstate: leaving a skip
+      // token behind would swallow the user's next Back without a dialog.
       action();
     }
   }, []);
@@ -162,6 +176,7 @@ export function AppShell() {
       return;
     }
     pendingActionRef.current = perform;
+    pendingIsBackRef.current = false;
     setGuardOpen(true);
   }, []);
 
@@ -193,6 +208,7 @@ export function AppShell() {
       event.stopPropagation();
       const destination = `${targetRoute}${url.search}${url.hash}`;
       pendingActionRef.current = () => navigate(destination);
+      pendingIsBackRef.current = false;
       setGuardOpen(true);
     };
     document.addEventListener("click", onClickCapture, true);
@@ -248,6 +264,7 @@ export function AppShell() {
         pendingActionRef.current = () => {
           window.history.back();
         };
+        pendingIsBackRef.current = true;
         setGuardOpen(true);
       }
     };

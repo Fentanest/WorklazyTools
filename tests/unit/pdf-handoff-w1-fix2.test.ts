@@ -1,60 +1,64 @@
 import assert from "node:assert/strict";
-import fs from "node:fs";
-import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
 import { isDevTestEnvironment } from "../../src/app/toolState.ts";
+import {
+  MAX_PDF_DISPLAY_EPOCHS,
+  createDisplayEpochCounter,
+  isWorkerSetupFailure,
+  pdfDisplayEpoch,
+} from "../../src/features/pdf-editor/pdfDisplayEpoch.ts";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const read = (relativePath: string) => fs.readFileSync(path.join(root, relativePath), "utf8");
-
-test("fix2 timeout gate: ack deadline honors the override only in dev/QA", () => {
-  const source = read("src/features/pdf-editor/PdfEditorPage.tsx");
-  // The override global must be read only behind a dev/QA gate so normal
-  // production builds always use exactly 30s.
-  assert.match(source, /isDevTestEnvironment\(\) \|\| isLocalQaBuild/);
-  assert.match(source, /function ackTimeoutMs/);
-  const gateBlock = source.slice(source.indexOf("function ackTimeoutMs"));
-  assert.match(gateBlock, /__wlHandoffAckTimeoutMs/);
-  assert.match(gateBlock, /return HANDOFF_ACK_TIMEOUT_MS/);
+test("display epoch: fresh counter serves the base URL with no suffix", () => {
+  const counter = createDisplayEpochCounter();
+  assert.equal(counter.peek(), 0);
+  assert.equal(counter.url("https://x/assets/pdf-CCjkBPdx.mjs"), "https://x/assets/pdf-CCjkBPdx.mjs");
 });
 
-test("fix2 pdfjs epoch: reset is bounded and reports whether it reset", () => {
-  const source = read("src/features/pdf-editor/pdfPreview.ts");
-  assert.match(source, /MAX_PDF_DISPLAY_EPOCHS = \d+/);
-  assert.match(source, /export function resetPdfDisplayModule\(\): boolean/);
-  assert.match(source, /if \(pdfDisplayModuleEpoch >= MAX_PDF_DISPLAY_EPOCHS\) return false/);
+test("display epoch: resets mint epoch-suffixed URLs up to the cap, then refuse", () => {
+  const counter = createDisplayEpochCounter(3);
+  assert.equal(counter.reset(), true);
+  assert.equal(counter.peek(), 1);
+  assert.equal(counter.url("https://x/assets/pdf.mjs"), "https://x/assets/pdf.mjs?w1-pdfjs=1");
+  assert.equal(counter.url("https://x/assets/a.mjs?v=2"), "https://x/assets/a.mjs?v=2&w1-pdfjs=1");
+  assert.equal(counter.reset(), true);
+  assert.equal(counter.reset(), true);
+  assert.equal(counter.peek(), 3);
+  assert.equal(counter.reset(), false);
+  assert.equal(counter.reset(), false);
+  assert.equal(counter.peek(), 3);
 });
 
-test("fix2 F3: the intake effect has no consumed-once guard", () => {
-  // A StrictMode remount aborts the first insert; treating the aborted run
-  // as consumed leaves the intake empty forever. Superseded runs exit via
-  // the fileRequestRef generation check instead.
-  const source = read("src/features/pdf-editor/PdfFinishPanel.tsx");
-  assert.doesNotMatch(source, /intakeConsumedRef/);
+test("display epoch: counters are independent (no shared global in tests)", () => {
+  const first = createDisplayEpochCounter(1);
+  const second = createDisplayEpochCounter(1);
+  assert.equal(first.reset(), true);
+  assert.equal(first.reset(), false);
+  assert.equal(second.reset(), true);
 });
 
-test("fix2 F1: unmount always cancels the armed ack timer", () => {
-  const source = read("src/features/pdf-editor/PdfEditorPage.tsx");
-  // The fire callback must recheck ownership (generation+attempt) so an old
-  // timer can never release a newer handoff's hold.
-  assert.match(source, /current\.generation === generation && current\.attempt === attempt/);
+test("display epoch: production singleton honors the shipped cap", () => {
+  assert.equal(MAX_PDF_DISPLAY_EPOCHS, 8);
+  assert.equal(typeof pdfDisplayEpoch.peek(), "number");
+  assert.equal(typeof pdfDisplayEpoch.reset(), "boolean");
 });
 
-test("fix2 F2/F5: save signals keep the payload and never discard the slot", () => {
-  const source = read("src/features/pdf-editor/PdfEditorPage.tsx");
-  // Chip/boundary/retained downloads release the guard via setResultSaved;
-  // only the explicit discard path nulls the slot.
-  assert.match(source, /const markHandoffSaved = useCallback\(\(\) => \{\s+clearUnsavedWork\("pdf-result"\);\s+setResultSaved\(true\);/);
-  assert.match(source, /const handleBoundaryDownloaded = useCallback\(\(\) => \{\s+releaseHold\(\);\s+clearUnsavedWork\("pdf-result"\);\s+setResultSaved\(true\);/);
-});
-
-test("fix2 leave race: our own back() popstate is swallowed on arrival", () => {
-  // The destination re-pushes its guard entry before our back()'s popstate
-  // arrives; consuming it as a fresh Back press reopens the dialog.
-  const source = read("src/components/AppShell.tsx");
-  assert.match(source, /skipPopRef\.current = true;\s+action\(\);/);
+test("worker-setup classification: runtime failures reset, content failures do not", () => {
+  const displayLoad = new Error("Files needed");
+  (displayLoad as { code?: string }).code = "pdf-display-load";
+  assert.equal(isWorkerSetupFailure(displayLoad), true);
+  assert.equal(isWorkerSetupFailure(new Error('Setting up fake worker failed: "oops"')), true);
+  assert.equal(
+    isWorkerSetupFailure(new Error("Failed to fetch dynamically imported module: http://x/pdf.worker.min.mjs")),
+    true,
+  );
+  const password = new Error("This PDF is password protected. Try again with the password.");
+  assert.equal(isWorkerSetupFailure(password), false);
+  assert.equal(isWorkerSetupFailure(new Error("Invalid PDF structure")), false);
+  assert.equal(isWorkerSetupFailure(new DOMException("PDF loading cancelled", "AbortError")), false);
+  assert.equal(isWorkerSetupFailure(null), false);
+  assert.equal(isWorkerSetupFailure(undefined), false);
+  assert.equal(isWorkerSetupFailure("Setting up fake worker failed"), false);
 });
 
 test("isDevTestEnvironment honors NODE_ENV in plain node", () => {

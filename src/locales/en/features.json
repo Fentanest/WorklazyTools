@@ -1849,6 +1849,8 @@
         "retainedResultWaiting": "Waiting for the finish screen to accept the result…",
         "retainedResultFailed": "The finish screen could not accept the result.",
         "retryIntake": "Insert again",
+        "engineReloadRequired": "The PDF engine needs a restart to recover. Save the retained result with Download below, then refresh the page.",
+        "reloadPage": "Refresh page",
         "retainedDownload": "Download",
         "discardResult": "Discard result",
         "finishLoadFailed": "Could not load the finish screen.",

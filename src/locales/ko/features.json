@@ -1842,6 +1842,8 @@
         "retainedResultWaiting": "마무리 화면이 결과를 받는 중입니다…",
         "retainedResultFailed": "마무리 화면이 결과를 받지 못했습니다.",
         "retryIntake": "다시 넣기",
+        "engineReloadRequired": "PDF 표시 엔진을 복구하려면 새로고침이 필요합니다. 보관된 결과는 아래 다운로드로 저장한 뒤 새로고침하세요.",
+        "reloadPage": "새로고침",
         "retainedDownload": "다운로드",
         "discardResult": "결과 버리기",
         "finishLoadFailed": "마무리 화면을 불러오지 못했습니다.",

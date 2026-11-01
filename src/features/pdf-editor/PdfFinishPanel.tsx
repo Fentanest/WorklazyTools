@@ -18,7 +18,7 @@ import { useAppLanguage } from "../../i18n/routing";
 import { cn } from "../../lib/utils";
 import { PdfThumbnail } from "./PdfThumbnail";
 import { PdfStampOverlay } from "./PdfStampOverlay";
-import { inspectPdf, isPdfDisplayLoadError, releasePdf, renderPdfThumbnail } from "./pdfPreview";
+import { inspectPdf, isPdfDisplayLoadError, isWorkerSetupFailure, releasePdf, renderPdfThumbnail } from "./pdfPreview";
 import { PdfDownloadCard, PdfError, useDownloadResults } from "./pdfUi";
 import {
   finishPdfFiles,
@@ -290,7 +290,13 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
    */
   handoffIntake?: { blob: Blob; name: string; generation: number; attempt: number } | null;
   onHandoffAccepted?: (generation: number) => void;
-  onHandoffFailed?: (generation: number) => void;
+  /**
+   * G3-2: reports whether the intake failure implicates the shared pdfjs
+   * runtime (worker/module unloadable) as opposed to bad content. Only the
+   * former can poison the module and justify spending a fresh epoch on
+   * retry; unknown failures default to true (previous behavior).
+   */
+  onHandoffFailed?: (generation: number, isWorkerFailure: boolean) => void;
   /** Localized organize path for [① 정리로 돌아가기]. */
   organizePath?: string;
   /**
@@ -627,6 +633,15 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
       if (!retainPrimary) { setRangeText(`1-${first.pageCount}`); setParity("all"); }
     } catch (reason) {
       if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
+      // G3-2: remember whether THIS failure implicates the shared runtime.
+      // Only the pending intake's own bytes count; other batches re-decide.
+      const failedFirst = incoming[0];
+      const expected = intakeFileRef.current;
+      if (expected && failedFirst && failedFirst.name === expected.name && failedFirst.size === expected.size) {
+        // Structural (not instanceof): the preview module may be duplicated
+        // across lazy chunks, but the failure shape still classifies.
+        intakeFailedWorkerRef.current = isWorkerSetupFailure(reason);
+      }
       setError(inspectionErrorMessage(reason, language, copy));
       for (const next of incoming) if (!retainedSources.has(next)) await releasePdf(next);
     } finally {
@@ -673,10 +688,15 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
   const intakeAckedRef = useRef<number | null>(null);
   const intakeFailedRef = useRef<number | null>(null);
   const intakeFileRef = useRef<{ name: string; size: number } | null>(null);
+  // G3-2: whether the latest intake failure implicates the shared runtime
+  // (reset-worthy) or the content (reset-futile). Unknown defaults to worker
+  // (previous behavior) at the call site.
+  const intakeFailedWorkerRef = useRef<boolean | null>(null);
   useEffect(() => {
     if (!handoffIntake) return;
     intakeAckedRef.current = null;
     intakeFailedRef.current = null;
+    intakeFailedWorkerRef.current = null;
     intakeFileRef.current = { name: handoffIntake.name, size: handoffIntake.blob.size };
     void replaceFile([new File([handoffIntake.blob], handoffIntake.name, { type: "application/pdf" })]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -700,7 +720,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     if (!handoffIntake || inspecting || !error) return;
     if (intakeFailedRef.current === handoffIntake.attempt) return;
     intakeFailedRef.current = handoffIntake.attempt;
-    onHandoffFailed?.(handoffIntake.generation);
+    onHandoffFailed?.(handoffIntake.generation, intakeFailedWorkerRef.current ?? true);
   }, [handoffIntake, inspecting, error, onHandoffFailed]);
 
   const backToOrganizePath = organizePath ?? localizedPath(language, "/tools/pdf-editor");
