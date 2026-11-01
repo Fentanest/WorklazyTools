@@ -62,7 +62,7 @@ export function setUnsavedWork(toolId: string, registration: UnsavedWorkRegistra
     current.hasWork === registration.hasWork &&
     current.kind === registration.kind &&
     current.scopePath === registration.scopePath &&
-    joinPaths(current.safePaths) === joinPaths(normalizedSafePaths) &&
+    safePathsEqual(current.safePaths, normalizedSafePaths) &&
     (current.messageKey ?? "") === (registration.messageKey ?? "")
   ) {
     return;
@@ -120,11 +120,16 @@ function withinScope(strippedTargetPath: string, scopePath: string): boolean {
  */
 export function isGuardedTarget(strippedTargetPath: string): boolean {
   const normalizedTarget = normalizeTargetPath(strippedTargetPath);
+  // R5: the pending grant is settled once per evaluation, before and
+  // separately from the registration loop. Any evaluated path consumes it:
+  // a match grants its tool one pass, anything else (or TTL/route expiry)
+  // drops it.
+  const oneShot = takeOneShotForEvaluation(normalizedTarget);
   for (const [toolId, entry] of entries) {
     if (!entry.hasWork) continue;
-    if (entry.safePaths) {
+    if (entry.safePaths !== undefined) {
       if (entry.safePaths.includes(normalizedTarget)) continue;
-      if (consumeOneShotSafeTarget(toolId, normalizedTarget)) continue;
+      if (oneShot && oneShot.toolId === toolId) continue;
       return true;
     }
     if (withinScope(normalizedTarget, entry.scopePath)) continue;
@@ -168,17 +173,46 @@ function normalizeTargetPath(strippedTargetPath: string): string {
   return (collapsed.length > 1 ? collapsed.replace(/\/+$/, "") : collapsed) || "/";
 }
 
-function joinPaths(paths: readonly string[] | undefined): string {
-  return (paths ?? []).join("\n");
+/**
+ * R5: an absent safePaths (legacy scope-prefix rule) and an explicitly empty
+ * set (nothing is safe) are different registrations.
+ */
+function safePathsEqual(a: readonly string[] | undefined, b: readonly string[] | undefined): boolean {
+  if (a === undefined || b === undefined) return a === undefined && b === undefined;
+  if (a.length !== b.length) return false;
+  return a.every((path, index) => path === b[index]);
 }
 
-/** Test hook: last consumed grant that a failed perform() may restore. */
-export function __clearToolStateForTests(): void {
+/** N1: dev/test-only hooks live on globalThis, never as module exports. */
+export function isDevTestEnvironment(): boolean {
+  const metaEnv = (import.meta as unknown as { env?: Record<string, string | boolean | undefined> }).env;
+  if (metaEnv) return metaEnv["DEV"] === true || metaEnv["MODE"] === "test";
+  if (typeof process !== "undefined" && typeof process.env !== "undefined") {
+    return process.env["NODE_ENV"] !== "production";
+  }
+  return false;
+}
+
+/** N1: test-only reset. Not exported; installed on globalThis in dev/test. */
+function clearToolStateForTests(): void {
   entries.clear();
   oneShotSafeTarget = null;
   lastConsumedOneShot = null;
   generation = 0;
   for (const listener of [...listeners]) listener();
+}
+
+/** N1: test-only inspect. Not exported; installed on globalThis in dev/test. */
+function peekOneShotSafeTargetForTests(): { toolId: string; path: string } | null {
+  return oneShotSafeTarget ? { toolId: oneShotSafeTarget.toolId, path: oneShotSafeTarget.path } : null;
+}
+
+/** N1: dev/test-only hooks live on globalThis, never as module exports. */
+if (isDevTestEnvironment()) {
+  (globalThis as unknown as Record<string, unknown>).__wlToolStateTestHooks = {
+    __clearToolStateForTests: clearToolStateForTests,
+    __peekOneShotSafeTargetForTests: peekOneShotSafeTargetForTests,
+  };
 }
 
 interface OneShotSafeTarget {
@@ -238,24 +272,25 @@ export function restoreLastOneShotSafeTarget(): void {
   notify();
 }
 
-/** Test hook: inspect the pending one-shot grant, if any. */
-export function __peekOneShotSafeTargetForTests(): { toolId: string; path: string } | null {
-  return oneShotSafeTarget ? { toolId: oneShotSafeTarget.toolId, path: oneShotSafeTarget.path } : null;
-}
-
-function consumeOneShotSafeTarget(toolId: string, normalizedTarget: string): boolean {
-  if (!oneShotSafeTarget) return false;
-  const href = typeof window !== "undefined" ? window.location.href : "";
+/**
+ * Settle the pending one-shot grant for this single evaluation (R5).
+ * Always clears the pending grant: a path match banks it for the granting
+ * tool, while another path, a route change, or TTL expiry drops it.
+ * Only a matched consumption is restorable via restoreLastOneShotSafeTarget.
+ */
+function takeOneShotForEvaluation(normalizedTarget: string): { toolId: string } | null {
+  if (!oneShotSafeTarget) return null;
   const grant = oneShotSafeTarget;
+  oneShotSafeTarget = null;
+  const href = typeof window !== "undefined" ? window.location.href : "";
   const expired =
     Date.now() > grant.expiresAt || (grant.href !== "" && href !== "" && href !== grant.href);
-  oneShotSafeTarget = null;
-  if (expired || grant.toolId !== toolId || grant.path !== normalizedTarget) {
+  if (expired || grant.path !== normalizedTarget) {
     lastConsumedOneShot = null;
-    return false;
+    return null;
   }
   lastConsumedOneShot = grant;
-  return true;
+  return { toolId: grant.toolId };
 }
 
 export function subscribeUnsavedWork(listener: () => void): () => void {
@@ -276,7 +311,8 @@ export function useUnsavedWorkGuard(
 ): void {
   const { kind, scopePath, safePaths, messageKey } = options;
   // Join for the dep: a fresh-but-equal array must not re-register (N5-1).
-  const safePathsKey = (safePaths ?? []).join("\n");
+  // R5: absent and [] are different keys.
+  const safePathsKey = safePaths === undefined ? "\0absent" : safePaths.join("\n");
   useEffect(() => {
     setUnsavedWork(toolId, {
       hasWork,

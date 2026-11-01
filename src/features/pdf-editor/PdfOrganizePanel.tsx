@@ -106,23 +106,29 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   const download = useDownloadResult();
   const locked = inspecting || operation.status === "running";
 
-  // W1 invalidation (plan §4.1): any input/page/output edit discards the
-  // panel result. The parent is notified only when a live result actually
-  // dies, so mount-time resets stay silent.
+  // W1 invalidation (plan §4.1, R3): any input/page/output edit discards the
+  // panel result AND always notifies the parent — even when the panel holds
+  // no local result (e.g. after a remount that adopted the parent slot).
+  // The direct-entry apply below is mount-only and stays silent on purpose:
+  // a fresh mount never has a panel result, and notifying there would kill
+  // an adopted parent slot (stale-Blob guard).
   const invalidateResult = useCallback(() => {
-    const hadResult = download.result !== null;
     download.clearResult();
-    if (hadResult) onResultInvalidated();
+    onResultInvalidated();
   }, [download, onResultInvalidated]);
 
-  // W1 pdf-organize protection (plan §4.1 T1): sources present. Safe only
-  // on the five organize paths (exact set, no scope-prefix OR).
+  // W1 pdf-organize protection (plan §4.1 T1, R6): sources present. Safe only
+  // on the five organize paths (exact set, no scope-prefix OR). The wording
+  // is format-aware and true for every guarded destination: a merged result
+  // survives only via the finish handoff, a ZIP result never does.
   useUnsavedWorkGuard("pdf-organize", sources.length > 0 || inspecting, {
     kind: "files",
     scopePath: "/tools/pdf-editor",
     safePaths: [...PDF_ORGANIZE_SAFE_PATHS],
     messageKey: download.result
-      ? "pdf.messages.PdfEditorPage.unsavedOrganizeWithResult"
+      ? outputMode === "merged"
+        ? "pdf.messages.PdfEditorPage.unsavedOrganizeWithResult"
+        : "pdf.messages.PdfEditorPage.unsavedOrganizeWithZipResult"
       : "pdf.messages.PdfEditorPage.unsavedOrganize",
   });
 
@@ -139,7 +145,10 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     if (resume.length) void inputTask.current.then(() => { if (generation === resumeGeneration.current) void inputHandler.current?.(resume); });
     setInspecting(false);
     operation.reset();
-    invalidateResult();
+    // R3: mount-time only (a fresh mount never holds a panel result, and
+    // post-mount applies go through the dirty-confirm path instead), so no
+    // parent notification here — an adopted slot must survive the mount.
+    download.clearResult();
     setError("");
     setOutputMode(next?.outputMode ?? "merged");
     setQuickSplitOpen(next?.quickSplit ?? false);
@@ -726,10 +735,10 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
                   <SummaryRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.outputPdfs")} value={resultFileCount} />
                   <SummaryRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.rotatedPages")} value={pages.filter((page) => page.rotation).length} />
                 </dl>
-                <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName2") : featureMessage(language, "pdf.messages.PdfOrganizePanel.zipFileName")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={outputName} disabled={locked} onChange={(event) => setOutputName(event.target.value)} /><small className="text-xs text-muted-foreground">.{outputMode === "merged" ? "pdf" : "zip"}</small></label>
-                <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.watermarkTextOptional")}</span><UtilityInput className="col-span-2 h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={watermarkText} disabled={locked} maxLength={120} onChange={(event) => setWatermarkText(event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eGInternalReview")} /></label>
-                <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPageNumbers")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.numberEachOutputPdfFrom1AtThe")} checked={pageNumbers} onChange={setPageNumbers} disabled={locked} />
-                <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.imageBasedCompression")} description={outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.redrawPagesAs144DpiJpegToReduce") : featureMessage(language, "pdf.messages.PdfOrganizePanel.availableOnlyWhenCreatingOnePdf")} checked={imageCompression && outputMode === "merged"} onChange={setImageCompression} disabled={locked || outputMode !== "merged"} />
+                <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName2") : featureMessage(language, "pdf.messages.PdfOrganizePanel.zipFileName")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={outputName} disabled={locked} onChange={(event) => { setOutputName(event.target.value); invalidateResult(); }} /><small className="text-xs text-muted-foreground">.{outputMode === "merged" ? "pdf" : "zip"}</small></label>
+                <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.watermarkTextOptional")}</span><UtilityInput className="col-span-2 h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={watermarkText} disabled={locked} maxLength={120} onChange={(event) => { setWatermarkText(event.target.value); invalidateResult(); }} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eGInternalReview")} /></label>
+                <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPageNumbers")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.numberEachOutputPdfFrom1AtThe")} checked={pageNumbers} onChange={(checked) => { setPageNumbers(checked); invalidateResult(); }} disabled={locked} />
+                <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.imageBasedCompression")} description={outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.redrawPagesAs144DpiJpegToReduce") : featureMessage(language, "pdf.messages.PdfOrganizePanel.availableOnlyWhenCreatingOnePdf")} checked={imageCompression && outputMode === "merged"} onChange={(checked) => { setImageCompression(checked); invalidateResult(); }} disabled={locked || outputMode !== "merged"} />
               </div>
 
               <div className="pdf-output-action-zone max-h-[min(58dvh,540px)] shrink-0 overflow-y-auto border-t border-border bg-primary/5 px-[18px] pt-3.5 pb-[18px] [scrollbar-gutter:stable] max-[820px]:pb-[calc(18px+env(safe-area-inset-bottom))]">

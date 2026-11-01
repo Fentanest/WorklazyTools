@@ -1848,7 +1848,8 @@
         "retryFinishLoad": "다시 시도",
         "handoffHint": "마무리 화면이 결과를 받아들이면 보호가 마무리로 넘어갑니다. 그 전까지 이 화면에 결과가 남습니다.",
         "unsavedResult": "저장하지 않은 PDF 결과가 있습니다. 나가면 사라집니다.",
-        "unsavedOrganizeWithResult": "정리 화면의 원본 파일과 편집 상태가 사라집니다. 마지막으로 만든 결과 PDF는 마무리 화면에서 계속 쓸 수 있습니다.",
+        "unsavedOrganizeWithResult": "정리 화면의 원본 파일과 편집 상태가 사라집니다. 마지막으로 만든 결과 PDF는 마무리 화면으로 넘긴 경우에만 유지됩니다.",
+        "unsavedOrganizeWithZipResult": "정리 화면의 원본 파일과 편집 상태가 사라집니다. 여러 파일 결과(ZIP)는 마무리로 넘길 수 없어 함께 사라지니, 먼저 내려받으세요.",
         "unsavedOrganize": "정리 화면의 원본 파일과 편집 내용이 사라집니다.",
         "unsavedFinish": "마무리 화면의 파일·설정·결과가 사라집니다."
       },

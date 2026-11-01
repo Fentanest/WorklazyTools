@@ -1855,7 +1855,8 @@
         "retryFinishLoad": "Try again",
         "handoffHint": "Protection moves to finish after it accepts the result. Until then the result stays here.",
         "unsavedResult": "You have an unsaved PDF result. Leaving will discard it.",
-        "unsavedOrganizeWithResult": "The organize screen's source files and edits will be lost. The result PDF you just made stays available on the finish screen.",
+        "unsavedOrganizeWithResult": "The organize screen's source files and edits will be lost. The result PDF you just made is kept only if you hand it to finish.",
+        "unsavedOrganizeWithZipResult": "The organize screen's source files and edits will be lost. Multi-file results (ZIP) cannot be sent to finish and will be lost too — download them first.",
         "unsavedOrganize": "The organize screen's source files and edits will be lost.",
         "unsavedFinish": "The finish screen's files, settings, and results will be lost."
       },

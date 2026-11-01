@@ -16,6 +16,26 @@ type PdfDisplayModule = typeof import("pdfjs-dist");
 
 let pdfDisplayModulePromise: Promise<PdfDisplayModule> | undefined;
 let passwordExceptionConstructor: PdfDisplayModule["PasswordException"] | undefined;
+/** Epoch for the pdfjs display module (R1: retry-after-failure resets it). */
+let pdfDisplayModuleEpoch = 0;
+
+function pdfDisplayModuleUrl(): string {
+  if (pdfDisplayModuleEpoch === 0) return pdfDisplayUrl;
+  const separator = pdfDisplayUrl.includes("?") ? "&" : "?";
+  return `${pdfDisplayUrl}${separator}w1-pdfjs=${pdfDisplayModuleEpoch}`;
+}
+
+/**
+ * Drop the cached pdfjs display module so the next load fetches a fresh copy
+ * (R1). pdfjs permanently disables workers page-wide after a single worker
+ * load failure (and caches the failed fake-worker setup), so a retry after a
+ * transient outage can never recover without this reset. The per-File
+ * document cache is untouched: failed loads already evict themselves.
+ */
+export function resetPdfDisplayModule(): void {
+  pdfDisplayModulePromise = undefined;
+  pdfDisplayModuleEpoch += 1;
+}
 
 export class PdfDisplayLoadError extends Error {
   readonly code = "pdf-display-load";
@@ -26,7 +46,7 @@ export function isPdfDisplayLoadError(error: unknown): error is PdfDisplayLoadEr
 }
 
 function loadPdfDisplayModule() {
-  pdfDisplayModulePromise ??= (import(/* @vite-ignore */ pdfDisplayUrl) as Promise<PdfDisplayModule>).then((module) => {
+  pdfDisplayModulePromise ??= (import(/* @vite-ignore */ pdfDisplayModuleUrl()) as Promise<PdfDisplayModule>).then((module) => {
     module.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
     passwordExceptionConstructor = module.PasswordException;
     return module;

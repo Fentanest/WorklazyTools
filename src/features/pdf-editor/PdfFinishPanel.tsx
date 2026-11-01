@@ -363,9 +363,24 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
   const tabPanelId = useId();
   const form = forms[activeTab];
   const locked = inspecting || operation.status === "running";
-  // W1 pdf-finish protection (plan §4.1 T1): sources present and no saved
-  // result yet. Safe only on the five finish paths (exact set, no OR).
-  const finishHasWork = (sources.length > 0 || inspecting) && download.results.length === 0;
+  // W1 pdf-finish protection (plan §4.1 T1, R2): sources present and no
+  // *saved* result yet. A produced result alone does not clear the guard —
+  // only an actual download click / completed share does. Safe only on the
+  // five finish paths (exact set, no OR).
+  // Saved state is tracked per result URL (R2); partial results and the
+  // post-cancel preserved output use the same rule.
+  const [savedResultUrls, setSavedResultUrls] = useState<ReadonlySet<string>>(new Set());
+  const markResultSaved = useCallback((url: string) => {
+    setSavedResultUrls((current) => {
+      if (current.has(url)) return current;
+      const next = new Set(current);
+      next.add(url);
+      return next;
+    });
+  }, []);
+  const finishHasWork =
+    (sources.length > 0 || inspecting) &&
+    (download.results.length === 0 || download.results.some((result) => !savedResultUrls.has(result.url)));
   useUnsavedWorkGuard("pdf-finish", finishHasWork, {
     kind: "files",
     scopePath: "/tools/pdf-editor/finish",
@@ -1069,7 +1084,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
                   {operation.status === "running" && <Button type="button" variant="outline" className="mt-2 min-h-11 w-full rounded-xl text-destructive" data-testid="pdf-finish-cancel" onClick={() => controllerRef.current?.abort()}><X size={17} />{copy.cancel}</Button>}
                 </div>
                 <OperationProgress {...operation} compact accent="coral" title={copy.progressTitle} />
-                {download.results.map((result) => <PdfDownloadCard key={result.url} compact result={result} title={copy.ready} />)}
+                {download.results.map((result) => <PdfDownloadCard key={result.url} compact result={result} title={copy.ready} onSaved={() => markResultSaved(result.url)} />)}
               </Card>
             </aside>
           </div>

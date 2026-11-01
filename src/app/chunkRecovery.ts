@@ -25,10 +25,8 @@ export function isAutoReloadHeld(): boolean {
   return autoReloadHoldCount > 0;
 }
 
-/** Test hook: drop all holds without balancing releases. */
-export function __clearAutoReloadHoldForTests(): void {
-  autoReloadHoldCount = 0;
-}
+// N1: no test hooks in this module at all (it is also evaluated in a bare
+// vm context by unit tests). Tests balance hold/release instead of resetting.
 
 // Vite and React receive the same rejection. Only that failure may share a
 // pending navigation; another error or route must still consult its budget.
