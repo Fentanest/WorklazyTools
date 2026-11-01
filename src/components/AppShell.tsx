@@ -125,6 +125,11 @@ export function AppShell() {
       leaveAfterPopRef.current = action;
       window.history.back();
     } else {
+      // Swallow the popstate our own back() produces below. The destination
+      // commits and re-pushes its guard entry before that popstate arrives;
+      // without this it would be consumed as a fresh Back press, reopening
+      // the dialog on arrival (same pattern as the branch above).
+      skipPopRef.current = true;
       action();
     }
   }, []);

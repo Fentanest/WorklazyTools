@@ -16,6 +16,7 @@ import { clearUnsavedWork, grantOneShotSafeTarget, isDevTestEnvironment, setUnsa
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
 import { localizedPath, stripLanguagePrefix } from "../../i18n/languages";
 import { useAppLanguage } from "../../i18n/routing";
+import { isLocalQaBuild } from "../../components/localQa";
 import { PdfConvertPanel } from "./PdfConvertPanel";
 import { PdfOrganizePanel, type PdfOrganizeOutputMode, type PdfOrganizeProducedResult } from "./PdfOrganizePanel";
 import { PDF_EDITOR_SAFE_PATHS } from "./pdfUi";
@@ -169,12 +170,15 @@ const RESULT_GUARD = {
 const HANDOFF_ACK_TIMEOUT_MS = 30_000;
 
 /**
- * Ack deadline, injectable for tests ("시간 주입 허용").
- * Production has no override global, so this is exactly 30s there.
+ * Ack deadline, injectable in dev/QA only ("시간 주입 허용").
+ * Production builds ignore the override global and use exactly 30s.
  */
 function ackTimeoutMs(): number {
-  const injected = (globalThis as unknown as Record<string, unknown>).__wlHandoffAckTimeoutMs;
-  return typeof injected === "number" && Number.isFinite(injected) && injected > 0 ? injected : HANDOFF_ACK_TIMEOUT_MS;
+  if (isDevTestEnvironment() || isLocalQaBuild) {
+    const injected = (globalThis as unknown as Record<string, unknown>).__wlHandoffAckTimeoutMs;
+    if (typeof injected === "number" && Number.isFinite(injected) && injected > 0) return injected;
+  }
+  return HANDOFF_ACK_TIMEOUT_MS;
 }
 
 type PdfEditorPageProps =
@@ -269,6 +273,9 @@ function OrganizeHandoffHost({ organizePreset }: { organizePreset?: PdfOrganizeP
     // Download click / completed share: the bytes now exist outside the SPA,
     // so the result no longer blocks navigation. The payload stays for reuse
     // (handoff, suggestion) until it is invalidated or discarded.
+    // Clear synchronously so the save signal holds even before the next
+    // render flushes the guard effect below.
+    clearUnsavedWork("pdf-result");
     setResultSaved(true);
   }, []);
 
@@ -399,6 +406,10 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
   // is being adopted (mount render runs before the adopt effect commits).
   const [adoptKind, setAdoptKind] = useState<"auto" | "suggest" | null>(null);
   const ackTimerRef = useRef<number | undefined>(undefined);
+  // F1: which handoff the pending timer belongs to. The unmount cleanup
+  // clears the timeout but keeps this record so a StrictMode re-setup can
+  // re-arm the same deadline; terminal transitions clear both.
+  const armedTimerRef = useRef<{ generation: number; attempt: number } | null>(null);
   // StrictMode remount guard: the mount adoption below must run once.
   const adoptedAttemptRef = useRef<number | null>(null);
 
@@ -407,15 +418,20 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
       window.clearTimeout(ackTimerRef.current);
       ackTimerRef.current = undefined;
     }
+    armedTimerRef.current = null;
   };
 
-  /** R1: (re)arm the ack deadline with ownership in one place. */
-  const armAckTimer = () => {
+  /** F1: arm the ack deadline bound to a specific handoff (generation+attempt).
+   * The callback only acts while that same handoff still owns the slot, so
+   * an old timer can never release a newer handoff's hold. Timeout remains
+   * a hold-only release: the result stays for retry/download. */
+  const armAckTimerFor = (generation: number, attempt: number) => {
     clearAckTimer();
+    armedTimerRef.current = { generation, attempt };
     ackTimerRef.current = window.setTimeout(() => {
       ackTimerRef.current = undefined;
-      // Timeout is a hold-only release: the result stays for retry/download.
-      if (handoffSlot) {
+      const current = handoffSlot;
+      if (current && current.generation === generation && current.attempt === attempt) {
         releaseHold();
         setTimedOut(true);
       }
@@ -425,12 +441,13 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
   const retryFinishLoad = useCallback(() => {
     // A rejected lazy import is cached by React: mint a fresh handle so the
     // retry actually refetches the chunk.
-    // R1: a retry after timeout/failure re-acquires hold and a fresh deadline.
+    // F1: a retry after timeout/failure re-acquires hold and a fresh deadline
+    // bound to the current handoff (ownership-checked on fire).
     if (handoffSlot) {
       acquireHold();
       setTimedOut(false);
       setFailedAttempt(null);
-      armAckTimer();
+      armAckTimerFor(handoffSlot.generation, handoffSlot.attempt);
     }
     setLazyFinish(createLazyFinishPanel());
     setBoundaryKey((key) => key + 1);
@@ -438,6 +455,9 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
   }, []);
 
   // Adopt the slot on mount: handoff (auto) or top-link arrival (suggest).
+  // F1: the unmount cleanup below always clears the armed timeout, so the
+  // mount re-runs the arm whenever the same intake is still pending
+  // (StrictMode re-setup and remounts re-arm; ownership is rechecked on fire).
   useEffect(() => {
     cancelPendingTeardown();
     const slot = handoffSlot;
@@ -448,20 +468,36 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     if (slot.outputMode !== "merged") {
       handoffSlot = null;
       setSlotTick((tick) => tick + 1);
-      return;
+      return undefined;
     }
-    if (adoptedAttemptRef.current === slot.attempt) return;
-    adoptedAttemptRef.current = slot.attempt;
-    if (slot.auto) {
-      slot.auto = false;
-      setAdoptKind("auto");
-      setIntake({ blob: slot.blob, name: slot.name, generation: slot.generation, attempt: slot.attempt });
-      armAckTimer();
-    } else {
-      // Suggestion: no auto insert; the chip below offers it.
-      setAdoptKind("suggest");
-      setSlotTick((tick) => tick + 1);
+    if (adoptedAttemptRef.current !== slot.attempt) {
+      adoptedAttemptRef.current = slot.attempt;
+      if (slot.auto) {
+        slot.auto = false;
+        setAdoptKind("auto");
+        setIntake({ blob: slot.blob, name: slot.name, generation: slot.generation, attempt: slot.attempt });
+        armAckTimerFor(slot.generation, slot.attempt);
+      } else {
+        // Suggestion: no auto insert; the chip below offers it.
+        setAdoptKind("suggest");
+      }
+    } else if (
+      armedTimerRef.current &&
+      armedTimerRef.current.generation === slot.generation &&
+      armedTimerRef.current.attempt === slot.attempt
+    ) {
+      // StrictMode re-setup cleared the first timer while the same intake
+      // is still pending: re-arm its deadline (F1).
+      armAckTimerFor(slot.generation, slot.attempt);
     }
+    return () => {
+      // F1: a real unmount always cancels this instance's timer. State
+      // updates never touch it (R1), and the fire callback rechecks ownership.
+      if (ackTimerRef.current !== undefined) {
+        window.clearTimeout(ackTimerRef.current);
+        ackTimerRef.current = undefined;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -482,14 +518,17 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
   // acked, the parent keeps hasWork so home/other/back/exit stay guarded.
   // R1: no cleanup on updates — the entry is idempotent, and only the
   // unmount effect above may tear down.
+  // F2: an explicit download/share marks the result saved and releases the
+  // guard, but keeps the payload (slot + blob URL) for retry/reuse.
+  const [resultSaved, setResultSaved] = useState(false);
   useEffect(() => {
-    if (handoffSlot) {
+    if (handoffSlot && !resultSaved) {
       setUnsavedWork("pdf-result", { hasWork: true, ...RESULT_GUARD });
     } else {
       clearUnsavedWork("pdf-result");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slotTick, intake, timedOut, failedAttempt, boundaryKey]);
+  }, [slotTick, intake, timedOut, failedAttempt, boundaryKey, resultSaved]);
 
   const handleAccepted = useCallback((generation: number) => {
     const slot = handoffSlot;
@@ -522,14 +561,16 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     // R1: a failed attempt may have poisoned the pdfjs module (worker
     // failure disables workers page-wide); reset it before re-inspecting.
     if (failedAttemptRef.current !== null) resetPdfDisplayModule();
+    // F1: bump the attempt first, then arm the deadline bound to the new
+    // attempt — an old arm must never outlive the handoff it was made for.
+    slot.attempt += 1;
+    slot.auto = false;
     // R1: (re)inserting re-acquires the hold and a fresh ack deadline —
     // the intake window is protected again until ack / failure / timeout.
     acquireHold();
-    armAckTimer();
+    armAckTimerFor(slot.generation, slot.attempt);
     setTimedOut(false);
     setFailedAttempt(null);
-    slot.attempt += 1;
-    slot.auto = false;
     setIntake({ blob: slot.blob, name: slot.name, generation: slot.generation, attempt: slot.attempt });
     setSlotTick((tick) => tick + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -543,6 +584,23 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     setTimedOut(false);
     releaseHold();
     setSlotTick((tick) => tick + 1);
+  }, []);
+
+  // F2/F5: an explicit download/share is a *save signal*, not a discard.
+  // The guard releases but the payload (slot + blob URL) stays alive so the
+  // in-flight download cannot be canceled and retry/reuse still work.
+  // The registry clear is synchronous (the state flag only drives the
+  // idempotent effect below), so the save signal holds even if the tab
+  // closes before the next render.
+  const markHandoffSaved = useCallback(() => {
+    clearUnsavedWork("pdf-result");
+    setResultSaved(true);
+  }, []);
+
+  const handleBoundaryDownloaded = useCallback(() => {
+    releaseHold();
+    clearUnsavedWork("pdf-result");
+    setResultSaved(true);
   }, []);
 
   const handleBackToOrganize = useCallback((files: File[]): string | null => {
@@ -565,7 +623,10 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
   }, [language]);
 
   const slot = handoffSlot;
-  const slotUrl = useMemo(() => (slot ? URL.createObjectURL(slot.blob) : null), [slot, slotTick]);
+  // F2: key the object URL on the blob itself so guard-only re-renders
+  // (e.g. marking saved) never revoke the in-flight download URL.
+  const slotBlob = slot ? slot.blob : null;
+  const slotUrl = useMemo(() => (slotBlob ? URL.createObjectURL(slotBlob) : null), [slotBlob]);
   useEffect(() => () => {
     if (slotUrl) URL.revokeObjectURL(slotUrl);
   }, [slotUrl]);
@@ -599,7 +660,7 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
                 href={slotUrl}
                 download={slot.name}
                 data-testid="pdf-handoff-download"
-                onClick={discardSlot}
+                onClick={markHandoffSaved}
               >
                 {featureMessage(language, "pdf.messages.PdfEditorPage.retainedDownload")}
               </a>
@@ -615,7 +676,7 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
         language={language}
         downloadHref={slotUrl}
         downloadName={slot?.name}
-        onDownloaded={releaseHold}
+        onDownloaded={handleBoundaryDownloaded}
         onRetry={retryFinishLoad}
       >
         <Suspense fallback={<div className="tool-route-loading min-h-[420px]" role="status">{featureMessage(language, "pdf.messages.PdfEditorPage.loadingFinish")}</div>}>

@@ -661,19 +661,20 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     download.clearResults();
   };
 
-  // W1 prepared handoff intake (plan §4.1 D4-1): insert through the normal
+  // W1 prepared handoff intake (plan §4.1 D4-1, F3): insert through the normal
   // inspection path. The ack goes out only after inspection success, and the
   // finish protection is registered first (direct setUnsavedWork, so the
   // registry — not the hook effect — defines the order).
-  const intakeConsumedRef = useRef<{ generation: number; attempt: number } | null>(null);
+  // F3: no consumed-once guard. A StrictMode remount aborts the first insert
+  // via the lifecycle controller, and the re-setup must start it again;
+  // treating the aborted run as consumed leaves the intake empty forever.
+  // Superseded runs exit silently through the fileRequestRef generation
+  // check inside replaceFile, so re-running is always safe.
   const intakeAckedRef = useRef<number | null>(null);
   const intakeFailedRef = useRef<number | null>(null);
   const intakeFileRef = useRef<{ name: string; size: number } | null>(null);
   useEffect(() => {
     if (!handoffIntake) return;
-    const key = { generation: handoffIntake.generation, attempt: handoffIntake.attempt };
-    if (intakeConsumedRef.current?.generation === key.generation && intakeConsumedRef.current?.attempt === key.attempt) return;
-    intakeConsumedRef.current = key;
     intakeAckedRef.current = null;
     intakeFailedRef.current = null;
     intakeFileRef.current = { name: handoffIntake.name, size: handoffIntake.blob.size };

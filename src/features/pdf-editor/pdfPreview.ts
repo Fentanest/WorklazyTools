@@ -27,14 +27,20 @@ function pdfDisplayModuleUrl(): string {
 
 /**
  * Drop the cached pdfjs display module so the next load fetches a fresh copy
- * (R1). pdfjs permanently disables workers page-wide after a single worker
+ * (R1/F4). pdfjs permanently disables workers page-wide after a single worker
  * load failure (and caches the failed fake-worker setup), so a retry after a
  * transient outage can never recover without this reset. The per-File
  * document cache is untouched: failed loads already evict themselves.
+ * Best-effort dereference of the previous module's exception class so the
+ * old runtime can be collected; returns false once the epoch cap is hit.
  */
-export function resetPdfDisplayModule(): void {
+export const MAX_PDF_DISPLAY_EPOCHS = 8;
+export function resetPdfDisplayModule(): boolean {
+  if (pdfDisplayModuleEpoch >= MAX_PDF_DISPLAY_EPOCHS) return false;
   pdfDisplayModulePromise = undefined;
+  passwordExceptionConstructor = undefined;
   pdfDisplayModuleEpoch += 1;
+  return true;
 }
 
 export class PdfDisplayLoadError extends Error {
@@ -109,10 +115,38 @@ const thumbnailCache = new Map<File, Map<string, PdfThumbnailCacheEntry>>();
 const thumbnailRenderQueue: Array<() => void> = [];
 const THUMBNAIL_RENDER_CONCURRENCY = 3;
 let activeThumbnailRenders = 0;
+
+/**
+ * F4: probe the pdfjs worker script before touching pdfjs. A failed worker
+ * fetch permanently disables pdfjs workers page-wide (fake-worker fallback
+ * plus a cached failed setup), so a blind getDocument during an outage
+ * poisons every later inspection. Failing fast here keeps pdfjs pristine and
+ * makes retries free until the worker is reachable again.
+ */
+async function isPdfWorkerReachable(signal?: AbortSignal): Promise<boolean> {
+  try {
+    if (typeof location === "undefined" || !/^https?:$/.test(location.protocol)) return true;
+  } catch {
+    return true;
+  }
+  try {
+    const response = await fetch(pdfWorkerUrl, { method: "HEAD", signal });
+    // Some static hosts reject HEAD: let the GET path decide then.
+    if (!response.ok && response.status !== 405 && response.status !== 501) return false;
+    return true;
+  } catch (error) {
+    if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
+    return false;
+  }
+}
+
 export async function getPdfDocument(file: File, language: AppLanguage = "ko", signal?: AbortSignal) {
   throwIfAborted(signal, "PDF loading cancelled");
   const cached = documentCache.get(file);
   if (cached) return waitWithAbort(cached.promise, signal);
+  if (!(await waitWithAbort(isPdfWorkerReachable(signal), signal))) {
+    throw new PdfDisplayLoadError(featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable"));
+  }
   let pdfDisplayModule: PdfDisplayModule;
   try {
     pdfDisplayModule = await waitWithAbort(loadPdfDisplayModule(), signal);
