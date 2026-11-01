@@ -560,6 +560,40 @@ for (const route of routes) {
 }
 if (!sitemap.includes('xmlns:xhtml=') || !sitemap.includes('hreflang="x-default"')) throw new Error("sitemap.xml is missing multilingual alternate links.");
 
+// RSS: each language feed mirrors the sitemap judgment (item links are a subset
+// of, in practice equal to, that language's sitemap locs), parses as XML, and
+// carries no alias, noindex, or unpublished addresses. Pages link their feed.
+{
+  const locSet = new Set([...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]));
+  for (const language of ["ko", "en"]) {
+    const rssPath = path.join("dist", language, "rss.xml");
+    const rss = await fs.readFile(rssPath, "utf8");
+    const rssDocument = new JSDOM(rss, { contentType: "text/xml" }).window.document;
+    if (rssDocument.querySelector("parsererror")) throw new Error(`${rssPath} is not well-formed XML.`);
+    const items = [...rssDocument.querySelectorAll("channel > item")];
+    if (items.length === 0) throw new Error(`${rssPath} has no items.`);
+    const itemLinks = items.map((item) => item.querySelector("link")?.textContent?.trim() ?? "");
+    if (itemLinks.some((link) => !link)) throw new Error(`${rssPath} has an item without a link.`);
+    if (new Set(itemLinks).size !== itemLinks.length) throw new Error(`${rssPath} has duplicate item links.`);
+    for (const link of itemLinks) {
+      if (!locSet.has(link)) throw new Error(`${rssPath} item ${link} is not in sitemap.xml.`);
+    }
+    const guids = items.map((item) => item.querySelector("guid")?.textContent?.trim() ?? "");
+    if (guids.some((guid, index) => guid !== itemLinks[index])) throw new Error(`${rssPath} guid must equal the canonical item link.`);
+    for (const forbidden of ["tools/pdf-editor/convert/", "tools/pdf-editor/ocr/", "tools/pdf-editor/image-to-pdf/", "tools/pdf-editor/pdf-to-image/", "/error/", "tools/office-editor/app/", "tools/excel-merger/xls-preserve/", "tools/word-compare/", "tools/hwp-compare/"]) {
+      if (rss.includes(`/${language}/${forbidden.replace(/^\//, "")}`)) throw new Error(`${rssPath} contains excluded address ${forbidden}.`);
+    }
+    if (!VIDEO_STUDIO_PUBLIC && rss.includes("/tools/video-studio/")) throw new Error(`${rssPath} contains unpublished video routes.`);
+    const sampleHtml = await fs.readFile(path.join("dist", language, "tools", "index.html"), "utf8");
+    if (!sampleHtml.includes(`type="application/rss+xml"`) || !sampleHtml.includes(`href="https://worklazy.net/${language}/rss.xml"`)) throw new Error(`dist/${language}/tools/index.html is missing its RSS alternate link.`);
+    console.log(`RSS check passed: ${language}/rss.xml with ${items.length} items, all in sitemap.`);
+  }
+  const landingHtml = await fs.readFile(path.join("dist", "index.html"), "utf8");
+  for (const language of ["ko", "en"]) {
+    if (!landingHtml.includes(`type="application/rss+xml"`) || !landingHtml.includes(`href="https://worklazy.net/${language}/rss.xml"`)) throw new Error(`dist/index.html is missing the ${language} RSS alternate link.`);
+  }
+}
+
 const [koreanFeatures, englishFeatures, koreanGuides, englishGuides] = await Promise.all([
   fs.readFile("src/locales/ko/features.json", "utf8"),
   fs.readFile("src/locales/en/features.json", "utf8"),

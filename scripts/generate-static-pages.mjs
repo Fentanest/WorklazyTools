@@ -1,6 +1,7 @@
 import { VIDEO_DIRECT_PATHS } from "../src/features/video-studio/videoDirectPaths.ts";
 import { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonToolPublished, isComparisonPathPublished } from "../src/app/publicServiceConfig.mjs";
 import { createHash } from "node:crypto";
+import { execSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -156,7 +157,32 @@ for (const language of languages) {
 await fs.writeFile(path.join(unprefixedExcelPreserveDirectory, "coi-serviceworker.js"), officeCoiSourceText);
 
 await fs.writeFile(path.join(outputDirectory, "sitemap.xml"), createSitemap(generated));
-await fs.writeFile(path.join(outputDirectory, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${new URL("sitemap.xml", siteUrl).href}\n`);
+await fs.writeFile(path.join(outputDirectory, "robots.txt"), `User-agent: *\nAllow: /\n\n# RSS feeds (register these in Naver SearchAdvisor):\n# ${new URL("ko/rss.xml", siteUrl).href}\n# ${new URL("en/rss.xml", siteUrl).href}\n\nSitemap: ${new URL("sitemap.xml", siteUrl).href}\n`);
+
+// Legacy WordPress address kept as a static move page: /privacy-policy/ -> /ko/privacy/.
+// Uses the same renderRedirect contract as the other legacy redirects
+// (meta refresh 0, canonical to the target, noindex) and stays out of the sitemap.
+for (const legacy of [{ from: "privacy-policy", target: absolute("ko", "privacy") }]) {
+  const directory = path.join(outputDirectory, legacy.from);
+  await fs.mkdir(directory, { recursive: true });
+  await fs.writeFile(path.join(directory, "index.html"), renderRedirect(sourceHtml, legacy.target));
+}
+
+// RSS 2.0 language feeds. Items reuse the exact sitemap judgment: only the
+// self-canonical, indexable, public entries in `generated` are included, with
+// title/description taken from the same SEO source and link/guid canonical.
+// No root /rss.xml: the two languages stay separate, matching the hreflang design.
+const rssPubDate = getRssPubDate();
+for (const language of languages) {
+  const items = generated
+    .filter((entry) => entry.language === language)
+    .map((entry) => {
+      const pathname = entry.route ? `/${entry.route}` : "/";
+      const definition = getSeoDefinition(language, pathname);
+      return { title: definition.title, description: definition.description, link: entry.canonical };
+    });
+  await fs.writeFile(path.join(outputDirectory, language, "rss.xml"), createRssFeed(language, items, rssPubDate));
+}
 console.log(`Generated ${generated.length} localized crawlable pages for ${siteUrl}`);
 
 function makePage(language, route) {
@@ -248,6 +274,7 @@ function renderPage(template, page, canonical) {
     `<link rel="alternate" hreflang="ko" href="${escapeHtml(alternateKo)}" />`,
     `<link rel="alternate" hreflang="en" href="${escapeHtml(alternateEn)}" />`,
     `<link rel="alternate" hreflang="x-default" href="${escapeHtml(alternateEn)}" />`,
+    `<link rel="alternate" type="application/rss+xml" title="Worklazy Tools (${page.language})" href="${escapeHtml(new URL(`${page.language}/rss.xml`, siteUrl).href)}" />`,
     `<meta property="og:locale" content="${locale}" />`,
     `<meta property="og:locale:alternate" content="${page.language === "ko" ? "en_US" : "ko_KR"}" />`,
     `<meta property="og:type" content="website" />`, `<meta property="og:site_name" content="Worklazy Tools" />`,
@@ -280,6 +307,8 @@ function renderLanding(template) {
     `<link rel="alternate" hreflang="ko" href="${absolute("ko", "")}" />`,
     `<link rel="alternate" hreflang="en" href="${absolute("en", "")}" />`,
     `<link rel="alternate" hreflang="x-default" href="${absolute("en", "")}" />`,
+    `<link rel="alternate" type="application/rss+xml" title="Worklazy Tools (ko)" href="${escapeHtml(new URL("ko/rss.xml", siteUrl).href)}" />`,
+    `<link rel="alternate" type="application/rss+xml" title="Worklazy Tools (en)" href="${escapeHtml(new URL("en/rss.xml", siteUrl).href)}" />`,
     `<meta property="og:locale" content="en_US" />`,
     `<meta property="og:locale:alternate" content="ko_KR" />`,
     `<meta property="og:type" content="website" />`,
@@ -367,6 +396,28 @@ function staticBody(page) {
   const related = (page.related?.length ? `<section><h2>${isKo ? "관련 도구" : "Related tools"}</h2><ul>${page.related.map((item) => `<li><a href="${escapeHtml(item.href)}">${escapeHtml(item.title)}</a> - ${escapeHtml(item.description)}</li>`).join("")}</ul></section>` : "")
     + ((page.route && page.route !== "" && page.route !== "tools" && page.route !== "error") ? `<p><a href="/${page.language}/tools/">${isKo ? "모든 도구 보기" : "Browse all tools"}</a></p>` : "");
   return `<main class="seo-static-fallback"><nav aria-label="${isKo ? "주요 페이지" : "Primary pages"}"><a href="/${page.language}/">${isKo ? "홈" : "Home"}</a><a href="/${page.language}/tools/">${isKo ? "모든 도구" : "All tools"}</a></nav><p class="eyebrow">WORKLAZY TOOLS</p><h1>${escapeHtml(page.heading)}</h1><p>${escapeHtml(page.description)}</p>${sections ? `<ul>${sections}</ul>` : ""}${blocks}${faq ? `<section><h2>${isKo ? "자주 묻는 질문" : "Frequently asked questions"}</h2>${faq}</section>` : ""}${related}${hub}</main>`;
+}
+
+// Item pubDate uses the repository HEAD commit time (VCS evidence shared by all
+// items; per-page modification history does not exist in this static build).
+// Build time is never stamped on items. Without git evidence, items omit pubDate.
+function getRssPubDate() {
+  try {
+    const iso = execSync("git log -1 --format=%cI", { cwd: sourceRoot, encoding: "utf8" }).trim();
+    const time = new Date(iso);
+    if (Number.isNaN(time.getTime())) return null;
+    return { iso, utc: time.toUTCString() };
+  } catch {
+    return null;
+  }
+}
+
+function createRssFeed(language, items, pubDate) {
+  const home = absolute(language, "");
+  const channelDescription = getSeoDefinition(language, "/").description;
+  const rows = items.map(({ title, description, link }) =>
+    `    <item><title>${escapeXml(title)}</title><link>${escapeXml(link)}</link><guid>${escapeXml(link)}</guid><description>${escapeXml(description)}</description>${pubDate ? `<pubDate>${pubDate.utc}</pubDate>` : ""}</item>`).join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>${escapeXml(`Worklazy Tools (${language})`)}</title>\n    <link>${escapeXml(home)}</link>\n    <description>${escapeXml(channelDescription)}</description>\n    <language>${language === "ko" ? "ko-kr" : "en-us"}</language>\n    <lastBuildDate>${escapeXml(new Date().toUTCString())}</lastBuildDate>\n${rows}\n  </channel>\n</rss>\n`;
 }
 
 function createSitemap(entries) {

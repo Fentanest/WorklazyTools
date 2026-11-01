@@ -212,3 +212,25 @@ jobs:
         # Manual runs deliberately skip the newest-main guard (they deploy the chosen ref); see docs/foliotrace-delivery-and-deploy.md.
         if: steps.fresh.outputs.current == 'true' || github.event_name == 'workflow_dispatch'
         uses: actions/deploy-pages@v4
+      # IndexNow (B7): after a successful deploy, submit the deployed sitemap
+      # URLs once. One POST to api.indexnow.org is shared with all
+      # participating engines (Bing, Naver, Yandex, Seznam, Yep); Google does
+      # not use IndexNow. Only public canonical sitemap URLs are sent.
+      # Validate-mode and PR runs never reach this job, so they never submit.
+      - name: Checkout submit script and key (IndexNow only)
+        if: steps.deployment.conclusion == 'success'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Setup Node for IndexNow submission
+        if: steps.deployment.conclusion == 'success'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Submit sitemap URLs to IndexNow
+        if: steps.deployment.conclusion == 'success'
+        # A submission failure must not fail the deployment.
+        continue-on-error: true
+        timeout-minutes: 2
+        run: node scripts/submit-indexnow.mjs --live
