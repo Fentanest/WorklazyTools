@@ -1,6 +1,6 @@
 import { Download, FileArchive, FileCheck2, GripVertical, Info, Layers3, Plus, Scissors, Settings2, Trash2, X } from "lucide-react";
 import Sortable from "sortablejs";
-import { type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { UtilityInput, UtilityNotice, UtilitySelect } from "../../components/UtilitySurface";
@@ -37,7 +37,33 @@ interface EvaluatedRangeRow extends RangeRow {
 import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
 import { pdfOrganizeDirty, type PdfOrganizePreset } from "./pdfOrganizeDirect";
 import { usePdfOrganize } from "./pdfOrganizeDirectLifecycle";
-export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
+import { useUnsavedWorkGuard } from "../../app/toolState";
+import { PDF_ORGANIZE_SAFE_PATHS } from "./pdfUi";
+
+export type PdfOrganizeOutputMode = OutputMode;
+
+export interface PdfOrganizeProducedResult {
+  blob: Blob;
+  name: string;
+  outputMode: OutputMode;
+}
+
+export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed, onResultProduced, onResultInvalidated, onResultSaved, onHandoffRequest }: {
+  preset?: PdfOrganizePreset;
+  /**
+   * W1 result ownership (plan §4.1): the parent keeps the produced Blob for
+   * the finish handoff and clears it on any invalidation.
+   */
+  onResultProduced: (result: PdfOrganizeProducedResult) => void;
+  onResultInvalidated: () => void;
+  /** Download anchor click or completed share (best-effort saved signal). */
+  onResultSaved: () => void;
+  /** [② 마무리로 넘기기] (merged + current result only; parent checks). */
+  onHandoffRequest: () => void;
+  /** Files handed back from finish via [① 정리로 돌아가기]; consumed once. */
+  initialFiles?: File[] | null;
+  onInitialFilesConsumed?: () => void;
+}) {
   const language = useAppLanguage();
   const [sources, setSources] = useState<PdfSourceFile[]>([]);
   const [pages, setPages] = useState<PdfPageItem[]>([]);
@@ -80,6 +106,26 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   const download = useDownloadResult();
   const locked = inspecting || operation.status === "running";
 
+  // W1 invalidation (plan §4.1): any input/page/output edit discards the
+  // panel result. The parent is notified only when a live result actually
+  // dies, so mount-time resets stay silent.
+  const invalidateResult = useCallback(() => {
+    const hadResult = download.result !== null;
+    download.clearResult();
+    if (hadResult) onResultInvalidated();
+  }, [download, onResultInvalidated]);
+
+  // W1 pdf-organize protection (plan §4.1 T1): sources present. Safe only
+  // on the five organize paths (exact set, no scope-prefix OR).
+  useUnsavedWorkGuard("pdf-organize", sources.length > 0 || inspecting, {
+    kind: "files",
+    scopePath: "/tools/pdf-editor",
+    safePaths: [...PDF_ORGANIZE_SAFE_PATHS],
+    messageKey: download.result
+      ? "pdf.messages.PdfEditorPage.unsavedOrganizeWithResult"
+      : "pdf.messages.PdfEditorPage.unsavedOrganize",
+  });
+
   const pendingInputs = useRef<File[]>([]);
   const inputTask = useRef<Promise<void>>(Promise.resolve());
   const inputHandler = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
@@ -93,7 +139,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     if (resume.length) void inputTask.current.then(() => { if (generation === resumeGeneration.current) void inputHandler.current?.(resume); });
     setInspecting(false);
     operation.reset();
-    download.clearResult();
+    invalidateResult();
     setError("");
     setOutputMode(next?.outputMode ?? "merged");
     setQuickSplitOpen(next?.quickSplit ?? false);
@@ -214,11 +260,11 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
         setPages(current => groupByFile
           ? movePdfItemsById(groupPdfPagesBySource(current), moving, beforeId).flatMap(group => group.pages)
           : movePdfItemsById(current, moving, beforeId));
-        download.clearResult();
+        invalidateResult();
       },
     });
     return () => sortable.destroy();
-  }, [download.clearResult, locked, pages.length, quickSplitOpen, groupByFile]);
+  }, [invalidateResult, locked, pages.length, quickSplitOpen, groupByFile]);
 
   const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length, language), [rangeRows, pages.length, language]);
   const groupMembership = useMemo(() => {
@@ -250,7 +296,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     const controller = new AbortController();
     activeController.current = controller;
     setInspecting(true);
-    download.clearResult();
+    invalidateResult();
     operation.start(featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingPagesInPdfs", { p0: incoming.length }));
     const addedSources: PdfSourceFile[] = [];
     const addedPages: PdfPageItem[] = [];
@@ -291,6 +337,17 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   };
   inputHandler.current = handleFiles;
 
+  // W1 [① 정리로 돌아가기]: files handed back from finish are acquired once
+  // through the normal input path.
+  const initialFilesConsumedRef = useRef(false);
+  useEffect(() => {
+    if (!initialFiles?.length || initialFilesConsumedRef.current) return;
+    initialFilesConsumedRef.current = true;
+    onInitialFilesConsumed?.();
+    void handleFiles(initialFiles);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFiles]);
+
   const removeSource = (index: number) => {
     if (locked) return;
     const source = sources[index];
@@ -302,7 +359,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setMovePageIds((current) => new Set([...current].filter((id) => !removedIds.has(id))));
     setSplitAfterPageIds((current) => new Set([...current].filter((id) => !removedIds.has(id))));
     void releasePdf(source.file);
-    download.clearResult();
+    invalidateResult();
   };
 
   const exportPdf = async () => {
@@ -311,7 +368,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     activeController.current = controller;
     const update = (...args: Parameters<typeof operation.update>) => { if (!controller.signal.aborted) operation.update(...args); };
     setError("");
-    download.clearResult();
+    invalidateResult();
     operation.start(featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingSelectedPagesOrderAndRotations"));
     try {
       const sourceFiles = sources.map((source) => ({ id: source.id, file: source.file }));
@@ -328,6 +385,10 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
           : await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, update, language, { watermarkText, pageNumbers }, controller.signal);
         if (controller.signal.aborted) return;
         download.makeResult(output);
+        // W1: the parent keeps this Blob for the finish handoff (merged only
+        // the parent can hand off, but every produced result is reported so
+        // the guard wording matches what actually exists).
+        onResultProduced({ blob: new Blob([output.buffer], { type: output.mimeType }), name: output.fileName, outputMode });
         operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.createdOnePdfFromSelectedPages", { p0: selectedPages.length }));
         return;
       }
@@ -346,6 +407,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
       const output = await exportPdfGroups(sourceFiles, groups, archiveName, update, language, { watermarkText, pageNumbers }, controller.signal);
       if (controller.signal.aborted) return;
         download.makeResult(output);
+      onResultProduced({ blob: new Blob([output.buffer], { type: output.mimeType }), name: output.fileName, outputMode });
       operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.createdPdfsAndPackedThemIntoAZip", { p0: groups.length }));
     } catch (reason) {
       if (controller.signal.aborted) return;
@@ -365,7 +427,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
       setMovePageIds(new Set(indexes.map((index) => pages[index].id)));
       setSelectionError("");
       setError("");
-      download.clearResult();
+      invalidateResult();
     } catch (reason) {
       setSelectionError(reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfOrganizePanel.checkThePageRangeToSelect"));
     }
@@ -374,7 +436,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
   const updateRangeRow = (id: string, field: "name" | "range", value: string) => {
     setRangeRows((current) => current.map((row) => row.id === id ? field === "range" ? rangeRowWithPages(row, value, pages, language) : { ...row, name: value } : row));
     setActiveRangeId(id);
-    download.clearResult();
+    invalidateResult();
   };
 
   const removePage = (id: string) => {
@@ -383,13 +445,13 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setSelectedPageIds((current) => { const next = new Set(current); next.delete(id); return next; });
     setMovePageIds((current) => { const next = new Set(current); next.delete(id); return next; });
     setSplitAfterPageIds((current) => { const next = new Set(current); next.delete(id); return next; });
-    download.clearResult();
+    invalidateResult();
   };
 
   const rotatePage = (id: string) => {
     if (locked) return;
     setPages((current) => current.map((page) => page.id === id ? { ...page, rotation: normalizeRotation(page.rotation + 90) } : page));
-    download.clearResult();
+    invalidateResult();
   };
 
   const movePage = (index: number, direction: -1 | 1) => {
@@ -397,7 +459,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     const nextIndex = index + direction;
     if (nextIndex < 0 || nextIndex >= pages.length) return;
     setPages((current) => movePdfItemsById(current, new Set([current[index].id]), current[direction < 0 ? nextIndex : nextIndex + 1]?.id));
-    download.clearResult();
+    invalidateResult();
   };
 
   const setMode = (mode: OutputMode) => {
@@ -413,21 +475,21 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setOutputMode(mode);
     setSelectionError("");
     setError("");
-    download.clearResult();
+    invalidateResult();
   };
 
   const selectAllPages = () => {
     setSelectedPageIds(new Set(pages.map((page) => page.id)));
     setMovePageIds(new Set(pages.map((page) => page.id)));
     setSelectionError("");
-    download.clearResult();
+    invalidateResult();
   };
 
   const clearPageSelection = () => {
     setSelectedPageIds(new Set());
     setMovePageIds(new Set());
     setSelectionError("");
-    download.clearResult();
+    invalidateResult();
   };
 
   const togglePageSelection = (id: string, selected: boolean, extend: boolean) => {
@@ -436,14 +498,14 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setMovePageIds((current) => setItemsSelected(current, affectedIds, selected));
     selectionAnchorsRef.current.set("single", id);
     setSelectionError("");
-    download.clearResult();
+    invalidateResult();
   };
 
   const addRange = () => {
     const row = createRangeRow(rangeRows.length + 1, language);
     setRangeRows((current) => [...current, row]);
     setActiveRangeId(row.id);
-    download.clearResult();
+    invalidateResult();
   };
 
   const removeRange = (id: string) => {
@@ -453,7 +515,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setRangeRows(nextRows);
     if (activeRangeId === id) setActiveRangeId(nextRows[Math.min(Math.max(removedIndex, 0), nextRows.length - 1)]?.id ?? "");
     selectionAnchorsRef.current.delete(id);
-    download.clearResult();
+    invalidateResult();
   };
 
   const toggleRangePage = (id: string, selected: boolean, extend: boolean) => {
@@ -476,7 +538,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     selectionAnchorsRef.current.set(row.id, id);
     setActiveRangeId(row.id);
     setError("");
-    download.clearResult();
+    invalidateResult();
   };
 
   const setActiveRangePages = (selected: boolean) => {
@@ -485,7 +547,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setRangeRows((current) => current.map((candidate) => candidate.id === row.id ? { ...candidate, range: selected ? compactPdfPageRange(pages.map((_, index) => index)) : "", pageIds: selected ? pages.map(page => page.id) : [], orderIds: undefined } : candidate));
     setMovePageIds(selected ? new Set(pages.map(page => page.id)) : new Set());
     selectionAnchorsRef.current.delete(row.id);
-    download.clearResult();
+    invalidateResult();
   };
 
   const toggleSplitAfter = (id: string) => {
@@ -515,7 +577,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
     setActiveRangeId(nextRows[0]?.id ?? "");
     cancelQuickSplit();
     setError("");
-    download.clearResult();
+    invalidateResult();
   };
 
   function openMobileOutputWorkspace() {
@@ -577,7 +639,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
                   <input type="checkbox" checked={groupByFile} disabled={locked || quickSplitOpen} onChange={event => {
                     const enabled = event.target.checked;
                     setGroupByFile(enabled);
-                    if (enabled) { setPages(current => groupPdfPagesBySource(current).flatMap(group => group.pages)); download.clearResult(); }
+                    if (enabled) { setPages(current => groupPdfPagesBySource(current).flatMap(group => group.pages)); invalidateResult(); }
                   }} />{featureMessage(language, "pdf.messages.PdfOrganizePanel.groupByFile")}
                 </label>
                 {groupByFile ? <span className="text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.ungroupToMovePages")}</span> : movePageIds.size > 0 && <>
@@ -678,7 +740,18 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
                 <p className="mx-0.5 mt-3 text-center text-sm leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.passwordProtectedPdfsRequireAnUnlockedCopy")}</p>
                 <OperationProgress {...operation} compact accent="coral" title={featureMessage(language, "pdf.messages.PdfOrganizePanel.pdfEditExtractLog")} />
                 <PdfError message={error} />
-                {download.result && <div ref={downloadResultRef}><PdfDownloadCard result={download.result} compact /></div>}
+                {download.result && <div ref={downloadResultRef}>
+                  <PdfDownloadCard result={download.result} compact onSaved={onResultSaved} />
+                  {/* W1 [② 마무리로 넘기기] (plan §4.1): merged + current result only. */}
+                  <Button type="button" className="mt-2 min-h-11 w-full rounded-xl" variant="secondary" data-testid="pdf-organize-send-to-finish" disabled={locked || outputMode !== "merged"} onClick={onHandoffRequest}>
+                    {featureMessage(language, "pdf.messages.PdfEditorPage.sendToFinish")}
+                  </Button>
+                  {outputMode === "merged" ? (
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfEditorPage.handoffHint")}</p>
+                  ) : (
+                    <p className="mt-2 text-xs leading-relaxed text-muted-foreground" role="note">{featureMessage(language, "pdf.messages.PdfOrganizePanel.multiFileHandoffBlocked")}</p>
+                  )}
+                </div>}
               </div>
             </Card>
           </aside>
@@ -691,7 +764,7 @@ export function PdfOrganizePanel({ preset }: { preset?: PdfOrganizePreset }) {
             <span className="flex min-w-0 flex-col"><strong className="text-[13px] text-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputWorkspace")}</strong><small className="mt-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground" aria-live="polite">{operation.status === "running" ? creatingLabel : featureMessage(language, "pdf.messages.PdfOrganizePanel.outputWorkspaceSummary", { p0: resultFileCount, p1: includedPageCount })}</small></span>
           </Button>
           {download.result && operation.status === "success" ? (
-            <a className="pdf-mobile-download inline-flex min-h-[46px] min-w-24 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-center text-xs font-bold leading-tight text-primary-foreground shadow-md shadow-primary/20" href={download.result.url} download={download.result.fileName}><Download size={17} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.downloadResult")}</a>
+            <a className="pdf-mobile-download inline-flex min-h-[46px] min-w-24 items-center justify-center gap-1 rounded-xl bg-primary px-3 text-center text-xs font-bold leading-tight text-primary-foreground shadow-md shadow-primary/20" href={download.result.url} download={download.result.fileName} onClick={() => onResultSaved()}><Download size={17} /> {featureMessage(language, "pdf.messages.PdfOrganizePanel.downloadResult")}</a>
           ) : (
             <Button className="pdf-mobile-create min-h-[46px] min-w-24 rounded-xl bg-primary px-3 text-center text-xs font-bold leading-tight text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90" type="button" disabled={exportDisabled} onClick={() => void exportPdf()}>{operation.status === "running" ? `${operation.progress}%` : operation.status === "error" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.retry") : createLabel}</Button>
           )}

@@ -21,6 +21,17 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 
 export const FocusModeContext = createContext<(mode: "standard" | "editor") => void>(() => {});
 export function useFocusMode() { return useContext(FocusModeContext); }
+
+/**
+ * Programmatic guarded navigation (W1): consult the unsaved-work registry
+ * before leaving. `perform` runs only when the target needs no confirmation
+ * and may return false to report that the navigation did not happen (the
+ * consumed one-shot allowance is then restored).
+ */
+export const GuardedNavigateContext = createContext<(to: string, perform: () => boolean | void) => void>(
+  (_to, perform) => { perform(); },
+);
+export function useGuardedNavigate() { return useContext(GuardedNavigateContext); }
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -38,7 +49,8 @@ import { AppInstallControl } from "./AppInstallControl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { RouteSeo } from "./RouteSeo";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
-import { getUnsavedWorkKind, hasUnsavedWork, isGuardedTarget, subscribeUnsavedWork } from "../app/toolState";
+import { getUnsavedWorkKind, getUnsavedWorkMessageKey, hasUnsavedWork, isGuardedTarget, restoreLastOneShotSafeTarget, subscribeUnsavedWork } from "../app/toolState";
+import { featureMessage } from "../i18n/featureMessages";
 import { UnsavedWorkDialog } from "./UnsavedWorkDialog";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "./ui/sheet";
 import { getToolIconTone } from "./toolAccentStyles";
@@ -117,7 +129,7 @@ export function AppShell() {
     }
   }, []);
 
-  const requestGuardedNavigate = useCallback((to: string, perform: () => void) => {
+  const requestGuardedNavigate = useCallback((to: string, perform: () => boolean | void) => {
     let target: URL | null = null;
     try {
       target = new URL(to, window.location.href);
@@ -134,7 +146,14 @@ export function AppShell() {
     const targetStripped = stripLanguagePrefix(targetRoute).replace(/\/+$/, "") || "/";
     const currentStripped = stripLanguagePrefix(currentRoute).replace(/\/+$/, "") || "/";
     if (targetStripped === currentStripped || !hasUnsavedWork() || !isGuardedTarget(targetStripped)) {
-      perform();
+      let result: boolean | void;
+      try {
+        result = perform();
+      } catch (error) {
+        restoreLastOneShotSafeTarget();
+        throw error;
+      }
+      if (result === false) restoreLastOneShotSafeTarget();
       return;
     }
     pendingActionRef.current = perform;
@@ -302,8 +321,16 @@ export function AppShell() {
     else setSidebarCollapsed((collapsed) => !collapsed);
   };
 
+  // W1 custom guard message: the first hasWork registration carrying a
+  // messageKey wins; otherwise the kind-based message is used.
+  // Recomputed on every registry-notified render (guardTick above).
+  const guardMessageKey = getUnsavedWorkMessageKey();
+  const resolvedGuardMessage = guardMessageKey ? featureMessage(language, guardMessageKey) : guardMessageKey;
+  const guardMessage = resolvedGuardMessage && resolvedGuardMessage !== guardMessageKey ? resolvedGuardMessage : undefined;
+
   return (
     <FocusModeContext.Provider value={setFocusMode}>
+    <GuardedNavigateContext.Provider value={requestGuardedNavigate}>
     <FileDropProvider routeKey={location.pathname}>
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} triggerId="mobile-navigation-trigger">
       <div className={cn("app-shell", sidebarCollapsed && "wl-collapsed", focusMode === "editor" && "editor-mode")}>
@@ -419,6 +446,7 @@ export function AppShell() {
       <UnsavedWorkDialog
         open={guardOpen}
         kind={getUnsavedWorkKind()}
+        message={guardMessage}
         onStay={closeGuardStay}
         onLeave={confirmGuardLeave}
       />
@@ -477,6 +505,7 @@ export function AppShell() {
       </div>
     </Sheet>
     </FileDropProvider>
+    </GuardedNavigateContext.Provider>
     </FocusModeContext.Provider>
   );
 }
@@ -486,7 +515,7 @@ function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed, onGuar
   onCycleTheme: () => void;
   onToggleSidebar: () => void;
   sidebarCollapsed: boolean;
-  onGuardedNavigate: (to: string, perform: () => void) => void;
+  onGuardedNavigate: (to: string, perform: () => boolean | void) => void;
 }) {
   const { t } = useTranslation("common");
   const language = useAppLanguage();

@@ -6,6 +6,30 @@ declare global {
   }
 }
 
+// W1 handoff hold (plan §4.1 D4-1): while a generated result is mid-handoff,
+// automatic chunk-recovery reloads are suspended so the result is not lost.
+let autoReloadHoldCount = 0;
+
+/** Suspend automatic chunk-recovery reloads until release() is called. */
+export function holdAutoReload(): void {
+  autoReloadHoldCount += 1;
+}
+
+/** Resume automatic chunk-recovery reloads (balances holdAutoReload). */
+export function release(): void {
+  autoReloadHoldCount = Math.max(0, autoReloadHoldCount - 1);
+}
+
+/** Whether automatic chunk-recovery reloads are currently suspended. */
+export function isAutoReloadHeld(): boolean {
+  return autoReloadHoldCount > 0;
+}
+
+/** Test hook: drop all holds without balancing releases. */
+export function __clearAutoReloadHoldForTests(): void {
+  autoReloadHoldCount = 0;
+}
+
 // Vite and React receive the same rejection. Only that failure may share a
 // pending navigation; another error or route must still consult its budget.
 let pending: { key: string; error: unknown; result: boolean | Promise<boolean> } | undefined;
@@ -41,6 +65,9 @@ export function installChunkRecovery() {
 }
 
 export function recoverChunkError(error: unknown, preloadError = false): boolean | Promise<boolean> {
+  // A held handoff keeps its in-memory result: never reload, and never mint
+  // a retry budget key while the hold lasts.
+  if (isAutoReloadHeld()) return false;
   const key = chunkRetryKey(window.location);
   if (pending?.key === key) return pending.error === error ? pending.result : false;
   if (!preloadError && !isChunkLoadError(error)) return false;

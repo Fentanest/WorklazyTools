@@ -8,6 +8,8 @@ import { Button } from "./ui/button";
 interface UnsavedWorkDialogProps {
   open: boolean;
   kind: UnsavedWorkKind;
+  /** W1: registration-provided description; falls back to the kind message. */
+  message?: string;
   onStay: () => void;
   onLeave: () => void;
 }
@@ -15,7 +17,7 @@ interface UnsavedWorkDialogProps {
 // In-app confirmation shown *before* SPA navigation destroys tool state.
 // Native <dialog> provides the modal top layer, initial focus handling, and
 // the Escape-to-stay gesture; it never uses window.confirm().
-export function UnsavedWorkDialog({ open, kind, onStay, onLeave }: UnsavedWorkDialogProps) {
+export function UnsavedWorkDialog({ open, kind, message, onStay, onLeave }: UnsavedWorkDialogProps) {
   const { t } = useTranslation("common");
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const stayRef = useRef<HTMLButtonElement | null>(null);
@@ -75,7 +77,7 @@ export function UnsavedWorkDialog({ open, kind, onStay, onLeave }: UnsavedWorkDi
             {t("recovery.unsavedWorkTitle")}
           </h2>
           <p id={descriptionId} className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-            {t(kind === "files" ? "recovery.unsavedWorkDescriptionFiles" : "recovery.unsavedWorkDescriptionEdits")}
+            {message ?? t(kind === "files" ? "recovery.unsavedWorkDescriptionFiles" : "recovery.unsavedWorkDescriptionEdits")}
           </p>
         </div>
       </div>

@@ -73,6 +73,9 @@ try {
     assert.equal(before.resultFiles.length, 1, `${action}: the first completed output was not retained before the ownership transition`);
     if (action === "navigate") {
       await page.locator("[data-pdf-nav-mode='organize']").click();
+      // W1: unsaved finish work must ask before leaving (pdf-finish guard).
+      await page.locator("[data-testid='unsaved-work-dialog']").waitFor({ state: "visible" });
+      await page.locator("[data-testid='unsaved-leave']").click();
       await page.locator("[data-testid='pdf-finish-ready']").waitFor({ state: "detached" });
     } else if (action === "replace") {
       await page.locator("[data-ui-component='file-list'] li").first().locator("button").click();
@@ -91,6 +94,15 @@ try {
       assert.equal(after.pdfUrls.length, 1, "same-screen cancellation did not register the completed PDF URL");
       assert.equal(after.pdfUrls[0].revoked, false, "same-screen cancellation revoked the visible partial result");
       await page.locator("[data-pdf-nav-mode='organize']").click();
+      // Saved results do not block leaving; unsaved work would show the dialog.
+      await page.waitForFunction(() => {
+        if (!document.querySelector("[data-testid='pdf-finish-ready']")) return true;
+        const dialog = document.querySelector("[data-testid='unsaved-work-dialog']");
+        return !!dialog && dialog.open;
+      });
+      if (await page.locator("[data-testid='unsaved-work-dialog']").isVisible()) {
+        await page.locator("[data-testid='unsaved-leave']").click();
+      }
       await page.locator("[data-testid='pdf-finish-ready']").waitFor({ state: "detached" });
       await page.waitForTimeout(400);
       const afterLeave = await inspectPage(page);

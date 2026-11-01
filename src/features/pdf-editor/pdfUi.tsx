@@ -12,6 +12,34 @@ import { cn } from "../../lib/utils";
 
 export { normalizeOutputName } from "./outputName.ts";
 
+/**
+ * W1 result-owner protection paths (plan §4.1 T1). Registered as exact sets
+ * (no scope-prefix OR). pdf-result covers all ten; the panels cover five each.
+ */
+export const PDF_ORGANIZE_PATHS = [
+  "/tools/pdf-editor",
+  "/tools/pdf-editor/merge",
+  "/tools/pdf-editor/split",
+  "/tools/pdf-editor/delete",
+  "/tools/pdf-editor/rotate",
+] as const;
+
+export const PDF_FINISH_PATHS = [
+  "/tools/pdf-editor/finish",
+  "/tools/pdf-editor/page-numbers",
+  "/tools/pdf-editor/header-footer",
+  "/tools/pdf-editor/watermark",
+  "/tools/pdf-editor/stamp",
+] as const;
+
+export const PDF_EDITOR_SAFE_PATHS: readonly string[] = [
+  ...PDF_ORGANIZE_PATHS,
+  ...PDF_FINISH_PATHS,
+];
+
+export const PDF_ORGANIZE_SAFE_PATHS: readonly string[] = [...PDF_ORGANIZE_PATHS];
+export const PDF_FINISH_SAFE_PATHS: readonly string[] = [...PDF_FINISH_PATHS];
+
 export interface DownloadResult {
   url: string;
   fileName: string;
@@ -70,27 +98,27 @@ export function useDownloadResults() {
   return useMemo(() => ({ results, makeBlobResults, clearResults }), [clearResults, makeBlobResults, results]);
 }
 
-export function PdfDownloadCard({ result, title, compact = false }: { result: DownloadResult; title?: string; compact?: boolean }) {
+export function PdfDownloadCard({ result, title, compact = false, onSaved }: { result: DownloadResult; title?: string; compact?: boolean; onSaved?: () => void }) {
   const language = useAppLanguage();
   const displayTitle = title ?? featureMessage(language, "pdf.messages.pdfUi.yourFileIsReady");
   if (compact) {
     return (
       <Card as="section" className="pdf-download-compact mt-2.5 gap-0 overflow-visible rounded-2xl border border-primary/50 bg-primary/10 p-3 py-3 text-muted-foreground shadow-none ring-0 dark:border-primary dark:bg-primary/10" aria-live="polite">
         <div className="flex items-center gap-2 text-green-700 dark:text-green-300"><CheckCircle2 size={18} /><strong className="text-sm text-foreground">{displayTitle}</strong></div>
-        <a className={cn(buttonVariants({ size: "lg" }), "mt-2.5 min-w-0 justify-center rounded-xl bg-primary px-3 font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90")} data-testid="pdf-download" href={result.url} download={result.fileName}>
+        <a className={cn(buttonVariants({ size: "lg" }), "mt-2.5 min-w-0 justify-center rounded-xl bg-primary px-3 font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90")} data-testid="pdf-download" href={result.url} download={result.fileName} onClick={() => onSaved?.()}>
           <Download size={16} /> <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{result.fileName}</span><small className="border-l border-white/25 pl-2 text-xs text-primary-foreground/75">{formatBytes(result.size)}</small>
         </a>
-        <FileShareButton url={result.url} fileName={result.fileName} shadcn className="mt-2 min-h-10 w-full justify-center rounded-xl" />
+        <FileShareButton url={result.url} fileName={result.fileName} shadcn className="mt-2 min-h-10 w-full justify-center rounded-xl" onShared={() => onSaved?.()} />
         {!!result.warnings.length && <div className="mt-3">{result.warnings.map((warning) => <p className="mt-1 flex items-start gap-1 text-[13px] text-amber-800 dark:text-amber-300" key={warning}><AlertTriangle className="mt-0.5 shrink-0" size={13} /> {warning}</p>)}</div>}
       </Card>
     );
   }
   return (
     <ResultCard title={displayTitle} message={featureMessage(language, "pdf.messages.pdfUi.thisFileWasCreatedInYourBrowserDownload")}>
-      <a className={cn(buttonVariants({ size: "lg" }), "mt-3 w-fit max-w-full rounded-xl bg-primary px-3 font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90")} data-testid="pdf-download" href={result.url} download={result.fileName}>
+      <a className={cn(buttonVariants({ size: "lg" }), "mt-3 w-fit max-w-full rounded-xl bg-primary px-3 font-bold text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/90")} data-testid="pdf-download" href={result.url} download={result.fileName} onClick={() => onSaved?.()}>
         <Download size={16} /><span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{result.fileName}</span><small className="border-l border-white/25 pl-2 text-xs text-primary-foreground/75">{formatBytes(result.size)}</small>
       </a>
-      <FileShareButton url={result.url} fileName={result.fileName} shadcn className="mt-2 rounded-xl" />
+      <FileShareButton url={result.url} fileName={result.fileName} shadcn className="mt-2 rounded-xl" onShared={() => onSaved?.()} />
       {!!result.warnings.length && <div className="mt-3">{result.warnings.map((warning) => <p className="mt-1 flex items-start gap-1 text-[13px] text-amber-800 dark:text-amber-300" key={warning}><AlertTriangle className="mt-0.5 shrink-0" size={13} /> {warning}</p>)}</div>}
     </ResultCard>
   );

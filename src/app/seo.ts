@@ -167,7 +167,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
     description: "PDF 페이지를 병합·분할·추출·회전하고 페이지 번호·워터마크·스탬프를 추가하세요.",
     application: {
       name: "PDF 편집",
-      featureList: ["PDF 페이지 편집·병합·추출", "체크박스 범위 선택·연속 분할", "페이지 순서 변경·회전", "페이지 번호·워터마크", "머리글·스탬프"],
+      featureList: ["PDF 페이지 편집·병합·추출", "체크박스 범위 선택·연속 분할", "페이지 순서 변경·회전", "페이지 번호·워터마크", "머리글·스탬프", "정리 결과를 마무리 화면으로 넘기기"],
     },
   },
   "/tools/pdf-editor/image-to-pdf": {

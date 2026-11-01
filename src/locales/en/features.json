@@ -1843,7 +1843,21 @@
       },
       "PdfEditorPage": {
         "pdfTools": "PDF tools",
-        "loadingFinish": "Loading PDF finishing tools…"
+        "loadingFinish": "Loading PDF finishing tools…",
+        "sendToFinish": "② Send to finish",
+        "retainedResultTitle": "① Organize result",
+        "retainedResultWaiting": "Waiting for the finish screen to accept the result…",
+        "retainedResultFailed": "The finish screen could not accept the result.",
+        "retryIntake": "Insert again",
+        "retainedDownload": "Download",
+        "discardResult": "Discard result",
+        "finishLoadFailed": "Could not load the finish screen.",
+        "retryFinishLoad": "Try again",
+        "handoffHint": "Protection moves to finish after it accepts the result. Until then the result stays here.",
+        "unsavedResult": "You have an unsaved PDF result. Leaving will discard it.",
+        "unsavedOrganizeWithResult": "The organize screen's source files and edits will be lost. The result PDF you just made stays available on the finish screen.",
+        "unsavedOrganize": "The organize screen's source files and edits will be lost.",
+        "unsavedFinish": "The finish screen's files, settings, and results will be lost."
       },
       "pdf": {
         "unsupportedPdfOperation": "Unsupported PDF operation.",
@@ -1970,7 +1984,8 @@
         "ungroupToMovePages": "Ungroup to move individual pages.",
         "moveSelectionCount": "Move {{p0}} pages together",
         "clearMoveSelection": "Clear move selection",
-        "draggingPages": "Moving {{p0}} pages · Drop at the dashed position"
+        "draggingPages": "Moving {{p0}} pages · Drop at the dashed position",
+        "multiFileHandoffBlocked": "Multi-file results cannot be sent to finish. Switch the output to “Merge into one PDF” or download the files and add them to finish."
       },
       "PdfThumbnail": {
         "previewFailed": "Preview failed",
@@ -2298,7 +2313,11 @@
         "suffix": "finished",
         "fallback": "Worklazy-PDF-finished"
       },
-      "archiveFileName": "worklazy-pdf-finished.zip"
+      "archiveFileName": "worklazy-pdf-finished.zip",
+      "backToOrganize": "① Back to organize",
+      "suggestionTitle": "① Organize result",
+      "suggestionInsert": "Insert organize result",
+      "suggestionHint": "This result was made on the organize screen. Insert it to start finishing."
     },
     "page": {
       "modes": {

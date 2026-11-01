@@ -6,8 +6,13 @@ import { UtilityField, UtilityInput, UtilityNotice, UtilitySelect, UtilityTextar
 import { FileDropZone, FileList, PrimaryButton, SectionCard, ToggleRow } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
+import { useGuardedNavigate } from "../../components/AppShell";
+import { useNavigate } from "react-router-dom";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import { PDF_FINISH_SAFE_PATHS } from "./pdfUi";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
+import { localizedPath } from "../../i18n/languages";
 import type { AppLanguage } from "../../i18n/languages";
 import { useAppLanguage } from "../../i18n/routing";
 import { cn } from "../../lib/utils";
@@ -207,6 +212,10 @@ interface FinishCopy {
   retry: string;
   cancel: string;
   canceled: string;
+  backToOrganize: string;
+  suggestionTitle: string;
+  suggestionInsert: string;
+  suggestionHint: string;
   progressTitle: string;
   progress: Record<PdfFinishProgress["phase"], string>;
   complete: string;
@@ -273,8 +282,27 @@ function formatFinishWarning(copy: FinishCopy, warning: PdfFinishWarningCode, em
     .replace("{{total}}", (embeddedFontOutputCount * 3.8).toFixed(1));
 }
 
-export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
+export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHandoffFailed, organizePath, onBackToOrganize }: {
+  preset: PdfFinishPreset;
+  /**
+   * W1 prepared handoff from organize (plan §4.1 D4-1). The panel inserts it
+   * via the normal inspection path and acks only on inspection success.
+   */
+  handoffIntake?: { blob: Blob; name: string; generation: number; attempt: number } | null;
+  onHandoffAccepted?: (generation: number) => void;
+  onHandoffFailed?: (generation: number) => void;
+  /** Localized organize path for [① 정리로 돌아가기]. */
+  organizePath?: string;
+  /**
+   * Arms the organize reopen (passes the files to reopen) and returns the
+   * target path, or null when there is nothing to reopen. Called inside the
+   * guarded perform so Stay never leaves stale reopen state behind.
+   */
+  onBackToOrganize?: (files: File[]) => string | null;
+}) {
   const language = useAppLanguage();
+  const navigate = useNavigate();
+  const requestGuardedNavigate = useGuardedNavigate();
   const copy = featureResource<FinishCopy>(language, "pdf.finish");
   const [activeTab, setActiveTab] = useState<ImplementedFinishTab>(() => implementedTab(preset.initialTab));
   const [enabled, setEnabled] = useState<Record<ImplementedFinishTab, boolean>>(() => ({
@@ -335,6 +363,15 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
   const tabPanelId = useId();
   const form = forms[activeTab];
   const locked = inspecting || operation.status === "running";
+  // W1 pdf-finish protection (plan §4.1 T1): sources present and no saved
+  // result yet. Safe only on the five finish paths (exact set, no OR).
+  const finishHasWork = (sources.length > 0 || inspecting) && download.results.length === 0;
+  useUnsavedWorkGuard("pdf-finish", finishHasWork, {
+    kind: "files",
+    scopePath: "/tools/pdf-editor/finish",
+    safePaths: [...PDF_FINISH_SAFE_PATHS],
+    messageKey: "pdf.messages.PdfEditorPage.unsavedFinish",
+  });
   const fontSize = numericInput(form.fontSize);
   const margin = numericInput(form.margin);
   const startingNumber = numericInput(startNumber);
@@ -609,6 +646,59 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
     download.clearResults();
   };
 
+  // W1 prepared handoff intake (plan §4.1 D4-1): insert through the normal
+  // inspection path. The ack goes out only after inspection success, and the
+  // finish protection is registered first (direct setUnsavedWork, so the
+  // registry — not the hook effect — defines the order).
+  const intakeConsumedRef = useRef<{ generation: number; attempt: number } | null>(null);
+  const intakeAckedRef = useRef<number | null>(null);
+  const intakeFailedRef = useRef<number | null>(null);
+  const intakeFileRef = useRef<{ name: string; size: number } | null>(null);
+  useEffect(() => {
+    if (!handoffIntake) return;
+    const key = { generation: handoffIntake.generation, attempt: handoffIntake.attempt };
+    if (intakeConsumedRef.current?.generation === key.generation && intakeConsumedRef.current?.attempt === key.attempt) return;
+    intakeConsumedRef.current = key;
+    intakeAckedRef.current = null;
+    intakeFailedRef.current = null;
+    intakeFileRef.current = { name: handoffIntake.name, size: handoffIntake.blob.size };
+    void replaceFile([new File([handoffIntake.blob], handoffIntake.name, { type: "application/pdf" })]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handoffIntake]);
+  useEffect(() => {
+    if (!handoffIntake || inspecting || !file || pageCount === 0 || error) return;
+    if (intakeAckedRef.current === handoffIntake.generation) return;
+    const expected = intakeFileRef.current;
+    if (!expected || file.name !== expected.name || file.size !== expected.size) return;
+    intakeAckedRef.current = handoffIntake.generation;
+    setUnsavedWork("pdf-finish", {
+      hasWork: true,
+      kind: "files",
+      scopePath: "/tools/pdf-editor/finish",
+      safePaths: [...PDF_FINISH_SAFE_PATHS],
+      messageKey: "pdf.messages.PdfEditorPage.unsavedFinish",
+    });
+    onHandoffAccepted?.(handoffIntake.generation);
+  }, [handoffIntake, inspecting, file, pageCount, error, onHandoffAccepted]);
+  useEffect(() => {
+    if (!handoffIntake || inspecting || !error) return;
+    if (intakeFailedRef.current === handoffIntake.attempt) return;
+    intakeFailedRef.current = handoffIntake.attempt;
+    onHandoffFailed?.(handoffIntake.generation);
+  }, [handoffIntake, inspecting, error, onHandoffFailed]);
+
+  const backToOrganizePath = organizePath ?? localizedPath(language, "/tools/pdf-editor");
+  const backToOrganize = () => {
+    requestGuardedNavigate(backToOrganizePath, () => {
+      const target = onBackToOrganize
+        ? onBackToOrganize(sources.map(({ file: sourceFile }) => sourceFile))
+        : backToOrganizePath;
+      if (!target) return false;
+      navigate(target);
+      return true;
+    });
+  };
+
   const watermarkActive = activeTab === "watermark";
   const stampActive = activeTab === "stamp";
   const watermarkForm = forms.watermark;
@@ -841,6 +931,9 @@ export function PdfFinishPanel({ preset }: { preset: PdfFinishPreset }) {
         <SectionCard step={1} title={copy.uploadTitle} description={copy.uploadDescription} className="">
           <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map(({ file: sourceFile }) => sourceFile)} onFiles={replaceFile} disabled={locked} accent="violet" hint={inspecting ? copy.inspecting : copy.uploadHint} />
           <FileList files={sources.map(({ file: sourceFile }) => sourceFile)} onRemove={removeFile} accent="violet" />
+          <Button type="button" variant="ghost" className="mt-2 min-h-10 w-fit rounded-xl px-3 text-xs font-bold text-primary" data-testid="pdf-finish-back-to-organize" onClick={backToOrganize} disabled={locked}>
+            {copy.backToOrganize}
+          </Button>
           {(inspecting || previewing) && operation.status !== "running" && <Button type="button" variant="outline" className="mt-2 min-h-11 w-full rounded-xl text-destructive" data-testid="pdf-finish-file-cancel" onClick={() => removeFile()}><X size={17} />{copy.cancel}</Button>}
         </SectionCard>
         <PdfError message={error} />

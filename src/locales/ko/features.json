@@ -1836,7 +1836,21 @@
       },
       "PdfEditorPage": {
         "pdfTools": "PDF 기능",
-        "loadingFinish": "PDF 마무리 도구를 불러오는 중…"
+        "loadingFinish": "PDF 마무리 도구를 불러오는 중…",
+        "sendToFinish": "② 마무리로 넘기기",
+        "retainedResultTitle": "① 정리 결과",
+        "retainedResultWaiting": "마무리 화면이 결과를 받는 중입니다…",
+        "retainedResultFailed": "마무리 화면이 결과를 받지 못했습니다.",
+        "retryIntake": "다시 넣기",
+        "retainedDownload": "다운로드",
+        "discardResult": "결과 버리기",
+        "finishLoadFailed": "마무리 화면을 불러오지 못했습니다.",
+        "retryFinishLoad": "다시 시도",
+        "handoffHint": "마무리 화면이 결과를 받아들이면 보호가 마무리로 넘어갑니다. 그 전까지 이 화면에 결과가 남습니다.",
+        "unsavedResult": "저장하지 않은 PDF 결과가 있습니다. 나가면 사라집니다.",
+        "unsavedOrganizeWithResult": "정리 화면의 원본 파일과 편집 상태가 사라집니다. 마지막으로 만든 결과 PDF는 마무리 화면에서 계속 쓸 수 있습니다.",
+        "unsavedOrganize": "정리 화면의 원본 파일과 편집 내용이 사라집니다.",
+        "unsavedFinish": "마무리 화면의 파일·설정·결과가 사라집니다."
       },
       "pdf": {
         "unsupportedPdfOperation": "지원하지 않는 PDF 작업입니다.",
@@ -1963,7 +1977,8 @@
         "ungroupToMovePages": "개별 페이지를 이동하려면 묶기를 해제하세요.",
         "moveSelectionCount": "함께 이동 {{p0}}페이지",
         "clearMoveSelection": "이동 선택만 해제",
-        "draggingPages": "{{p0}}페이지 함께 이동 · 점선 위치에 놓으세요"
+        "draggingPages": "{{p0}}페이지 함께 이동 · 점선 위치에 놓으세요",
+        "multiFileHandoffBlocked": "여러 파일 결과는 마무리로 넘길 수 없습니다. 출력 방식을 '하나로 합치기'로 바꾸거나 파일을 내려받아 마무리에 올리세요."
       },
       "PdfThumbnail": {
         "previewFailed": "미리보기 실패",
@@ -2291,7 +2306,11 @@
         "suffix": "마무리",
         "fallback": "Worklazy-PDF-마무리"
       },
-      "archiveFileName": "worklazy-pdf-finished.zip"
+      "archiveFileName": "worklazy-pdf-finished.zip",
+      "backToOrganize": "① 정리로 돌아가기",
+      "suggestionTitle": "① 정리 결과",
+      "suggestionInsert": "정리 결과 넣기",
+      "suggestionHint": "정리 화면에서 만든 결과입니다. 넣기를 눌러 마무리 작업을 시작하세요."
     },
     "page": {
       "modes": {

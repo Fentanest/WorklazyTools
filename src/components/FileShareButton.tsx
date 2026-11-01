@@ -10,9 +10,11 @@ interface FileShareButtonProps {
   mimeType?: string;
   className?: string;
   shadcn?: boolean;
+  /** Fired when the system share sheet completes (download fallback included). */
+  onShared?: () => void;
 }
 
-export function FileShareButton({ url, fileName, mimeType, className = "secondary-button", shadcn = false }: FileShareButtonProps) {
+export function FileShareButton({ url, fileName, mimeType, className = "secondary-button", shadcn = false, onShared }: FileShareButtonProps) {
   const { t } = useTranslation("common");
   const blobRef = useRef<Blob | undefined>(undefined);
   const [supported] = useState(() => typeof navigator !== "undefined" && typeof navigator.share === "function");
@@ -32,14 +34,18 @@ export function FileShareButton({ url, fileName, mimeType, className = "secondar
     const blob = blobRef.current;
     if (!blob) {
       triggerDownload(url, fileName);
+      onShared?.();
       return;
     }
     const file = new File([blob], fileName, { type: mimeType || blob.type || "application/octet-stream" });
     if (typeof navigator.canShare === "function" && !navigator.canShare({ files: [file] })) {
       triggerDownload(url, fileName);
+      onShared?.();
       return;
     }
-    void navigator.share({ title: fileName, files: [file] }).catch((error) => {
+    void navigator.share({ title: fileName, files: [file] }).then(() => {
+      onShared?.();
+    }).catch((error) => {
       if (!(error instanceof DOMException && error.name === "AbortError")) triggerDownload(url, fileName);
     });
   };
