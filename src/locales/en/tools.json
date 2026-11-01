@@ -181,7 +181,7 @@
     "hwp-editor": {
       "title": "Online HWP Document Editor",
       "shortTitle": "HWP Editor",
-      "description": "Open, edit, and save HWP and HWPX documents directly in your browser with formatting support.",
+      "description": "Open and view HWP/HWPX files without installing software, then edit them. Save as HWP, HWPX or HML with formatting support.",
       "eyebrow": "HANGUL DOCUMENTS",
       "highlights": [
         "HWP, HWPX & HML",

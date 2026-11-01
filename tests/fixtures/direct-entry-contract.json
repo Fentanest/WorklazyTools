@@ -111,11 +111,11 @@
       "ko",
       "en"
     ],
-    "canonical": "self",
+    "canonical": "/tools/pdf-converter/pdf-to-document/ocr",
     "indexable": true,
-    "sitemap": true,
+    "sitemap": false,
     "static": true,
-    "redirectTarget": "/ko/tools/pdf-editor/ocr",
+    "redirectTarget": "/ko/tools/pdf-converter/pdf-to-document/ocr",
     "readySelector": "[data-direct-purpose=\"ocr\"]",
     "postLoadAssertions": {
       "format": "searchable-pdf",
@@ -128,7 +128,8 @@
       "en": "/en/tools/pdf-editor/ocr",
       "x-default": "/en/tools/pdf-editor/ocr"
     },
-    "socialSlug": "pdf-editor-ocr"
+    "socialSlug": "pdf-editor-ocr",
+    "redirectTo": "/tools/pdf-converter/pdf-to-document/ocr"
   },
   {
     "path": "/tools/pdf-editor/convert",
@@ -138,11 +139,11 @@
       "ko",
       "en"
     ],
-    "canonical": "self",
+    "canonical": "/tools/pdf-converter/pdf-to-document",
     "indexable": true,
-    "sitemap": true,
+    "sitemap": false,
     "static": true,
-    "redirectTarget": "/ko/tools/pdf-editor/convert",
+    "redirectTarget": "/ko/tools/pdf-converter/pdf-to-document",
     "readySelector": "[data-direct-purpose=\"convert\"]",
     "postLoadAssertions": {
       "format": "docx",
@@ -154,7 +155,8 @@
       "en": "/en/tools/pdf-editor/convert",
       "x-default": "/en/tools/pdf-editor/convert"
     },
-    "socialSlug": "pdf-convert"
+    "socialSlug": "pdf-convert",
+    "redirectTo": "/tools/pdf-converter/pdf-to-document"
   },
   {
     "path": "/tools/image-studio/resize",
@@ -265,7 +267,8 @@
       "en": "/en/tools/video-studio/trim",
       "x-default": "/en/tools/video-studio/trim"
     },
-    "socialSlug": "video-studio-trim"
+    "socialSlug": "video-studio-trim",
+    "videoPublic": true
   },
   {
     "path": "/tools/video-studio/merge",
@@ -293,7 +296,8 @@
       "en": "/en/tools/video-studio/merge",
       "x-default": "/en/tools/video-studio/merge"
     },
-    "socialSlug": "video-studio-merge"
+    "socialSlug": "video-studio-merge",
+    "videoPublic": true
   },
   {
     "path": "/tools/video-studio/extract-audio",
@@ -322,7 +326,8 @@
       "en": "/en/tools/video-studio/extract-audio",
       "x-default": "/en/tools/video-studio/extract-audio"
     },
-    "socialSlug": "video-studio-extract-audio"
+    "socialSlug": "video-studio-extract-audio",
+    "videoPublic": true
   },
   {
     "path": "/tools/audio-studio/trim",
@@ -374,5 +379,85 @@
       "x-default": "/en/tools/excel-merger"
     },
     "socialSlug": "excel-merger"
+  },
+  {
+    "path": "/tools/pdf-editor/page-numbers",
+    "initialTab": "page-numbers",
+    "owner": "pdf-finish",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/page-numbers",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/page-numbers",
+      "en": "/en/tools/pdf-editor/page-numbers",
+      "x-default": "/en/tools/pdf-editor/page-numbers"
+    },
+    "socialSlug": "pdf-page-numbers"
+  },
+  {
+    "path": "/tools/pdf-editor/header-footer",
+    "initialTab": "header-footer",
+    "owner": "pdf-finish",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/header-footer",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/header-footer",
+      "en": "/en/tools/pdf-editor/header-footer",
+      "x-default": "/en/tools/pdf-editor/header-footer"
+    },
+    "socialSlug": "pdf-header-footer"
+  },
+  {
+    "path": "/tools/pdf-editor/watermark",
+    "initialTab": "watermark",
+    "owner": "pdf-finish",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/watermark",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/watermark",
+      "en": "/en/tools/pdf-editor/watermark",
+      "x-default": "/en/tools/pdf-editor/watermark"
+    },
+    "socialSlug": "pdf-watermark"
+  },
+  {
+    "path": "/tools/pdf-editor/stamp",
+    "initialTab": "stamp",
+    "owner": "pdf-finish",
+    "locales": [
+      "ko",
+      "en"
+    ],
+    "canonical": "self",
+    "indexable": true,
+    "sitemap": true,
+    "static": true,
+    "redirectTarget": "/ko/tools/pdf-editor/stamp",
+    "hreflang": {
+      "ko": "/ko/tools/pdf-editor/stamp",
+      "en": "/en/tools/pdf-editor/stamp",
+      "x-default": "/en/tools/pdf-editor/stamp"
+    },
+    "socialSlug": "pdf-stamp"
   }
 ]

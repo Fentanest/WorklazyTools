@@ -20,16 +20,16 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
       "/tools/video-studio": "온라인 동영상 편집 - 자르기·합치기·변환 | Worklazy Tools",
       "/tools/audio-studio": "온라인 오디오 편집 - 음소거·피치 조절 | Worklazy Tools",
       "/tools/image-studio": "온라인 사진 편집 - 자르기·그리기·콜라주 | Worklazy Tools",
-      "/tools/image-privacy": "사진 위치정보 삭제 - EXIF·GPS 확인 및 제거 | Worklazy Tools",
+      "/tools/image-privacy": "사진 위치정보·메타데이터(EXIF) 삭제 | Worklazy Tools",
       "/tools/qr-studio": "QR 코드 만들기·읽기 - 로고 삽입·사진 스캔 | Worklazy Tools",
       "/tools/qr-studio/bulk": "QR 코드 일괄 생성 - 엑셀·CSV로 대량 생성 | Worklazy Tools",
       "/tools/data-converter": "CSV·JSON·HTML 표 변환기 | Worklazy Tools",
       "/tools/document-compare": "워드·한글 문서 비교 - 수정 전후 차이 확인 | Worklazy Tools",
       "/tools/pdf-compare": "PDF 파일 비교 - 화면·텍스트 변경사항 확인 | Worklazy Tools",
       "/tools/excel-compare": "엑셀 파일 비교 - 값·수식·기준 항목별 차이 | Worklazy Tools",
-      "/tools/excel-cleaner": "엑셀 데이터 정리 - 공백·빈 행·중복 정리 | Worklazy Tools",
+      "/tools/excel-cleaner": "엑셀 데이터 정리 - 중복 제거·공백 제거·빈 행 삭제 | Worklazy Tools",
       "/tools/document-generator": "워드 문서 일괄 생성 - 엑셀 명단으로 메일머지 | Worklazy Tools",
-      "/tools/office-editor": "온라인 문서 편집 - Word·Excel·PowerPoint | Worklazy Tools",
+      "/tools/office-editor": "워드·엑셀·PPT 온라인 편집 - 설치 없이 열기·저장 | Worklazy Tools",
       "/tools/text-merger": "텍스트 파일 합치기 - TXT·메모 순서대로 병합 | Worklazy Tools",
     },
     en: {
@@ -73,17 +73,24 @@ test("English tool titles do not fall back to a generic browser-tool label", () 
   }
 });
 
-test("PDF finish aliases retain distinct metadata and canonicalize to the finish guide", () => {
+test("PDF finish subpaths are self-canonical with distinct metadata and per-path FAQs", () => {
   for (const language of ["ko", "en"] as const) {
     const routes = ["/tools/pdf-editor/finish", "/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp"];
     assert.equal(new Set(routes.map((route) => getSeoDefinition(language, route).title)).size, 5);
-    assert.ok(routes.every((route) => getSeoDefinition(language, route).faq?.length === 2));
+    const expectedCounts: Record<string, number> = {
+      "/tools/pdf-editor/finish": 4,
+      "/tools/pdf-editor/page-numbers": 3,
+      "/tools/pdf-editor/header-footer": 3,
+      "/tools/pdf-editor/watermark": 3,
+      "/tools/pdf-editor/stamp": 3,
+    };
+    for (const route of routes) assert.equal(getSeoDefinition(language, route).faq?.length, expectedCounts[route]);
   }
   assert.equal(canonicalSeoPath("/tools/pdf-editor/finish"), "/tools/pdf-editor/finish");
-  assert.equal(canonicalSeoPath("/tools/pdf-editor/page-numbers"), "/tools/pdf-editor/finish");
-  assert.equal(canonicalSeoPath("/tools/pdf-editor/header-footer/"), "/tools/pdf-editor/finish");
-  assert.equal(canonicalSeoPath("/tools/pdf-editor/watermark/"), "/tools/pdf-editor/finish");
-  assert.equal(canonicalSeoPath("/tools/pdf-editor/stamp/"), "/tools/pdf-editor/finish");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/page-numbers"), "/tools/pdf-editor/page-numbers");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/header-footer/"), "/tools/pdf-editor/header-footer");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/watermark/"), "/tools/pdf-editor/watermark");
+  assert.equal(canonicalSeoPath("/tools/pdf-editor/stamp"), "/tools/pdf-editor/stamp");
 });
 
 test("new document tools expose matching Korean and English static FAQs", () => {

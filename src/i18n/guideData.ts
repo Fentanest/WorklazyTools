@@ -103,6 +103,7 @@ export const toolToGuideKey: Record<string, string> = {
 
 export function getGuideKeyForPath(slug: string, path: string): string {
   if (path === "/tools/pdf-editor/convert" || path === "/tools/pdf-editor/ocr") return "pdfEditor.convert";
+  if (path === "/tools/pdf-editor/image-to-pdf" || path === "/tools/pdf-editor/pdf-to-image") return "pdfConverter";
   return toolToGuideKey[slug] || slug;
 }
 

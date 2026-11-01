@@ -602,7 +602,7 @@
     ],
     "faq": {
       "faq_0": {
-        "q": "Is the entered salary saved?",
+        "q": "Is my entered pay saved?",
         "a": "No. All values are calculated only in the current screen state and browser memory."
       },
       "faq_1": {
@@ -616,6 +616,10 @@
       "new_faq_3": {
         "q": "Can I use these results as the basis for final company settlement?",
         "a": "These are reference values for preliminary checking. Actual payroll and severance settlements must be processed by checking work records and applied standards."
+      },
+      "new_faq_4": {
+        "q": "How do I estimate take-home pay from an annual salary?",
+        "a": "Enter the annual salary divided by 12 as monthly taxable pay. Check bonuses and tax-free allowances separately."
       }
     }
   },
@@ -1104,8 +1108,8 @@
         "a": "Yes. It opens in the resize starting state."
       },
       "faq_8": {
-        "q": "Can I mosaic only a selected area?",
-        "a": "Yes. Select the area to cover and apply the mosaic effect."
+        "q": "Can I mosaic just a face?",
+        "a": "Yes. Pick areas such as faces or license plates and apply a mosaic or blur. Faces are not detected automatically."
       },
       "faq_9": {
         "q": "Does this screen open the effect panel directly?",
@@ -1126,6 +1130,10 @@
       "new_faq_13": {
         "q": "Is all personal information safe just by applying a mosaic?",
         "a": "You must manually verify the intensity of the effect and the covered area. If your goal is to clearly obscure text in a document, consider the Personal Information Redaction tool and its result verification procedure."
+      },
+      "new_faq_14": {
+        "q": "Does smaller size mean a smaller file?",
+        "a": "Usually, but it depends on the format and quality settings. For multiple images, check the quality settings in the batch tab."
       }
     },
     "pathFaqs": {
@@ -2030,6 +2038,30 @@
       "new_faq_1": {
         "q": "Are Image Conversion and OCR the same feature?",
         "a": "Image Conversion saves the visible appearance of pages as PNG or JPG, while OCR reads the shapes of text in an image to treat them as text data. We do not advise using OCR to restore text that disappeared during conversion."
+      },
+      "faq_20": {
+        "q": "Can I apply the same finishings to several PDFs at once?",
+        "a": "Yes. Open several PDFs together on the finishing screen, apply page numbers, watermarks and stamps in order, then save once."
+      },
+      "faq_21": {
+        "q": "Does finishing overwrite the originals?",
+        "a": "No. Original files are unchanged; download a new PDF or ZIP and review the marks in the saved files."
+      },
+      "faq_22": {
+        "q": "Can I apply the same number format to several PDFs?",
+        "a": "Yes. Open the files together, apply the same starting number and cover exclusion, then check the first, middle and last numbers in each file."
+      },
+      "faq_23": {
+        "q": "Does each file get a different date?",
+        "a": "The batch-start date token inserts the same value for files in one batch. Process files separately when each needs a different date."
+      },
+      "faq_24": {
+        "q": "Does a watermark block unauthorized copying?",
+        "a": "No. A watermark only signals the document purpose; it is not an access restriction or anti-copy feature."
+      },
+      "faq_25": {
+        "q": "Does a stamp image need a transparent background?",
+        "a": "Yes. A white-background image can stamp a white box as well. Prepare a transparent PNG and check the preview."
       }
     },
     "pathFaqs": {
@@ -2041,23 +2073,29 @@
       ],
       "/tools/pdf-editor/finish": [
         "faq_2",
-        "faq_3"
+        "faq_3",
+        "faq_20",
+        "faq_21"
       ],
       "/tools/pdf-editor/page-numbers": [
         "faq_2",
-        "faq_4"
+        "faq_4",
+        "faq_22"
       ],
       "/tools/pdf-editor/header-footer": [
         "faq_5",
-        "faq_6"
+        "faq_6",
+        "faq_23"
       ],
       "/tools/pdf-editor/watermark": [
         "faq_7",
-        "faq_8"
+        "faq_8",
+        "faq_24"
       ],
       "/tools/pdf-editor/stamp": [
         "faq_9",
-        "faq_10"
+        "faq_10",
+        "faq_25"
       ],
       "/tools/pdf-editor/merge": [
         "faq_11",
@@ -2139,6 +2177,13 @@
           "paragraphs": [
             "You can apply page numbers, headers, watermarks, and stamps simultaneously. Check one page first to ensure the positions of each mark do not overlap or cover the main text. When processing multiple files, be aware that page sizes and orientations may vary between files."
           ]
+        },
+        {
+          "title": "How do I apply several finishings at once?",
+          "paragraphs": [
+            "Apply page numbers, headers, watermarks and stamps in order on the same finishing screen, then save once. When handling several PDFs together, page sizes and orientations can differ between files.",
+            "The application order does not change the result, but check overlapping positions in the preview. After processing, download the ZIP or individual files and review the marks in each file."
+          ]
         }
       ],
       "/tools/pdf-editor/page-numbers": [
@@ -2146,6 +2191,13 @@
           "title": "How do I skip the cover and start numbering from page 1 on the main content?",
           "paragraphs": [
             "If the first page of the PDF is a cover, the file's page number and the printed body number may differ. Verify the starting page for the marks and the starting value for the numbers separately. For long documents, check the numbers on the first, middle, and last pages before saving."
+          ]
+        },
+        {
+          "title": "How do I apply the same number format to several files?",
+          "paragraphs": [
+            "Open several PDFs together and apply the same starting number, starting page and cover exclusion.",
+            "Because total page counts differ, check the numbers on the first, middle and last pages of each file before saving."
           ]
         }
       ],
@@ -2155,6 +2207,13 @@
           "paragraphs": [
             "You can insert repeating content such as document names, dates, and page numbers. Check the preview to ensure the text does not overlap with the main body or existing page numbers. For marks that insert automatic values, use only the formats provided on the screen."
           ]
+        },
+        {
+          "title": "How do I apply the same header to several files?",
+          "paragraphs": [
+            "Use the same filename and date tokens with the same six positions across several PDFs.",
+            "Long filenames or date formats can be cut off, so check the first and last pages of each file in the preview."
+          ]
         }
       ],
       "/tools/pdf-editor/watermark": [
@@ -2163,6 +2222,13 @@
           "paragraphs": [
             "Use this to add marks indicating the document's purpose, such as 'For Review' or 'Internal Sharing'. Check the opacity, rotation, position, and applied pages, and ensure it does not make tables or small text hard to read. A watermark is not an access restriction or anti-copy feature."
           ]
+        },
+        {
+          "title": "How do I apply the same watermark to several files?",
+          "paragraphs": [
+            "Use the same text or image, front or back layer, repeated layout and opacity across several PDFs.",
+            "Keep the opacity low and check the preview so tables or small text stay readable."
+          ]
         }
       ],
       "/tools/pdf-editor/stamp": [
@@ -2170,6 +2236,13 @@
           "title": "Does adding a stamp image make it a certified digital signature?",
           "paragraphs": [
             "Place a prepared PNG or JPG stamp or signature image in the desired location. Check the image's margins, size, orientation, and the actual page where it will be applied. Since this is simply overlaying an image, do not use it as a cryptographic electronic signature to verify the signer's identity or document integrity."
+          ]
+        },
+        {
+          "title": "How do I apply the same stamp to several files?",
+          "paragraphs": [
+            "Set the PNG or JPG stamp size and position once, then apply it to the same relative position on the selected pages.",
+            "Undo and redo can restore the position. Before saving, check the stamped position on the first and last pages of each file."
           ]
         }
       ]
@@ -2312,6 +2385,18 @@
       "new_faq_1": {
         "q": "If it looks good on the screen, can I submit it right away?",
         "a": "Reopen and check the saved file. The line breaks and page layouts you saw in the browser might differ from those in the final program you use."
+      },
+      "faq_view": {
+        "q": "Can I view HWP files without the Hangul program?",
+        "a": "Yes. Open and view HWP and HWPX documents in the browser without installing software. Original files are not sent elsewhere."
+      },
+      "faq_hwpx": {
+        "q": "Does HWPX open as well?",
+        "a": "Yes. HWP, HWPX and HML documents can be opened. Choose the matching extension in file selection."
+      },
+      "faq_save": {
+        "q": "Which formats can edited files be saved as?",
+        "a": "Files can be saved as HWP, HWPX or HML. Reopen the saved file in the program you will actually use."
       }
     }
   },
@@ -2409,6 +2494,22 @@
       "7": {
         "q": "Can I make a scanned PDF searchable?",
         "a": "Yes. Choose searchable PDF with automatic OCR to add text to scanned pages that need it while keeping existing text."
+      },
+      "8": {
+        "q": "Can I reorder images or fit them to A4?",
+        "a": "Yes. In Image to PDF, arrange JPG or PNG images and choose A4 fit or the original image size."
+      },
+      "9": {
+        "q": "Does combining photos into a PDF make text searchable?",
+        "a": "No. Combining photos alone does not make text in the photos searchable. Use a PDF conversion with OCR to read text."
+      },
+      "10": {
+        "q": "Should I save the images as PNG or JPG?",
+        "a": "In PDF to Image, choose PNG or JPG, resolution and pages, then download the page images as a ZIP. Pick what fits your use."
+      },
+      "11": {
+        "q": "Does higher resolution make images clearer?",
+        "a": "Small text can become easier to read, but details absent in the original are not restored. File size and memory use also grow."
       }
     },
     "pathFaqs": {
@@ -2421,10 +2522,14 @@
         "7"
       ],
       "/tools/pdf-converter/image-to-pdf": [
-        "0"
+        "0",
+        "8",
+        "9"
       ],
       "/tools/pdf-converter/pdf-to-image": [
-        "0"
+        "0",
+        "10",
+        "11"
       ],
       "/tools/pdf-converter/document-to-pdf": [
         "0",
@@ -2443,6 +2548,16 @@
         "0",
         "7",
         "5"
+      ],
+      "/tools/pdf-editor/image-to-pdf": [
+        "0",
+        "8",
+        "9"
+      ],
+      "/tools/pdf-editor/pdf-to-image": [
+        "0",
+        "10",
+        "11"
       ]
     }
   },
@@ -2465,8 +2580,16 @@
     ],
     "faq": {
       "source": {
-        "q": "Can I see U.S. market hours in Korea time?",
-        "a": "Yes. NYSE and Nasdaq sessions show both New York and Korea time. Calendar dates follow the exchange’s local date, and a different date in Korea is shown when needed."
+        "q": "Can I see U.S. market holidays in Korea time?",
+        "a": "Yes. NYSE and Nasdaq sessions show both New York and Korea time, including a different date when trading crosses midnight in Korea."
+      },
+      "early_close": {
+        "q": "Are early closes shown?",
+        "a": "Yes. Early-close days show a different end time from the regular session. Check the official notice linked in the date details as well."
+      },
+      "nxt": {
+        "q": "Are NXT trading hours included?",
+        "a": "Yes. Choose NXT in the venue selector to see that date’s trading hours the same way as KRX, NYSE and Nasdaq."
       }
     }
   },

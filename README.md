@@ -1,5 +1,7 @@
 # Worklazy Tools
 
+대표 도구: [엑셀 병합](https://worklazy.net/ko/tools/excel-merger/) · [PDF 합치기](https://worklazy.net/ko/tools/pdf-editor/merge/) · [HWP 열기·편집](https://worklazy.net/ko/tools/hwp-editor/) · [엑셀 비교](https://worklazy.net/ko/tools/excel-compare/) · [급여 계산](https://worklazy.net/ko/tools/payroll-calculator/) · [QR 만들기](https://worklazy.net/ko/tools/qr-studio/). 선택한 파일과 결과는 외부 처리 서버로 보내지 않고 브라우저에서 처리합니다.
+
 **귀찮은 파일 작업은 도구에게 맡기세요.**
 
 여러 엑셀 파일을 하나로 모으고, PDF에서 필요한 페이지만 꺼내고, 수정 전후 문서의 차이를 확인하는 일. Worklazy Tools는 이런 반복 작업을 브라우저에서 처리하는 무료 업무 도구 모음입니다.

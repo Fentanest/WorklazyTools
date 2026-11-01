@@ -13,6 +13,43 @@ const siteUrl = ensureTrailingSlash(process.env.VITE_SITE_URL || "https://workla
 const languages = ["ko", "en"];
 const { canonicalSeoPath, getSeoDefinition, getSocialImageDefinition, toolSlugByPath } = await import("../src/app/seo.ts");
 const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData.ts");
+const { relatedToolsFor } = await import("../src/app/relatedTools.ts");
+const koToolsJson = JSON.parse(await fs.readFile(path.join(sourceRoot, "src/locales/ko/tools.json"), "utf8"));
+const enToolsJson = JSON.parse(await fs.readFile(path.join(sourceRoot, "src/locales/en/tools.json"), "utf8"));
+const TOOL_CATEGORY = {
+  "market-calendar": "investment-research",
+  "image-compare": "media",
+  "folder-compare": "documents",
+  "text-compare": "text-data",
+  "document-markdown": "documents",
+  "product-banner": "media",
+  "foliotrace": "investment-research",
+  "document-redactor": "security-share",
+  "excel-merger": "spreadsheets",
+  "excel-compare": "spreadsheets",
+  "excel-cleaner": "spreadsheets",
+  "document-generator": "documents",
+  "pdf-converter": "documents",
+  "pdf-editor": "documents",
+  "document-compare": "documents",
+  "pdf-compare": "documents",
+  "hwp-editor": "documents",
+  "office-editor": "documents",
+  "video-studio": "media",
+  "audio-studio": "media",
+  "image-studio": "media",
+  "text-merger": "text-data",
+  "text-tools": "text-data",
+  "text-formatter": "text-data",
+  "work-calculator": "work",
+  "timezone-calculator": "work",
+  "payroll-calculator": "work",
+  "image-privacy": "security-share",
+  "security-tools": "security-share",
+  "qr-studio": "security-share",
+  "data-converter": "spreadsheets",
+};
+const CATEGORY_ORDER = ["spreadsheets", "documents", "media", "text-data", "work", "security-share", "investment-research"];
 
 const toolRoutes = ["product-banner",
   "foliotrace", "market-calendar",
@@ -38,13 +75,18 @@ for (const language of languages) {
   for (const route of localizedRoutes) {
     const page = makePage(language, route);
     const routeUrl = absolute(language, route);
-    const canonicalRoute = canonicalSeoPath(`/${route}`).replace(/^\//, "");
+    // S1: sitemap holds only self-canonical paths. Normalize '/' + route before compare (T4).
+    const pathnameForCanon = route ? `/${route}` : "/";
+    const isSelfCanonical = canonicalSeoPath(pathnameForCanon) === pathnameForCanon;
+    const isNoindexRoute = route === "error";
+    const canonicalRoute = canonicalSeoPath(pathnameForCanon).replace(/^\//, "");
     const canonical = absolute(language, canonicalRoute);
     const html = route === "tools/document-redactor" ? renderRedactorPage(sourceHtml, page, canonical) : route === "tools/pdf-converter/document-to-pdf" ? renderPage(sourceHtml, page, canonical).replace("</head>", `<meta name="worklazy-office-isolation" content="document-scope" /><script>globalThis.coi={quiet:true};</script><script data-worklazy-office-isolation src="./coi-serviceworker.js"></script></head>`) : renderPage(sourceHtml, page, canonical);
     const directory = path.join(outputDirectory, language, route);
     await fs.mkdir(directory, { recursive: true });
     await fs.writeFile(path.join(directory, "index.html"), html);
-    generated.push({ language, route, canonical: routeUrl });
+    // S1/S2: non-canonical (16 paths) and noindex error stay as HTML but leave the sitemap.
+    if (!isNoindexRoute && isSelfCanonical) generated.push({ language, route, canonical: routeUrl });
   }
 }
 
@@ -140,8 +182,54 @@ function makePage(language, route) {
     highlights: definition.application?.featureList ?? [],
     faq: definition.faq ?? [],
     blocks,
+    related: relatedLinkItems(language, pathname),
+    hubGroups: (route === "" || route === "tools") ? hubLinkGroups(language) : null,
     socialImage,
   };
+}
+
+function linkTitle(language, targetPath) {
+  const toolsJson = language === "ko" ? koToolsJson : enToolsJson;
+  const topSlug = targetPath.split("/")[2];
+  if (targetPath === `/tools/${topSlug}` && toolsJson.items?.[topSlug]?.title) return toolsJson.items[topSlug].title;
+  const definition = getSeoDefinition(language, targetPath);
+  return definition.title.split(/\s(?:\||—|-)\s/)[0];
+}
+
+function linkDescription(language, targetPath) {
+  return getSeoDefinition(language, targetPath).description;
+}
+
+function relatedLinkItems(language, pathname) {
+  return relatedToolsFor(pathname)
+    .filter((target) => canonicalSeoPath(target) === target)
+    .filter((target) => {
+      if (!VIDEO_STUDIO_PUBLIC && target.startsWith("/tools/video-studio")) return false;
+      if (target === "/tools/office-editor/app" || target === "/tools/excel-merger/xls-preserve") return false;
+      if (target === "/tools/word-compare" || target === "/tools/hwp-compare") return false;
+      return true;
+    })
+    .slice(0, 4)
+    .map((target) => ({ href: `/${language}${target}/`, title: linkTitle(language, target), description: linkDescription(language, target) }));
+}
+
+function hubLinkGroups(language) {
+  const toolsJson = language === "ko" ? koToolsJson : enToolsJson;
+  const groups = [];
+  for (const categoryId of CATEGORY_ORDER) {
+    const category = toolsJson.categories?.[categoryId];
+    if (!category) continue;
+    const items = toolRoutes
+      .filter((slug) => TOOL_CATEGORY[slug] === categoryId)
+      .map((slug) => {
+        const target = `/tools/${slug}`;
+        if (canonicalSeoPath(target) !== target) return null;
+        return { href: `/${language}${target}/`, title: toolsJson.items?.[slug]?.title ?? linkTitle(language, target), description: toolsJson.items?.[slug]?.description ?? linkDescription(language, target) };
+      })
+      .filter(Boolean);
+    if (items.length) groups.push({ category: category.label, items });
+  }
+  return groups;
 }
 
 function renderPage(template, page, canonical) {
@@ -158,8 +246,6 @@ function renderPage(template, page, canonical) {
     `<link rel="alternate" hreflang="ko" href="${escapeHtml(alternateKo)}" />`,
     `<link rel="alternate" hreflang="en" href="${escapeHtml(alternateEn)}" />`,
     `<link rel="alternate" hreflang="x-default" href="${escapeHtml(alternateEn)}" />`,
-    // D2: Error page must not be indexed.
-    ...(page.route === "error" ? [`<meta name="robots" content="noindex" />`] : []),
     `<meta property="og:locale" content="${locale}" />`,
     `<meta property="og:locale:alternate" content="${page.language === "ko" ? "en_US" : "ko_KR"}" />`,
     `<meta property="og:type" content="website" />`, `<meta property="og:site_name" content="Worklazy Tools" />`,
@@ -174,7 +260,11 @@ function renderPage(template, page, canonical) {
     `<script id="worklazy-route-jsonld" type="application/ld+json">${JSON.stringify(structuredData)}</script>`,
     ...(VIDEO_STUDIO_PUBLIC && VIDEO_DIRECT_PATHS.includes(`/${page.route}`) ? [`<meta name="worklazy-video-isolation" content="document-scope" />`, `<script>globalThis.coi={quiet:true,coepCredentialless:()=>true};</script>`, `<script data-worklazy-video-isolation src="${page.route === videoRoute ? "./" : "../"}coi-serviceworker.js"></script>`] : []),
   ].join("\n    ");
-  return template.replace(/<html[^>]*>/, `<html lang="${page.language}">`).replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(page.title)}</title>`).replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/, `<meta name="description" content="${escapeHtml(page.description)}" />`).replace("</head>", `    ${head}\n  </head>`).replace('<div id="root"></div>', `<div id="root">${staticBody(page)}</div>`);
+  // B3: robots meta is replaced (single), not appended.
+  const robotsReplacement = page.route === "error"
+    ? '<meta name="robots" content="noindex" />'
+    : '<meta name="robots" content="index, follow, max-image-preview:large" />';
+  return template.replace(/<html[^>]*>/, `<html lang="${page.language}">`).replace(/<title>[\s\S]*?<\/title>/, `<title>${escapeHtml(page.title)}</title>`).replace(/<meta\s+name="description"\s+content="[^"]*"\s*\/>/, `<meta name="description" content="${escapeHtml(page.description)}" />`).replace(/<meta\s+name="robots"\s+content="[^"]*"\s*\/>/, robotsReplacement).replace("</head>", `    ${head}\n  </head>`).replace('<div id="root"></div>', `<div id="root">${staticBody(page)}</div>`);
 }
 
 function renderLanding(template) {
@@ -253,7 +343,8 @@ function renderExcelPreserveApp(template, language) {
 
 function renderRedirect(template, target) {
   const scriptTarget = JSON.stringify(target);
-  return template.replace(/<title>[\s\S]*?<\/title>/, "<title>Redirecting | Worklazy Tools</title>").replace("</head>", `<link rel="canonical" href="${escapeHtml(target)}" /><meta name="robots" content="noindex, follow" /><meta http-equiv="refresh" content="0;url=${escapeHtml(target)}" /><script>location.replace(${scriptTarget}+location.search+location.hash);</script></head>`).replace('<div id="root"></div>', `<div id="root"><p><a href="${escapeHtml(target)}">Continue</a></p></div>`);
+  // B3: replace the template robots meta instead of appending a second one.
+  return template.replace(/<title>[\s\S]*?<\/title>/, "<title>Redirecting | Worklazy Tools</title>").replace(/<meta\s+name="robots"\s+content="[^"]*"\s*\/>/, '<meta name="robots" content="noindex, follow" />').replace("</head>", `<link rel="canonical" href="${escapeHtml(target)}" /><meta http-equiv="refresh" content="0;url=${escapeHtml(target)}" /><script>location.replace(${scriptTarget}+location.search+location.hash);</script></head>`).replace('<div id="root"></div>', `<div id="root"><p><a href="${escapeHtml(target)}">Continue</a></p></div>`);
 }
 
 function renderNotFound(template) {
@@ -264,11 +355,16 @@ function renderNotFound(template) {
 
 function staticBody(page) {
   const isKo = page.language === "ko";
-  const intro = isKo ? "설치나 로그인 없이 브라우저에서 바로 사용하세요." : "Use this tool directly in your browser without installing software or signing in.";
+  // S6 (T5): keep the page description once; the shared intro sentence is removed.
   const sections = (page.highlights ?? []).map((item) => `<li>${escapeHtml(item)}</li>`).join("");
   const blocks = (page.blocks ?? []).map((item) => `<h2>${escapeHtml(item.title)}</h2>` + (item.paragraphs ?? []).map(p => `<p>${escapeHtml(p)}</p>`).join("") + (item.items?.length ? `<ul>${item.items.map(i => `<li>${escapeHtml(i)}</li>`).join("")}</ul>` : "")).join("");
   const faq = (page.faq ?? []).map((item) => `<h3>${escapeHtml(item.question)}</h3><p>${escapeHtml(item.answer)}</p>`).join("");
-  return `<main class="seo-static-fallback"><nav aria-label="${isKo ? "주요 페이지" : "Primary pages"}"><a href="/${page.language}/">${isKo ? "홈" : "Home"}</a><a href="/${page.language}/tools/">${isKo ? "모든 도구" : "All tools"}</a></nav><p class="eyebrow">WORKLAZY TOOLS</p><h1>${escapeHtml(page.heading)}</h1><p>${escapeHtml(page.description)}</p><p>${intro}</p>${sections ? `<ul>${sections}</ul>` : ""}${blocks}${faq ? `<section><h2>${isKo ? "자주 묻는 질문" : "Frequently asked questions"}</h2>${faq}</section>` : ""}</main>`;
+  // B1: hub pages list every public tool by category with name + one-line description.
+  const hub = page.hubGroups ? page.hubGroups.map((group) => `<section><h2>${escapeHtml(group.category)}</h2><ul>${group.items.map((item) => `<li><a href="${escapeHtml(item.href)}">${escapeHtml(item.title)}</a> - ${escapeHtml(item.description)}</li>`).join("")}</ul></section>`).join("") : "";
+  // S7/B1: tool pages end with 2-4 related tools plus the parent hub link.
+  const related = (page.related?.length ? `<section><h2>${isKo ? "관련 도구" : "Related tools"}</h2><ul>${page.related.map((item) => `<li><a href="${escapeHtml(item.href)}">${escapeHtml(item.title)}</a> - ${escapeHtml(item.description)}</li>`).join("")}</ul></section>` : "")
+    + ((page.route && page.route !== "" && page.route !== "tools" && page.route !== "error") ? `<p><a href="/${page.language}/tools/">${isKo ? "모든 도구 보기" : "Browse all tools"}</a></p>` : "");
+  return `<main class="seo-static-fallback"><nav aria-label="${isKo ? "주요 페이지" : "Primary pages"}"><a href="/${page.language}/">${isKo ? "홈" : "Home"}</a><a href="/${page.language}/tools/">${isKo ? "모든 도구" : "All tools"}</a></nav><p class="eyebrow">WORKLAZY TOOLS</p><h1>${escapeHtml(page.heading)}</h1><p>${escapeHtml(page.description)}</p>${sections ? `<ul>${sections}</ul>` : ""}${blocks}${faq ? `<section><h2>${isKo ? "자주 묻는 질문" : "Frequently asked questions"}</h2>${faq}</section>` : ""}${related}${hub}</main>`;
 }
 
 function createSitemap(entries) {

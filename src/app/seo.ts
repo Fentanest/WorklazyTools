@@ -105,7 +105,7 @@ const socialImageSlugByPath: Record<string, string> = {
 };
 
 export const seoByPath: Record<string, SeoDefinition> = {
-  "/tools/market-calendar": { title: "주식시장 휴장일·거래시간 | KRX·NYSE·Nasdaq 달력 | Worklazy Tools", description: "KRX·NXT·NYSE·Nasdaq의 2026·2027년 휴장일과 조기폐장, 개장·마감 시간을 날짜별로 확인하세요. 미국 시장은 한국 시간도 함께 보여줍니다." },
+  "/tools/market-calendar": { title: "주식시장(증시) 휴장일·거래시간 | KRX·NYSE·Nasdaq 달력 | Worklazy Tools", description: "KRX·NXT·NYSE·Nasdaq 휴장일과 조기폐장, 개장·마감 시간을 확인하세요. 미국 시장은 한국 시간도 함께 보여줍니다." },
   "/tools/product-banner": { title: "알리익스프레스 광고 배너 만들기 - Excel·CSV로 HTML·iframe 생성 | Worklazy Tools", description: "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 HTML·iframe 광고 배너를 만들거나, 배너 주소를 iframe 코드로 변환하세요. 파일과 주소는 브라우저에서 처리합니다.", application: { name: "알리익스프레스 광고 배너 만들기", featureList: ["Excel·CSV 입력", "5종 디자인", "HTML·iframe 코드", "편집용 JSON"] } },
   "/tools/foliotrace": { title: "FolioTrace | 국민연금 공개 공시 추적", description: "국민연금의 국내주식 연말 보유 목록과 이후 DART 공시를 근거로 공개 추적 범위를 살펴봅니다. 실제 계좌 잔고나 전체 자산을 뜻하지 않습니다." },
   "/tools/image-compare": { title: "이미지 비교 - 픽셀·정렬·인식 글자 차이 | Worklazy Tools", description: "PNG·JPEG·WebP의 픽셀과 투명도 차이를 브라우저에서 비교하세요. 정렬 후보, 변경 영역, 인식 글자와 정정 비교를 지원합니다.", application: { name: "이미지 비교", featureList: ["아홉 가지 보기", "정렬 후보의 미리보기와 적용", "변경 영역 검사", "원본을 보존하는 작업 해상도", "로컬 글자 인식과 정정 비교"] } },
@@ -130,15 +130,15 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/excel-compare": {
     title: "엑셀 파일 비교 - 값·수식·기준 항목별 차이 | Worklazy Tools",
-    description: "Excel·CSV 파일 쌍을 위치나 키 기준으로 비교하세요. 값·수식·서식 차이를 XLSX 보고서로 확인할 수 있습니다.",
+    description: "두 엑셀(Excel)·CSV 파일을 위치·키 기준으로 비교하세요. 회계 대사(대조)도 지원합니다. 값·수식·서식 차이를 XLSX 보고서로 확인할 수 있습니다.",
     application: {
       name: "엑셀 비교",
       featureList: ["XLSX·XLSM·XLS·XLSB·SpreadsheetML·CSV", "머리글 후보 선택·직접 변경", "위치·키·회계 대사 비교", "중복 키 좌우 원본 행 묶음", "수식·캐시값 비교", "XLSX·XLSM 서식 비교", "쌍별 9개 시트 보고서", "다중 쌍 ZIP"],
     },
   },
   "/tools/excel-cleaner": {
-    title: "엑셀 데이터 정리 - 공백·빈 행·중복 정리 | Worklazy Tools",
-    description: "Excel·CSV 파일에 공백 제거, 빈 행 삭제, 중복 정리 등 28종 규칙을 순서대로 적용하여 데이터를 깔끔하게 정리하세요.",
+    title: "엑셀 데이터 정리 - 중복 제거·공백 제거·빈 행 삭제 | Worklazy Tools",
+    description: "엑셀(Excel)·CSV 파일에 공백 제거, 빈 행 삭제, 중복 정리 등 28종 규칙을 순서대로 적용하여 데이터를 깔끔하게 정리하세요.",
     application: {
       name: "엑셀 정리",
       featureList: ["Excel·CSV 다중 파일", "구조 규칙 13종", "텍스트 규칙 7종", "행 필터 3종", "값 변환 5종", "수식 참조 갱신·안전 강등", "XLSX·CSV·ZIP 결과"],
@@ -186,13 +186,13 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "PDF 문서 변환", featureList: ["페이지 선택", "PDF를 DOCX·XLSX로", "PDF를 PPTX·HWPX로", "스캔 PDF OCR", "페이지 모양 유지"] },
   },
   "/tools/pdf-editor/finish": {
-    title: "PDF 페이지 번호·워터마크·도장 넣기 | Worklazy Tools",
-    description: "여러 PDF에 페이지 번호, 머리글, 바닥글, 워터마크 및 도장 이미지를 일괄 적용하세요.",
+    title: "PDF 마무리 한 번에 - 페이지 번호·워터마크·도장 일괄 적용 | Worklazy Tools",
+    description: "여러 PDF에 페이지 번호·머리글·바닥글·워터마크·도장을 한 번에 일괄 적용하세요.",
     application: { name: "PDF 워터마크·번호", featureList: ["페이지 번호", "머리글·바닥글", "텍스트·이미지 워터마크", "도장·서명 이미지", "여러 PDF 일괄 처리", "ZIP 다운로드"] },
   },
   "/tools/pdf-editor/page-numbers": {
     title: "PDF 페이지 번호 넣기 - 표지 제외·시작 번호 | Worklazy Tools",
-    description: "표지를 제외하거나 시작 번호를 지정하여 PDF에 원하는 형식의 페이지 번호를 삽입하세요.",
+    description: "표지를 제외하거나 시작 번호를 지정하여 PDF에 원하는 형식의 페이지 번호(쪽 번호)를 삽입하세요.",
     application: { name: "PDF 번호 매기기", featureList: ["시작 번호", "시작 페이지", "표지 제외", "페이지 범위", "홀짝 필터", "썸네일 선택"] },
   },
   "/tools/pdf-editor/header-footer": {
@@ -207,7 +207,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/pdf-editor/stamp": {
     title: "PDF 도장·서명 이미지 넣기 | Worklazy Tools",
-    description: "서명이나 도장 이미지를 PDF에 자유롭게 배치하고 크기를 조절하여 여러 페이지에 한 번에 적용하세요.",
+    description: "도장·직인·서명 이미지를 PDF에 배치하고 여러 페이지에 한 번에 적용하세요.",
     application: { name: "PDF 도장 삽입", featureList: ["PNG·JPEG 이미지", "직접 이동·크기 조절", "고정 비율", "선택 페이지 적용", "같은 상대 위치", "실행 취소·다시 실행"] },
   },
   "/tools/pdf-editor/merge": {
@@ -217,7 +217,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/pdf-editor/split": {
     title: "PDF 분할·페이지 추출 - 필요한 구간 저장 | Worklazy Tools",
-    description: "PDF 파일에서 원하는 범위를 선택하여 자르고, 필요한 구간만 따로 저장하세요.",
+    description: "PDF를 필요한 페이지 범위로 나누거나(자르기) 일부만 추출해 저장하세요.",
     application: { name: "PDF 분할", featureList: ["나누기 위치 선택", "범위별 저장", "최초 전체 범위", "브라우저 처리"] },
   },
   "/tools/pdf-editor/delete": {
@@ -236,13 +236,13 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "스캔 PDF OCR", featureList: ["필요한 스캔 페이지 인식", "한국어·영어", "검색 가능한 PDF", "브라우저에서 처리"] },
   },
   "/tools/image-studio/resize": {
-    title: "사진 크기 조절 - 이미지 픽셀·비율 변경 | Worklazy Tools",
+    title: "사진 크기 줄이기·이미지 크기 조절 - 픽셀·비율 변경 | Worklazy Tools",
     description: "이미지 비율을 유지하면서 원하는 정확한 픽셀 크기로 사진 크기를 조절하고 저장하세요.",
     application: { name: "사진 크기 조절", featureList: ["픽셀 크기 지정", "비율 유지", "크기 패널 바로 열기", "브라우저 처리"] },
   },
   "/tools/image-studio/mosaic": {
     title: "사진 모자이크 - 원하는 영역 직접 가리기 | Worklazy Tools",
-    description: "사진에서 가리고 싶은 개인정보나 민감한 영역을 선택해 모자이크 효과를 적용하세요.",
+    description: "얼굴·차량 번호판처럼 가리고 싶은 영역을 직접 골라 모자이크나 블러를 적용하세요.",
     application: { name: "사진 모자이크", featureList: ["선택 영역 모자이크", "효과 패널 바로 열기", "브라우저 처리"] },
   },
   "/tools/image-studio/watermark": {
@@ -267,16 +267,16 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/audio-studio/trim": {
     title: "MP3·오디오 자르기 - 필요한 구간 저장 | Worklazy Tools",
-    description: "오디오나 녹음 파일에서 필요한 구간을 선택하여 원하는 부분만 잘라 저장하세요.",
+    description: "음악·녹음 등 오디오 파일에서 필요한 구간을 선택하여 원하는 부분만 잘라 저장하세요.",
     application: { name: "오디오 자르기", featureList: ["구간 선택", "선택 구간 저장", "자동 처리 없음", "브라우저 처리"] },
   },
   "/tools/hwp-editor": {
-    title: "한글 파일 편집 - HWP·HWPX 온라인 편집 | Worklazy Tools",
-    description: "HWP와 HWPX 문서를 브라우저에서 바로 열어 본문과 서식을 편집하고 저장하세요.",
+    title: "한글(HWP) 파일 열기·편집 - HWP·HWPX 온라인 편집기 | Worklazy Tools",
+    description: "설치 없이 HWP·HWPX 파일을 열어 보고 편집하세요. HWP와 HWPX 문서를 브라우저에서 바로 열어 본문과 서식을 편집하고 HWP·HWPX·HML로 저장하세요.",
     application: { name: "한글 편집", featureList: ["HWP·HWPX·HML 문서 열기", "본문과 글자 서식 편집", "표·그림·도형·수식 편집", "실행 취소와 문서 찾기", "HWP·HWPX 저장", "HWP 재열기 검증"] },
   },
   "/tools/office-editor": {
-    title: "온라인 문서 편집 - Word·Excel·PowerPoint | Worklazy Tools",
+    title: "워드·엑셀·PPT 온라인 편집 - 설치 없이 열기·저장 | Worklazy Tools",
     description: "Word, Excel, PowerPoint 문서를 브라우저에서 간편하게 편집하고 저장할 수 있습니다.",
     application: { name: "오피스 편집", featureList: ["파일 드롭 자동 시작", "전체 화면 집중 편집", "한글 대체 글꼴", "DOCX·DOC·ODT Writer", "XLSX·XLS·ODS Calc", "PPTX·PPT·ODP Impress", "실제 다운로드 진행률", "매크로·외부 갱신 차단", "브라우저 내 파일 처리"] },
   },
@@ -326,7 +326,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "급여 계산", featureList: ["주휴수당", "국민연금", "건강보험", "장기요양보험", "고용보험", "근로소득세 추정", "퇴직금"] },
   },
   "/tools/image-privacy": {
-    title: "사진 위치정보 삭제 - EXIF·GPS 확인 및 제거 | Worklazy Tools",
+    title: "사진 위치정보·메타데이터(EXIF) 삭제 | Worklazy Tools",
     description: "사진에 숨겨진 GPS 위치 및 촬영 기기 정보(EXIF)를 확인하고 완전히 삭제하세요.",
     application: { name: "위치정보 삭제", featureList: ["JPG·PNG·WebP 지원", "숨은 촬영 정보(EXIF) 확인", "GPS 위치 확인", "촬영 기기·시각 확인", "사진 내용만 새 파일로 저장", "메타데이터 제거"] },
   },
@@ -337,12 +337,12 @@ export const seoByPath: Record<string, SeoDefinition> = {
   },
   "/tools/qr-studio": {
     title: "QR 코드 만들기·읽기 - 로고 삽입·사진 스캔 | Worklazy Tools",
-    description: "URL, 텍스트 등으로 QR 코드를 만들거나 카메라 및 사진 업로드로 기존 QR 코드를 스캔하세요.",
+    description: "URL, 텍스트 등으로 QR코드를 만들거나 카메라 및 사진 업로드로 기존 QR 코드를 스캔하세요.",
     application: { name: "QR 스튜디오", featureList: ["URL QR 생성", "텍스트 QR 생성", "중앙 로고", "실시간 카메라 스캔", "사진 QR 스캔", "모바일 공유·저장"] },
   },
   "/tools/qr-studio/bulk": {
     title: "QR 코드 일괄 생성 - 엑셀·CSV로 대량 생성 | Worklazy Tools",
-    description: "엑셀(Excel)이나 CSV 데이터 목록을 이용하여 한 번에 수많은 QR 코드를 일괄 생성하세요.",
+    description: "엑셀(Excel)이나 CSV 데이터 목록으로 대량 QR코드를 한 번에 일괄 생성하세요.",
     application: { name: "QR 일괄 생성", featureList: ["Excel·CSV 행별 QR", "7종 표준 페이로드", "열 번호 매핑·머리글 템플릿", "로고·투명 PNG", "생성 후 재판독", "증분 ZIP", "A4·Letter 라벨 PDF", "XLSX 생성·실패 보고서"] },
   },
   "/tools/data-converter": {
@@ -382,14 +382,14 @@ const englishToolTitles: Record<keyof typeof enTools.items, string> = {
   "document-redactor": "Redact PDF & Images - Blackout Private Info | Worklazy Tools",
   "excel-merger": "Excel Merger - Combine Files & Merge Sheets | Worklazy Tools",
   "excel-compare": "Compare Excel Files - Find Differences in Values & Formulas | Worklazy Tools",
-  "excel-cleaner": "Excel Data Cleaner - Remove Spaces, Blank Rows & Duplicates | Worklazy Tools",
+  "excel-cleaner": "Excel Data Cleaner - Remove Duplicates, Spaces & Blank Rows | Worklazy Tools",
   "document-generator": "Batch Word Document Generator - Excel to Word Mail Merge | Worklazy Tools",
   "pdf-editor": "PDF Editor - Reorder, Merge, Split & Convert | Worklazy Tools",
   "document-markdown": "Document to Markdown - MarkItDown | Worklazy Tools",
   "pdf-converter": "PDF Converter - Images and Documents | Worklazy Tools",
   "document-compare": "Compare Word & HWP Documents - Track Changes | Worklazy Tools",
   "pdf-compare": "Compare PDF Files - Check Visual & Text Differences | Worklazy Tools",
-  "hwp-editor": "HWP Editor - Edit HWP & HWPX Online | Worklazy Tools",
+  "hwp-editor": "HWP Viewer & Editor - Open and Edit HWP/HWPX Online | Worklazy Tools",
   "office-editor": "Online Office Editor - Word, Excel & PowerPoint | Worklazy Tools",
   "video-studio": "Online Video Editor - Trim, Merge & Convert | Worklazy Tools",
   "audio-studio": "Online Audio Editor - Mute, Trim & Pitch Shift | Worklazy Tools",
@@ -421,7 +421,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
   "/tools/pdf-editor/image-to-pdf": { title: "Image to PDF - Convert JPG & PNG to PDF | Worklazy Tools", description: "Arrange multiple JPG or PNG images and combine them into a single, clean PDF file.", application: { name: "Image to PDF", featureList: ["JPG to PDF", "PNG to PDF", "Image ordering", "Automatic A4 fitting"] } },
   "/tools/pdf-editor/pdf-to-image": { title: "PDF to JPG & PNG - Save Pages as Images | Worklazy Tools", description: "Convert every page of a PDF into high-resolution PNG or JPG images, and download them all at once in a ZIP file.", application: { name: "PDF to Image", featureList: ["PDF to PNG", "PDF to JPG", "Resolution selection", "ZIP download"] } },
   "/tools/pdf-editor/convert": { title: "PDF to Word, Excel, PowerPoint & HWPX | Worklazy Tools", description: "Convert PDF to DOCX, PPTX or HWPX, and extract visible tables to XLSX. Use OCR for scans or preserve each page's appearance as an image.", application: { name: "PDF to documents", featureList: ["Choose pages", "PDF to DOCX and XLSX", "PDF to PPTX and HWPX", "Scanned PDF OCR", "Preserve page appearance"] } },
-  "/tools/pdf-editor/finish": { title: "PDF Page Numbers, Watermarks & Stamps | Worklazy Tools", description: "Batch apply page numbers, headers, footers, watermarks, and stamp images across multiple PDFs.", application: { name: "PDF Finish", featureList: ["Page numbers", "Headers and footers", "Text and image watermarks", "Stamp and signature images", "Multiple PDF processing", "ZIP download"] } },
+  "/tools/pdf-editor/finish": { title: "Finish PDFs in One Pass - Page Numbers, Watermarks & Stamps | Worklazy Tools", description: "Batch apply page numbers, headers, footers, watermarks, and stamp images across multiple PDFs in one pass.", application: { name: "PDF Finish", featureList: ["Page numbers", "Headers and footers", "Text and image watermarks", "Stamp and signature images", "Multiple PDF processing", "ZIP download"] } },
   "/tools/pdf-editor/page-numbers": { title: "Add PDF Page Numbers - Skip Cover & Set Start | Worklazy Tools", description: "Insert page numbers in your preferred format, with options to skip the cover page or set a custom starting number.", application: { name: "PDF Page Numbers", featureList: ["Starting number", "Starting page", "Cover exclusion", "Page ranges", "Parity filter", "Thumbnail selection"] } },
   "/tools/pdf-editor/header-footer": { title: "Add PDF Header & Footer - Filename & Date | Worklazy Tools", description: "Add text such as filenames, dates, or page numbers to desired header or footer positions in your PDF.", application: { name: "PDF Header & Footer", featureList: ["Filename token", "Batch-start date", "Page-number tokens", "Six positions", "Size and color", "Overlay preview"] } },
   "/tools/pdf-editor/watermark": { title: "Add PDF Watermark - Text & Image Marks | Worklazy Tools", description: "Place repeating text or image watermarks in the background or foreground of your PDF, and adjust the transparency.", application: { name: "PDF Watermark", featureList: ["Vector text", "PNG and JPEG images", "Background and foreground layers", "Single and repeated placement", "Rotation and opacity", "Overlay preview"] } },
@@ -446,7 +446,7 @@ const englishPageSeo: Record<string, SeoDefinition> = {
 };
 
 seoByPath["/tools/document-markdown"] = {
-  title: "워드·엑셀·PPT·PDF를 Markdown으로 | Worklazy Tools",
+  title: "워드·엑셀·PPT·PDF를 마크다운(Markdown)으로 변환 | Worklazy Tools",
   description: "DOCX·XLS·XLSX·PPTX와 글자를 선택할 수 있는 PDF에서 제목·문단·표를 Markdown으로 저장하세요. 스캔 PDF OCR과 HWP 입력은 지원하지 않습니다.",
   application: { name: "문서 → Markdown", featureList: ["워드·엑셀·PPTX·PDF 입력", "제목·문단·표 추출", "Markdown 저장"] },
 };
@@ -466,7 +466,7 @@ englishPageSeo["/tools/pdf-converter"] = {
   application: { name: "PDF Converter", featureList: ["Word, Excel and PowerPoint to PDF", "HWP and HWPX via print", "PDF to DOCX, XLSX, PPTX and HWPX", "Images and PDF", "Scanned-page OCR"] },
 };
 for (const [mode, koTitle, enTitle, koDescription, enDescription] of [
-  ["document-to-pdf", "워드·엑셀·PPT·한글을 PDF로 저장", "Word, Excel, PowerPoint & HWP to PDF", "워드·엑셀·PPT 파일은 PDF로 바로 변환하세요. HWP·HWPX는 브라우저 인쇄에서 PDF로 저장해야 합니다.", "Convert Word, Excel and PowerPoint files to PDF. HWP and HWPX require Save as PDF in the browser print dialog."],
+  ["document-to-pdf", "워드·엑셀·PPT PDF 변환 - 한글(HWP)은 인쇄로 PDF 저장", "Word, Excel, PowerPoint & HWP to PDF", "워드·엑셀·PPT 파일은 PDF로 바로 변환하세요. HWP·HWPX는 브라우저 인쇄에서 PDF로 저장해야 합니다.", "Convert Word, Excel and PowerPoint files to PDF. HWP and HWPX require Save as PDF in the browser print dialog."],
   ["pdf-to-document", "PDF 워드·엑셀·PPT·HWPX 변환", "PDF to Word, Excel, PowerPoint & HWPX", "PDF를 DOCX·PPTX·HWPX로 바꾸고 보이는 표를 XLSX로 추출하세요. 스캔 페이지는 OCR하거나 모양을 그림으로 보존할 수 있습니다.", "Convert PDF to DOCX, PPTX or HWPX and extract visible tables to XLSX. Use OCR for scans or preserve page appearance as an image."],
 ]) {
   seoByPath[`/tools/pdf-converter/${mode}`] = { title: `${koTitle} | Worklazy Tools`, description: koDescription, application: { name: koTitle, featureList: [koDescription] } };
@@ -535,9 +535,7 @@ export function canonicalSeoPath(pathname: string) {
   if (path === "/tools/pdf-editor/convert") return "/tools/pdf-converter/pdf-to-document";
   if (path === "/tools/pdf-editor/ocr") return "/tools/pdf-converter/pdf-to-document/ocr";
   if (path === "/tools/pdf-editor/image-to-pdf" || path === "/tools/pdf-editor/pdf-to-image") return path.replace("pdf-editor", "pdf-converter");
-  return ["/tools/pdf-editor/page-numbers", "/tools/pdf-editor/header-footer", "/tools/pdf-editor/watermark", "/tools/pdf-editor/stamp"].includes(path)
-    ? "/tools/pdf-editor/finish"
-    : path;
+  return path;
 }
 
 export function getSiteBaseUrl() {

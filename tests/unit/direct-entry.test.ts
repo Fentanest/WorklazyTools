@@ -36,12 +36,21 @@ test("video family is exact under locales/base; assets stay in localized parent"
   }
   for (const path of ["/ko/tools/video-studio/unknown", "/ko/tools/video-studio/trim/child", "/ko/tools/video-studio2", "/tools/audio-studio"]) assert.equal(isVideoDirectPath(path), false);
 });
-test("independent fixture fixes fourteen rows, twelve static additions, eleven React additions and no tool ID", () => {
+test("independent fixture fixes eighteen rows, sixteen static additions, fifteen React additions and no tool ID", () => {
   const rows = JSON.parse(readFileSync(new URL("../fixtures/direct-entry-contract.json", import.meta.url), "utf8"));
-  assert.equal(rows.length, 14);
-  assert.equal(new Set(rows.map((row: any) => row.path)).size, 14);
+  assert.equal(rows.length, 18);
+  assert.equal(new Set(rows.map((row: any) => row.path)).size, 18);
   const existing = ["/tools/pdf-editor/convert", "/tools/excel-merger"];
-  assert.equal(rows.filter((row: any) => !existing.includes(row.path)).length, 12);
-  assert.equal(rows.filter((row: any) => ![...existing, "/tools/pdf-editor/split"].includes(row.path)).length, 11);
-  for (const row of rows) { assert.deepEqual(row.locales, ["ko", "en"]); assert.equal(row.canonical, "self"); assert.equal(row.redirectTarget, `/ko${row.path}`); }
+  assert.equal(rows.filter((row: any) => !existing.includes(row.path)).length, 16);
+  assert.equal(rows.filter((row: any) => ![...existing, "/tools/pdf-editor/split"].includes(row.path)).length, 15);
+  for (const row of rows) {
+    assert.deepEqual(row.locales, ["ko", "en"]);
+    if (row.redirectTo) {
+      assert.equal(row.canonical, row.redirectTo);
+      assert.equal(row.redirectTarget, `/ko${row.redirectTo}`);
+    } else {
+      assert.equal(row.canonical, "self");
+      assert.equal(row.redirectTarget, `/ko${row.path}`);
+    }
+  }
 });

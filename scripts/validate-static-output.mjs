@@ -145,6 +145,13 @@ for (const route of routes) {
   for (const marker of required) {
     if (!html.includes(marker)) throw new Error(`${filePath} is missing ${marker}`);
   }
+  // B3: every output HTML carries exactly one robots meta.
+  const robotsCount = (html.match(/<meta\s+name="robots"\s+content="[^"]*"\s*\/>/g) || []).length;
+  if (robotsCount !== 1) throw new Error(`${filePath} must contain exactly one robots meta, found ${robotsCount}.`);
+  // S6 (T5): the shared intro sentence is removed; the page description appears once.
+  if (html.includes("설치나 로그인 없이 브라우저에서 바로 사용하세요.") || html.includes("Use this tool directly in your browser without installing software or signing in.")) {
+    throw new Error(`${filePath} still contains the removed shared intro sentence.`);
+  }
   if (route === "tools/document-redactor") {
     if (!html.includes('name="google-adsense-account"')) throw new Error(`${filePath} is missing the AdSense account marker.`);
     if (html.includes('rel="manifest"')) throw new Error(`${filePath} must not include the web app manifest.`);
@@ -170,15 +177,58 @@ for (const route of routes) {
   const faqExpectation = faqExpectations[`/${route}`];
   if (faqExpectation) assertStaticFaqHtml(html, { filePath, expectedQuestion: faqExpectation[language] });
   if (html.includes("#/")) throw new Error(`${filePath} still contains a hash route.`);
+  // S-B: finish and its four subpaths are self-canonical (each page points to itself).
   if (["tools/pdf-editor/finish", "tools/pdf-editor/page-numbers", "tools/pdf-editor/header-footer", "tools/pdf-editor/watermark", "tools/pdf-editor/stamp"].includes(route)) {
-    const canonicalRoute = "tools/pdf-editor/finish";
-    const expectedCanonical = `https://worklazy.net/${language}/${canonicalRoute}/`;
+    const expectedCanonical = `https://worklazy.net/${language}/${route}/`;
     if (!html.includes(`<link rel="canonical" href="${expectedCanonical}" />`) || !html.includes(`<meta property="og:url" content="${expectedCanonical}" />`)) {
-      throw new Error(`${filePath} does not use the expected canonical URL ${expectedCanonical}.`);
+      throw new Error(`${filePath} does not use the expected self canonical URL ${expectedCanonical}.`);
+    }
+  }
+  // S7/B1: tool pages carry 2-4 related self-canonical links plus the parent hub link.
+  if (route.startsWith("tools/")) {
+    const fallbackMatch = html.match(/<main class="seo-static-fallback">([\s\S]*?)<\/main>/);
+    const fallback = fallbackMatch ? fallbackMatch[1] : "";
+    const hrefs = [...fallback.matchAll(/<a href="(\/ko\/[^"]+?\/|\/en\/[^"]+?\/)">/g)].map((m) => m[1]);
+    if (!hrefs.includes(`/${language}/tools/`)) throw new Error(`${filePath} is missing its parent hub link.`);
+    const relatedHrefs = hrefs.filter((href) => href !== `/${language}/` && href !== `/${language}/tools/`);
+    if (relatedHrefs.length < 2 || relatedHrefs.length > 4) throw new Error(`${filePath} must list 2-4 related tools, found ${relatedHrefs.length}.`);
+    for (const href of relatedHrefs) {
+      const targetFile = path.join("dist", href.replace(/^\//, ""), "index.html");
+      if (!await fs.stat(targetFile).then(() => true, () => false)) throw new Error(`${filePath} links to missing static page ${href}.`);
     }
   }
 }
 }
+
+// B1: hub static bodies list every public tool by category with name + one-line description.
+for (const language of ["ko", "en"]) {
+  for (const hubRoute of ["", "tools"]) {
+    const filePath = path.join("dist", language, hubRoute, "index.html");
+    const html = await fs.readFile(filePath, "utf8");
+    const fallback = html.match(/<main class="seo-static-fallback">([\s\S]*?)<\/main>/)?.[1] ?? "";
+    // B1: hubs list top-level public tools (single-segment tools/<id>); subpaths ride on related links.
+    const hubExpected = routes.filter((route) => route && route !== "error" && route.split("/").length === 2);
+    for (const route of hubExpected) {
+      if (!route || route === "error") continue;
+      const expected = `/${language}/${route}/`;
+      if (!fallback.includes(`<a href="${expected}">`)) throw new Error(`${filePath} hub is missing public tool link ${expected}.`);
+    }
+    if (VIDEO_STUDIO_PUBLIC) {
+      for (const route of ["tools/video-studio", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio"]) {
+        if (!fallback.includes(`/${language}/${route}/`)) throw new Error(`${filePath} hub is missing public video link ${route}.`);
+      }
+    } else {
+      for (const route of ["tools/video-studio", "tools/video-studio/trim", "tools/video-studio/merge", "tools/video-studio/extract-audio"]) {
+        if (fallback.includes(`${route}/`)) throw new Error(`${filePath} hub must not link unpublished ${route}.`);
+      }
+    }
+    for (const unpublished of ["tools/office-editor/app", "tools/excel-merger/xls-preserve", "tools/word-compare", "tools/hwp-compare"]) {
+      if (fallback.includes(`${unpublished}/`)) throw new Error(`${filePath} hub must not link unpublished ${unpublished}.`);
+    }
+  }
+}
+
+// S1/S2 check runs after sitemap is loaded (see below).
 
 {
   const filePath = path.join("dist", "index.html");
@@ -290,6 +340,49 @@ const [ads, robots, sitemap, notFound] = await Promise.all([
   fs.readFile("dist/sitemap.xml", "utf8"),
   fs.readFile("dist/404.html", "utf8"),
 ]);
+
+// S1/S2: sitemap holds only self-canonical public pages; every loc matches its HTML canonical and is not noindex.
+{
+  // S-B final: finish subpaths are self-canonical. Only the four converter
+  // aliases stay non-canonical (canonicalSeoPath maps them to /tools/pdf-converter/*).
+  const NON_CANONICAL = new Set([
+    "tools/pdf-editor/convert",
+    "tools/pdf-editor/ocr",
+    "tools/pdf-editor/image-to-pdf",
+    "tools/pdf-editor/pdf-to-image",
+  ]);
+  const isSelfCanonical = (route) => !NON_CANONICAL.has(route);
+  const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
+  const locSet = new Set(locs);
+  // Non-canonical aliases and noindex error must be absent (T4: sitemap:false means assert absence).
+  for (const alias of ["tools/pdf-editor/convert", "tools/pdf-editor/ocr", "tools/pdf-editor/image-to-pdf", "tools/pdf-editor/pdf-to-image"]) {
+    for (const language of ["ko", "en"]) {
+      if (locSet.has(`https://worklazy.net/${language}/${alias}/`)) throw new Error(`sitemap.xml must not contain non-canonical alias ${language}/${alias}.`);
+    }
+  }
+  for (const language of ["ko", "en"]) {
+    if (locSet.has(`https://worklazy.net/${language}/error/`)) throw new Error(`sitemap.xml must not contain noindex ${language}/error.`);
+  }
+  for (const loc of locs) {
+    const url = new URL(loc);
+    const parts = url.pathname.split("/").filter(Boolean);
+    const language = parts[0];
+    const route = parts.slice(1).join("/");
+    const filePath = path.join("dist", language, route, "index.html");
+    const html = await fs.readFile(filePath, "utf8");
+    if (!html.includes(`<link rel="canonical" href="${loc}" />`)) throw new Error(`${filePath} canonical does not match sitemap loc ${loc}.`);
+    if (/name="robots" content="[^"]*noindex/.test(html)) throw new Error(`${filePath} is noindex but present in sitemap ${loc}.`);
+    if (!isSelfCanonical(route)) throw new Error(`sitemap.xml contains non-canonical route ${loc}.`);
+  }
+  for (const route of routes) {
+    if (!route) continue;
+    if (!isSelfCanonical(route)) continue;
+    for (const language of ["ko", "en"]) {
+      if (!locSet.has(`https://worklazy.net/${language}/${route}/`)) throw new Error(`sitemap.xml is missing self-canonical ${language}/${route}.`);
+    }
+  }
+  console.log(`Sitemap canonical check passed: ${locs.length} locs, all self-canonical and indexable.`);
+}
 
 const [cname, worklazyLicense, thirdPartyLicenses, favicon, logo, manifestText, serviceWorker, installIcon180, installIcon192, installIcon512, socialImage, koreanSocialImage] = await Promise.all([
   fs.readFile("dist/CNAME", "utf8"),
@@ -449,7 +542,16 @@ if (!robots.includes("https://worklazy.net/sitemap.xml")) throw new Error("robot
 if (sitemap.includes("/worklazytools/")) throw new Error("sitemap.xml still contains the repository subpath.");
 if (sitemap.includes("/tools/office-editor/app/") || sitemap.includes("/tools/excel-merger/xls-preserve/") || sitemap.includes("/tools/word-compare/") || sitemap.includes("/tools/hwp-compare/")) throw new Error("sitemap.xml contains a workspace or retired comparison route.");
 if (!VIDEO_STUDIO_PUBLIC && sitemap.includes("/tools/video-studio/")) throw new Error("sitemap.xml contains unpublished Video Studio routes.");
+// S1/S2 + S-B: non-canonical aliases and noindex error stay out of the sitemap.
+const SITEMAP_EXCLUDED = new Set([
+  "error",
+  "tools/pdf-editor/convert",
+  "tools/pdf-editor/ocr",
+  "tools/pdf-editor/image-to-pdf",
+  "tools/pdf-editor/pdf-to-image",
+]);
 for (const route of routes) {
+  if (!route || SITEMAP_EXCLUDED.has(route)) continue;
   if (route && !sitemap.includes(`/ko/${route}/`)) throw new Error(`sitemap.xml is missing ko/${route}.`);
   if (route && !sitemap.includes(`/en/${route}/`)) throw new Error(`sitemap.xml is missing en/${route}.`);
 }
