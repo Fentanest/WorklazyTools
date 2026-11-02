@@ -53,6 +53,7 @@ const EDITOR_WORK_MAX_DIMENSION = 4096;
 const EDITOR_EXPORT_MAX_DIMENSION = 8192;
 const EDITOR_PANEL_STORAGE_KEY = "worklazy:image-editor-panel-collapsed";
 
+import { useUnsavedWorkGuard } from "../../app/toolState";
 import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
 import { imageDirectDirty, type ImageDirectPreset } from "./imageDirect";
 import { useImageDirect } from "./imageDirectLifecycle";
@@ -68,9 +69,42 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
   const [editorDirty, setEditorDirty] = useState(false);
   const [otherDirty, setOtherDirty] = useState<Record<string, boolean>>({});
   const [resultReset, setResultReset] = useState(0);
+  const [batchQueue, setBatchQueue] = useState<{ inputFiles: File[]; handoffFiles: File[] }>({ inputFiles: [], handoffFiles: [] });
+  const batchQueueRef = useRef(batchQueue);
+  const [batchNotice, setBatchNotice] = useState<"added" | "limit" | undefined>();
+  const batchCount = batchQueue.inputFiles.length + batchQueue.handoffFiles.length;
+  const updateBatchQueue = (next: typeof batchQueue) => {
+    batchQueueRef.current = next;
+    setBatchQueue(next);
+  };
+  const appendBatchFiles = (incoming: File[]) => {
+    const current = batchQueueRef.current;
+    const available = 50 - current.inputFiles.length - current.handoffFiles.length;
+    const accepted = filterRasterImages(incoming);
+    setBatchNotice(accepted.length > available ? "limit" : undefined);
+    updateBatchQueue({ ...current, inputFiles: [...current.inputFiles, ...accepted.slice(0, available)] });
+  };
+  const onEditedResult = (file: File) => {
+    const current = batchQueueRef.current;
+    if (current.inputFiles.length + current.handoffFiles.length >= 50) {
+      setBatchNotice("limit");
+      return;
+    }
+    updateBatchQueue({ ...current, handoffFiles: [...current.handoffFiles, file] });
+    setBatchNotice("added");
+  };
+  const removeBatchFile = (index: number) => {
+    const current = batchQueueRef.current;
+    updateBatchQueue(index < current.inputFiles.length
+      ? { ...current, inputFiles: current.inputFiles.filter((_, i) => i !== index) }
+      : { ...current, handoffFiles: current.handoffFiles.filter((_, i) => i !== index - current.inputFiles.length) });
+    setBatchNotice(undefined);
+  };
+  const pageDirty = editorDirty || batchCount > 0 || Object.values(otherDirty).some(Boolean) || progress.status === "running";
+  useUnsavedWorkGuard("image-studio", pageDirty, { kind: "files", scopePath: "/tools/image-studio" });
   const editorHandle = useRef<ImageEditorDirectHandle | undefined>(undefined);
   const reportOtherDirty = useCallback((tab: string, value: boolean) => setOtherDirty(current => current[tab] === value ? current : { ...current, [tab]: value }), []);
-  const direct = useImageDirect(preset, editorDirty || Object.values(otherDirty).some(Boolean) || progress.status === "running", next => {
+  const direct = useImageDirect(preset, pageDirty, next => {
     activeController.current?.abort();
     activeController.current = undefined;
     progress.reset();
@@ -96,8 +130,8 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       <UtilityNotice className="image-format-notice mb-2">{t("image.heic")}</UtilityNotice>
       {(tab === "batch" || tab === "collage" || tab === "gif") && <UtilityNotice className="image-worker-notice mb-2">{t("image.offscreen")}</UtilityNotice>}
 
-      <div hidden={tab !== "editor"} data-image-owner="editor"><ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} /></div>
-      {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
+      <div hidden={tab !== "editor"} data-image-owner="editor"><ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} /></div>
+      {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel inputFiles={batchQueue.inputFiles} handoffFiles={batchQueue.handoffFiles} onFiles={appendBatchFiles} onRemove={removeBatchFile} limitReached={batchNotice === "limit"} progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("collage") && <div hidden={tab !== "collage"} data-image-owner="collage"><CollagePanel progress={progress} controllerRef={activeController} active={tab === "collage"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("gif") && <div hidden={tab !== "gif"} data-image-owner="gif"><GifPanel progress={progress} controllerRef={activeController} active={tab === "gif"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
 
@@ -161,7 +195,11 @@ interface EditorHistorySnapshot {
   outputMultiplier: number;
 }
 
-function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>; onDirty: (dirty: boolean) => void }) {
+function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: { onEditedResult: (file: File) => void; batchCount: number; batchNotice?: "added" | "limit"; active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>; onDirty: (dirty: boolean) => void }) {
+  const batchAddLock = useRef(false);
+  const batchAddTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [addingToBatch, setAddingToBatch] = useState(false);
+  useEffect(() => () => clearTimeout(batchAddTimer.current), []);
   const activeRef = useRef(active);
   activeRef.current = active;
   const acceptedPresetRef = useRef(preset);
@@ -264,7 +302,7 @@ function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; 
   };
   handleRef.current = { apply: applyDirectPreset, cancel: () => { editController.current?.abort(); setLoadingImage(false); setRegionEffectBusy(false); regionEffectBusyRef.current = false; setStickerBusy(false); } };
   useLayoutEffect(() => { applyDirectPreset(preset); }, [preset]);
-  useLayoutEffect(() => { onDirty(imageDirectDirty({ file, historyLength: historyState.length, emptyReadyHistoryLength: emptyReadyHistoryLength.current ?? historyState.length, regionEffectBusy, stickerBusy, status: loadingImage ? "running" : "idle", result: false, otherTabHasInput: false, otherTabHasResult: false, otherTabRunning: false })); }, [file, historyState.length, regionEffectBusy, stickerBusy, loadingImage, onDirty]);
+  useLayoutEffect(() => { onDirty(imageDirectDirty({ file, historyLength: historyState.length, emptyReadyHistoryLength: emptyReadyHistoryLength.current ?? historyState.length, regionEffectBusy, stickerBusy, status: loadingImage ? "running" : "idle", result: false, otherTabHasInput: batchCount > 0, otherTabHasResult: false, otherTabRunning: false })); }, [file, historyState.length, regionEffectBusy, stickerBusy, loadingImage, batchCount, onDirty]);
   useEffect(() => () => { resumeImageGeneration.current += 1; editController.current?.abort(); }, []);
   const updateOutputMultiplier = useCallback((value: number) => {
     const normalized = Math.max(Number.EPSILON, Number.isFinite(value) ? value : 1);
@@ -1576,9 +1614,19 @@ function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; 
   const originalExportPlan = getOriginalQualityExportPlan(canvasDimensions, outputMultiplier, EDITOR_EXPORT_MAX_DIMENSION);
   const exportResultDimensions = exportMode === "original" ? originalExportPlan.dimensions : normalizeEditorDimensions(exportDimensions, EDITOR_EXPORT_MAX_DIMENSION);
 
-  const exportImage = () => {
+  const exportImage = (destination: "download" | "batch" = "download") => {
+    if (destination === "batch" && batchAddLock.current) return;
     const instance = canvas.current;
     if (!instance) return;
+    if (destination === "batch") {
+      // Guard the event itself; React updaters/effects never deliver files.
+      batchAddLock.current = true;
+      setAddingToBatch(true);
+      batchAddTimer.current = setTimeout(() => {
+        batchAddLock.current = false;
+        setAddingToBatch(false);
+      }, 500);
+    }
     const overlays = [cropOverlay.current, effectOverlay.current].filter((overlay): overlay is Rect => Boolean(overlay));
     const activeOverlay = overlays.find((overlay) => instance.getActiveObject() === overlay);
     const viewport = [...instance.viewportTransform] as TMat2D;
@@ -1600,10 +1648,16 @@ function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; 
       source.width = 1;
       source.height = 1;
       const actualFormat = dataUrl.startsWith("data:image/png") ? "png" : dataUrl.startsWith("data:image/webp") ? "webp" : "jpeg";
-      const anchor = document.createElement("a");
-      anchor.href = dataUrl;
-      anchor.download = `${file ? stripExtension(file.name) : "worklazy-image"}-${t("image.editor.suffix")}.${actualFormat === "jpeg" ? "jpg" : actualFormat}`;
-      anchor.click();
+      const fileName = `${file ? stripExtension(file.name) : "worklazy-image"}-${t("image.editor.suffix")}.${actualFormat === "jpeg" ? "jpg" : actualFormat}`;
+      if (destination === "batch") {
+        const bytes = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(",") + 1)), char => char.charCodeAt(0));
+        onEditedResult(new File([bytes], fileName, { type: `image/${actualFormat}` }));
+      } else {
+        const anchor = document.createElement("a");
+        anchor.href = dataUrl;
+        anchor.download = fileName;
+        anchor.click();
+      }
     } catch {
       setEditorError(t("image.editor.exportError"));
     } finally {
@@ -1774,6 +1828,10 @@ function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; 
           onLayerReorder={reorderLayer}
         />
       </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <Button type="button" variant="outline" className="min-h-11 rounded-xl" data-testid="image-editor-add-to-batch" disabled={addingToBatch || loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("batch")}>{t("image.handoff.add", { count: batchCount })}</Button>
+        <span role="status" data-testid="image-batch-notice" className="text-sm text-muted-foreground">{batchNotice ? t(`image.handoff.${batchNotice}`, { max: 50 }) : ""}</span>
+      </div>
       <div className="export-row image-editor-export-row mt-3.5 grid grid-cols-[minmax(260px,1fr)_minmax(230px,310px)] items-end gap-3 max-[620px]:grid-cols-1">
         <div className="image-editor-export-settings grid min-w-0 gap-3">
           <div className="image-format-control"><SegmentedControl value={format} options={[{ value: "png", label: "PNG" }, { value: "jpeg", label: "JPG" }, { value: "webp", label: "WebP" }]} onChange={setFormat} label={t("image.editor.format")} /><small className="mt-2 block text-[13px] leading-relaxed text-muted-foreground">{t("image.editor.formatHelp")}</small></div>
@@ -1804,7 +1862,7 @@ function ImageEditor({ active, preset, handleRef, onDirty }: { active: boolean; 
             >{t("image.editor.exportResult", { width: exportResultDimensions.width, height: exportResultDimensions.height })}{originalExportPlan.reduced && exportMode === "original" ? ` ${t("image.editor.exportLimited", { max: EDITOR_EXPORT_MAX_DIMENSION })}` : ""}</p>
           </Card>
         </div>
-        <div className="w-full" data-testid="image-editor-export-action"><PrimaryButton accent="sky" onClick={exportImage}><Download size={18} /> {t("image.editor.download")}</PrimaryButton></div>
+        <div className="w-full" data-testid="image-editor-export-action"><PrimaryButton accent="sky" onClick={() => exportImage()}><Download size={18} /> {t("image.editor.download")}</PrimaryButton></div>
       </div>
     </UtilitySectionCard>
   );

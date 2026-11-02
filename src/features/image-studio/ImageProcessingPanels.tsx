@@ -3,7 +3,7 @@ import Sortable from "sortablejs";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { UtilityField, UtilityInput, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
+import { UtilityField, UtilityNotice, UtilityInput, UtilitySectionCard, UtilitySelect } from "../../components/UtilitySurface";
 import { FileDropZone, FileList, PrimaryButton } from "../../components/ui";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
@@ -30,9 +30,10 @@ import {
 } from "./imageStudioShared";
 import type { CollageOptions, ImageOutputFormat, WatermarkPosition } from "./types";
 
-export function BatchImagePanel({ progress, controllerRef, active = true, onDirty, resetResults }: ProcessPanelProps) {
+export function BatchImagePanel({ progress, controllerRef, active = true, onDirty, resetResults, inputFiles, handoffFiles, onFiles, onRemove, limitReached }: ProcessPanelProps & { inputFiles: File[]; handoffFiles: File[]; onFiles: (files: File[]) => void; onRemove: (index: number) => void; limitReached: boolean }) {
   const { t, i18n } = useTranslation("features");
-  const [files, setFiles] = useState<File[]>([]);
+  const { t: commonT } = useTranslation("common");
+  const files = [...inputFiles, ...handoffFiles];
   const [mode, setMode] = useState<"fit-width" | "contain" | "cover" | "original">("fit-width");
   const [width, setWidth] = useState(1600);
   const [height, setHeight] = useState(1200);
@@ -46,7 +47,7 @@ export function BatchImagePanel({ progress, controllerRef, active = true, onDirt
   useLayoutEffect(() => onDirty?.("batch", files.length > 0 || Boolean(watermarkFile)), [files.length, watermarkFile, onDirty]);
   void resetResults;
 
-  useClipboardImages((images) => setFiles((current) => [...current, ...images]), active);
+  useClipboardImages(onFiles, active);
 
   const execute = async () => {
     if (!files.length) return;
@@ -63,7 +64,15 @@ export function BatchImagePanel({ progress, controllerRef, active = true, onDirt
   };
 
   return <UtilitySectionCard title={t("image.batch.title")} description={t("image.batch.description")}>
-    <FileDropZone disabled={progress.status === "running"} files={files} onFiles={(next) => setFiles(filterRasterImages(next))} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.batch.hint")} accent="sky" /><ClipboardHint mode="append" /><FileList files={files} onRemove={(index) => setFiles((current) => current.filter((_, i) => i !== index))} accent="sky" />
+    <FileDropZone disabled={progress.status === "running"} files={files} onFiles={onFiles} onNewFiles={onFiles} accept={RASTER_IMAGE_ACCEPT} multiple hint={t("image.batch.hint")} accent="sky" /><ClipboardHint mode="append" />
+    {limitReached && <UtilityNotice role="status">{t("image.handoff.limit", { max: 50 })}</UtilityNotice>}
+    <div data-testid="image-batch-list" data-count={files.length}>
+      <FileList files={inputFiles} onRemove={onRemove} accent="sky" />
+      {handoffFiles.map((file, index) => <Card key={index} className="mt-2 flex flex-row items-center gap-3 rounded-xl border border-border p-3 shadow-none ring-0" data-testid="image-batch-edited-file">
+        <div className="min-w-0 flex-1"><strong className="block truncate text-sm">{file.name}</strong><span className="mt-1 inline-block rounded-md bg-sky-100 px-2 py-1 text-xs text-sky-800 dark:bg-sky-950 dark:text-sky-200" data-testid="image-batch-source">{t("image.handoff.source")}</span></div>
+        <Button type="button" variant="ghost" className="size-11 rounded-xl" aria-label={commonT("files.remove", { name: file.name })} onClick={() => onRemove(inputFiles.length + index)}><Trash2 size={17} /></Button>
+      </Card>)}
+    </div>
     <div className="image-settings-grid mt-3 grid grid-cols-3 gap-2.5 max-[620px]:grid-cols-1"><UtilityField><span>{t("image.batch.resize")}</span><UtilitySelect value={mode} onChange={(event) => setMode(event.target.value as typeof mode)}><option value="fit-width">{t("image.batch.fitWidth")}</option><option value="contain">{t("image.batch.contain")}</option><option value="cover">{t("image.batch.cover")}</option><option value="original">{t("image.batch.original")}</option></UtilitySelect></UtilityField><NumberField label={t("image.batch.width")} value={width} onChange={setWidth} /><NumberField label={t("image.batch.height")} value={height} onChange={setHeight} disabled={mode === "fit-width" || mode === "original"} /><FormatField value={format} onChange={setFormat} /><RangeField label={t("image.batch.quality")} value={quality} min={0.4} max={1} step={0.05} onChange={setQuality} /></div>
     <TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} />
     <Card className="watermark-settings mt-3 grid grid-cols-2 gap-2.5 rounded-2xl border border-sky-200 bg-sky-50/70 p-3 py-3 shadow-none ring-0 max-[620px]:grid-cols-1 dark:border-sky-900 dark:bg-sky-950/35"><UtilityField><span>{t("image.batch.watermarkText")}</span><UtilityInput value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} placeholder={t("image.batch.watermarkPlaceholder")} /></UtilityField><UtilityField><span>{t("image.batch.watermarkImage")}</span><UtilityInput className="cursor-pointer px-2 py-1.5 file:mr-2 file:rounded-lg file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-bold" type="file" disabled={progress.status === "running"} accept={RASTER_IMAGE_ACCEPT} onChange={(event) => setWatermarkFile(filterRasterImages(Array.from(event.target.files || []))[0])} /></UtilityField><UtilityField><span>{t("image.batch.position")}</span><UtilitySelect value={watermarkPosition} onChange={(event) => setWatermarkPosition(event.target.value as WatermarkPosition)}><option value="top-left">{t("image.batch.topLeft")}</option><option value="top-right">{t("image.batch.topRight")}</option><option value="center">{t("image.batch.center")}</option><option value="bottom-left">{t("image.batch.bottomLeft")}</option><option value="bottom-right">{t("image.batch.bottomRight")}</option></UtilitySelect></UtilityField><RangeField label={t("image.batch.opacity")} value={watermarkOpacity} min={0.1} max={1} step={0.05} onChange={setWatermarkOpacity} /></Card>

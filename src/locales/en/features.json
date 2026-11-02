@@ -1037,6 +1037,12 @@
     }
   },
   "image": {
+    "handoff": {
+      "add": "Add to batch list ({{count}})",
+      "added": "Added to the batch list. You can keep editing.",
+      "limit": "The batch list holds up to {{max}} images. Images over the limit were not added.",
+      "source": "Edited result"
+    },
     "title": "Image Studio",
     "description": "Decorate one image, batch-edit several files, or export a collage or animated GIF.",
     "tabs": {

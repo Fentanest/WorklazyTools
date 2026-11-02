@@ -341,6 +341,19 @@ async function assertHwpComparisonResult(page, expectedWarning) {
 }
 
 async function testImageStudio(page, imagePaths) {
+  // Image work now registers beforeunload protection. These tests explicitly
+  // replace their synthetic documents between independent image scenarios.
+  page.on("dialog", (dialog) => {
+    if (dialog.handled) return;
+    if (dialog.type() === "beforeunload") void dialog.accept();
+    // Preserve Puppeteer's default dismissal when no scenario owns a confirm.
+    else if (page.listenerCount("dialog") === 1) void dialog.dismiss();
+  });
+  const clickImageControl = async (selector, options) => {
+    await page.$eval(selector, element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.click(selector, options);
+  };
   await page.goto(`${koBaseUrl}/tools/image-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForFunction(() => document.querySelectorAll(".studio-tabs button").length === 4 && document.querySelector(".studio-tabs button")?.textContent?.includes("이미지 편집"));
   const tabStates = await page.$$eval(".studio-tabs button", (buttons) => buttons.map((button) => button.getAttribute("aria-pressed")));
@@ -364,15 +377,15 @@ async function testImageStudio(page, imagePaths) {
   if (!editorControls.hasVerticalFlip || editorControls.toolbarPanels !== 10 || !editorControls.hasPanelToggle || !editorControls.jpgNotice.includes("JPG") || !editorControls.jpgNotice.includes("흰색")) {
     throw new Error(`Unified editor controls are incomplete: ${JSON.stringify(editorControls)}`);
   }
-  await page.click('[data-testid="image-editor-panel-canvas"]');
-  await page.click('[data-testid="image-editor-options-panel"][data-panel="canvas"] .image-background-options button[role="switch"]');
+  await clickImageControl('[data-testid="image-editor-panel-canvas"]');
+  await clickImageControl('[data-testid="image-editor-options-panel"][data-panel="canvas"] .image-background-options button[role="switch"]');
   await page.waitForFunction(() => {
     const canvas = document.querySelector(".fabric-stage .lower-canvas");
     if (!(canvas instanceof HTMLCanvasElement)) return false;
     return canvas.getContext("2d")?.getImageData(1, 1, 1, 1).data[3] === 0;
   });
   const expandedShapeKinds = ["rounded-rect", "triangle", "star", "hexagon", "speech-bubble", "arrow", "double-arrow", "highlighter"];
-  await page.click('[data-testid="image-editor-panel-shapes"]');
+  await clickImageControl('[data-testid="image-editor-panel-shapes"]');
   for (const kind of expandedShapeKinds) {
     console.log(`  image: probing shape ${kind}`);
     await page.$eval(`[data-testid="image-editor-shape-${kind}"]`, (button) => button.click());
@@ -433,16 +446,21 @@ async function testImageStudio(page, imagePaths) {
   const objectCanvas = await page.$(".fabric-stage .upper-canvas");
   const objectCanvasBox = await objectCanvas?.boundingBox();
   if (!objectCanvasBox) throw new Error("Image canvas is unavailable for the minibar movement test");
+  // Keep the selected shape near the viewport center so later zoom/pan
+  // checks measure tracking instead of a correctly clamped edge position.
   const objectScale = objectCanvasBox.width / 900;
   await page.mouse.move(objectCanvasBox.x + 120 * objectScale, objectCanvasBox.y + 120 * objectScale);
   await page.mouse.down();
-  await page.mouse.move(objectCanvasBox.x + 220 * objectScale, objectCanvasBox.y + 190 * objectScale, { steps: 8 });
+  await page.mouse.move(objectCanvasBox.x + 330 * objectScale, objectCanvasBox.y + 260 * objectScale, { steps: 8 });
   await page.mouse.up();
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const minibarAfterMove = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
   if (Math.hypot(minibarAfterMove.left - minibarBeforeMove.left, minibarAfterMove.top - minibarBeforeMove.top) < 20) throw new Error(`Floating minibar did not follow the moved object: ${JSON.stringify({ minibarBeforeMove, minibarAfterMove })}`);
-  await page.click('[data-testid="image-editor-panel-select"]');
-  await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-selection-controls"]')?.classList.contains("is-disabled"));
+  await page.$eval('[data-testid="image-editor-panel-select"]', button => button.click());
+  await page.waitForFunction(() => {
+    const controls = document.querySelector('[data-testid="image-editor-selection-controls"]');
+    return controls && !controls.classList.contains("is-disabled");
+  });
   await page.evaluate(() => {
     const setValue = (input, value) => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set.call(input, value);
@@ -452,7 +470,7 @@ async function testImageStudio(page, imagePaths) {
     const fill = document.querySelector('[data-testid="image-editor-select-color"]');
     const stroke = document.querySelector('[data-testid="image-editor-select-stroke"]');
     const width = document.querySelector('[data-testid="image-editor-select-width"]');
-    if (!(fill instanceof HTMLInputElement) || !(stroke instanceof HTMLInputElement) || !(width instanceof HTMLInputElement)) throw new Error("Shape controls are unavailable");
+    if (!(fill instanceof HTMLInputElement) || !(stroke instanceof HTMLInputElement) || !(width instanceof HTMLInputElement)) throw new Error(`Shape controls are unavailable: ${document.querySelector('[data-testid="image-editor-selection-controls"]')?.outerHTML}`);
     setValue(fill, "#00ff00");
     setValue(stroke, "#000000");
     setValue(width, "8");
@@ -505,18 +523,19 @@ async function testImageStudio(page, imagePaths) {
     throw new Error(`High-resolution JPEG export is cropped, blurred, or scaled incorrectly: ${JSON.stringify(jpegGreenBounds)}`);
   }
   console.log("  image: high-resolution export verified");
+  await page.$eval(".fabric-stage .upper-canvas", canvas => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   const viewportCanvas = await page.$(".fabric-stage .upper-canvas");
   const viewportCanvasBox = await viewportCanvas?.boundingBox();
   if (!viewportCanvasBox) throw new Error("Image canvas is unavailable for zoom and pan");
   await page.mouse.move(viewportCanvasBox.x + viewportCanvasBox.width / 2, viewportCanvasBox.y + viewportCanvasBox.height / 2);
   await page.mouse.wheel({ deltaY: -400 });
   await page.waitForFunction(() => parseInt(document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent || "0", 10) > 100);
-  await page.click('[data-testid="image-editor-fit"]');
+  await clickImageControl('[data-testid="image-editor-fit"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
   const minibarBeforeViewportChange = await page.$eval('[data-testid="image-editor-minibar"]', (bar) => ({ left: bar.getBoundingClientRect().left, top: bar.getBoundingClientRect().top }));
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "200%");
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   const panCanvasBox = await (await page.$(".fabric-stage .upper-canvas"))?.boundingBox();
@@ -543,9 +562,9 @@ async function testImageStudio(page, imagePaths) {
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const deletedCanvas = await page.$eval(".fabric-stage .lower-canvas", (canvas) => canvas.toDataURL());
   if (!styledCanvas || styledCanvas === deletedCanvas) throw new Error("Delete did not remove the selected Fabric layer");
-  await page.click('[data-testid="image-editor-panel-shapes"]');
+  await clickImageControl('[data-testid="image-editor-panel-shapes"]');
   await page.$eval('[data-testid="image-editor-shape-rounded-rect"]', (button) => button.click());
-  await page.click('[data-testid="image-editor-panel-select"]');
+  await clickImageControl('[data-testid="image-editor-panel-select"]');
   const centeredShapeCanvas = await page.$(".fabric-stage .upper-canvas");
   const centeredShapeBox = await centeredShapeCanvas?.boundingBox();
   if (!centeredShapeBox) throw new Error("Image canvas is unavailable for centered view tracking");
@@ -573,7 +592,7 @@ async function testImageStudio(page, imagePaths) {
     Object.defineProperty(window, "CanvasRenderingContext2D", { configurable: true, writable: true, value: undefined });
     return true;
   });
-  await page.click('[data-testid="image-editor-panel-effect"]');
+  await clickImageControl('[data-testid="image-editor-panel-effect"]');
   await page.$$eval('[data-testid="image-editor-effect-options"] button', (buttons) => {
     const blur = buttons.find((button) => button.textContent?.trim() === "블러");
     if (!(blur instanceof HTMLButtonElement)) throw new Error("Blur region effect is unavailable");
@@ -595,7 +614,7 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.move(effectBox.x + effectBox.width * 0.42, effectBox.y + effectBox.height * 0.36, { steps: 8 });
   await page.mouse.up();
   await page.waitForSelector('[data-testid="image-editor-effect-selection"]');
-  await page.click('[data-testid="image-editor-effect-selection-apply"]');
+  await clickImageControl('[data-testid="image-editor-effect-selection-apply"]');
   await page.waitForFunction(() => !document.querySelector(".fabric-stage.is-effect-mode") && !document.querySelector('[data-testid="image-editor-effect-selection"]'));
   if (disabledNativeCanvasBlur) {
     await page.evaluate(() => Object.defineProperty(window, "CanvasRenderingContext2D", window.__canvasContextConstructorDescriptor));
@@ -615,9 +634,9 @@ async function testImageStudio(page, imagePaths) {
   if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "200%") throw new Error("Dimension-preserving redo reset the canvas view");
   console.log("  image: region effect redo verified");
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  await page.click('[data-testid="image-editor-panel-effect"]');
+  await clickImageControl('[data-testid="image-editor-panel-effect"]');
   await page.click('button[aria-label="원본 사진 잠금"]');
-  await page.click('[data-testid="image-editor-panel-select"]');
+  await clickImageControl('[data-testid="image-editor-panel-select"]');
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   const transformedBaseCanvas = await page.$(".fabric-stage .upper-canvas");
   const transformedBaseBox = await transformedBaseCanvas?.boundingBox();
@@ -638,18 +657,18 @@ async function testImageStudio(page, imagePaths) {
   await page.$eval('[data-testid="image-editor-redo"]', (button) => button.click());
   await page.waitForFunction((expected) => document.querySelector(".fabric-stage .lower-canvas")?.toDataURL() === expected, {}, afterBaseTransform);
   if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "200%") throw new Error("Base-transform redo reset a dimension-preserving view");
-  await page.click('[data-testid="image-editor-panel-effect"]');
+  await clickImageControl('[data-testid="image-editor-panel-effect"]');
   await page.click('button[aria-label="원본 사진 잠금"]');
   console.log("  image: anchored effect alignment and dimension-preserving transform history verified");
-  await page.click('[data-testid="image-editor-panel-canvas"]');
-  await page.click('[data-testid="image-editor-clear-layers"]');
+  await clickImageControl('[data-testid="image-editor-panel-canvas"]');
+  await clickImageControl('[data-testid="image-editor-clear-layers"]');
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.$eval(".fabric-stage .lower-canvas", (canvas) => {
     window.__protectedEffectBeforeLayerMove = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
   });
-  await page.click('[data-testid="image-editor-panel-effect"]');
+  await clickImageControl('[data-testid="image-editor-panel-effect"]');
   await page.click('button[aria-label="원본 사진 잠금"]');
-  await page.click('[data-testid="image-editor-panel-select"]');
+  await clickImageControl('[data-testid="image-editor-panel-select"]');
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   const baseCanvas = await page.$(".fabric-stage .upper-canvas");
   const baseBox = await baseCanvas?.boundingBox();
@@ -677,7 +696,7 @@ async function testImageStudio(page, imagePaths) {
   });
   if (protectedEffectDifference.changedRatio > 0.02 || protectedEffectDifference.meanChannelDelta > 3) throw new Error(`Bringing the base image forward exposed pixels concealed by a region effect: ${JSON.stringify(protectedEffectDifference)}`);
   console.log("  image: protected effect layer order verified");
-  await page.click('[data-testid="image-editor-panel-effect"]');
+  await clickImageControl('[data-testid="image-editor-panel-effect"]');
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   const overlayCanvas = await page.$(".fabric-stage .upper-canvas");
   const overlayBox = await overlayCanvas?.boundingBox();
@@ -687,14 +706,14 @@ async function testImageStudio(page, imagePaths) {
   await page.mouse.move(overlayBox.x + overlayBox.width * 0.34, overlayBox.y + overlayBox.height * 0.32, { steps: 6 });
   await page.mouse.up();
   await page.waitForSelector('[data-testid="image-editor-effect-selection"]');
-  await page.click('[data-testid="image-editor-export-action"] button');
+  await clickImageControl('[data-testid="image-editor-export-action"] button');
   const exportWithSelection = await page.evaluate(() => window.__worklazyExportDataUrl);
-  await page.click('[data-testid="image-editor-effect-selection-cancel"]');
-  await page.click('[data-testid="image-editor-export-action"] button');
+  await clickImageControl('[data-testid="image-editor-effect-selection-cancel"]');
+  await clickImageControl('[data-testid="image-editor-export-action"] button');
   const exportWithoutSelection = await page.evaluate(() => window.__worklazyExportDataUrl);
   if (!exportWithSelection || exportWithSelection !== exportWithoutSelection) throw new Error("The region-selection overlay contaminated the raster export");
   console.log("  image: region overlay export verified");
-  await page.click('[data-testid="image-editor-panel-crop"]');
+  await clickImageControl('[data-testid="image-editor-panel-crop"]');
   const portraitPresets = await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => buttons.map((button) => button.textContent?.trim()).filter(Boolean));
   if (!portraitPresets.includes("3:4") || !portraitPresets.includes("9:16") || !portraitPresets.includes("자유") || portraitPresets.length !== 6) throw new Error(`Crop presets are incomplete: ${JSON.stringify(portraitPresets)}`);
   await dragImageEditorRegion(page, 1);
@@ -711,15 +730,15 @@ async function testImageStudio(page, imagePaths) {
     throw new Error(`4:3 preset changed the canvas instead of the crop box: ${JSON.stringify({ ratioCanvasSize, ratioBefore, ratioAfter, expectedRatioWidth })}`);
   }
   console.log("  image: ratio preset changes the crop box without resizing the canvas");
-  await page.click('[data-testid="image-editor-panel-crop"]');
+  await clickImageControl('[data-testid="image-editor-panel-crop"]');
   await page.$$eval('[data-testid="image-editor-crop-presets"] button', (buttons) => {
     const free = buttons.find((button) => button.textContent?.trim() === "자유");
     if (!(free instanceof HTMLButtonElement)) throw new Error("Free crop option is unavailable");
     free.click();
   });
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
   await page.waitForSelector(".fabric-stage.is-crop-mode");
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
   await page.waitForFunction(() => {
@@ -740,28 +759,28 @@ async function testImageStudio(page, imagePaths) {
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   const freeCropGeometry = await readImageEditorRegionGeometry(page, "crop");
-  await page.click('[data-testid="image-editor-crop-selection-apply"]');
+  await clickImageControl('[data-testid="image-editor-crop-selection-apply"]');
   await page.waitForFunction(() => !document.querySelector('[data-testid="image-editor-crop-selection"]'));
   if (await page.$eval('[data-testid="image-editor-zoom-level"]', (level) => level.textContent) !== "100%") throw new Error("Free crop did not reset the canvas view");
   const croppedSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
   if (croppedSize.width !== Math.round(freeCropGeometry.selection.width) || croppedSize.height !== Math.round(freeCropGeometry.selection.height)) {
     throw new Error(`Free crop did not resize the canvas as selected: ${JSON.stringify({ croppedSize, selection: freeCropGeometry.selection })}`);
   }
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
   await dropCanvasImages(page, ".fabric-stage", ["#34c759"]);
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
   const replacedSize = await page.$eval(".fabric-stage .lower-canvas", (canvas) => ({ width: canvas.width / devicePixelRatio, height: canvas.height / devicePixelRatio }));
   if (replacedSize.width !== 900 || replacedSize.height !== 600) throw new Error(`Replacing a file did not restore the fitted canvas: ${JSON.stringify(replacedSize)}`);
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
-  await page.click('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
+  await clickImageControl('[data-testid="image-editor-zoom-in"]');
   page.once("dialog", (dialog) => void dialog.accept());
   await page.click(".editor-source-actions button");
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "100%");
   console.log("  image: free crop, file replacement, and blank-canvas view reset verified");
-  await page.click('[data-testid="image-editor-panel-stickers"]');
+  await clickImageControl('[data-testid="image-editor-panel-stickers"]');
   const stickerPicker = await page.evaluate(() => ({
     count: document.querySelectorAll('[data-testid="image-editor-stickers"] button').length,
     categories: document.querySelectorAll('[data-testid="image-editor-sticker-categories"] button').length,
@@ -790,9 +809,9 @@ async function testImageStudio(page, imagePaths) {
     throw new Error(`SVG sticker insertion or export failed: ${JSON.stringify({ stickerInsert, canvasChanged: beforeSticker !== afterSticker, exportLength: stickerExport.length })}`);
   }
   console.log("  image: categorized sticker search, SVG insertion, and export verified");
-  await page.click(".studio-tabs button:nth-child(2)");
+  await clickImageControl(".studio-tabs button:nth-child(2)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
-  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page :is(.file-row, [data-ui-component=file-list] > li)").length === 2);
+  await page.waitForFunction(() => document.querySelectorAll("[data-image-owner]:not([hidden]) :is(.file-row, [data-ui-component=file-list] > li)").length === 2);
   await page.waitForFunction(() => !document.querySelector("[data-testid='image-batch-action'] button")?.disabled);
   await page.$eval("[data-testid='image-batch-action'] button", (button) => button.scrollIntoView({ block: "center", behavior: "instant" }));
   const batchHitTarget = await page.$eval("[data-testid='image-batch-action'] button", (button) => {
@@ -804,9 +823,9 @@ async function testImageStudio(page, imagePaths) {
   await page.click("[data-testid='image-batch-action'] button");
   await waitForTerminalStatus(page);
   if (await page.$(".ui-operation-progress.ui-status-error")) throw new Error(await page.$eval(".ui-operation-current-message", (element) => element.textContent || "Image error"));
-  await page.click(".studio-tabs button:nth-child(3)");
+  await clickImageControl(".studio-tabs button:nth-child(3)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
-  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page :is(.file-row, [data-ui-component=file-list] > li)").length === 2);
+  await page.waitForFunction(() => document.querySelectorAll("[data-image-owner]:not([hidden]) :is(.file-row, [data-ui-component=file-list] > li)").length === 2);
   await page.evaluate(() => {
     const labels = Array.from(document.querySelectorAll(".image-settings-grid label"));
     const layout = labels.find((label) => label.querySelector("span")?.textContent === "배치")?.querySelector("select");
@@ -839,7 +858,7 @@ async function testImageStudio(page, imagePaths) {
     gap.value = "12";
     gap.dispatchEvent(new Event("change", { bubbles: true }));
   });
-  await page.click('.image-background-options button[role="switch"]');
+  await clickImageControl('[data-image-owner="collage"] .image-background-options button[role="switch"]');
   await page.waitForFunction(() => {
     const canvas = document.querySelector(".collage-preview-stage canvas");
     if (!(canvas instanceof HTMLCanvasElement)) return false;
@@ -847,8 +866,8 @@ async function testImageStudio(page, imagePaths) {
     return alpha === 0;
   });
   await dropCanvasImages(page, ".collage-preview-stage", ["#34c759"]);
-  await page.waitForFunction(() => document.querySelectorAll(".image-studio-page :is(.file-row, [data-ui-component=file-list] > li)").length === 3);
-  await page.click(".studio-tabs button:nth-child(4)");
+  await page.waitForFunction(() => document.querySelectorAll("[data-image-owner]:not([hidden]) :is(.file-row, [data-ui-component=file-list] > li)").length === 3);
+  await clickImageControl(".studio-tabs button:nth-child(4)");
   await pasteCanvasImages(page, ["#159bd7", "#ff375f"]);
   await page.waitForFunction(() => document.querySelectorAll(".gif-frame-row").length === 2 && document.querySelectorAll(".gif-frame-drag-handle").length === 2);
   const gifActionLabels = await page.$$eval(".gif-frame-row", (rows) => rows.map((row) => ({
@@ -859,6 +878,7 @@ async function testImageStudio(page, imagePaths) {
     throw new Error(`GIF actions do not identify their target frame: ${JSON.stringify(gifActionLabels)}`);
   }
   const initialFrameOrder = await page.$$eval(".gif-frame-row", (rows) => rows.map((row) => row.textContent || ""));
+  await page.$eval(".gif-frame-row", row => row.scrollIntoView({ block: "center", behavior: "instant" }));
   const firstHandle = await page.$(".gif-frame-row:first-child .gif-frame-drag-handle");
   const secondRow = await page.$(".gif-frame-row:nth-child(2)");
   const firstHandleBox = await firstHandle?.boundingBox();
@@ -875,26 +895,31 @@ async function testImageStudio(page, imagePaths) {
 }
 
 async function testImageStudioLayersAndSelection(page) {
+  const clickP3Control = async (selector, options) => {
+    await page.$eval(selector, element => element.scrollIntoView({ block: "center", behavior: "instant" }));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.click(selector, options);
+  };
   console.log("  image: probing P3 layers, multi-selection, and context menu");
   await loadSyntheticImageEditor(page);
   await installImageEditorExportCapture(page);
   await readImageEditorP3State(page);
 
   // Use the public effect workflow so every layer-order assertion includes the fixed base+effect block.
-  await page.click('[data-testid="image-editor-panel-effect"]');
+  await clickP3Control('[data-testid="image-editor-panel-effect"]');
   await dragImageEditorRegion(page, 1);
-  await page.click('[data-testid="image-editor-effect-selection-apply"]');
+  await clickP3Control('[data-testid="image-editor-effect-selection-apply"]');
   await page.waitForFunction(() => !document.querySelector(".fabric-stage.is-effect-mode"));
   await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.objects.some((object) => object.role === "region-effect"));
 
-  await page.click('[data-testid="image-editor-panel-text"]');
-  await page.click('[data-testid="image-editor-add-text"]');
-  await page.click('[data-testid="image-editor-panel-shapes"]');
-  await page.click('[data-testid="image-editor-shape-rounded-rect"]');
-  await page.click('[data-testid="image-editor-shape-triangle"]');
+  await clickP3Control('[data-testid="image-editor-panel-text"]');
+  await clickP3Control('[data-testid="image-editor-add-text"]');
+  await clickP3Control('[data-testid="image-editor-panel-shapes"]');
+  await clickP3Control('[data-testid="image-editor-shape-rounded-rect"]');
+  await clickP3Control('[data-testid="image-editor-shape-triangle"]');
   await configureImageEditorP3Geometry(page, true);
 
-  await page.click('[data-testid="image-editor-panel-layers"]');
+  await clickP3Control('[data-testid="image-editor-panel-layers"]');
   await page.waitForFunction(() => document.querySelectorAll(".image-editor-layer-row").length === 4);
   let state = await readImageEditorP3State(page);
   const initialKinds = state.additional.map((object) => object.kind);
@@ -947,9 +972,9 @@ async function testImageStudioLayersAndSelection(page) {
   if ((await readImageEditorP3State(page)).objects.length !== beforeBaseKeyboardDelete) throw new Error("Keyboard Delete removed the base layer");
 
   // Unlock only for the shift-click and base/effect context-target probes below.
-  await page.click('[data-testid="image-editor-panel-effect"]');
+  await clickP3Control('[data-testid="image-editor-panel-effect"]');
   await page.click('button[aria-label="원본 사진 잠금"]');
-  await page.click('[data-testid="image-editor-panel-layers"]');
+  await clickP3Control('[data-testid="image-editor-panel-layers"]');
 
   // Hiding the active additional layer clears selection, excludes it from export, and is fully restorable.
   await page.click('.image-editor-layer-row[data-layer-kind="text"] .image-editor-layer-select');
@@ -960,11 +985,11 @@ async function testImageStudioLayersAndSelection(page) {
   if (state.activeCount !== 0 || state.additional.find((object) => object.kind === "text")?.visible !== false) throw new Error(`Hiding an active layer left a stale selection: ${JSON.stringify(state)}`);
   const hiddenExport = await captureImageEditorExport(page, "PNG");
   if (hiddenExport === visibleExport) throw new Error("Hidden layer remained in the image export");
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction(() => document.querySelector('.image-editor-layer-row[data-layer-kind="text"]')?.getAttribute("data-layer-visible") === "true");
-  await page.click('[data-testid="image-editor-redo"]');
+  await clickP3Control('[data-testid="image-editor-redo"]');
   await page.waitForFunction(() => document.querySelector('.image-editor-layer-row[data-layer-kind="text"]')?.getAttribute("data-layer-visible") === "false");
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction(() => document.querySelector('.image-editor-layer-row[data-layer-kind="text"]')?.getAttribute("data-layer-visible") === "true");
 
   // Base visibility is atomic with every region effect, including undo and redo.
@@ -972,11 +997,11 @@ async function testImageStudioLayersAndSelection(page) {
   await page.click('.image-editor-layer-row[data-layer-base="true"] .image-editor-layer-visibility');
   state = await readImageEditorP3State(page);
   if (state.base?.visible !== false || state.effects.some((effect) => effect.visible) || state.activeCount !== 0) throw new Error(`Base/effect visibility was not coupled: ${JSON.stringify(state)}`);
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction(async () => { const value = await window.__readImageEditorP3State?.(); return value?.base?.visible && value.effects.every((effect) => effect.visible) && document.querySelector('.image-editor-layer-row[data-layer-base="true"]')?.getAttribute("data-layer-visible") === "true"; });
-  await page.click('[data-testid="image-editor-redo"]');
+  await clickP3Control('[data-testid="image-editor-redo"]');
   await page.waitForFunction(async () => { const value = await window.__readImageEditorP3State?.(); return value?.base?.visible === false && value.effects.every((effect) => !effect.visible) && document.querySelector('.image-editor-layer-row[data-layer-base="true"]')?.getAttribute("data-layer-visible") === "false"; });
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.base?.visible === true && document.querySelector('.image-editor-layer-row[data-layer-base="true"]')?.getAttribute("data-layer-visible") === "true");
   console.log("  image: P3 visibility/history verified");
 
@@ -987,7 +1012,7 @@ async function testImageStudioLayersAndSelection(page) {
   state = await readImageEditorP3State(page);
   if (!state.blockValid || state.additional[0]?.kind !== "triangle") throw new Error(`Minibar back crossed or missed the base block: ${JSON.stringify(state)}`);
   await assertImageEditorUndoRedoOrder(page, "triangle,text,rounded-rect", "text,rounded-rect,triangle", "minibar reorder");
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.additional.map((object) => object.kind).join(",") === "text,rounded-rect,triangle");
   console.log("  image: P3 three-route z-order clamp verified");
 
@@ -996,7 +1021,7 @@ async function testImageStudioLayersAndSelection(page) {
   await page.$eval('[data-testid="image-editor-context-back"]', (button) => button.click());
   state = await readImageEditorP3State(page);
   if (!state.blockValid || state.additional[0]?.kind !== "triangle") throw new Error(`Context-menu back crossed or missed the base block: ${JSON.stringify(state)}`);
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.additional.map((object) => object.kind).join(",") === "text,rounded-rect,triangle");
   console.log("  image: P3 context clamp verified");
 
@@ -1016,7 +1041,7 @@ async function testImageStudioLayersAndSelection(page) {
   if (!state.blockValid || state.additional.map((object) => object.kind).join(",") === "text,rounded-rect,triangle" || state.layerRows.at(-1)?.kind !== "base") {
     throw new Error(`Panel drag broke or missed the fixed base block: ${JSON.stringify(state)}`);
   }
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction(async () => (await window.__readImageEditorP3State?.())?.additional.map((object) => object.kind).join(",") === "text,rounded-rect,triangle");
 
   // Rubber-band selection includes the unlocked base as a candidate, then the selection hook removes it.
@@ -1054,8 +1079,8 @@ async function testImageStudioLayersAndSelection(page) {
   // Six scene-bbox alignments must remain invariant under object transforms and VPT zoom.
   const alignments = ["left", "center-horizontal", "right", "top", "center-vertical", "bottom"];
   for (const zoom of [1, 2]) {
-    await page.click('[data-testid="image-editor-fit"]');
-    if (zoom === 2) for (let index = 0; index < 3; index += 1) await page.click('[data-testid="image-editor-zoom-in"]');
+    await clickP3Control('[data-testid="image-editor-fit"]');
+    if (zoom === 2) for (let index = 0; index < 3; index += 1) await clickP3Control('[data-testid="image-editor-zoom-in"]');
     await page.waitForFunction((expected) => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === `${expected * 100}%`, {}, zoom);
     for (const alignment of alignments) {
       await configureImageEditorP3Geometry(page, true, ["text", "rounded-rect", "triangle"]);
@@ -1065,16 +1090,16 @@ async function testImageStudioLayersAndSelection(page) {
     }
   }
   const alignedState = await readImageEditorP3State(page);
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-redo"]')?.disabled === false);
   const undoneAlignment = await readImageEditorP3State(page);
   if (JSON.stringify(undoneAlignment.additional.map((object) => object.bounds)) === JSON.stringify(alignedState.additional.map((object) => object.bounds))) {
     throw new Error("Alignment undo did not restore the preceding geometry");
   }
-  await page.click('[data-testid="image-editor-redo"]');
+  await clickP3Control('[data-testid="image-editor-redo"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-redo"]')?.disabled === true);
   assertImageEditorAlignment((await readImageEditorP3State(page)).additional, "bottom", "alignment redo");
-  await page.click('[data-testid="image-editor-fit"]');
+  await clickP3Control('[data-testid="image-editor-fit"]');
   console.log("  image: P3 six-way scene alignment at 100/200% verified");
 
   // Multiple clone is per-object, translated as a set, and preserves the originals' relative z-order.
@@ -1088,12 +1113,12 @@ async function testImageStudioLayersAndSelection(page) {
   if (!state.blockValid || state.additional.length !== beforeCloneCount + 2 || state.activeCount !== 2 || state.activeKinds.join(",") !== beforeCloneKinds) {
     throw new Error(`Multi-clone did not preserve relative z-order: ${JSON.stringify(state)}`);
   }
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
   console.log("  image: P3 multi-clone relative order/history verified");
-  await page.click('[data-testid="image-editor-redo"]');
+  await clickP3Control('[data-testid="image-editor-redo"]');
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count + 2), {}, beforeCloneCount);
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
 
   // Multiple context policy: duplicate/delete/alignment only; delete is independently undoable.
@@ -1114,7 +1139,7 @@ async function testImageStudioLayersAndSelection(page) {
   }
   await page.$eval('[data-testid="image-editor-context-delete"]', (button) => button.click());
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count - 2), {}, beforeCloneCount);
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
 
   // Every normal-object menu command receives an actual right-click path.
@@ -1123,23 +1148,23 @@ async function testImageStudioLayersAndSelection(page) {
   await openImageEditorContextMenu(page, triangle);
   await page.$eval('[data-testid="image-editor-context-duplicate"]', (button) => button.click());
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count + 1), {}, beforeCloneCount);
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
   triangle = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle");
   await openImageEditorContextMenu(page, triangle);
   await page.$eval('[data-testid="image-editor-context-front"]', (button) => button.click());
   if ((await readImageEditorP3State(page)).additional.at(-1)?.kind !== "triangle") throw new Error("Context-menu front did not move the object to the additional-layer front");
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   triangle = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle");
   await openImageEditorContextMenu(page, triangle);
   await page.$eval('[data-testid="image-editor-context-back"]', (button) => button.click());
   if ((await readImageEditorP3State(page)).additional[0]?.kind !== "triangle") throw new Error("Context-menu back did not clamp above the fixed block");
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   triangle = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle");
   await openImageEditorContextMenu(page, triangle);
   await page.$eval('[data-testid="image-editor-context-delete"]', (button) => button.click());
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count - 1), {}, beforeCloneCount);
-  await page.click('[data-testid="image-editor-undo"]');
+  await clickP3Control('[data-testid="image-editor-undo"]');
   await page.waitForFunction((count) => window.__readImageEditorP3State?.().then((value) => value.additional.length === count), {}, beforeCloneCount);
   const textLayer = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "text");
   await openImageEditorContextMenu(page, textLayer);
@@ -1155,7 +1180,7 @@ async function testImageStudioLayersAndSelection(page) {
   await page.keyboard.press("Escape");
   if (await page.$('[data-testid="image-editor-context-menu"]')) throw new Error("Escape did not close the object menu");
   await openImageEditorContextMenu(page, (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle"));
-  await page.click('[data-testid="image-editor-panel-layers"]');
+  await clickP3Control('[data-testid="image-editor-panel-layers"]');
   if (await page.$('[data-testid="image-editor-context-menu"]')) throw new Error("Outside click did not close the object menu");
   await openImageEditorContextMenu(page, (await readImageEditorP3State(page)).additional.find((object) => object.kind === "triangle"));
   await page.evaluate(() => window.dispatchEvent(new Event("resize")));
@@ -1175,7 +1200,7 @@ async function testImageStudioLayersAndSelection(page) {
   await page.mouse.click(blankPoint.x, blankPoint.y, { button: "right" });
   if (await page.$('[data-testid="image-editor-context-menu"]')) throw new Error("Blank canvas right-click opened an object menu");
   await setImageEditorAllCanvasObjectsHitTesting(page, true);
-  await page.click('[data-testid="image-editor-panel-layers"]', { button: "right" });
+  await clickP3Control('[data-testid="image-editor-panel-layers"]', { button: "right" });
   const defaults = await page.evaluate(() => window.__imageEditorContextDefaults || []);
   if (defaults.filter((entry) => entry.inside).some((entry) => !entry.prevented) || !defaults.some((entry) => !entry.inside && !entry.prevented)) {
     throw new Error(`Context-menu default suppression escaped the Fabric canvas: ${JSON.stringify(defaults)}`);
@@ -1183,7 +1208,7 @@ async function testImageStudioLayersAndSelection(page) {
 
   // Space pan wins over group selection, while crop owns drag and never creates an ActiveSelection.
   await discardImageEditorSelection(page);
-  for (let index = 0; index < 3; index += 1) await page.click('[data-testid="image-editor-zoom-in"]');
+  for (let index = 0; index < 3; index += 1) await clickP3Control('[data-testid="image-editor-zoom-in"]');
   await page.waitForFunction(() => document.querySelector('[data-testid="image-editor-zoom-level"]')?.textContent === "200%");
   const beforePanState = await readImageEditorP3State(page);
   const beforePan = beforePanState.viewport;
@@ -1197,8 +1222,8 @@ async function testImageStudioLayersAndSelection(page) {
   await page.keyboard.up("Space");
   state = await readImageEditorP3State(page);
   if (JSON.stringify(state.viewport) === JSON.stringify(beforePan) || state.activeType === "activeselection") throw new Error(`Space pan lost input priority: ${JSON.stringify(state)}`);
-  await page.click('[data-testid="image-editor-fit"]');
-  await page.click('[data-testid="image-editor-panel-crop"]');
+  await clickP3Control('[data-testid="image-editor-fit"]');
+  await clickP3Control('[data-testid="image-editor-panel-crop"]');
   await dragImageEditorRegion(page, 1);
   state = await readImageEditorP3State(page);
   if (state.activeType === "activeselection" || !state.objects.some((object) => object.role === "crop-overlay")) throw new Error(`Crop drag lost ownership to rubber-band selection: ${JSON.stringify(state)}`);
@@ -1208,8 +1233,8 @@ async function testImageStudioLayersAndSelection(page) {
   // English labels are rendered from the same target policy, with no clipboard/paste command.
   await page.goto(`${baseUrl}/en/tools/image-studio`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector('[data-testid="image-editor-panel-text"]');
-  await page.click('[data-testid="image-editor-panel-text"]');
-  await page.click('[data-testid="image-editor-add-text"]');
+  await clickP3Control('[data-testid="image-editor-panel-text"]');
+  await clickP3Control('[data-testid="image-editor-add-text"]');
   await configureImageEditorP3Geometry(page, false);
   const englishText = (await readImageEditorP3State(page)).additional.find((object) => object.kind === "text");
   await openImageEditorContextMenu(page, englishText);
@@ -2142,6 +2167,7 @@ async function rightClickImageEditorObject(page, object) {
   // getImageEditorSceneMapping intentionally scrolls the canvas into view; let that
   // scroll event settle before asserting the product's scroll-to-close contract.
   await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 100)));
+  await page.evaluate(({point,mapping}) => { const r=document.querySelector(".fabric-stage .upper-canvas").getBoundingClientRect(); window.__rightClickProbe={point,mapping,bounds:r.toJSON(),dpr:devicePixelRatio}; },{point,mapping});
   await page.mouse.click(point.x, point.y, { button: "right" });
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
@@ -2151,7 +2177,7 @@ async function openImageEditorContextMenu(page, object) {
   try {
     await page.waitForSelector('[data-testid="image-editor-context-menu"]', { timeout: 3_000 });
   } catch {
-    const fabricEvent = await page.evaluate(() => window.__imageEditorLastFabricContext);
+    const fabricEvent = await page.evaluate(() => ({ event:window.__imageEditorLastFabricContext,probe:window.__rightClickProbe }));
     throw new Error(`Image editor context menu did not open: ${JSON.stringify({ target: object, fabricEvent, state: await readImageEditorP3State(page) })}`);
   }
 }
@@ -2465,12 +2491,33 @@ async function transformImageEditorBase(page) {
 
 async function getImageEditorSceneMapping(page, zoom) {
   await page.$eval(".fabric-stage .upper-canvas", (canvas) => canvas.scrollIntoView({ block: "center", behavior: "instant" }));
+  // History restoration schedules responsive CSS sizing on animation frames.
+  // Map the pointer only after those dimensions and the scroll position settle.
+  await page.evaluate(async () => {
+    const canvas = document.querySelector(".fabric-stage .upper-canvas");
+    let previous = "", stable = 0;
+    const started = performance.now();
+    while (stable < 4) {
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const { x, y, width, height } = canvas.getBoundingClientRect();
+      const next = JSON.stringify([x, y, width, height]);
+      stable = next === previous ? stable + 1 : 0;
+      previous = next;
+      if (performance.now() - started > 2000) throw new Error("Image canvas layout did not settle");
+    }
+  });
   const bounds = await page.$eval(".fabric-stage .upper-canvas", (canvas) => {
     const rect = canvas.getBoundingClientRect();
     return { x: rect.left, y: rect.top, width: rect.width, height: rect.height };
   });
   if (bounds.width <= 0 || bounds.height <= 0) throw new Error("Image editor canvas is unavailable");
-  const logical = await page.$eval(".fabric-stage .lower-canvas", (element) => ({ width: element.width / devicePixelRatio, height: element.height / devicePixelRatio }));
+  const logical = await page.$eval(".fabric-stage .lower-canvas", (element) => {
+    const canvas = window.__imageEditorFabricCanvas;
+    // P3 uses Fabric scene coordinates; a restored canvas backing store can
+    // differ from the logical dimensions after responsive CSS sizing.
+    return canvas ? { width: canvas.getWidth(), height: canvas.getHeight() }
+      : { width: element.width / devicePixelRatio, height: element.height / devicePixelRatio };
+  });
   return { bounds, logical, zoom, scaleX: bounds.width / logical.width, scaleY: bounds.height / logical.height };
 }
 
