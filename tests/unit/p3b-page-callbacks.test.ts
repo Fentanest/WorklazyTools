@@ -61,7 +61,7 @@ for (const isolated of [false, true]) for (const language of ["ko", "en"]) test(
   const parsed = page("pdf-converter/DocumentPdfPanel"), input = new File(["doc"], "input.docx");
   const errors: string[] = [], chosen: File[][] = [];
   const adapter = execute(`globalThis.api=(${parsed.adapter()});`, {
-    intakeGeneration: { current: 0 }, inspectDocumentInput: async () => true, crossOriginIsolated: isolated,
+    intakeGeneration: { current: 0 }, officeSessionNeedsReload: false, inspectDocumentInput: async () => true, crossOriginIsolated: isolated,
     setError: (message: string) => errors.push(message), L: (ko: string, en: string) => language === "ko" ? ko : en,
     choose: (files: File[]) => chosen.push(files), setUnsavedWork: noop,
   });
