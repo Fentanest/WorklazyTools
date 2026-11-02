@@ -1596,7 +1596,9 @@
         "Click an object on the canvas to select it. Use the Layers panel to lock, reorder, group, align, or change opacity. Shift-click to multi-select.": "Click an object on the canvas to select it. Use the Layers panel to lock, reorder, group, align, or change opacity. Shift-click to multi-select.",
         "Working…": "Working…",
         "Downloading model…": "Downloading model…",
-        "Processing…": "Processing…"
+        "Processing…": "Processing…",
+        "Object": "Object",
+        "Redaction": "Redaction"
       },
       "retryPerson": "Retry portrait mode",
       "retryReady": "Portrait mode selected. Press Remove background again.",

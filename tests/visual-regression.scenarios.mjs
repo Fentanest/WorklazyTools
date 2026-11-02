@@ -546,7 +546,6 @@ const interactionDefinitions = Object.freeze({
           { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
           { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
           { type: "wait", selector: ".asp-layers__row:nth-child(11)" },
-          { type: "assert-truncated", selector: ".asp-layers__row:nth-child(10) .asp-layers__name" },
           { type: "assert-scroll-overflow", selector: ".asp-layers__scroll", axis: "y" },
           { type: "scroll-into-view", selector: ".asp-layer-list", offset: -72 },
         ],

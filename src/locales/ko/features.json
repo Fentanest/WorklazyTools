@@ -1589,7 +1589,9 @@
         "Click an object on the canvas to select it. Use the Layers panel to lock, reorder, group, align, or change opacity. Shift-click to multi-select.": "캔버스의 개체를 클릭하여 선택하세요. 레이어 패널에서 잠금·순서·그룹·정렬·불투명도를 바꿉니다. Shift를 누른 채 클릭하면 여러 개체를 선택합니다.",
         "Working…": "처리 중…",
         "Downloading model…": "모델 받는 중…",
-        "Processing…": "처리 중…"
+        "Processing…": "처리 중…",
+        "Object": "개체",
+        "Redaction": "가리기"
       },
       "retryPerson": "인물 모드로 다시",
       "retryReady": "인물 모드를 선택했습니다. 배경 제거를 다시 눌러 주세요.",

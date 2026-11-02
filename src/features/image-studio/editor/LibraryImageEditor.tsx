@@ -26,6 +26,7 @@ type PendingDecision<T> = { resolve: (value: T) => void };
 const FORMATS = ['png', 'jpeg', 'webp', 'pdf', 'svg', 'json'] as const;
 const localFonts = new Set(['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Verdana', 'Courier New', 'Noto Sans']);
 const fontResolver = (family: string) => localFonts.has(family) || family.includes('system-ui') ? 'local' as const : 'google' as const;
+const readThemeMode = (): 'light' | 'dark' => document.documentElement.dataset.theme?.startsWith('dark') || getComputedStyle(document.documentElement).colorScheme === 'dark' ? 'dark' : 'light';
 const initialTool = (preset?: ImageDirectPreset) => preset?.purpose === 'mosaic' ? 'redact' : preset?.purpose === 'watermark' ? 'text' : preset?.purpose === 'resize' ? 'resize' : 'select';
 
 export default function LibraryImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: Props) {
@@ -44,6 +45,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const exportRevision = useRef(0);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [hasTemplateInput, setHasTemplateInput] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [mode, setMode] = useState<BgMode>('person');
@@ -101,17 +103,17 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   }, [language, dismissPending]);
   useEffect(() => { if (!active) cancel(); }, [active, cancel]);
   useEffect(() => {
-    onDirtyRef.current(!!source || dirty || loading || bgBusy || !!result);
-  }, [source, dirty, loading, bgBusy, result]);
+    onDirtyRef.current(!!source || hasTemplateInput || dirty || loading || bgBusy || !!result);
+  }, [source, hasTemplateInput, dirty, loading, bgBusy, result]);
   useEffect(() => () => { version.current++; loadedAck.current?.resolve(false); clearTimeout(batchTimer.current); onDirtyRef.current(false); }, []);
   useEffect(() => {
     if (!result) { setResultUrl(undefined); return; }
     const url = URL.createObjectURL(result); setResultUrl(url); return () => URL.revokeObjectURL(url);
   }, [result]);
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  const [theme, setTheme] = useState<'light' | 'dark'>(readThemeMode);
   useEffect(() => {
-    const observer = new MutationObserver(() => setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light'));
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }); return () => observer.disconnect();
+    const observer = new MutationObserver(() => setTheme(readThemeMode()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] }); return () => observer.disconnect();
   }, []);
 
   const receive = async (file: File, context?: IntakeContext) => {
@@ -124,7 +126,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       const prepared = await prepareImage(file, policy.resolutionLimits.inputMaxDimension);
       if (request !== version.current || context?.signal.aborted) return false;
       setUnsavedWork('image-studio', { hasWork: true, kind: 'files', scopePath: '/tools/image-studio' });
-      setLoaded(false); setSource(prepared); setGeneration(value => value + 1);
+      setLoaded(false); setHasTemplateInput(false); setSource(prepared); setGeneration(value => value + 1);
       return await new Promise<boolean>(resolve => { loadedAck.current = { resolve, version: request }; });
     } catch {
       if (request === version.current) setError(t('image.library.loadFailed'));
@@ -273,6 +275,13 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         if (event.target instanceof Element && event.target.closest('.asp-commit')) exportRevision.current = documentRevision.current;
       }} onChangeCapture={event => {
         const input = event.target;
+        // Template loading establishes a clean library baseline, but still owns a
+        // user file. Protect it and cancel any operation on the previous scene.
+        if (input instanceof HTMLInputElement && input.type === 'file' && input.accept.includes('.json') && input.files?.length) {
+          if (loading) { event.stopPropagation(); input.value = ''; setNotice(t('image.library.loading')); return; }
+          cancel(); setHasTemplateInput(true); setResult(undefined);
+          setUnsavedWork('image-studio', { hasWork: true, kind: 'files', scopePath: '/tools/image-studio' });
+        }
         // Route source replacement through the host's measured File-only import.
         if (input instanceof HTMLInputElement && input.type === 'file' && input.accept === 'image/*' && input.closest('.asp-menu') && !input.closest('label')?.classList.contains('asp-mt-sm')) {
           event.stopPropagation(); const file = input.files?.[0]; input.value = ''; if (file) void receiveRef.current(file);

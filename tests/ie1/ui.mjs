@@ -30,6 +30,13 @@ try {
         assert.ok((await editor.locator('.asp-panel__title').allTextContents()).some(value => value.includes(label)), path);
       }
     });
+    await scenario('editor follows coral and mint light/dark theme attributes', async () => {
+      await fresh();
+      for(const theme of ['dark-coral','light-coral','dark-mint','light-mint']) {
+        await p.evaluate(theme=>document.documentElement.setAttribute('data-theme',theme),theme);
+        await p.waitForFunction(dark=>{ const node=document.querySelector('.asp-image-editor');const rgb=getComputedStyle(node).backgroundColor.match(/\d+/g)?.slice(0,3).map(Number);return rgb && (dark ? Math.max(...rgb)<100 : Math.min(...rgb)>180); },theme.startsWith('dark'));
+      }
+    });
     await scenario('global header drop routes to one editor without duplicate choices', async () => {
       await fresh();
       const data = await p.evaluateHandle(base64 => { const transfer = new DataTransfer(); const bytes=Uint8Array.from(atob(base64), value=>value.charCodeAt(0)); transfer.items.add(new File([bytes], 'ie1-global.png', {type:'image/png'})); return transfer; }, input.buffer.toString('base64'));
@@ -117,6 +124,23 @@ try {
       if(await p.locator('[data-testid=unsaved-work-dialog][open]').count())await p.locator('[data-testid=unsaved-stay]').click();
       await editor.getByRole('button',{name:'Apply redaction',exact:true}).waitFor();
       assert.equal(await editor.locator('.asp-layers__row').count(),before); assert.equal(await editor.getByRole('button',{name:'Undo',exact:true}).isEnabled(),true);
+    });
+    await scenario('user-renamed long layer names visibly truncate', async () => {
+      await fresh('watermark/'); await put(); await editor.locator('#asp-text-input').fill('Layer'); await editor.locator('.asp-text-add .asp-btn-accent').click();
+      await editor.locator('.asp-layers__name').first().dblclick();
+      await editor.getByRole('textbox',{name:'Layer name',exact:true}).fill('A very long layer name that must visibly truncate with an ellipsis in this layer panel');
+      await editor.getByRole('textbox',{name:'Layer name',exact:true}).press('Enter');
+      const metrics=await editor.locator('.asp-layers__name').first().evaluate(node=>({client:node.clientWidth,scroll:node.scrollWidth,overflow:getComputedStyle(node).textOverflow}));
+      assert.ok(metrics.scroll>metrics.client);assert.equal(metrics.overflow,'ellipsis');
+      await p.screenshot({path:`${out}/layer-name.png`,fullPage:true});
+    });
+    await scenario('a loaded template remains protected after the library marks it clean', async () => {
+      await fresh(); await editor.getByRole('button',{name:'Image',exact:true}).click();
+      const downloading=p.waitForEvent('download');await editor.getByRole('button',{name:'Save template',exact:true}).click();const file=await downloading;const savedPath=await file.path();
+      await fresh();await editor.getByRole('button',{name:'Image',exact:true}).click();await editor.locator('input[accept*=".json"]').setInputFiles(savedPath);
+      await editor.getByRole('button',{name:'Edit history',exact:true}).click();await editor.getByText('Loaded template',{exact:true}).waitFor();await p.keyboard.press('Escape');
+      await p.locator('a[href="/en"],a[href="/en/"]').first().click();await p.locator('[data-testid=unsaved-work-dialog][open]').waitFor();await p.locator('[data-testid=unsaved-stay]').click();
+      assert.ok(p.url().includes('image-studio'));
     });
     await scenario('H1 receives through the home drop zone and cold library chunk', async () => {
       await p.setViewportSize({width:1365,height:900}); await p.goto(`${base}/en/`);
