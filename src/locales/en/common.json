@@ -150,7 +150,10 @@
         "document-compare": "$t(u5CompareHandoff.receivers.document-compare)",
         "document-redactor": "Redact documents",
         "document-to-pdf": "Convert documents to PDF",
-        "xls-preserve": "Preserve XLS formulas · formatting"
+        "xls-preserve": "Preserve XLS formulas · formatting",
+        "image-to-pdf": "Images to PDF",
+        "pdf-to-image": "PDF to images",
+        "pdf-to-document": "PDF to documents"
       },
       "hints": {
         "excel": "Add another spreadsheet to merge files.",
@@ -266,5 +269,20 @@
     },
     "before": "Before",
     "after": "After"
+  },
+  "sendTo": {
+    "editImages": "Open in batch image editor",
+    "editImage": "Open in image editor",
+    "privacy": "Send to metadata remover",
+    "imagePdf": "Make a PDF from this image",
+    "pdfDocument": "Convert PDF to a document",
+    "pdfImages": "Convert PDF to images",
+    "failed": "Could not transfer the result. Download it or try again.",
+    "download": "Download the result being transferred",
+    "retry": "Try sending again",
+    "webp": "Choose PNG or JPG as the output format to send it to PDF.",
+    "selectPages": "Choose page images to edit",
+    "limit": "Choose 1–50 page images. The ZIP file is not transferred.",
+    "page": "Page {{page}}"
   }
 }

@@ -150,7 +150,10 @@
         "document-compare": "$t(u5CompareHandoff.receivers.document-compare)",
         "document-redactor": "개인정보 가리기",
         "document-to-pdf": "문서를 PDF로",
-        "xls-preserve": "XLS 수식·서식 보존"
+        "xls-preserve": "XLS 수식·서식 보존",
+        "image-to-pdf": "이미지를 PDF로",
+        "pdf-to-image": "PDF를 이미지로",
+        "pdf-to-document": "PDF를 문서로"
       },
       "hints": {
         "excel": "엑셀 파일을 하나 더 넣으면 병합할 수 있어요.",
@@ -266,5 +269,20 @@
     },
     "before": "수정 전",
     "after": "수정 후"
+  },
+  "sendTo": {
+    "editImages": "이미지 일괄 편집에서 열기",
+    "editImage": "이미지 편집에서 열기",
+    "privacy": "사진 정보 제거로 넘기기",
+    "imagePdf": "이미지를 PDF로 만들기",
+    "pdfDocument": "PDF를 문서로 변환",
+    "pdfImages": "PDF를 이미지로 변환",
+    "failed": "결과를 넘기지 못했습니다. 결과를 다운로드하거나 다시 시도하세요.",
+    "download": "넘기던 결과 다운로드",
+    "retry": "다시 넘기기",
+    "webp": "PDF로 넘기려면 출력 형식을 PNG 또는 JPG로 선택하세요.",
+    "selectPages": "편집할 페이지 이미지 선택",
+    "limit": "페이지 이미지를 1~50장 선택하세요. ZIP 파일은 넘기지 않습니다.",
+    "page": "페이지 {{page}}"
   }
 }

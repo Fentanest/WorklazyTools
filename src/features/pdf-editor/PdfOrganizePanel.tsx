@@ -1,3 +1,4 @@
+import { useMemoryHandoff } from "../../components/AppShell";
 import { useTranslation } from "react-i18next";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
 import { acceptsFile } from "../../app/fileAccepts";
@@ -68,6 +69,10 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   initialFiles?: File[] | null;
   onInitialFilesConsumed?: () => void;
 }) {
+  const sender = useMemoryHandoff();
+  const sendGeneration = useRef(0);
+  useEffect(() => () => { sendGeneration.current++; }, []);
+  const [sendError, setSendError] = useState(false);
   const language = useAppLanguage();
   const { t } = useTranslation("common");
   const intakeElementRef = useRef<HTMLDivElement>(null);
@@ -138,6 +143,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
       : "pdf.messages.PdfEditorPage.unsavedOrganize",
   });
 
+  const handoffRollback = useRef<{ generation: number; signal: AbortSignal; controller: AbortController; files: File[] } | null>(null);
   const pendingInputs = useRef<File[]>([]);
   const inputTask = useRef<Promise<void>>(Promise.resolve());
   const inputHandler = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
@@ -306,16 +312,17 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     const incoming = nextFiles.filter((file) => !sources.some((source) => source.file === file));
     if (!incoming.length || context?.signal.aborted) return;
     const generation = ++resumeGeneration.current;
-    setError("");
+    if (!context) setError("");
     activeController.current?.abort();
-    pendingInputs.current = context ? [] : incoming;
+    if (!context) pendingInputs.current = incoming;
     const controller = new AbortController();
     activeController.current = controller;
+    handoffRollback.current = context ? { generation, signal: context.signal, controller, files: incoming } : null;
     const isCurrent = () => !controller.signal.aborted && !context?.signal.aborted && generation === resumeGeneration.current;
     const abort = () => controller.abort();
     context?.signal.addEventListener("abort", abort, { once: true });
     setInspecting(true);
-    invalidateResult();
+    if (!context) invalidateResult();
     operation.start(featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingPagesInPdfs", { p0: incoming.length }));
     const addedSources: PdfSourceFile[] = [];
     const addedPages: PdfPageItem[] = [];
@@ -346,6 +353,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
         operation.reset();
         return { status: "rejected", accepted: [], rejected };
       }
+      if (context) { setError(""); invalidateResult(); }
       focusAfterLoad.current = direct.acceptedPreset?.postLoadFocus;
       setSources((current) => [...current, ...addedSources]);
       setPages((current) => [...current, ...addedPages]);
@@ -368,8 +376,9 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
       operation.fail(message);
     } finally {
       context?.signal.removeEventListener("abort", abort);
+      if (handoffRollback.current?.generation === generation) handoffRollback.current = null;
       if (!isCurrent()) addedSources.forEach(source => { void releasePdf(source.file); });
-      if (isCurrent() && activeController.current === controller) { setInspecting(false); pendingInputs.current = []; }
+      if (isCurrent() && activeController.current === controller) { setInspecting(false); if (!context) pendingInputs.current = []; }
     }
   };
 
@@ -385,15 +394,19 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     receive: async (entry, context) => await acquireInput(entry.files, context)
       ?? { status: "cancelled", accepted: [], rejected: [] },
     invalidate: () => {
-      // Invalidate before resetting; a parser may finish after abort/timeout.
-      resumeGeneration.current += 1;
-      activeController.current?.abort();
-      pendingInputs.current = [];
-      sourcesRef.current.forEach(source => { void releasePdf(source.file); });
-      sourcesRef.current = [];
-      setSources([]); setPages([]); setSelectedPageIds(new Set()); setMovePageIds(new Set());
-      setSplitAfterPageIds(new Set()); setSelectionRange(""); setSelectionError("");
-      setInspecting(false); setError(""); operation.reset(); invalidateResult();
+      const rollback = handoffRollback.current;
+      if (!rollback?.signal.aborted) return;
+      handoffRollback.current = null;
+      if (rollback.generation !== resumeGeneration.current) return;
+      resumeGeneration.current++;
+      rollback.controller.abort();
+      rollback.files.forEach(file => { void releasePdf(file); });
+      if (activeController.current === rollback.controller) {
+        activeController.current = undefined; setInspecting(false); operation.reset();
+      }
+      // Sources/pages/selection and pre-existing pending input were never
+      // committed by this handoff. Keep them and the old generated result.
+
     },
   });
   const downloadReceived = () => {
@@ -658,6 +671,18 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     requestAnimationFrame(() => mobileWorkspaceTriggerRef.current?.focus());
   }
 
+  const latestResult = useRef(download.result); latestResult.current = download.result;
+  const sendResult = async (receiverId: "pdf-to-document" | "pdf-to-image") => {
+    const result = download.result;
+    if (!result || outputMode !== "merged") return;
+    const generation = ++sendGeneration.current;
+    setSendError(false);
+    try {
+      const blob = await (await fetch(result.url)).blob();
+      if (latestResult.current !== result || generation !== sendGeneration.current) return;
+      sender.send({ receiverId, entryPath: `/tools/pdf-converter/${receiverId}`, files: [new File([blob], result.fileName, { type: "application/pdf" })], origin: "generated", source: "pdf-organize" });
+    } catch { if (generation === sendGeneration.current) setSendError(true); }
+  };
   const exportDisabled = !pages.length || !resultFileCount || inspecting || operation.status === "running" || quickSplitOpen;
   const includedPageCount = outputMode === "ranges" ? rangePageCount : selectedPages.length;
   const createLabel = outputMode === "merged"
@@ -820,6 +845,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
                 <PdfError message={error} />
                 {download.result && <div ref={downloadResultRef}>
                   <PdfDownloadCard result={download.result} compact onSaved={onResultSaved} />
+                  {outputMode === "merged" && <div className="mt-2 grid gap-2" data-testid="pdf-organize-send-actions"><Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={locked} data-testid="pdf-send-to-document" onClick={() => void sendResult("pdf-to-document")}>{sender.reason || sendError ? `${t("sendTo.retry")} · ` : ""}{t("sendTo.pdfDocument")}</Button><Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={locked} data-testid="pdf-send-to-images" onClick={() => void sendResult("pdf-to-image")}>{sender.reason || sendError ? `${t("sendTo.retry")} · ` : ""}{t("sendTo.pdfImages")}</Button>{(sender.reason || sendError) && <p role="alert">{t("sendTo.failed")}</p>}</div>}
                   {/* W1 [② 마무리로 넘기기] (plan §4.1): merged + current result only. */}
                   <Button type="button" className="mt-2 min-h-11 w-full rounded-xl" variant="secondary" data-testid="pdf-organize-send-to-finish" disabled={locked || outputMode !== "merged"} onClick={onHandoffRequest}>
                     {featureMessage(language, "pdf.messages.PdfEditorPage.sendToFinish")}

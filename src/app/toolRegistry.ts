@@ -515,7 +515,7 @@ const toolMetadata: Record<string, { actions: ToolAction[]; receiverIds?: Receiv
   "excel-compare": { actions: ["compare"], receiverIds: ["excel-compare"] },
   "document-generator": { actions: ["create"], receiverIds: ["document-generator"] },
   "pdf-editor": { actions: ["cut", "merge", "protect"], receiverIds: ["pdf-organize", "pdf-finish"] },
-  "pdf-converter": { actions: ["convert"] },
+  "pdf-converter": { actions: ["convert"], receiverIds: ["image-to-pdf", "pdf-to-image", "pdf-to-document"] },
   "document-compare": { actions: ["compare"], receiverIds: ["document-compare"] },
   "pdf-compare": { actions: ["compare"], receiverIds: ["pdf-compare"] },
   "text-compare": { actions: ["compare"] },

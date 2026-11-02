@@ -21,6 +21,9 @@ export const fileAccepts = {
   "pdf-finish": { paths: ["/tools/pdf-editor/watermark"], extensions: ["pdf"], max: 50, kind: "inspection" },
   "image-edit": { paths: ["/tools/image-studio", "/tools/image-studio/resize", "/tools/image-studio/mosaic", "/tools/image-studio/watermark"], extensions: images, max: 1, kind: "inspection" },
   "image-batch": { paths: ["/tools/image-studio"], extensions: images, max: 50, kind: "selection" },
+  "image-to-pdf": { paths: ["/tools/pdf-converter/image-to-pdf"], extensions: ["jpg", "jpeg", "png"], max: 50, kind: "inspection" },
+  "pdf-to-image": { paths: ["/tools/pdf-converter/pdf-to-image"], extensions: ["pdf"], max: 1, kind: "inspection" },
+  "pdf-to-document": { paths: ["/tools/pdf-converter/pdf-to-document"], extensions: ["pdf"], max: 1, kind: "inspection" },
 } as const satisfies Record<string, HandoffReceiverDefinition>;
 export type ReceiverId = keyof typeof fileAccepts;
 export function acceptsFile(receiverId: ReceiverId, file: File): boolean {
