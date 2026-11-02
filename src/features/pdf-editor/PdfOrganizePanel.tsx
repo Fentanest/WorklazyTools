@@ -342,6 +342,10 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
         }
       }
       if (!isCurrent()) return;
+      if (!addedSources.length) {
+        operation.reset();
+        return { status: "rejected", accepted: [], rejected };
+      }
       focusAfterLoad.current = direct.acceptedPreset?.postLoadFocus;
       setSources((current) => [...current, ...addedSources]);
       setPages((current) => [...current, ...addedPages]);
