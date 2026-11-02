@@ -75,11 +75,12 @@ try {
       await size.locator('input[type=number]').nth(0).fill('240');await size.locator('input[type=number]').nth(1).fill('140');await editor.locator('.asp-commit').click();
       await p.locator('[data-testid=image-editor-result] img').waitFor();const dimensions=await p.locator('[data-testid=image-editor-result] img').evaluate(async image=>{await image.decode();return[image.naturalWidth,image.naturalHeight]});assert.deepEqual(dimensions,[240,140]);
       await p.evaluate(()=>window.__ie1Release());await p.waitForFunction(()=>document.querySelector('[data-testid=image-editor-add-to-batch]').textContent.includes('(1)'));await p.evaluate(()=>HTMLCanvasElement.prototype.toBlob=window.__ie1OriginalBlob);
-      await tab(1);assert.equal(await p.locator('[data-testid=image-batch-list]').getAttribute('data-count'),'1');await p.locator('[data-image-owner=batch] select').first().selectOption('original');
+      await tab(1);assert.equal(await p.locator('[data-testid=image-batch-list]').getAttribute('data-count'),'1');await p.locator('[data-image-owner=batch] select').first().selectOption('original');await p.locator('[data-image-owner=batch] select:has(option[value="png"])').selectOption('png');
       const downloading=p.waitForEvent('download');await p.locator('[data-testid=image-batch-action] button').click();const download=await downloading;const zip=await JSZip.loadAsync(await fs.readFile(await download.path()));const entry=Object.values(zip.files).find(value=>!value.dir);const {PNG}=await import('pngjs');const image=PNG.sync.read(await entry.async('nodebuffer'));assert.deepEqual([image.width,image.height],[200,120]);
       await fresh();await put();
     });
     await scenario('W2 repeated trusted activations extend 600ms burst and enqueue one image', async () => {
+      await fresh(); await put();
       const add = p.locator('[data-testid=image-editor-add-to-batch]');
       await add.focus();
       for (let i = 0; i < 10; i++) { await p.keyboard.press('Enter'); await p.waitForTimeout(100); }

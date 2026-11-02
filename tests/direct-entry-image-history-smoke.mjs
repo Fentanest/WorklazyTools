@@ -73,8 +73,13 @@ async function testW2(page) {
     await fresh();await tab('batch');await tab('editor');await add.scrollIntoViewIfNeeded();
     if(process.env.TEST_EXPECT_DEV==='1'){const source=await (await page.request.get(`${base}/src/main.tsx`)).text();assert.match(source,/StrictMode/);assert.ok(await page.locator('script[src*="vite"]').count());}
     await add.evaluate(button=>{
-     window.__w2TrustedClicks=[];window.__w2TrustedKeys=[];
-     button.addEventListener('click',event=>window.__w2TrustedClicks.push({trusted:event.isTrusted,time:event.timeStamp,detail:event.detail}),{capture:true});
+     window.__w2TrustedClicks=[];window.__w2TrustedKeys=[];window.__w2Quiet450=undefined;window.__w2Quiet700=undefined;
+     button.addEventListener('click',event=>{
+      window.__w2TrustedClicks.push({trusted:event.isTrusted,time:event.timeStamp,detail:event.detail});
+      clearTimeout(window.__w2Probe450);clearTimeout(window.__w2Probe700);
+      window.__w2Probe450=setTimeout(()=>{window.__w2Quiet450={aria:button.getAttribute('aria-disabled'),disabled:button.disabled,opacity:Number(getComputedStyle(button).opacity),elapsed:performance.now()-event.timeStamp}},450);
+      window.__w2Probe700=setTimeout(()=>{window.__w2Quiet700={aria:button.getAttribute('aria-disabled'),elapsed:performance.now()-event.timeStamp}},700);
+     },{capture:true});
      button.addEventListener('keydown',event=>window.__w2TrustedKeys.push({trusted:event.isTrusted,key:event.key,repeat:event.repeat}),{capture:true});
     });
     const box=await add.boundingBox();assert.ok(box);
@@ -93,13 +98,12 @@ async function testW2(page) {
     assert.equal(inputs.clicks.length,10);assert.ok(inputs.clicks.every(event=>event.trusted));
     if(mode!=='mouse')assert.ok(inputs.keys.every(event=>event.trusted));
     if(mode==='Enter')assert.ok(inputs.keys.some(event=>event.repeat));
-    assert.equal(await add.getAttribute('aria-disabled'),'true');
-    assert.equal(await add.evaluate(button=>button.disabled),false);
-    assert.ok(await add.evaluate(button=>Number(getComputedStyle(button).opacity)<1));
-    await new Promise(resolve=>setTimeout(resolve,450));
-    assert.equal(await add.getAttribute('aria-disabled'),'true');
-    await new Promise(resolve=>setTimeout(resolve,250));
-    assert.equal(await add.getAttribute('aria-disabled'),'false');
+    // Sample relative to the last trusted click in the browser. Node/CDP
+    // round trips must not consume the 450-to-600ms observation margin.
+    await page.waitForFunction(()=>window.__w2Quiet700!==undefined);
+    const quiet=await page.evaluate(()=>({at450:window.__w2Quiet450,at700:window.__w2Quiet700}));
+    assert.equal(quiet.at450.aria,'true');assert.equal(quiet.at450.disabled,false);assert.ok(quiet.at450.opacity<1);
+    assert.equal(quiet.at700.aria,'false');
     await mouseClick();
     await page.waitForFunction(()=>document.querySelector('[data-testid=image-batch-list]').dataset.count==='2');
     await count(2);
