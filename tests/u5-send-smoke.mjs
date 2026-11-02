@@ -7,7 +7,9 @@ import {PDFDocument} from 'pdf-lib';
 const base=process.env.TEST_BASE_URL||'http://127.0.0.1:5480';
 const out=process.env.U5_SEND_OUTPUT||'/tmp/sol-u5send/browser';await fs.mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
-const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=','base64');
+const encoder=await browser.newPage();
+const png=Buffer.from(await encoder.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=16;canvas.height=16;const ctx=canvas.getContext('2d');ctx.fillStyle='#5c9eaa';ctx.fillRect(0,0,16,16);return [...Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]),c=>c.charCodeAt(0))];}));
+await encoder.close();
 const doc=await PDFDocument.create();doc.addPage([64,64]);doc.addPage([64,64]);const pdf=Buffer.from(await doc.save());
 async function setup(lang='en',width=1280){
  const context=await browser.newContext({viewport:{width,height:940},serviceWorkers:'block',reducedMotion:'reduce'});
@@ -34,6 +36,12 @@ try{
     await clickSend(page,'[data-testid="image-send-to-privacy"]');await page.waitForURL('**/tools/image-privacy');await page.locator('[data-tool-page="image-privacy"] input[type="file"]').waitFor();assert.equal(await page.locator('[data-ui-component="file-drop-zone"] strong').innerText().then(v=>/1/.test(v)),true);await consumed(page,'image-privacy','/tools/image-privacy');
     await page.locator('[data-ui-component="primary-button"]').click();await page.getByTestId('privacy-send-to-image').waitFor();await page.getByTestId('privacy-send-to-image').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,`${lang}-privacy-send.png`)});
     await clickSend(page,'[data-testid="privacy-send-to-image"]');await page.waitForURL('**/tools/image-studio');await page.waitForFunction(()=>/1/.test(document.querySelector('[data-image-owner="editor"] [data-ui-component="file-drop-zone"] strong')?.textContent||''));await consumed(page,'image-edit','/tools/image-studio');assert.deepEqual(errors,[]);
+   }finally{await context.close();}
+  });
+
+  await test(`${lang} cleaned photo batch -> image batch as individual files`,async()=>{
+   const {context,page,errors}=await setup(lang);try{
+    await page.goto(`${base}/${lang}/tools/image-privacy/`,{waitUntil:'networkidle'});await page.locator('input[type="file"]').setInputFiles([{name:'first.png',mimeType:'image/png',buffer:png},{name:'second.png',mimeType:'image/png',buffer:png}]);await page.locator('[data-ui-component="primary-button"]').click();await page.getByTestId('privacy-send-to-image').waitFor();await page.getByTestId('privacy-send-to-image').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,`${lang}-privacy-batch.png`)});await clickSend(page,'[data-testid="privacy-send-to-image"]');await page.waitForURL('**/tools/image-studio');await consumed(page,'image-batch','/tools/image-studio');await page.locator('[data-testid="image-batch-list"][data-count="2"]').waitFor();assert.ok(!(await page.getByTestId('image-batch-list').innerText()).includes('.zip'));assert.deepEqual(errors,[]);
    }finally{await context.close();}
   });
   await test(`${lang} image editor -> image-to-pdf; actual inspection, no automatic PDF creation`,async()=>{

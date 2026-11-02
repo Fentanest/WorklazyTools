@@ -55,6 +55,7 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   const inputHandler = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
   const resumeGeneration = useRef(0);
   const activeController = useRef<AbortController | undefined>(undefined);
+  const handoffInspection = useRef<{ generation: number; signal: AbortSignal; controller: AbortController; file: File } | undefined>(undefined);
   const direct = usePdfConvert(preset, Boolean(batchFiles) || pdfConvertDirty({ file, loading, status: operation.status, result: download.result }), next => {
     if (batchFiles) { setBatchFiles([...batchInputs.current]); setBatchGeneration(value => value + 1); }
     const resume = pendingInputs.current;
@@ -73,21 +74,24 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   useEffect(() => () => { if (file) void releasePdf(file); }, [file]);
 
   const acquireInput = async (files: File[], context?: IntakeContext): Promise<boolean> => {
+    if (context?.signal.aborted) return false;
     const generation = ++intakeGeneration.current;
+    handoffInspection.current = undefined;
     const next = files.at(-1);
     if (!next) return false;
     if (next === file) return true;
     activeController.current?.abort();
-    pendingInputs.current = [next];
+    if (!context) pendingInputs.current = [next];
     const controller = new AbortController();
     activeController.current = controller;
+    handoffInspection.current = context ? { generation, signal: context.signal, controller, file: next } : undefined;
     setLoading(true);
-    setError("");
-    download.clearResult();
+    if (!context) { setError(""); download.clearResult(); }
     operation.start(featureMessage(language, "pdf.messages.PdfConvertPanel.checkingPagesAndSecuritySettingsIn", { p0: next.name }));
     try {
       const inspected = await inspectPdf(next, language, { signal: controller.signal });
       if (controller.signal.aborted || context?.signal.aborted || generation !== intakeGeneration.current) return false;
+      if (context) { setError(""); download.clearResult(); }
       setFile(next);
       setPageCount(inspected.pageCount);
       setPageRange("");
@@ -100,18 +104,24 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
       const message = pdfConversionMessage(reason, language, "INPUT");
       setError(message);
       operation.fail(message); return false;
-    } finally { if (activeController.current === controller && generation === intakeGeneration.current && !context?.signal.aborted) { setLoading(false); pendingInputs.current = []; } }
+    } finally {
+      if (handoffInspection.current?.generation === generation) handoffInspection.current = undefined;
+      if (activeController.current === controller && generation === intakeGeneration.current && !context?.signal.aborted) { setLoading(false); if (!context) pendingInputs.current = []; }
+    }
   };
 
   const setInput = (files: File[]) => {
-    if (files.length > 1) { activeController.current?.abort(); setFile(null); download.clearResult(); setBatchFiles(files); return Promise.resolve(); }
+    if (files.length > 1) { handoffInspection.current = undefined; intakeGeneration.current++; activeController.current?.abort(); setFile(null); download.clearResult(); setBatchFiles(files); return Promise.resolve(); }
     const task = acquireInput(files);
     inputTask.current = task.then(() => {});
     return task;
   };
   inputHandler.current = files => setInput(files).then(() => {});
   const handoff = useHandoffReceiver("pdf-to-document", { kind: "inspection", invalidate: () => {
-    intakeGeneration.current++; resumeGeneration.current++; activeController.current?.abort(); pendingInputs.current = []; setFile(null); setPageCount(0); setLoading(false); download.clearResult(); operation.reset();
+    const job = handoffInspection.current;
+    if (!job?.signal.aborted || job.generation !== intakeGeneration.current) return;
+    handoffInspection.current = undefined; intakeGeneration.current++; job.controller.abort();
+    void releasePdf(job.file); setLoading(false); operation.reset();
   }, receive: async (entry, context) => {
     const next = entry.files[0]; const ok = !!next && acceptsFile("pdf-to-document", next) && await acquireInput([next], context);
     return { status: ok ? "accepted" : "rejected", accepted: ok ? [next] : [], rejected: ok ? [] : entry.files.map(file => ({ file, reasonCode: "inspection" })) };

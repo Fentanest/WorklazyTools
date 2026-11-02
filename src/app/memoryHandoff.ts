@@ -63,6 +63,12 @@ const claimedHolds = new WeakMap<HandoffEntry, () => void>();
 let recovery: Recovery | null = null;
 let recoveryReleases: (() => void)[] = [];
 let deferredError: (() => void) | undefined;
+let errorDocumentNavigationPath: string | undefined;
+/** Keep same-document history cleanup from cancelling an explicit error assign. */
+export function isErrorDocumentNavigationPending(): boolean {
+  return errorDocumentNavigationPath !== undefined && typeof window !== "undefined"
+    && errorDocumentNavigationPath === `${window.location.pathname}${window.location.search}`;
+}
 const listeners = new Set<() => void>();
 export function subscribeHandoff(listener: () => void): () => void { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function emit() { for (const listener of listeners) listener(); }
@@ -244,13 +250,17 @@ export function deferErrorNavigation(action: () => void): boolean {
   deferredError = action; return true;
 }
 export function clearRecovery(runDeferred = true): void {
+  const action = runDeferred ? deferredError : undefined;
+  deferredError = undefined;
+  errorDocumentNavigationPath = action ? `${window.location.pathname}${window.location.search}` : undefined;
   recovery = null; clearUnsavedWork("handoff-recovery");
   for (const releaseHold of recoveryReleases) releaseHold();
-  recoveryReleases = []; const action = deferredError; deferredError = undefined; emit();
-  if (runDeferred) action?.();
+  recoveryReleases = []; emit();
+  try { action?.(); } catch (error) { errorDocumentNavigationPath = undefined; throw error; }
 }
 export function reconcileHandoffLocation(): void {
   const path = `${window.location.pathname}${window.location.search}`;
+  if (errorDocumentNavigationPath !== path) errorDocumentNavigationPath = undefined;
   // A confirmed route change replaces the failed screen with the chosen destination.
   if (recovery && recovery.path !== path) clearRecovery(false);
   for (const record of deliveries.values()) if (record.path !== path) closeDelivery(record);
@@ -264,7 +274,7 @@ export function purgeExpiredHandoffs(now = Date.now()): void {
   emit();
 }
 // bfcache preserves the heap. Reconcile its real age when it returns.
-if (typeof window !== "undefined") window.addEventListener("pageshow", event => { if (event.persisted) purgeExpiredHandoffs(); });
+if (typeof window !== "undefined") window.addEventListener("pageshow", event => { if (event.persisted) { errorDocumentNavigationPath = undefined; purgeExpiredHandoffs(); } });
 /** Selection adapters use the same synchronous filter as the tool input. */
 export function selectHandoffFiles(receiverId: ReceiverId, files: File[], remaining = fileAccepts[receiverId].max): DeliveryResult {
   const accepted = files.filter(file => acceptsFile(receiverId, file)).slice(0, Math.max(0, remaining));

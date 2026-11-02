@@ -251,6 +251,7 @@
     "roles": "Select one template and at least one data file."
   },
   "sendTo": {
+    "editImages": "Open in batch image editor",
     "editImage": "Open in image editor",
     "privacy": "Send to metadata remover",
     "imagePdf": "Make a PDF from this image",

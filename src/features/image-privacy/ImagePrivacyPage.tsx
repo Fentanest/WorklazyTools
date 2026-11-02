@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import { useMemoryHandoff } from "../../components/AppShell";
 import { acceptsFile } from "../../app/fileAccepts";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
@@ -52,13 +53,20 @@ export function ImagePrivacyPage() {
     }
   };
   const sendResult = async () => {
-    if (!result || result.items.length !== 1) return;
+    if (!result) return;
     const generation = intakeGeneration.current;
     setSendError(false);
     try {
       const blob = await (await fetch(result.url)).blob();
+      const files = result.items.length === 1 ? [new File([blob], result.fileName, { type: result.mimeType })] : await (async () => {
+        const archive = await JSZip.loadAsync(await blob.arrayBuffer());
+        const entries = Object.values(archive.files).filter(entry => !entry.dir);
+        if (entries.length !== result.items.length || entries.length > 50) throw new Error("count");
+        return Promise.all(entries.map(async entry => new File([await entry.async("uint8array")], entry.name, { type: /\.png$/i.test(entry.name) ? "image/png" : /\.webp$/i.test(entry.name) ? "image/webp" : "image/jpeg" })));
+      })();
+      if (!files.length || files.some(file => !acceptsFile("image-batch", file))) throw new Error("format");
       if (generation !== intakeGeneration.current || currentResult.current !== result) return;
-      sender.send({ receiverId: "image-edit", entryPath: "/tools/image-studio", tab: "edit", files: [new File([blob], result.fileName, { type: result.mimeType })], origin: "generated", source: "image-privacy" });
+      sender.send({ receiverId: files.length === 1 ? "image-edit" : "image-batch", entryPath: "/tools/image-studio", tab: files.length === 1 ? "edit" : "batch", files, origin: "generated", source: "image-privacy" });
     } catch { if (generation === intakeGeneration.current) setSendError(true); }
   };
   return <UtilityPage toolId="image-privacy"><div ref={intakeRoot} className="contents">
@@ -82,7 +90,7 @@ export function ImagePrivacyPage() {
       title={t("imagePrivacy.result")}
       description={t("imagePrivacy.found", { count: result.items.reduce<number>((sum, item) => sum + item.metadata.foundCount, 0) })}
     >
-      {result.items.length === 1 && <div className="mb-3 flex flex-wrap gap-2"><Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="privacy-send-to-image" onClick={() => void sendResult()}>{ht(sender.reason || sendError ? "sendTo.retry" : "sendTo.editImage")}</Button>{(sender.reason || sendError) && <p role="alert">{ht("sendTo.failed")}</p>}</div>}
+      {<div className="mb-3 flex flex-wrap gap-2"><Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="privacy-send-to-image" onClick={() => void sendResult()}>{ht(sender.reason || sendError ? "sendTo.retry" : result.items.length === 1 ? "sendTo.editImage" : "sendTo.editImages")}</Button>{(sender.reason || sendError) && <p role="alert">{ht("sendTo.failed")}</p>}</div>}
       {result.items.length === 1
         ? <div className="grid grid-cols-3 gap-2.5 max-[620px]:grid-cols-1"><Meta icon={<MapPin />} label={t("imagePrivacy.gps")} value={result.metadata.latitude || result.metadata.longitude ? `${result.metadata.latitude}, ${result.metadata.longitude}` : t("imagePrivacy.noLocation")} /><Meta icon={<Smartphone />} label={t("imagePrivacy.device")} value={[result.metadata.make, result.metadata.model].filter(Boolean).join(" ") || t("imagePrivacy.noDevice")} /><Meta icon={<Camera />} label={t("imagePrivacy.date")} value={result.metadata.dateTime || t("imagePrivacy.noDate")} /></div>
         : <div className="my-2.5 grid gap-2">{result.items.map((item) => <div className="flex justify-between gap-3 rounded-xl border border-border bg-muted p-3" key={item.sourceName}><strong className="overflow-hidden text-ellipsis whitespace-nowrap">{item.sourceName}</strong><span className="shrink-0 text-muted-foreground">{t("imagePrivacy.fileFound", { count: item.metadata.foundCount })}</span></div>)}</div>}

@@ -4,9 +4,11 @@ import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {PDFDocument} from 'pdf-lib';
 const base=process.env.TEST_BASE_URL||'http://127.0.0.1:5480',output=process.env.U5_RECEIVER_OUTPUT||'/tmp/sol-u5send/receiver';await fs.mkdir(output,{recursive:true});
-const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=','base64');
-const pdfDoc=await PDFDocument.create();pdfDoc.addPage([64,64]);const pdf=Buffer.from(await pdfDoc.save());
 const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
+const encoder=await browser.newPage();
+const png=Buffer.from(await encoder.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=16;canvas.height=16;const ctx=canvas.getContext('2d');ctx.fillStyle='#5c9eaa';ctx.fillRect(0,0,16,16);return [...Uint8Array.from(atob(canvas.toDataURL('image/png').split(',')[1]),c=>c.charCodeAt(0))];}));
+await encoder.close();
+const pdfDoc=await PDFDocument.create();pdfDoc.addPage([64,64]);const pdf=Buffer.from(await pdfDoc.save());
 async function fixture(id,files,{delayed=false}={}){
  const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:940}});await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(base).origin?r.continue():r.abort());const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(45000);await page.goto(`${base}/en/`,{waitUntil:'networkidle'});await page.locator('[data-testid="home-dropzone"]').waitFor();
  const token=await page.evaluate(async({id,files,delayed})=>{
@@ -49,6 +51,35 @@ try{
   const {context,page,errors}=await fixture('image-privacy',[{name:'valid.png',type:'image/png',bytes:png},{name:'rejected.txt',type:'text/plain',bytes:Buffer.from('private synthetic')}]);try{
    const recovery=page.locator('[data-handoff-recovery]');await recovery.waitFor();assert.ok((await recovery.innerText()).includes('rejected.txt'));assert.equal(await page.evaluate(()=>window.__workers),0);
    await page.locator('input[type="file"]').setInputFiles({name:'manual.png',mimeType:'image/png',buffer:png});assert.ok(await recovery.isVisible());assert.ok((await recovery.innerText()).includes('rejected.txt'));assert.equal(await page.evaluate(()=>window.__workers),0);assert.deepEqual(errors,[]);
+  }finally{await context.close();}
+ });
+ for(const id of ['image-to-pdf','pdf-to-image','pdf-to-document'])await test(`${id} preserves existing input through a real incoming timeout`,async()=>{
+  const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:940}});await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(base).origin?r.continue():r.abort());
+  await context.route('**/src/components/AppShell.tsx*',async route=>{const response=await route.fetch(),body=await response.text();const start=body.indexOf('function AppShell()');const needle='const navigate = useNavigate();';const point=body.indexOf(needle,start);assert.ok(start>=0&&point>start);await route.fulfill({response,body:body.slice(0,point+needle.length)+' window.__incomingNavigate=navigate;'+body.slice(point+needle.length)});});
+  const page=await context.newPage();page.setDefaultTimeout(45000);try{
+   const value=input(id),target=`/tools/pdf-converter/${id}`,oldName=id==='image-to-pdf'?'existing.png':'existing.pdf';
+   await page.goto(`${base}/en${target}`,{waitUntil:'networkidle'});await page.locator('input[type="file"]').first().setInputFiles({name:oldName,mimeType:value.type,buffer:value.bytes});
+   await page.locator(id==='image-to-pdf'?'[data-image-status="ready"]':'.pdf-page-card').waitFor();
+   await page.evaluate(async({id,target,value})=>{const h=await import('/src/app/memoryHandoff.ts');const file=new File([new Uint8Array(value.bytes)],value.name,{type:value.type}),read=file.arrayBuffer.bind(file);file.arrayBuffer=()=>new Promise(resolve=>{window.__releaseOldRead=()=>resolve(read());window.__oldReadStarted=true;});const token=h.stageHandoff({receiverId:id,entryPath:target,files:[file],origin:'user-input',source:'existing-fixture'});window.__incomingNavigate(`/en${target}`,{state:{wlHandoff:token}});},{id,target,value:{...value,bytes:[...value.bytes]}});
+   await page.waitForFunction(()=>window.__oldReadStarted);await page.locator('[data-pdf-send-recovery]').waitFor({timeout:40000});
+   const list=page.locator(id==='image-to-pdf'?'.pdf-image-card':'[data-ui-component="file-list"]');assert.ok((await list.innerText()).includes(oldName));assert.ok(!(await list.innerText()).includes(value.name));
+   await page.evaluate(()=>window.__releaseOldRead());await page.waitForTimeout(500);assert.ok((await list.innerText()).includes(oldName));assert.ok(!(await list.innerText()).includes(value.name));
+  }finally{await context.close();}
+ });
+ for(const mode of ['organize','finish'])await test(`${mode} existing input survives a real 30s incoming timeout and late parser`,async()=>{
+  const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:940}});await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(base).origin?r.continue():r.abort());
+  // Expose only the existing Router navigate in this response. The actual
+  // panel, memory transport, parser, timer and state remain production code.
+  await context.route('**/src/components/AppShell.tsx*',async route=>{const response=await route.fetch(),body=await response.text();const start=body.indexOf('function AppShell()');const needle='const navigate = useNavigate();';const point=body.indexOf(needle,start);assert.ok(start>=0&&point>start);await route.fulfill({response,body:body.slice(0,point+needle.length)+' window.__incomingNavigate=navigate;'+body.slice(point+needle.length)});});
+  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(45000);
+  try{
+   const receiver=mode==='organize'?'pdf-organize':'pdf-finish';const target=mode==='organize'?'/tools/pdf-editor':'/tools/pdf-editor/watermark';
+   await page.goto(`${base}/en${target}`,{waitUntil:'networkidle'});await page.locator('.pdf-tool-page input[type="file"]').first().setInputFiles({name:'existing.pdf',mimeType:'application/pdf',buffer:pdf});await page.locator('[data-ui-component="file-list"]').filter({hasText:'existing.pdf'}).waitFor();
+   let oldOutput; if(mode==='organize'){await page.locator('.pdf-output-action-zone [data-ui-component="primary-button"]').click();await page.getByTestId('pdf-download').waitFor();oldOutput=await page.getByTestId('pdf-download').getAttribute('href');}
+   await page.evaluate(async({receiver,target,bytes})=>{const h=await import('/src/app/memoryHandoff.ts');const file=new File([new Uint8Array(bytes)],'incoming.pdf',{type:'application/pdf'}),read=file.arrayBuffer.bind(file);file.arrayBuffer=()=>new Promise(resolve=>{window.__releaseOldRead=()=>resolve(read());window.__oldReadStarted=true;});const token=h.stageHandoff({receiverId:receiver,entryPath:target,files:[file],origin:'user-input',source:'rollback-fixture'});window.__incomingNavigate(`/en${target}`,{state:{wlHandoff:token}});},{receiver,target,bytes:[...pdf]});
+   await page.waitForFunction(()=>window.__oldReadStarted);const recovery=page.locator(mode==='organize'?'[data-pdf-handoff-recovery]':'[data-pdf-handoff-recovery]');await recovery.waitFor({timeout:40000});
+   const list=page.locator('[data-ui-component="file-list"]');assert.ok((await list.innerText()).includes('existing.pdf'));assert.ok(!(await list.innerText()).includes('incoming.pdf'));if(oldOutput)assert.equal(await page.getByTestId('pdf-download').getAttribute('href'),oldOutput);
+   await page.evaluate(()=>window.__releaseOldRead());await page.waitForTimeout(500);assert.ok((await list.innerText()).includes('existing.pdf'));assert.ok(!(await list.innerText()).includes('incoming.pdf'));assert.deepEqual(errors,[]);
   }finally{await context.close();}
  });
 }finally{await browser.close();}

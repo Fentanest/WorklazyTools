@@ -7,8 +7,8 @@ const base=process.env.TEST_BASE_URL||'http://127.0.0.1:5480';const out='/tmp/so
 const doc=await PDFDocument.create();doc.addPage([64,64]);const pdf=Buffer.from(await doc.save());
 const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
 async function setup(){const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1280,height:940}});await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(base).origin?r.continue():r.abort());await context.addInitScript(()=>window.__documentMarker=crypto.randomUUID());const page=await context.newPage();page.setDefaultTimeout(45000);page.on('dialog',d=>d.accept());return {context,page};}
-async function clickSend(page){await page.getByTestId('pdf-send-to-images').click();try{await page.getByTestId('unsaved-leave').waitFor({state:'visible',timeout:1000});await page.getByTestId('unsaved-leave').click();}catch{}}
-async function source(page){await page.goto(`${base}/en/tools/pdf-editor/`,{waitUntil:'networkidle'});await page.locator('.pdf-tool-page input[type="file"]').first().setInputFiles({name:'synthetic.pdf',mimeType:'application/pdf',buffer:pdf});await page.locator('.pdf-page-card').waitFor();await page.locator('.pdf-output-action-zone [data-ui-component="primary-button"]').click();await page.getByTestId('pdf-download').waitFor({timeout:90000});}
+async function clickSend(page){await page.getByTestId('pdf-send-to-images').click();await page.getByTestId('unsaved-leave').waitFor({state:'visible',timeout:15000});await page.getByTestId('unsaved-leave').click();}
+async function source(page){await page.goto(`${base}/en/tools/pdf-editor/`,{waitUntil:'networkidle'});await page.locator('.pdf-tool-page input[type="file"]').first().setInputFiles({name:'synthetic.pdf',mimeType:'application/pdf',buffer:pdf});await page.locator('.pdf-page-card').waitFor();await page.waitForFunction(()=>{const button=document.querySelector('.pdf-output-action-zone [data-ui-component="primary-button"]');return button&&!button.disabled;});await page.locator('.pdf-output-action-zone [data-ui-component="primary-button"]').evaluate(button=>button.click());try{await page.getByTestId('pdf-download').waitFor({timeout:90000});}catch(error){await fs.writeFile(out+'/source-produce-failure.txt',await page.locator('.pdf-tool-page').innerText());await page.screenshot({path:out+'/source-produce-failure.png'});throw error;}}
 try{
  await test('preload network failure keeps the source result downloadable and retries after restore',async()=>{
   const {context,page}=await setup();try{
@@ -27,7 +27,7 @@ try{
    if(sourceKind==='pdf')await clickSend(page);else{await page.getByTestId('image-send-to-pdf').click();await page.getByTestId('unsaved-leave').click();}
    await page.getByRole('alert').filter({hasText:'Could not transfer the result'}).waitFor();assert.equal(await page.evaluate(()=>window.__documentMarker),marker);assert.ok(!new URL(page.url()).pathname.includes('/pdf-converter/'));
    const event=page.waitForEvent('download');if(sourceKind==='pdf')await page.getByTestId('pdf-download').click();else await page.getByRole('button',{name:'Download the result being transferred',exact:true}).click();const bytes=await fs.readFile(await(await event).path());assert.ok(bytes.length>0);
-   if(sourceKind==='pdf')await clickSend(page);else{await page.getByRole('button',{name:'Try sending again',exact:true}).click();try{await page.getByTestId('unsaved-leave').waitFor({state:'visible',timeout:1000});await page.getByTestId('unsaved-leave').click();}catch{}}
+   if(sourceKind==='pdf')await clickSend(page);else{await page.getByRole('button',{name:'Try sending again',exact:true}).click();await page.getByTestId('unsaved-leave').waitFor({state:'visible',timeout:15000});await page.getByTestId('unsaved-leave').click();}
    await page.waitForURL(`**/pdf-converter/${sourceKind==='pdf'?'pdf-to-image':'image-to-pdf'}`);assert.equal(await page.evaluate(()=>window.__documentMarker),marker);
   }finally{await context.close();}
  });
@@ -45,14 +45,14 @@ try{
     await route.fulfill({response,body:text.replace(signature,`${signature} if (window.__u5Fail) throw new Error(window.__u5Error);`)});
    });
    if(sourceKind==='pdf')await source(page);else{
-    await page.goto(`${base}/en/tools/image-studio/`,{waitUntil:'networkidle'});const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=','base64');await page.locator('[data-image-owner="editor"] input[type="file"]').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:png});await page.waitForFunction(()=>!document.querySelector('[data-testid="image-send-to-pdf"]')?.disabled);
+    await page.goto(`${base}/en/tools/image-studio/`,{waitUntil:'networkidle'});const png=Buffer.from(await page.evaluate(()=>{const canvas=document.createElement('canvas');canvas.width=canvas.height=16;const ctx=canvas.getContext('2d');ctx.fillStyle='#5c9eaa';ctx.fillRect(0,0,16,16);return canvas.toDataURL('image/png').split(',')[1];}),'base64');await page.locator('[data-image-owner="editor"] input[type="file"]').setInputFiles({name:'synthetic.png',mimeType:'image/png',buffer:png});await page.waitForFunction(()=>!document.querySelector('[data-testid="image-send-to-pdf"]')?.disabled);
    }
    const marker=await page.evaluate(()=>window.__documentMarker);if(phase==='after')await page.evaluate(()=>window.__delayGenerated=true);
    if(sourceKind==='pdf')await clickSend(page);else{await page.getByTestId('image-send-to-pdf').click();await page.getByTestId('unsaved-leave').click();}
    if(phase==='after'){
     await page.waitForFunction(()=>window.__parserWaiting);await page.evaluate(async()=>{window.__u5Fail=true;(await import('/src/app/memoryHandoff.ts')).purgeExpiredHandoffs();});
    }
-   const recovery=page.locator('[data-handoff-recovery]');await recovery.waitFor();assert.equal(await page.evaluate(()=>window.__documentMarker),marker);assert.equal(await page.evaluate(async()=> (await import('/src/app/chunkRecovery.ts')).isAutoReloadHeld()),true);assert.equal(await page.evaluate(async()=> (await import('/src/app/memoryHandoff.ts')).getRecovery()?.files.length),1);
+   const recovery=page.locator('[data-handoff-recovery]');await recovery.waitFor();await page.locator('[data-route-error]').waitFor();assert.equal(await page.evaluate(()=>window.__documentMarker),marker);assert.equal(await page.evaluate(async()=> (await import('/src/app/chunkRecovery.ts')).isAutoReloadHeld()),true);assert.equal(await page.evaluate(async()=> (await import('/src/app/memoryHandoff.ts')).getRecovery()?.files.length),1);
    if(phase==='after'){await page.evaluate(()=>window.__releaseParser());await page.waitForTimeout(300);assert.ok(await recovery.isVisible());}
    if(sourceKind==='image'&&phase==='after'&&kind==='JS'){await page.locator('.sidebar a[href="/en/"]').first().click();await page.getByTestId('unsaved-stay').click();assert.ok(await recovery.isVisible());}
    if(sourceKind==='image'&&kind==='CSS'&&phase==='after')await recovery.getByRole('button',{name:'Discard',exact:true}).click();else{

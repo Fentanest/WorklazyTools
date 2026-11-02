@@ -9,7 +9,7 @@ import { JSDOM } from "jsdom";
 import * as handoff from "../../src/app/memoryHandoff.ts";
 import { isAutoReloadHeld } from "../../src/app/chunkRecovery.ts";
 import { acceptsFile, fileAccepts, type HandoffReceiverDefinition } from "../../src/app/fileAccepts.ts";
-import { clearUnsavedWork, hasUnsavedWork } from "../../src/app/toolState.ts";
+import { clearUnsavedWork, hasUnsavedWork, subscribeUnsavedWork } from "../../src/app/toolState.ts";
 import { claimHandoff, stageHandoff, deliverHandoff, closeDelivery, retainDelivery, cancelStagedHandoff,
   clearRecovery, getRecovery, transferToRecovery, deferErrorNavigation, purgeExpiredHandoffs, reconcileHandoffLocation,
   selectHandoffFiles, validateHandoff, MAX_HANDOFF_TEXT_BYTES, type HandoffInput, type DeliveryResult } from "../../src/app/memoryHandoff.ts";
@@ -503,4 +503,38 @@ test("U5a bfcache age purge preserves claimed generated text through the same re
     assert.equal(await getRecovery()!.files[0].text(), "bfcache-private");
     assert.equal(isAutoReloadHeld(), true); clearRecovery(); assert.equal(isAutoReloadHeld(), false);
   });
+});
+
+test("error document navigation is pending before unsaved listeners and survives deferred assign", () => {
+  clearRecovery(false);
+  stageHandoff(input()); transferToRecovery();
+  const pending = () => (handoff as any).isErrorDocumentNavigationPending?.() ?? false;
+  let duringAssign = false, observedCleanup = false;
+  const unsubscribe = subscribeUnsavedWork(() => { if (!hasUnsavedWork()) observedCleanup = pending(); });
+  deferErrorNavigation(() => { duringAssign = pending(); }); clearRecovery(); unsubscribe();
+  assert.equal(duringAssign, true); assert.equal(observedCleanup, true); assert.equal(pending(), true);
+  window.location.pathname = "/ko/"; reconcileHandoffLocation(); assert.equal(pending(), false);
+  window.location.pathname = "/ko/tools/pdf-editor";
+});
+test("error document navigation is not pending after route dismissal or a throwing assign", () => {
+  const pending = () => (handoff as any).isErrorDocumentNavigationPending?.() ?? false;
+  stageHandoff(input()); transferToRecovery(); let assigned = false;
+  deferErrorNavigation(() => { assigned = true; }); clearRecovery(false);
+  assert.equal(assigned, false); assert.equal(pending(), false);
+  stageHandoff(input()); transferToRecovery(); deferErrorNavigation(() => { throw new Error("assign blocked"); });
+  assert.throws(() => clearRecovery(), /assign blocked/); assert.equal(pending(), false);
+});
+test("error document navigation prevents the shell sentinel pop; normal cleanup still pops", () => {
+  const source = ts.createSourceFile("AppShell.tsx", readFileSync("src/components/AppShell.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let effect = "";
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node) && node.expression.getText(source) === "useEffect" && node.arguments[0]?.getText(source).includes("else if (!unsavedActive && guardEntryRef.current)")) effect = node.arguments[0].getText(source);
+    ts.forEachChild(node, visit);
+  }; visit(source); assert.ok(effect);
+  let pending = true, backs = 0;
+  const context = { leavingRef: { current: false }, unsavedActive: false, guardOpen: false, guardEntryRef: { current: true }, guardKeyRef: { current: "old" }, skipPopRef: { current: false }, location: { key: "old" }, window: { history: { back() { backs++; } } }, isErrorDocumentNavigationPending: () => pending };
+  const js = ts.transpileModule(`globalThis.effect=(${effect});`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  vm.runInNewContext(js, context); (context as any).effect();
+  assert.equal(backs, 0); assert.equal(context.guardEntryRef.current, true);
+  pending = false; (context as any).effect(); assert.equal(backs, 1); assert.equal(context.guardEntryRef.current, false);
 });

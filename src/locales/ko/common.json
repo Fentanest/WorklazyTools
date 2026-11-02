@@ -251,6 +251,7 @@
     "roles": "양식 파일 1개와 데이터 파일을 선택해 주세요."
   },
   "sendTo": {
+    "editImages": "이미지 일괄 편집에서 열기",
     "editImage": "이미지 편집에서 열기",
     "privacy": "사진 정보 제거로 넘기기",
     "imagePdf": "이미지를 PDF로 만들기",

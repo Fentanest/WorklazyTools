@@ -63,7 +63,7 @@ function ImagesToPdf() {
   const download = useDownloadResult();
 
   const latestInputs = useRef(inputs); latestInputs.current = inputs;
-  const pending = useRef<{ before: Set<string>; files: File[]; ids?: string[]; done: boolean; resolve: (accepted: File[]) => void } | undefined>(undefined);
+  const pending = useRef<{ signal: AbortSignal; before: Set<string>; files: File[]; ids?: string[]; done: boolean; resolve: (accepted: File[]) => void } | undefined>(undefined);
   const settle = () => {
     const job = pending.current;
     if (!job) return;
@@ -75,9 +75,10 @@ function ImagesToPdf() {
   };
   useLayoutEffect(settle, [inputs.entries, inputs.acquiring]);
   const invalidateIntake = () => {
-    setCancelledAcquisition(true); generation.current++; pending.current?.resolve([]); pending.current = undefined;
-    latestInputs.current.cancelPreparation(); latestInputs.current.entries.forEach(entry => latestInputs.current.remove(entry.id));
-    active.current?.abort(); active.current = undefined; setBusy(false); setCanceling(false); download.clearResult(); operation.reset();
+    const job = pending.current;
+    if (!job?.signal.aborted) return;
+    setCancelledAcquisition(true); generation.current++; job.resolve([]); pending.current = undefined;
+    latestInputs.current.entries.filter(entry => !job.before.has(entry.id)).forEach(entry => latestInputs.current.remove(entry.id));
   };
   const handoff = useHandoffReceiver("image-to-pdf", { kind: "inspection", invalidate: invalidateIntake, receive: async (entry, context) => {
     setCancelledAcquisition(false);
@@ -85,11 +86,11 @@ function ImagesToPdf() {
     const eligible = entry.files.filter(file => acceptsFile("image-to-pdf", file)).slice(0, Math.max(0, 50 - latestInputs.current.entries.length));
     if (!eligible.length) return receivedResult(entry.files, []);
     const accepted = await new Promise<File[]>(resolve => {
-      pending.current = { before: new Set(latestInputs.current.entries.map(row => row.id)), files: eligible, done: false, resolve };
+      pending.current = { signal: context.signal, before: new Set(latestInputs.current.entries.map(row => row.id)), files: eligible, done: false, resolve };
       void latestInputs.current.add(eligible).then(() => { if (generation.current === version && !context.signal.aborted && pending.current) { pending.current.done = true; settle(); } });
     });
     if (generation.current !== version || context.signal.aborted) return receivedResult(entry.files, []);
-    if (accepted.length) setUnsavedWork("image-to-pdf", { hasWork: true, kind: "files", scopePath: "/tools/pdf-converter/image-to-pdf" });
+    if (accepted.length) { download.clearResult(); setUnsavedWork("image-to-pdf", { hasWork: true, kind: "files", scopePath: "/tools/pdf-converter/image-to-pdf" }); }
     return receivedResult(entry.files, accepted);
   } });
   useUnsavedWorkGuard("image-to-pdf", inputs.entries.length > 0 || !!download.result || handoff.recoveryFiles.length > 0, { kind: "files", scopePath: "/tools/pdf-converter/image-to-pdf" });
@@ -201,6 +202,7 @@ function PdfToImages() {
   const sender = useMemoryHandoff();
   const intakeRoot = useRef<HTMLDivElement>(null);
   const intakeGeneration = useRef(0);
+  const handoffInspection = useRef<{ generation: number; signal: AbortSignal; controller: AbortController; file: File } | undefined>(undefined);
   const [pageImages, setPageImages] = useState<{ archive: JSZip; names: string[]; pages: number[]; mime: string }>();
   const [chosen, setChosen] = useState<Set<number>>(new Set());
   const [sending, setSending] = useState(false);
@@ -221,22 +223,25 @@ function PdfToImages() {
   useEffect(() => () => { if (file) void releasePdf(file); }, [file]);
 
   const setInput = async (files: File[], context?: IntakeContext): Promise<boolean> => {
+    if (context?.signal.aborted) return false;
     sendGeneration.current++; setSending(false);
     const generation = ++intakeGeneration.current;
+    handoffInspection.current = undefined;
     active.current?.abort();
-    setPageImages(undefined); setChosen(new Set());
+    if (!context) { setPageImages(undefined); setChosen(new Set()); }
     if (files.length > 1) { setFile(null); download.clearResult(); setBatchFiles(files); return false; }
     const controller = new AbortController(); active.current = controller;
     const next = files.at(-1);
     if (!next) return false;
     if (next === file) return true;
+    handoffInspection.current = context ? { generation, signal: context.signal, controller, file: next } : undefined;
     setLoading(true);
-    setError("");
-    download.clearResult();
+    if (!context) { setError(""); download.clearResult(); }
     operation.start(featureMessage(language, "pdf.messages.PdfImagePanel.checkingPagesIn", { p0: next.name }));
     try {
       const inspected = await inspectPdf(next, language, { signal: controller.signal });
       if (controller.signal.aborted || context?.signal.aborted || generation !== intakeGeneration.current) return false;
+      if (context) { setError(""); download.clearResult(); setPageImages(undefined); setChosen(new Set()); }
       setFile(next);
       setPageCount(inspected.pageCount);
       setPageRange("");
@@ -248,11 +253,17 @@ function PdfToImages() {
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfImagePanel.unableToReadThePdf");
       setError(message);
       operation.fail(message); return false;
-    } finally { if (active.current === controller && generation === intakeGeneration.current && !context?.signal.aborted) setLoading(false); }
+    } finally {
+      if (handoffInspection.current?.generation === generation) handoffInspection.current = undefined;
+      if (active.current === controller && generation === intakeGeneration.current && !context?.signal.aborted) setLoading(false);
+    }
   };
 
   const handoff = useHandoffReceiver("pdf-to-image", { kind: "inspection", invalidate: () => {
-    intakeGeneration.current++; active.current?.abort(); setFile(null); setPageCount(0); setLoading(false); setPageImages(undefined); setChosen(new Set()); download.clearResult(); operation.reset();
+    const job = handoffInspection.current;
+    if (!job?.signal.aborted || job.generation !== intakeGeneration.current) return;
+    handoffInspection.current = undefined; intakeGeneration.current++; job.controller.abort();
+    void releasePdf(job.file); setLoading(false); operation.reset();
   }, receive: async (entry, context) => {
     const next = entry.files[0]; const ok = !!next && acceptsFile("pdf-to-image", next) && await setInput([next], context);
     return receivedResult(entry.files, ok ? [next] : []);

@@ -143,6 +143,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
       : "pdf.messages.PdfEditorPage.unsavedOrganize",
   });
 
+  const handoffRollback = useRef<{ generation: number; signal: AbortSignal; controller: AbortController; files: File[] } | null>(null);
   const pendingInputs = useRef<File[]>([]);
   const inputTask = useRef<Promise<void>>(Promise.resolve());
   const inputHandler = useRef<((files: File[]) => Promise<void>) | undefined>(undefined);
@@ -311,16 +312,17 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     const incoming = nextFiles.filter((file) => !sources.some((source) => source.file === file));
     if (!incoming.length || context?.signal.aborted) return;
     const generation = ++resumeGeneration.current;
-    setError("");
+    if (!context) setError("");
     activeController.current?.abort();
-    pendingInputs.current = context ? [] : incoming;
+    if (!context) pendingInputs.current = incoming;
     const controller = new AbortController();
     activeController.current = controller;
+    handoffRollback.current = context ? { generation, signal: context.signal, controller, files: incoming } : null;
     const isCurrent = () => !controller.signal.aborted && !context?.signal.aborted && generation === resumeGeneration.current;
     const abort = () => controller.abort();
     context?.signal.addEventListener("abort", abort, { once: true });
     setInspecting(true);
-    invalidateResult();
+    if (!context) invalidateResult();
     operation.start(featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingPagesInPdfs", { p0: incoming.length }));
     const addedSources: PdfSourceFile[] = [];
     const addedPages: PdfPageItem[] = [];
@@ -351,6 +353,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
         operation.reset();
         return { status: "rejected", accepted: [], rejected };
       }
+      if (context) { setError(""); invalidateResult(); }
       focusAfterLoad.current = direct.acceptedPreset?.postLoadFocus;
       setSources((current) => [...current, ...addedSources]);
       setPages((current) => [...current, ...addedPages]);
@@ -373,8 +376,9 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
       operation.fail(message);
     } finally {
       context?.signal.removeEventListener("abort", abort);
+      if (handoffRollback.current?.generation === generation) handoffRollback.current = null;
       if (!isCurrent()) addedSources.forEach(source => { void releasePdf(source.file); });
-      if (isCurrent() && activeController.current === controller) { setInspecting(false); pendingInputs.current = []; }
+      if (isCurrent() && activeController.current === controller) { setInspecting(false); if (!context) pendingInputs.current = []; }
     }
   };
 
@@ -390,15 +394,19 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     receive: async (entry, context) => await acquireInput(entry.files, context)
       ?? { status: "cancelled", accepted: [], rejected: [] },
     invalidate: () => {
-      // Invalidate before resetting; a parser may finish after abort/timeout.
-      resumeGeneration.current += 1;
-      activeController.current?.abort();
-      pendingInputs.current = [];
-      sourcesRef.current.forEach(source => { void releasePdf(source.file); });
-      sourcesRef.current = [];
-      setSources([]); setPages([]); setSelectedPageIds(new Set()); setMovePageIds(new Set());
-      setSplitAfterPageIds(new Set()); setSelectionRange(""); setSelectionError("");
-      setInspecting(false); setError(""); operation.reset(); invalidateResult();
+      const rollback = handoffRollback.current;
+      if (!rollback?.signal.aborted) return;
+      handoffRollback.current = null;
+      if (rollback.generation !== resumeGeneration.current) return;
+      resumeGeneration.current++;
+      rollback.controller.abort();
+      rollback.files.forEach(file => { void releasePdf(file); });
+      if (activeController.current === rollback.controller) {
+        activeController.current = undefined; setInspecting(false); operation.reset();
+      }
+      // Sources/pages/selection and pre-existing pending input were never
+      // committed by this handoff. Keep them and the old generated result.
+
     },
   });
   const downloadReceived = () => {

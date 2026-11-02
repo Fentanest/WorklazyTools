@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
+import vm from "node:vm";
+import ts from "typescript";
 import { fileAccepts, acceptsFile } from "../../src/app/fileAccepts.ts";
 import { validateHandoff, stageHandoff, claimHandoff, cancelStagedHandoff } from "../../src/app/memoryHandoff.ts";
 import { relatedToolsFor } from "../../src/app/relatedTools.ts";
@@ -35,4 +38,10 @@ test("related canonical links include the implemented follow-on image workflows"
   assert.ok(relatedToolsFor("/tools/image-studio").includes("/tools/pdf-converter/image-to-pdf"));
   assert.ok(relatedToolsFor("/tools/image-privacy").includes("/tools/image-studio"));
   assert.ok(relatedToolsFor("/tools/pdf-converter").includes("/tools/image-studio"));
+});
+
+for (const id of ['image-to-pdf','pdf-to-image','pdf-to-document']) test(`${id}: unrelated invalidate preserves existing inputs and outputs`, () => {
+ const file=id==='pdf-to-document'?'PdfConvertPanel':'PdfImagePanel';const source=ts.createSourceFile(file,fs.readFileSync(`src/features/pdf-editor/${file}.tsx`,'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);let fn: any;const variables=new Map();const visit=(node: ts.Node)=>{if(ts.isVariableDeclaration(node))variables.set(node.name.getText(source),node.initializer);if(ts.isCallExpression(node)&&node.expression.getText(source)==='useHandoffReceiver'&&ts.isStringLiteral(node.arguments[0])&&node.arguments[0].text===id){fn=(node.arguments[1] as ts.ObjectLiteralExpression).properties.find((p: any)=>p.name.getText(source)==='invalidate') as any; fn=fn.initializer;}ts.forEachChild(node,visit);};visit(source);if(ts.isIdentifier(fn))fn=variables.get(fn.text);
+ let mutations=0;const context: any={AbortController,Set,pending:{current:undefined},handoffInspection:{current:undefined},latestInputs:{current:{entries:[{id:'old'}],cancelPreparation(){mutations++},remove(){mutations++}}},generation:{current:0},intakeGeneration:{current:0},resumeGeneration:{current:0},active:{current:undefined},activeController:{current:undefined},pendingInputs:{current:[]},download:{clearResult(){mutations++}},operation:{reset(){mutations++}}};for(const name of ['setCancelledAcquisition','setBusy','setCanceling','setFile','setPageCount','setLoading','setPageImages','setChosen'])context[name]=()=>mutations++;
+ vm.runInNewContext(ts.transpileModule(`(${fn.getText(source)})();`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,context);assert.equal(mutations, 0);
 });
