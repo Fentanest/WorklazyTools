@@ -53,7 +53,7 @@ export async function runHomeAssets() {
         assert.equal(await page.locator(".wl-hero-assure small").innerText(),copy.noUploadBody);
         assert.equal(await page.locator(".wl-hero-art img").count(),0);
         assert.equal(await page.locator('[data-testid="home-dropzone"]').count(),1);
-        assert.equal(await page.locator(".tool-grid > a").count(),language==="ko"?12:13);
+        assert.equal(await page.locator(".tool-grid a.ui-tool-card").count(),language==="ko"?12:13);
         assert.equal(await page.locator(".home-how-grid > div").count(),3);
         assert.ok((await page.locator(".wl-cta").getAttribute("href")).endsWith(`/${language}/tools`));
         assert.equal(await page.locator("h1").count(),1);

@@ -157,9 +157,9 @@ test("catalog search, language switch and navigation work protection", async () 
   assert.ok(page.url().includes("product-banner"));
   await page.close();
   const search = await pageFor("en");
-  await search.goto(`${base}/en/tools/`); await search.locator(".all-tools-grid .ui-tool-card").first().waitFor(); await search.locator('[data-testid="tools-search-input"]').fill("affiliate");
-  await search.locator('.ui-tool-card[href="/en/tools/product-banner"]').waitFor();
-  assert.equal(await search.locator(".ui-tool-card").count(), 1);
+  await search.goto(`${base}/en/tools/`); await search.locator(".tool-category-groups [data-ui-component='tool-card']").first().waitFor(); await search.locator('[data-testid="tools-search-input"]').fill("affiliate");
+  await search.locator('[data-ui-component="tool-card"][href="/en/tools/product-banner"]').waitFor();
+  assert.equal(await search.locator('[data-ui-component="tool-card"]').count(), 1);
   await search.close();
 });
 

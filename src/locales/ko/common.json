@@ -266,5 +266,16 @@
     },
     "before": "수정 전",
     "after": "수정 후"
+  },
+  "personalization": {
+    "title": "내 도구",
+    "recent": "최근 사용한 도구",
+    "favorites": "즐겨찾기",
+    "clear": "지우기",
+    "recentEmpty": "도구를 열면 최근 사용한 도구가 여기에 표시됩니다.",
+    "favoritesEmpty": "도구의 별 버튼을 눌러 즐겨찾기에 추가하세요.",
+    "addFavorite": "{{tool}} 즐겨찾기에 추가",
+    "removeFavorite": "{{tool}} 즐겨찾기에서 제거",
+    "unavailable": "브라우저 저장소를 사용할 수 없어 이 저장 기능이 꺼졌습니다."
   }
 }
