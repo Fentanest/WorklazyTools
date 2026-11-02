@@ -1615,17 +1615,18 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const exportResultDimensions = exportMode === "original" ? originalExportPlan.dimensions : normalizeEditorDimensions(exportDimensions, EDITOR_EXPORT_MAX_DIMENSION);
 
   const exportImage = (destination: "download" | "batch" = "download") => {
-    if (destination === "batch" && batchAddLock.current) return;
     const instance = canvas.current;
     if (!instance) return;
     if (destination === "batch") {
-      // Guard the event itself; React updaters/effects never deliver files.
-      batchAddLock.current = true;
-      setAddingToBatch(true);
+      // Every activation, including an ignored one, extends the same burst.
+      clearTimeout(batchAddTimer.current);
       batchAddTimer.current = setTimeout(() => {
         batchAddLock.current = false;
         setAddingToBatch(false);
-      }, 500);
+      }, 600);
+      if (batchAddLock.current) return;
+      batchAddLock.current = true;
+      setAddingToBatch(true);
     }
     const overlays = [cropOverlay.current, effectOverlay.current].filter((overlay): overlay is Rect => Boolean(overlay));
     const activeOverlay = overlays.find((overlay) => instance.getActiveObject() === overlay);
@@ -1829,7 +1830,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" className="min-h-11 rounded-xl" data-testid="image-editor-add-to-batch" disabled={addingToBatch || loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("batch")}>{t("image.handoff.add", { count: batchCount })}</Button>
+        <Button type="button" variant="outline" className={cn("min-h-11 rounded-xl", addingToBatch && "opacity-60")} data-testid="image-editor-add-to-batch" aria-disabled={addingToBatch} disabled={loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("batch")}>{t("image.handoff.add", { count: batchCount })}</Button>
         <span role="status" data-testid="image-batch-notice" className="text-sm text-muted-foreground">{batchNotice ? t(`image.handoff.${batchNotice}`, { max: 50 }) : ""}</span>
       </div>
       <div className="export-row image-editor-export-row mt-3.5 grid grid-cols-[minmax(260px,1fr)_minmax(230px,310px)] items-end gap-3 max-[620px]:grid-cols-1">

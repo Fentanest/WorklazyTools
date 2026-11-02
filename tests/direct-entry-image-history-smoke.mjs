@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import {chromium} from 'playwright';
-const base=process.env.TEST_BASE_URL||'http://127.0.0.1:4199',out=process.env.DIRECT_ENTRY_OUTPUT||'/tmp/worklazy-u9-core/feature-final';const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});const c=await b.newContext();await c.addInitScript(()=>{localStorage.setItem('worklazy_privacy_consent_v2','denied');const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src');window.__holdRestore=false;window.__heldRestore=0;Object.defineProperty(HTMLImageElement.prototype,'src',{...d,set(value){if(window.__holdRestore&&String(value).startsWith('blob:')){window.__holdRestore=false;window.__heldRestore++;return;}d.set.call(this,value);}});});await c.route('**/*',route=>{const url=route.request().url();return url.startsWith(base)||url.startsWith('blob:')||url.startsWith('data:')?route.continue():route.abort();});const p=await c.newPage();p.setDefaultTimeout(30000);p.on('dialog',dialog=>dialog.accept());const errors=[];p.on('pageerror',e=>errors.push(e.message));
+const base=process.env.TEST_BASE_URL||'http://127.0.0.1:4199',out=process.env.DIRECT_ENTRY_OUTPUT||'/tmp/worklazy-u9-core/feature-final';const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});const c=await b.newContext();await c.addInitScript(()=>{localStorage.setItem('worklazy_privacy_consent_v2','denied');const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src');window.__holdRestore=false;window.__heldRestore=0;Object.defineProperty(HTMLImageElement.prototype,'src',{...d,set(value){if(window.__holdRestore&&String(value).startsWith('blob:')){window.__holdRestore=false;window.__heldRestore++;return;}d.set.call(this,value);}});});await c.route('**/*',route=>{const url=route.request().url();return url.startsWith(base)||url.startsWith('blob:')||url.startsWith('data:')?route.continue():route.abort();});const p=await c.newPage();p.setDefaultTimeout(30000);const acceptNativeDialog=dialog=>dialog.accept();p.on('dialog',acceptNativeDialog);const errors=[];p.on('pageerror',e=>errors.push(e.message));
 // Synthetic popstate also reaches AppShell's Back sentinel. Close its stay
 // dialog after testing the direct-entry decision; real link navigation has no popstate.
 const settleSyntheticBack = async () => {
@@ -34,10 +34,10 @@ async function testW2(page) {
  const count = async n => assert.equal(await list.getAttribute('data-count'),String(n));
  const fresh = async () => { await page.goto(`${base}/en/tools/image-studio/`); await page.locator('.upper-canvas').waitFor(); };
  const put = async n => { await tab('batch'); await batch.locator('input[type=file]').first().setInputFiles(Array.from({length:n},(_,i)=>({...input,name:`input-${i}.png`}))); };
- const addOne = async () => { await tab('editor'); await add.click(); await page.waitForFunction(()=>!document.querySelector('[data-testid=image-editor-add-to-batch]').disabled); };
+ const addOne = async () => { await tab('editor'); await add.click(); await page.waitForFunction(()=>document.querySelector('[data-testid=image-editor-add-to-batch]').getAttribute('aria-disabled')!=='true'); };
  await fs.mkdir(out,{recursive:true});
  await test('W2 browser regression',async t=>{
-  const scenario=(name,fn)=>t.test(name,{skip:process.env.TEST_W2_NEGATIVE==='1'&&!name.startsWith('10 rapid')},fn);
+  const scenario=(name,fn)=>t.test(name,{skip:process.env.TEST_W2_NEGATIVE==='1'&&!name.startsWith('10 rapid trusted mouse clicks 100ms')},fn);
   await scenario('direct resize/mosaic/watermark panels remain available',async()=>{
    for(const [route,panel] of [['resize','size'],['mosaic','effect'],['watermark','text']]) {
     await page.goto(`${base}/en/tools/image-studio/${route}/`);
@@ -66,15 +66,54 @@ async function testW2(page) {
    await fs.writeFile(path.join(out,'w2-batch-result.zip'),await fs.readFile(await saved.path()));
    await tab('editor');assert.equal(await page.locator('[data-testid=image-editor-text-input]').inputValue(),'W2 keep editing');
   });
-  await scenario('10 rapid browser clicks enqueue exactly one image',async()=>{
-   await fresh();await add.waitFor({timeout:5000});
-   if(process.env.TEST_EXPECT_DEV==='1'){const source=await (await page.request.get(`${base}/src/main.tsx`)).text();assert.match(source,/StrictMode/);assert.ok(await page.locator('script[src*="vite"]').count());}
-   await add.evaluate(button=>{for(let i=0;i<10;i++)button.click();});
-   await tab('batch');await count(1);
-   await page.waitForFunction(()=>!document.querySelector('[data-testid=image-editor-add-to-batch]').disabled);
-   await count(1);
-  });
+  const cdp = await page.context().newCDPSession(page);
+  const trustedResults = [];
+  for (const [mode, gap] of [['mouse',100],['mouse',300],['Enter',100],['Space',100]]) {
+   await scenario(`10 rapid trusted ${mode === 'mouse' ? 'mouse clicks' : mode + ' activations'} ${gap}ms apart enqueue one image`,async()=>{
+    await fresh();await tab('batch');await tab('editor');await add.scrollIntoViewIfNeeded();
+    if(process.env.TEST_EXPECT_DEV==='1'){const source=await (await page.request.get(`${base}/src/main.tsx`)).text();assert.match(source,/StrictMode/);assert.ok(await page.locator('script[src*="vite"]').count());}
+    await add.evaluate(button=>{
+     window.__w2TrustedClicks=[];window.__w2TrustedKeys=[];
+     button.addEventListener('click',event=>window.__w2TrustedClicks.push({trusted:event.isTrusted,time:event.timeStamp,detail:event.detail}),{capture:true});
+     button.addEventListener('keydown',event=>window.__w2TrustedKeys.push({trusted:event.isTrusted,key:event.key,repeat:event.repeat}),{capture:true});
+    });
+    const box=await add.boundingBox();assert.ok(box);
+    const mouseClick=async()=>{for(const type of ['mousePressed','mouseReleased'])await cdp.send('Input.dispatchMouseEvent',{type,x:box.x+20,y:box.y+20,button:'left',clickCount:1});};
+    if(mode!=='mouse')await add.focus();
+    for(let i=0;i<10;i++){
+     if(mode==='mouse')await mouseClick();
+     else if(mode==='Enter')await page.keyboard.down('Enter');
+     else await page.keyboard.press('Space');
+     if(i<9)await new Promise(resolve=>setTimeout(resolve,gap));
+    }
+    if(mode==='Enter')await page.keyboard.up('Enter');
+    // This assertion is first so the old candidate reports the actual duplicate count.
+    await count(1);
+    const inputs=await page.evaluate(()=>({clicks:window.__w2TrustedClicks,keys:window.__w2TrustedKeys}));
+    assert.equal(inputs.clicks.length,10);assert.ok(inputs.clicks.every(event=>event.trusted));
+    if(mode!=='mouse')assert.ok(inputs.keys.every(event=>event.trusted));
+    if(mode==='Enter')assert.ok(inputs.keys.some(event=>event.repeat));
+    assert.equal(await add.getAttribute('aria-disabled'),'true');
+    assert.equal(await add.evaluate(button=>button.disabled),false);
+    assert.ok(await add.evaluate(button=>Number(getComputedStyle(button).opacity)<1));
+    await new Promise(resolve=>setTimeout(resolve,450));
+    assert.equal(await add.getAttribute('aria-disabled'),'true');
+    await new Promise(resolve=>setTimeout(resolve,250));
+    assert.equal(await add.getAttribute('aria-disabled'),'false');
+    await mouseClick();
+    await page.waitForFunction(()=>document.querySelector('[data-testid=image-batch-list]').dataset.count==='2');
+    await count(2);
+    const after=await page.evaluate(()=>window.__w2TrustedClicks);
+    const quietGap=after.at(-1).time-after.at(-2).time;
+    assert.ok(quietGap>=600,`intentional addition came after ${quietGap}ms`);
+    trustedResults.push({mode,gap,burstCount:1,clicks:inputs.clicks,keys:inputs.keys,afterQuietCount:2,quietGap});
+    console.log('W2 trusted burst:',JSON.stringify({mode,gap,burstCount:1,trustedClicks:inputs.clicks.length,afterQuietCount:2,quietGap}));
+   });
+  }
+  await cdp.detach();
+  await fs.writeFile(path.join(out,'trusted-bursts.json'),JSON.stringify(trustedResults,null,2));
   await scenario('batch item can be removed',async()=>{
+   await fresh();await addOne();await tab('batch');
    await page.locator('[data-testid=image-batch-edited-file] button').click();await count(0);
    assert.equal(await page.locator('[data-testid=image-batch-source]').count(),0);
   });
@@ -109,6 +148,17 @@ async function testW2(page) {
    await tab('batch');await count(1);await page.locator('[data-testid=image-batch-edited-file] button').click();await count(0);
    await page.locator('.brand-card').click();await page.waitForURL(/\/en\/?$/);
    assert.equal(await page.locator('[data-testid=unsaved-work-dialog][open]').count(),0);
+  });
+  await scenario('native beforeunload cancellation preserves handoff and acceptance leaves',async()=>{
+   await fresh();await addOne();await tab('batch');await count(1);
+   page.off('dialog',acceptNativeDialog);
+   const seen=[];const stay=dialog=>{seen.push(dialog.type());return dialog.dismiss();};
+   page.on('dialog',stay);
+   try {
+    await assert.rejects(page.goto(`${base}/en/`));
+    assert.deepEqual(seen,['beforeunload']);assert.match(page.url(),/image-studio/);await count(1);
+   } finally {page.off('dialog',stay);page.on('dialog',acceptNativeDialog);}
+   await page.goto(`${base}/en/`);await page.waitForURL(/\/en\/$/);
   });
   await scenario('ko/en light/dark desktop/mobile changed surfaces',async()=>{
    for(const language of ['ko','en'])for(const theme of ['light','dark'])for(const width of [1280,390]){
