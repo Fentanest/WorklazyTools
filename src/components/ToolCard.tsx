@@ -13,11 +13,13 @@ import { Card } from "./ui/card";
 interface ToolCardProps {
   tool: ToolDefinition & { tagline?: string };
   featured?: boolean;
+  headingLevel?: 2 | 3;
 }
 
-export function ToolCard({ tool, featured = false }: ToolCardProps) {
+export function ToolCard({ tool, featured = false, headingLevel = 2 }: ToolCardProps) {
   const Icon = tool.icon;
   const language = useAppLanguage();
+  const Heading = headingLevel === 3 ? "h3" : "h2";
 
   return (
     <div className="relative h-full">
@@ -34,7 +36,7 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
       </div>
       <div className="ui-tool-card-copy">
         {!featured && <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{tool.eyebrow}</p>}
-        <h2>{tool.title}</h2>
+        <Heading>{tool.title}</Heading>
         <p data-testid="tool-tagline">{tool.tagline ?? tool.description}</p>
       </div>
       <div className="ui-tool-highlights">

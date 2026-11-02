@@ -528,14 +528,14 @@
 .ui-tool-card-top > span:first-child { width: 46px; height: 46px; border-radius: 14px; }
 .ui-card-arrow { width: 34px; height: 34px; }
 .ui-tool-card-copy { margin-top: 16px; }
-.ui-tool-card-copy h2 { font-size: 17px; font-weight: 800; }
+.ui-tool-card-copy :is(h2, h3) { font-size: 17px; font-weight: 800; }
 .ui-tool-card-copy > p:last-child { min-height: 0; font-size: 13.5px; }
 .ui-tool-highlights span { background: var(--bg-muted); font-size: 12px; }
 .wl-local-card {
   border-color: var(--brand-border);
   background: linear-gradient(140deg, var(--brand-soft), transparent 70%), var(--bg-elevated);
 }
-.wl-local-card .ui-tool-card-copy h2 { color: var(--brand-on-bg); }
+.wl-local-card .ui-tool-card-copy :is(h2, h3) { color: var(--brand-on-bg); }
 
 /* ---------- Shared accent touch-ups ---------- */
 .ui-operation-progress.ui-accent-coral .ui-operation-state-icon { color: #d63a1f; background: rgba(232, 80, 47, 0.12); }
