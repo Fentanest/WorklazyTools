@@ -202,6 +202,8 @@ export function ExcelMergerPage() {
     if (legacyAdditions.length) {
       try {
         const ready = await prepareLegacyInputs(additions, legacyAdditions, context, generation);
+        // Unlike ordinary inspection, legacy preparation can set a page-level error.
+        // With no accepted files, retain that error and the previous downloadable result.
         if (currentIntake() && context && ready.length) { clearResult(); setError(null); }
         return ready;
       } finally {
