@@ -5,7 +5,7 @@ import { isAutoReloadHeld } from "../../src/app/chunkRecovery.ts";
 import { acceptsFile } from "../../src/app/fileAccepts.ts";
 import { clearUnsavedWork, hasUnsavedWork } from "../../src/app/toolState.ts";
 import { claimHandoff, stageHandoff, deliverHandoff, closeDelivery, retainDelivery, cancelStagedHandoff,
-  clearRecovery, getRecovery, transferToRecovery, deferErrorNavigation, purgeExpiredHandoffs,
+  clearRecovery, getRecovery, transferToRecovery, deferErrorNavigation, purgeExpiredHandoffs, reconcileHandoffLocation,
   selectHandoffFiles, validateHandoff, type HandoffInput, type DeliveryResult } from "../../src/app/memoryHandoff.ts";
 const file = new File(["synthetic-result"], "result.pdf", { type: "application/pdf" });
 const input = (overrides: Partial<HandoffInput> = {}): HandoffInput => ({ receiverId: "pdf-organize", entryPath: "/tools/pdf-editor", files: [file], origin: "generated", source: "unit", ...overrides });
@@ -128,4 +128,37 @@ test("memory contract uses no persistent storage, URL token, feature imports or 
   const source = readFileSync(new URL("../../src/app/memoryHandoff.ts", import.meta.url), "utf8");
   assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB|caches\.|createObjectURL|URLSearchParams/);
   assert.doesNotMatch(readFileSync(new URL("../../src/app/fileAccepts.ts", import.meta.url), "utf8"), /import.*(?:features|pages)/);
+});
+
+test("recovery: approved location exit drops deferred assign and releases the result", () => {
+  const original = { pathname: window.location.pathname, search: window.location.search };
+  try {
+    for (const target of [{ pathname: "/ko/", search: "" }, { pathname: "/ko/tools/excel-cleaner", search: "" }, { pathname: original.pathname, search: "?changed=1" }]) {
+      window.location.pathname = original.pathname; window.location.search = original.search;
+      stageHandoff(input()); transferToRecovery();
+      let assigns = 0;
+      assert.equal(deferErrorNavigation(() => assigns++), true);
+      assert.equal(isAutoReloadHeld(), true);
+      window.location.pathname = target.pathname; window.location.search = target.search;
+      reconcileHandoffLocation();
+      assert.equal(assigns, 0, `approved exit to ${target.pathname}${target.search} must keep its destination`);
+      assert.equal(getRecovery(), null); assert.equal(hasUnsavedWork(), false); assert.equal(isAutoReloadHeld(), false);
+      clearRecovery(); assert.equal(assigns, 0, "the stale deferred action must also be forgotten");
+    }
+  } finally {
+    clearRecovery(false); window.location.pathname = original.pathname; window.location.search = original.search;
+  }
+});
+test("recovery: explicit download or discard executes deferred assign exactly once", () => {
+  for (const action of ["download", "discard"]) {
+    stageHandoff(input()); transferToRecovery();
+    let assigns = 0;
+    assert.equal(deferErrorNavigation(() => {
+      assigns++;
+      assert.equal(isAutoReloadHeld(), false, `${action} releases the hold before assign`);
+      assert.equal(getRecovery(), null);
+    }), true);
+    clearRecovery(); clearRecovery();
+    assert.equal(assigns, 1, action); assert.equal(hasUnsavedWork(), false);
+  }
 });

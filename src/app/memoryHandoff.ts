@@ -194,7 +194,8 @@ export function clearRecovery(runDeferred = true): void {
 }
 export function reconcileHandoffLocation(): void {
   const path = `${window.location.pathname}${window.location.search}`;
-  if (recovery && recovery.path !== path) clearRecovery();
+  // A confirmed route change replaces the failed screen with the chosen destination.
+  if (recovery && recovery.path !== path) clearRecovery(false);
   for (const record of deliveries.values()) if (record.path !== path) closeDelivery(record);
 }
 export function purgeExpiredHandoffs(now = Date.now()): void {
