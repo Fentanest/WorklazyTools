@@ -26,9 +26,11 @@ async function setup({ language = "ko", width = 1280, theme = "light-coral", see
     new PerformanceObserver(list => {
       for (const entry of list.getEntries()) window.__u6Shifts.push({ value: entry.value, hadRecentInput: entry.hadRecentInput, time: entry.startTime, sources: entry.sources.map(source => source.node?.className ?? source.node?.nodeName ?? "removed") });
     }).observe({ type: "layout-shift", buffered: true });
+    let sampling = false;
     const observer = new MutationObserver(() => {
       const panel = document.querySelector('[data-testid="home-personalization"]');
-      if (!panel || window.__u6Geometry.length) return;
+      if (!panel || sampling) return;
+      sampling = true;
       const frame = () => {
         const rect = panel.getBoundingClientRect();
         // Existing page-in uses translateY(9px); compositor animation is not CLS.
@@ -72,8 +74,9 @@ try {
       try {
         assert.equal(await page.locator('[data-personalization="recent"] a').count(), 2);
         assert.equal(await page.locator('[data-personalization="favorites"] a').count(), 1);
-        await page.waitForFunction(() => window.__u6Geometry.length === 12);
+        await page.waitForFunction(() => window.__u6Geometry.length >= 12);
         const geometry = await page.evaluate(() => ({ frames: window.__u6Geometry, shifts: window.__u6Shifts, overflow: document.documentElement.scrollWidth > innerWidth }));
+        assert.equal(geometry.frames.length, 12, "one sampling loop per page");
         assert.equal(geometry.overflow, false);
         assert.equal(geometry.shifts.filter(shift => !shift.hadRecentInput).reduce((total, shift) => total + shift.value, 0), 0, "initial CLS must remain zero");
         assert.ok(geometry.frames.every(frame => Math.abs(frame.y - geometry.frames[0].y) < 1 && Math.abs(frame.height - geometry.frames[0].height) < 1), JSON.stringify(geometry));
