@@ -18,6 +18,7 @@ import { createUniqueSafeFileName, SafeFileNameRegistry, type SafeFileName } fro
 import { writeZipArchive } from "../../utils/zipArchive.ts";
 import { inspectExcelCleanerFile, runExcelCleanerFile } from "./excelCleanerClient.ts";
 import { validatePipelineColumnLineage } from "./model.ts";
+import { deleteRecipe, readRecipes, saveRecipe, type RecipeStatus } from "./recipeStore.ts";
 import { validateExcelCleanerPipeline } from "./schema.ts";
 import { EXCEL_CLEANER_RULE_TYPES, type ExcelCleanerInspection, type ExcelCleanerOutput, type ExcelCleanerPipeline, type ExcelCleanerResult, type ExcelCleanerRule, type ExcelCleanerRuleType } from "./types.ts";
 
@@ -67,6 +68,14 @@ export function ExcelCleanerPage() {
   const [zip, setZip] = useState<{ fileName: SafeFileName; url: string; size: number }>();
   const [importText, setImportText] = useState("");
   const [pipelineMessage, setPipelineMessage] = useState<string>();
+  const [recipeState, setRecipeState] = useState(() => readRecipes());
+  const [recipeName, setRecipeName] = useState("");
+  const [recipeMessage, setRecipeMessage] = useState<RecipeStatus | "saved" | "loaded" | "deleted">();
+  useEffect(() => {
+    const refresh = (event: StorageEvent) => { if (event.key === null || event.key === "worklazy:excel-cleaner-recipes") setRecipeState(readRecipes()); };
+    window.addEventListener("storage", refresh);
+    return () => window.removeEventListener("storage", refresh);
+  }, []);
 
   useEffect(() => () => {
     controllerRef.current?.abort();
@@ -291,6 +300,34 @@ export function ExcelCleanerPage() {
             {parsedPipeline.errors[index] && <p className="mt-1.5 text-sm font-bold text-destructive">{t("features:excelCleaner.pipeline.invalidRule")}</p>}
           </Card>)}
           {!drafts.length && <p className="rounded-xl border border-dashed border-border p-4 text-center text-sm text-muted-foreground">{t("features:excelCleaner.pipeline.empty")}</p>}
+        </div>
+        <div className="mt-3 grid gap-3 rounded-2xl border border-border p-3" data-testid="excel-cleaner-recipes">
+          <h3 className="text-sm font-bold">{t("features:excelCleaner.recipes.title")}</h3>
+          <p className="text-sm text-muted-foreground">{t("features:excelCleaner.recipes.description")}</p>
+          <div className="flex flex-wrap items-end gap-2">
+            <UtilityField className="min-w-0 flex-1"><span>{t("features:excelCleaner.recipes.name")}</span><UtilityInput data-testid="recipe-name" value={recipeName} onChange={event => setRecipeName(event.target.value)} /></UtilityField>
+            <Button type="button" variant="outline" disabled={busy || !parsedPipeline.pipeline} data-testid="recipe-save" onClick={() => {
+              const saved = saveRecipe(recipeName, parsedPipeline.pipeline);
+              if (saved.status === "ok") { setRecipeState(saved); setRecipeName(""); }
+              setRecipeMessage(saved.status === "ok" ? "saved" : saved.status);
+            }}>{t("features:excelCleaner.recipes.save")}</Button>
+          </div>
+          {recipeState.recipes.length ? <ul className="grid gap-2">{recipeState.recipes.map((recipe, index) => <li key={`${recipe.savedAt}:${index}`} className="flex min-w-0 flex-wrap items-center gap-2 rounded-xl bg-muted/40 p-2" data-testid="recipe-item">
+            <span className="min-w-0 flex-1 break-all text-sm font-bold">{recipe.name}</span>
+            <Button type="button" variant="secondary" disabled={busy} data-testid="recipe-load" onClick={() => {
+              try {
+                const pipeline = validateExcelCleanerPipeline(recipe.pipeline);
+                setDrafts(pipeline.rules.map(rule => ({ key: rule.id, text: JSON.stringify(rule, null, 2) })));
+                markPreviewStale(); setPipelineMessage(undefined); setRecipeMessage("loaded");
+              } catch { setRecipeMessage("invalid"); }
+            }}>{t("features:excelCleaner.recipes.load")}</Button>
+            <Button type="button" variant="ghost" disabled={busy} data-testid="recipe-delete" aria-label={t("features:excelCleaner.recipes.deleteNamed", { name: recipe.name })} onClick={() => {
+              const deleted = deleteRecipe(recipe);
+              if (deleted.status === "ok") setRecipeState(deleted);
+              setRecipeMessage(deleted.status === "ok" ? "deleted" : deleted.status);
+            }}>{t("features:excelCleaner.recipes.delete")}</Button>
+          </li>)}</ul> : <p className="text-sm text-muted-foreground">{t("features:excelCleaner.recipes.empty")}</p>}
+          {(recipeMessage || recipeState.status !== "ok") && <p role="status" className="text-sm" data-testid="recipe-message">{t(`features:excelCleaner.recipes.messages.${recipeMessage ?? recipeState.status}` as never)}</p>}
         </div>
         <details className="mt-3 rounded-2xl border border-border bg-muted/40 p-3" data-testid="excel-cleaner-json"><summary className="cursor-pointer text-sm font-bold">{t("features:excelCleaner.pipeline.json")}</summary><div className="mt-3 grid grid-cols-2 gap-3 max-[720px]:grid-cols-1"><UtilityField><span>{t("features:excelCleaner.pipeline.export")}</span><UtilityTextarea className="min-h-44 rounded-xl font-mono text-xs" readOnly value={exported} /></UtilityField><UtilityField><span>{t("features:excelCleaner.pipeline.import")}</span><UtilityTextarea className="min-h-44 rounded-xl font-mono text-xs" value={importText} onChange={(event) => setImportText(event.target.value)} /><Button className="mt-1 self-start rounded-xl" variant="secondary" type="button" onClick={applyImport}>{t("features:excelCleaner.pipeline.apply")}</Button></UtilityField></div></details>
         {(pipelineMessage || parsedPipeline.rootError) && <p className="mt-2 text-sm font-bold text-destructive" role="alert">{pipelineMessage ?? t("features:excelCleaner.pipeline.invalid")}</p>}

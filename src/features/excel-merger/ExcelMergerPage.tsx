@@ -1,6 +1,6 @@
 import { acceptsFile } from "../../app/fileAccepts";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
-import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import { grantOneShotSafeTarget, setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
 import {
   AlertCircle,
@@ -26,6 +26,7 @@ import type { TFunction } from "i18next";
 import { useLocation } from "react-router-dom";
 import { withSiteBasePath } from "../../app/siteBasePath";
 
+import { useMemoryHandoff } from "../../components/AppShell";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
 import { FileShareButton } from "../../components/FileShareButton";
 import { OperationProgress } from "../../components/OperationProgress";
@@ -70,6 +71,7 @@ interface ExcelFileEntry {
 }
 
 interface DownloadResult extends Omit<ExcelMergeResult, "buffer"> {
+  file: File;
   url: string;
   fileName: string;
   size: number;
@@ -80,6 +82,7 @@ let fileIdSequence = 0;
 
 export function ExcelMergerPage() {
   const { t: ht } = useTranslation("common");
+  const sender = useMemoryHandoff();
   const intakeRoot = useRef<HTMLDivElement>(null);
   const intakeGeneration = useRef(0);
   const intakeMount = useRef(0);
@@ -450,6 +453,7 @@ export function ExcelMergerPage() {
       });
       const url = URL.createObjectURL(blob);
       setResult({
+        file: new File([blob], fileName, { type: blob.type }),
         url,
         fileName,
         size: blob.size,
@@ -487,7 +491,7 @@ export function ExcelMergerPage() {
     });
   };
 
-  useUnsavedWorkGuard("excel-merger", entries.length > 0 || !!result, { kind: "files", scopePath: "/tools/excel-merger" });
+  useUnsavedWorkGuard("excel-merger", entries.length > 0 || !!result, { kind: "files", scopePath: "/tools/excel-merger", safePaths: ["/tools/excel-merger", "/tools/excel-merger/xls-preserve"] });
   const handoff = useHandoffReceiver("excel-merger", {
     kind: "inspection",
     invalidate: () => { intakeGeneration.current++; setEntries([]); clearResult(); setError(null); },
@@ -784,6 +788,14 @@ export function ExcelMergerPage() {
           message={t("excel.result.message", { fileCount: result.fileCount, sheetCount: result.sheetCount, outputCount: result.outputSheetCount, encrypted: result.encrypted ? t("excel.result.encrypted") : "" })}
         >
           <div className="flex flex-wrap items-center gap-2" data-testid="excel-result-actions"><Button render={<a href={result.url} download={result.fileName} data-testid="excel-result-download" />} className="h-auto min-h-11 rounded-xl" variant="secondary"><Download size={17} /><span className="min-w-0 overflow-hidden text-ellipsis">{result.fileName}</span><small className="text-xs text-muted-foreground">{formatBytes(result.size)}</small></Button><FileShareButton url={result.url} fileName={result.fileName} mimeType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" /></div>
+          {preserveLegacyXls ? <p className="mt-2 text-sm text-muted-foreground">{t("excel.result.cleanerIsolated")}</p> : <div className="mt-3 grid justify-items-start gap-2" data-testid="excel-cleaner-handoff">
+            <Button type="button" variant="outline" onClick={() => {
+              grantOneShotSafeTarget("excel-merger", "/tools/excel-cleaner");
+              sender.send({ receiverId: "excel-cleaner", entryPath: "/tools/excel-cleaner", files: [result.file], origin: "generated", source: "excel-merger" });
+            }}>{t(sender.reason ? "excel.result.cleanerRetry" : "excel.result.sendToCleaner")}</Button>
+            <p className="text-sm text-muted-foreground">{t("excel.result.cleanerInputNotice")}</p>
+            {sender.reason && <p role="alert" className="text-sm text-destructive">{t("excel.result.cleanerFailed")}</p>}
+          </div>}
           {result.warnings.length > 0 && (
             <div className="mt-2 grid gap-1" data-testid="excel-result-warnings">{result.warnings.map((warning) => <p className="flex items-start gap-1.5 text-xs text-amber-800 dark:text-amber-300" key={warning}><Info className="mt-0.5 shrink-0" size={13} /> {warning}</p>)}</div>
           )}
