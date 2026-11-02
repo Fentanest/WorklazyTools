@@ -59,7 +59,7 @@
           "Results are offered through temporary browser download URLs",
           "Text, payroll and password inputs are not sent to a server or permanently stored",
           "Ordinary task state disappears on reload or tab close; the official rhwp editor may keep a local recovery draft in IndexedDB",
-          "A file dropped on the office guide is held briefly in IndexedDB while moving to the focused editing workspace and is deleted as soon as that workspace retrieves it",
+          "Only when handing a file to the Office editing screen, we temporarily keep it in IndexedDB on this device. It is deleted from storage as soon as the screen retrieves it. Files that could not be opened are deleted on the next visit after 15 minutes. Files are not sent to a server.",
           "The browser office editor may cache about 250 MB of shared application assets plus about 2 MB of editor-only Korean font data; the XLS preservation screen caches only the shared assets. Site-data settings can remove them, and opened documents or XLS files are not placed in that cache"
         ]
       },

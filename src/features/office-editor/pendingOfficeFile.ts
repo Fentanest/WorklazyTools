@@ -1,68 +1,27 @@
-const DATABASE_NAME = "worklazy-office-handoff";
-const STORE_NAME = "pending-files";
-const PENDING_KEY = "office-editor";
-const MAX_PENDING_AGE_MS = 15 * 60 * 1000;
+import { cancelPersistentHandoff, consumePersistentHandoff, PersistentHandoffError, stagePersistentHandoff } from "../../app/persistentHandoff";
 
-interface PendingOfficeFile {
-  file: File;
-  createdAt: number;
-}
+const TOKEN_KEY = "worklazy-handoff-token:office-editor";
 
 export async function stagePendingOfficeFile(file: File) {
-  const database = await openDatabase();
-  try {
-    await transactionPromise(database, "readwrite", (store) => store.put({ file, createdAt: Date.now() } satisfies PendingOfficeFile, PENDING_KEY));
-  } finally {
-    database.close();
+  const token = await stagePersistentHandoff(file);
+  try { sessionStorage.setItem(TOKEN_KEY, JSON.stringify(token)); }
+  catch {
+    // If the tab cannot retain its token, do not leave an unreachable file behind.
+    await cancelPersistentHandoff(token).catch(() => undefined);
+    throw new PersistentHandoffError("unavailable");
   }
 }
 
-export async function takePendingOfficeFile() {
-  const database = await openDatabase();
+export async function takePendingOfficeFile(): Promise<File | undefined> {
+  const raw = sessionStorage.getItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY); // One attempt, before any asynchronous work.
+  if (raw === null) return undefined;
+  let token: { id: string; nonce: string };
   try {
-    const pending = await transactionPromise<PendingOfficeFile | undefined>(database, "readwrite", (store) => {
-      const request = store.get(PENDING_KEY);
-      store.delete(PENDING_KEY);
-      return request;
-    });
-    if (!pending || !(pending.file instanceof File) || Date.now() - pending.createdAt > MAX_PENDING_AGE_MS) return undefined;
-    return pending.file;
-  } finally {
-    database.close();
-  }
-}
-
-function openDatabase() {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    if (!globalThis.indexedDB) {
-      reject(new Error("browser-storage-unavailable"));
-      return;
-    }
-    const request = indexedDB.open(DATABASE_NAME, 1);
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) request.result.createObjectStore(STORE_NAME);
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(new Error("browser-storage-unavailable"));
-  });
-}
-
-function transactionPromise<T = IDBValidKey>(
-  database: IDBDatabase,
-  mode: IDBTransactionMode,
-  action: (store: IDBObjectStore) => IDBRequest<T> | undefined,
-) {
-  return new Promise<T | undefined>((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, mode);
-    let request: IDBRequest<T> | undefined;
-    try {
-      request = action(transaction.objectStore(STORE_NAME));
-    } catch {
-      reject(new Error("browser-storage-unavailable"));
-      return;
-    }
-    transaction.oncomplete = () => resolve(request?.result);
-    transaction.onerror = () => reject(new Error("browser-storage-unavailable"));
-    transaction.onabort = () => reject(new Error("browser-storage-unavailable"));
-  });
+    token = JSON.parse(raw);
+    if (!token || typeof token.id !== "string" || typeof token.nonce !== "string") throw new Error();
+  } catch { throw new PersistentHandoffError("notReceived"); }
+  const file = await consumePersistentHandoff(token);
+  if (!file) throw new PersistentHandoffError("notReceived");
+  return file;
 }
