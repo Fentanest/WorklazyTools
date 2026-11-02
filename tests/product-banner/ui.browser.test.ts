@@ -157,9 +157,16 @@ test("catalog search, language switch and navigation work protection", async () 
   assert.ok(page.url().includes("product-banner"));
   await page.close();
   const search = await pageFor("en");
-  await search.goto(`${base}/en/tools/`); await search.locator(".all-tools-grid .ui-tool-card").first().waitFor(); await search.locator('[data-testid="tools-search-input"]').fill("affiliate");
-  await search.locator('.ui-tool-card[href="/en/tools/product-banner"]').waitFor();
-  assert.equal(await search.locator(".ui-tool-card").count(), 1);
+  await search.goto(`${base}/en/tools/`);
+  const listResults = search.locator('[data-testid="tool-results"][data-view="list"]');
+  await listResults.locator(".tool-list-row").first().waitFor();
+  await search.locator('[data-testid="tools-search-input"]').fill("affiliate");
+  await listResults.locator('.tool-list-row[href="/en/tools/product-banner"]').waitFor();
+  assert.equal(await listResults.locator(".tool-list-row").count(), 1);
+  await search.locator('[data-testid="tools-view-grid"]').click();
+  const gridResults = search.locator('[data-testid="tool-results"][data-view="grid"]');
+  await gridResults.locator('.ui-tool-card[href="/en/tools/product-banner"]').waitFor();
+  assert.equal(await gridResults.locator(".ui-tool-card").count(), 1);
   await search.close();
 });
 
