@@ -1,5 +1,5 @@
 import type { ReceiverId } from "./fileAccepts";
-import { isToolPublished } from "./publicService.ts";
+import { isToolPublished, toolFilterValues } from "./publicService.ts";
 import {
   AlignLeft,
   AudioWaveform,
@@ -50,7 +50,11 @@ export interface ToolCategoryDefinition {
 
 export type ToolAction = "cut" | "merge" | "convert" | "clean" | "compare" | "protect" | "create";
 
+export type ToolInputTopic = typeof toolFilterValues.from[number];
+
 export interface ToolDefinition {
+  // Catalog topics only; fileAccepts remains the accepted-file contract.
+  inputTopics: ToolInputTopic[];
   // Receiver IDs only: fileAccepts owns accepted formats and intake limits.
   receiverIds: ReceiverId[];
   scenarios: ToolCategoryId[];
@@ -503,46 +507,47 @@ const allTools = [
     ],
     status: "available",
   },
-] satisfies Omit<ToolDefinition, "receiverIds" | "scenarios" | "actions" | "entryPoints">[];
+] satisfies Omit<ToolDefinition, "receiverIds" | "scenarios" | "actions" | "entryPoints" | "inputTopics">[];
 
 // Scenario IDs reuse the existing categories until U1 supplies dedicated copy.
 // Entry points are existing routes, not new handoff receivers.
-const toolMetadata: Record<string, { actions: ToolAction[]; receiverIds?: ReceiverId[] }> = {
-  "market-calendar": { actions: [] },
-  "foliotrace": { actions: [] },
-  "excel-merger": { actions: ["merge"], receiverIds: ["excel-merger"] },
-  "excel-cleaner": { actions: ["clean"], receiverIds: ["excel-cleaner"] },
-  "excel-compare": { actions: ["compare"], receiverIds: ["excel-compare"] },
-  "document-generator": { actions: ["create"], receiverIds: ["document-generator"] },
-  "pdf-editor": { actions: ["cut", "merge", "protect"], receiverIds: ["pdf-organize", "pdf-finish"] },
-  "pdf-converter": { actions: ["convert"], receiverIds: ["image-to-pdf", "pdf-to-image", "pdf-to-document"] },
-  "document-compare": { actions: ["compare"], receiverIds: ["document-compare"] },
-  "pdf-compare": { actions: ["compare"], receiverIds: ["pdf-compare"] },
-  "text-compare": { actions: ["compare"] },
-  "image-compare": { actions: ["compare"], receiverIds: ["image-compare"] },
-  "folder-compare": { actions: ["compare"] },
-  "document-markdown": { actions: ["convert"] },
-  "document-redactor": { actions: ["protect"] },
-  "product-banner": { actions: ["create"] },
-  "hwp-editor": { actions: ["create"], receiverIds: ["hwp-editor"] },
-  "office-editor": { actions: ["create"] },
-  "video-studio": { actions: ["cut", "merge", "convert"] },
-  "audio-studio": { actions: ["cut", "merge", "convert"] },
-  "image-studio": { actions: ["cut", "convert", "protect"], receiverIds: ["image-edit", "image-batch"] },
-  "image-privacy": { actions: ["protect"], receiverIds: ["image-privacy"] },
-  "text-merger": { actions: ["merge"] },
-  "text-tools": { actions: ["clean"] },
-  "text-formatter": { actions: ["clean"] },
-  "data-converter": { actions: ["convert"] },
-  "work-calculator": { actions: [] },
-  "timezone-calculator": { actions: [] },
-  "payroll-calculator": { actions: [] },
-  "security-tools": { actions: ["create", "protect"] },
-  "qr-studio": { actions: ["create"] },
+const toolMetadata: Record<string, { inputTopics: ToolInputTopic[]; actions: ToolAction[]; receiverIds?: ReceiverId[] }> = {
+  "market-calendar": { inputTopics: [], actions: [] },
+  "foliotrace": { inputTopics: [], actions: [] },
+  "excel-merger": { inputTopics: ["spreadsheet"], actions: ["merge"], receiverIds: ["excel-merger"] },
+  "excel-cleaner": { inputTopics: ["spreadsheet"], actions: ["clean"], receiverIds: ["excel-cleaner"] },
+  "excel-compare": { inputTopics: ["spreadsheet"], actions: ["compare"], receiverIds: ["excel-compare"] },
+  "document-generator": { inputTopics: ["spreadsheet", "document"], actions: ["create"], receiverIds: ["document-generator"] },
+  "pdf-editor": { inputTopics: ["pdf"], actions: ["cut", "merge", "protect"], receiverIds: ["pdf-organize", "pdf-finish"] },
+  "pdf-converter": { inputTopics: ["pdf", "image", "document", "hwp"], actions: ["convert"], receiverIds: ["image-to-pdf", "pdf-to-image", "pdf-to-document"] },
+  "document-compare": { inputTopics: ["document", "hwp"], actions: ["compare"], receiverIds: ["document-compare"] },
+  "pdf-compare": { inputTopics: ["pdf"], actions: ["compare"], receiverIds: ["pdf-compare"] },
+  "text-compare": { inputTopics: ["text"], actions: ["compare"] },
+  "image-compare": { inputTopics: ["image"], actions: ["compare"], receiverIds: ["image-compare"] },
+  "folder-compare": { inputTopics: [], actions: ["compare"] },
+  "document-markdown": { inputTopics: ["pdf", "spreadsheet", "document"], actions: ["convert"] },
+  "document-redactor": { inputTopics: ["pdf", "image"], actions: ["protect"] },
+  "product-banner": { inputTopics: ["spreadsheet"], actions: ["create"] },
+  "hwp-editor": { inputTopics: ["document", "hwp"], actions: ["create"], receiverIds: ["hwp-editor"] },
+  "office-editor": { inputTopics: ["spreadsheet", "document"], actions: ["create"] },
+  "video-studio": { inputTopics: [], actions: ["cut", "merge", "convert"] },
+  "audio-studio": { inputTopics: ["audio"], actions: ["cut", "merge", "convert"] },
+  "image-studio": { inputTopics: ["image"], actions: ["cut", "convert", "protect"], receiverIds: ["image-edit", "image-batch"] },
+  "image-privacy": { inputTopics: ["image"], actions: ["protect"], receiverIds: ["image-privacy"] },
+  "text-merger": { inputTopics: ["text"], actions: ["merge"] },
+  "text-tools": { inputTopics: ["text"], actions: ["clean"] },
+  "text-formatter": { inputTopics: ["text"], actions: ["clean"] },
+  "data-converter": { inputTopics: ["spreadsheet", "text"], actions: ["convert"] },
+  "work-calculator": { inputTopics: [], actions: [] },
+  "timezone-calculator": { inputTopics: [], actions: [] },
+  "payroll-calculator": { inputTopics: [], actions: [] },
+  "security-tools": { inputTopics: [], actions: ["create", "protect"] },
+  "qr-studio": { inputTopics: ["image", "spreadsheet", "text"], actions: ["create"] },
 };
 
 export const tools: ToolDefinition[] = allTools.filter((tool) => isToolPublished(tool.id)).map((tool) => ({
   ...tool,
+  inputTopics: toolMetadata[tool.id].inputTopics,
   receiverIds: toolMetadata[tool.id].receiverIds ?? [],
   scenarios: [tool.category],
   actions: toolMetadata[tool.id].actions,
