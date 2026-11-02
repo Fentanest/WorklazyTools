@@ -157,9 +157,9 @@ export function ExcelMergerPage() {
   const visibleFiles = useMemo(() => entries.map((entry) => entry.file), [entries]);
 
   const handleFiles = async (nextFiles: File[], context?: IntakeContext): Promise<File[]> => {
+    if (precisionPreparing) return [];
     const generation = ++intakeGeneration.current;
     const currentIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
-    if (precisionPreparing) return [];
     const accepted: File[] = [];
     const rejected: string[] = [];
     const existingKeys = new Set(entries.map((entry) => fileKey(entry.file)));
@@ -199,7 +199,14 @@ export function ExcelMergerPage() {
         })))).filter(({ requiresConversion }) => requiresConversion).map(({ entry }) => entry)
       : [];
     if (!currentIntake()) return [];
-    if (legacyAdditions.length) return await prepareLegacyInputs(additions, legacyAdditions, context, generation);
+    if (legacyAdditions.length) {
+      const preparation = prepareLegacyInputs(additions, legacyAdditions, context, generation);
+      // Handoff must acknowledge inspected files; manual selection releases the
+      // drop zone while the cancellable preparation owns its separate UI lock.
+      if (context) return await preparation;
+      void preparation;
+      return [];
+    }
 
     return await inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
       .then((inspectionResults) => {

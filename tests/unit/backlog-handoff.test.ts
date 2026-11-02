@@ -42,15 +42,16 @@ async function mountPage(tool: string, overrides: Record<string, unknown> = {}, 
     if (id === "./recipeStore.ts") return { readRecipes: () => ({ recipes: [] }) };
     if (id === "./types.ts") return { EXCEL_CLEANER_RULE_TYPES: [] };
     if (id === "./schema.ts") return { validateExcelCleanerPipeline: () => ({ version: 1, rules: [] }) };
-    if (id.includes("useOperationProgress")) return { useOperationProgress: () => ({ status: "idle", reset() {}, update() {} }) };
+    if (id.includes("useOperationProgress")) return { useOperationProgress: () => ({ status: "idle", reset() {}, update() {}, start() {}, updateCurrent() {}, succeed() {}, fail() {} }) };
     if (id === "../../components/ui") return { ...fallback, FileDropZone: (props: any) => { zones.set(props.label, props); return React.createElement("div", null, props.files.map((file: File) => file.name).join(",")); }, PageHeader: shell, PrimaryButton: shell, ResultCard: shell, SegmentedControl: shell, ToggleRow: shell, formatBytes: String };
+    if (id === "../../components/ui/button") return { Button: ({ children, onClick, disabled }: any) => React.createElement("button", { onClick, disabled }, children) };
     if (id in overrides) return overrides[id];
     return fallback;
   };
   const name = tool === "document-generator" ? "DocumentGeneratorPage" : tool === "excel-cleaner" ? "ExcelCleanerPage" : "ExcelMergerPage";
   const file = path.resolve(process.env.BACKLOG_SOURCE_ROOT ?? ".", `src/features/${tool}/${name}.tsx`);
   const code = ts.transpileModule(fs.readFileSync(file, "utf8").replaceAll("import.meta.env", "({ DEV: true })"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
-  vm.runInNewContext(code, { require, exports, console, crypto, setTimeout, clearTimeout, queueMicrotask, window: dom.window, URL, URLSearchParams, File, AbortController }, { filename: file });
+  vm.runInNewContext(code, { require, exports, console, crypto, setTimeout, clearTimeout, queueMicrotask, window: dom.window, URL, URLSearchParams, File, AbortController, DOMException, crossOriginIsolated: true, SharedArrayBuffer }, { filename: file });
   const root = createRoot(dom.window.document.getElementById("root")!);
   await React.act(async () => root.render(React.createElement(React.StrictMode, null, React.createElement(exports[name]))));
   return { zones, client, guards, text: () => dom.window.document.body.textContent!,
@@ -154,4 +155,70 @@ for (const lateFailure of [false, true]) test(`persistent XLS abort preserves ma
     assert.doesNotMatch(page.text(), /incoming.xlsx/);
     assert.equal(page.guards.get("excel-merger"), true);
   } finally { finish(); await page.close(); }
+});
+
+function legacyFixture() {
+  let release!: () => void;
+  let started = false;
+  let inspectionCalls = 0;
+  const assets = new Promise<string>(resolve => { release = () => resolve("/synthetic/"); });
+  return {
+    release: () => release(), started: () => started, inspected: () => inspectionCalls,
+    overrides: {
+      "./xlsPreserve": { requiresLegacySpreadsheetConversion: async () => true, xlsPreserveError: () => "Preparation cancelled" },
+      "../office-editor/officeAssetLoader": { prepareOfficeAssets: async (_progress: any, signal: AbortSignal) => {
+        started = true;
+        const base = await assets;
+        signal.throwIfAborted();
+        return base;
+      } },
+      "../office-editor/officeRuntime": { launchOfficeRuntime: async () => ({ convertLegacySpreadsheet: async () => ({ bytes: new Uint8Array([1]), fileName: "converted.xlsx" }) }) },
+      "./excelWorkerClient": { inspectExcelFiles: async (files: any[]) => {
+        inspectionCalls++;
+        return files.map(item => ({ id: item.id, sheetNames: ["Sheet1"], encrypted: false }));
+      } },
+    },
+  };
+}
+const flushPreparation = () => new Promise<void>(resolve => setTimeout(resolve, 0));
+test("manual legacy XLS selection releases onFiles before conversion and permits retry after cancel", async () => {
+  const fixture = legacyFixture();
+  const page = await mountPage("excel-merger", fixture.overrides, "en", true);
+  try {
+    let settled = false;
+    let selection!: Promise<void>;
+    await React.act(async () => {
+      selection = [...page.zones.values()][0].onFiles([new File(["xls"], "manual.xls")]).then(() => { settled = true; });
+      await flushPreparation();
+    });
+    assert.equal(fixture.started(), true);
+    assert.equal(settled, true, "manual onFiles must finish while conversion is held");
+    assert.equal([...page.zones.values()][0].disabled, true, "preparation keeps its own lock");
+    const cancel = [...document.querySelectorAll("button")].find(button => button.textContent === "Cancel XLS preparation");
+    assert.ok(cancel);
+    await React.act(async () => { cancel.click(); fixture.release(); await selection; await flushPreparation(); });
+    assert.equal(fixture.inspected(), 0);
+    assert.equal([...page.zones.values()][0].disabled, false);
+    await React.act(async () => { await [...page.zones.values()][0].onFiles([new File(["new"], "retry.xlsx")]); });
+    assert.match(page.text(), /retry.xlsx/);
+    assert.equal(fixture.inspected(), 1);
+  } finally { fixture.release(); await page.close(); }
+});
+test("persistent legacy XLS keeps acknowledgement pending and abort rolls back only incoming files", async () => {
+  const fixture = legacyFixture();
+  const page = await mountPage("excel-merger", fixture.overrides, "en", true);
+  try {
+    await React.act(async () => { await [...page.zones.values()][0].onFiles([new File(["old"], "existing.xlsx")]); });
+    const job = await page.start([new File(["xls"], "incoming.xls")]);
+    let settled = false; void job.promise.then(() => { settled = true; });
+    await React.act(async () => { await flushPreparation(); });
+    assert.equal(fixture.started(), true);
+    assert.equal(settled, false, "handoff must wait for conversion and inspection");
+    await job.abort();
+    assert.equal([...page.zones.values()][0].disabled, false);
+    assert.match(page.text(), /existing.xlsx/); assert.doesNotMatch(page.text(), /incoming.xls/);
+    await React.act(async () => { fixture.release(); await job.promise; });
+    assert.equal(fixture.inspected(), 1, "cancelled conversion must not be inspected");
+    assert.match(page.text(), /existing.xlsx/); assert.doesNotMatch(page.text(), /incoming.xls/);
+  } finally { fixture.release(); await page.close(); }
 });
