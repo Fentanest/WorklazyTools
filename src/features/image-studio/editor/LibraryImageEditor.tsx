@@ -342,7 +342,18 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           exportFormats={FORMATS} exportQuality={92} jpegExportQuality={95} commitFormat="png" showCommit commitLabel={t('image.library.makeResult')}
           resolutionLimits={policy.resolutionLimits} flattenTarget={flattenTarget} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
           labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
-          onImageLoaded={() => { if (generation !== latestGeneration.current) return; lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false); loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false); if (selectedPreset?.purpose === 'watermark') requestAnimationFrame(clearWatermarkDraft); }}
+          onImageLoaded={() => {
+            const request = version.current;
+            const ready = () => {
+              if (generation !== latestGeneration.current || request !== version.current) return;
+              // Clear the fork's sample text before exposing readiness or H1 ack.
+              // Otherwise a fast edit can race the next-frame initialization.
+              if (selectedPreset?.purpose === 'watermark') clearWatermarkDraft();
+              lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false);
+              loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false);
+            };
+            if (selectedPreset?.purpose === 'watermark') requestAnimationFrame(ready); else ready();
+          }}
           onDirtyChange={value => { if (generation !== latestGeneration.current) return; setDirty(value); if (value) setResult(undefined); }}
           onHistoryChange={() => { if (generation === latestGeneration.current) { documentRevision.current++; invalidatePrepared(); setResult(undefined); } }}
           onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
