@@ -30,7 +30,7 @@ async function mountPage(tool: string, overrides: Record<string, unknown> = {}, 
     if (id === "react") return React;
     if (id === "react/jsx-runtime") return jsx;
     if (id === "react-i18next") return { useTranslation: () => ({ t, i18n: { language, resolvedLanguage: language } }) };
-    if (id.includes("useHandoffReceiver")) return { useHandoffReceiver: (_id: string, value: any) => { adapter = value; const [result, setResult] = React.useState<any>(); publish = setResult; return { result, notReceived: false, recoveryFiles: result?.rejected.map((item: any) => item.file) ?? [], dismiss() {} }; } };
+    if (id.includes("useHandoffReceiver")) return { useHandoffReceiver: (_id: string, value: any) => { adapter = value; const [result, setResult] = React.useState<any>(); publish = setResult; return { result, notReceived: false, recoveryFiles: result?.rejected.map((item: any) => item.file) ?? [], dismiss() {} }; }, usePersistentHandoffReceiver: () => ({ pending: false, notReceived: false, result: undefined, recoveryFiles: [], dismiss() {} }) };
     if (id.includes("toolState")) return { setUnsavedWork: (id: string, value: any) => guards.set(id, value.hasWork), useUnsavedWorkGuard: (id: string, work: boolean) => { guards.set(id, work); } };
     if (id.includes("fileAccepts")) return { acceptsFile: () => true };
     if (id === "./client") return { createDocumentGeneratorClient: () => typeof overrides.clientFactory === "function" ? (overrides.clientFactory as Function)() : client };
