@@ -41,7 +41,8 @@ const HOME_TOOL_IDS_EN = [
 export function HomePage() {
   const { t } = useTranslation("common");
   const language = useAppLanguage();
-  const { tools } = useToolCatalog();
+  const { tools, toolCategories } = useToolCatalog();
+  const scenarioLabels = new Map(tools.flatMap((tool) => tool.scenarioLabels.map(({ id, label }) => [id, label] as const)));
   
   const targetIds = language === "ko" ? HOME_TOOL_IDS_KO : HOME_TOOL_IDS_EN;
   const featuredTools = targetIds
@@ -72,6 +73,14 @@ export function HomePage() {
           <HomeDropzone />
         </div>
       </section>
+
+      <nav className="home-scenarios" aria-label={t("home.scenariosLabel")}>
+        <h2>{t("home.scenariosLabel")}</h2>
+        <div>{toolCategories.filter((category) => scenarioLabels.has(category.id)).map((category) => {
+          const Icon = category.icon;
+          return <Link key={category.id} data-scenario-id={category.id} to={`${localizedPath(language, "/tools")}?category=${category.id}`}><Icon size={16} aria-hidden="true" />{scenarioLabels.get(category.id)}</Link>;
+        })}</div>
+      </nav>
 
       <section className="home-section">
         <div className="home-section-head">

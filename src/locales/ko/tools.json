@@ -49,6 +49,7 @@
   },
   "items": {
     "product-banner": {
+      "tagline": "상품 목록으로 광고 배너 만들기",
       "title": "알리익스프레스 광고 배너 만들기",
       "shortTitle": "알리익스프레스 광고 배너 만들기",
       "description": "알리익스프레스 제휴 상품의 엑셀·CSV 목록으로 5종 HTML·iframe 광고 배너를 만들거나, 배너 주소를 iframe 코드로 변환하세요. 파일과 주소는 브라우저에서 처리합니다.",
@@ -61,6 +62,7 @@
       "synonyms": ["알리익스프레스", "알리", "광고 배너", "배너 만들기", "배너 생성기", "제휴 마케팅", "제휴 링크", "엑셀", "aliexpress", "affiliate", "ad", "banner", "builder", "excel", "csv", "html", "iframe"]
     },
     "document-markdown": {
+      "tagline": "문서 내용을 Markdown으로 저장",
       "title": "문서 → Markdown",
       "shortTitle": "문서 → Markdown",
       "description": "워드·엑셀·PPTX와 글자를 선택할 수 있는 PDF를 Markdown으로 저장하세요.",
@@ -73,6 +75,7 @@
       "synonyms": ["워드 마크다운", "엑셀 마크다운", "프레젠테이션", "마크다운", "Word to Markdown", "Excel to Markdown", "PowerPoint to Markdown", "PDF to Markdown", "DOCX", "XLSX", "XLS", "PPTX", "MarkItDown", "markdown"]
     },
     "pdf-converter": {
+      "tagline": "문서·이미지와 PDF 사이 변환",
       "title": "PDF 변환",
       "shortTitle": "PDF 변환",
       "description": "워드·엑셀·PPT를 PDF로, PDF를 DOCX·XLSX·PPTX·HWPX나 이미지로 변환하세요. HWP 원본은 인쇄로 저장합니다.",
@@ -86,6 +89,7 @@
       "synonyms": ["피디에프 변환", "PDF 워드 변환", "PDF 엑셀 변환", "PDF PPT 변환", "PDF 한글 변환", "스캔 PDF OCR", "검색 가능한 PDF", "HWP", "HWPX", "워드", "Word", "오피스", "Office", "엑셀", "Excel", "프레젠테이션", "PPT", "PPTX", "PowerPoint", "JPG", "PNG", "image to pdf", "pdf to image", "convert word to pdf", "pdf to word", "pdf to powerpoint", "word to pdf", "pdf to docx", "pdf to xlsx", "pdf to pptx", "pdf to hwpx", "searchable pdf", "scanned pdf ocr", "hwp to pdf"]
     },
     "foliotrace": {
+      "tagline": "공개 공시로 포트폴리오 변화 살펴보기",
       "title": "FolioTrace",
       "shortTitle": "FolioTrace",
       "description": "공개 공시로 추적하는 국민연금 국내주식 포트폴리오 추정 자료를 살펴봅니다.",
@@ -98,6 +102,7 @@
       "synonyms": ["foliotrace"]
     },
     "document-redactor": {
+      "tagline": "문서·사진의 민감한 영역 가리기",
       "title": "PDF·이미지 개인정보 가리기",
       "shortTitle": "개인정보 가리기",
       "description": "PDF와 이미지 파일에서 민감한 개인정보 영역을 검정색으로 가리고 안전하게 사본을 저장하세요.",
@@ -111,6 +116,7 @@
       "synonyms": ["개인정보 마스킹", "검정 박스", "PDF 가리기", "문서 가리기"]
     },
     "excel-merger": {
+      "tagline": "여러 엑셀·CSV를 하나로 합치기",
       "title": "엑셀 파일·시트 합치기",
       "shortTitle": "엑셀 병합",
       "description": "여러 엑셀 파일의 시트나 자료를 하나의 XLSX로 합치기(병합)하세요. 수식·서식을 보존하고 암호 입출력을 지원합니다.",
@@ -124,6 +130,7 @@
       "synonyms": ["엑셀", "xls", "xlsx"]
     },
     "excel-compare": {
+      "tagline": "값·수식·서식 차이를 비교",
       "title": "엑셀 파일·데이터 비교",
       "shortTitle": "엑셀 비교",
       "description": "Excel·CSV 파일 쌍을 위치나 키 기준으로 비교하세요. 값·수식·서식 차이를 XLSX 보고서로 확인할 수 있습니다.",
@@ -138,6 +145,7 @@
       "synonyms": ["엑셀", "xls", "xlsx", "엑셀 대사", "대사", "diff", "diff checker", "spreadsheet reconciliation"]
     },
     "excel-cleaner": {
+      "tagline": "빈 행·중복·공백을 한 번에 정리",
       "title": "엑셀 데이터 일괄 정리",
       "shortTitle": "엑셀 정리",
       "description": "Excel·CSV 파일에 공백 제거, 빈 행 삭제, 중복 정리 등 28종 규칙을 순서대로 적용하여 데이터를 깔끔하게 정리하세요.",
@@ -151,6 +159,7 @@
       "synonyms": ["엑셀", "xls", "xlsx", "엑셀 중복 제거", "공백 제거", "중복 제거", "빈 행 삭제", "remove duplicates", "trim spaces"]
     },
     "pdf-editor": {
+      "tagline": "PDF 페이지 정리부터 번호·스탬프까지",
       "title": "PDF 페이지 편집",
       "shortTitle": "PDF 편집",
       "description": "PDF 페이지를 병합·분할·추출·회전하고 페이지 번호·워터마크·스탬프를 추가하세요.",
@@ -164,6 +173,7 @@
       "synonyms": ["피디에프", "pdf", "PDF 나누기", "PDF 자르기", "PDF 직인", "쪽번호", "stamp", "watermark"]
     },
     "document-compare": {
+      "tagline": "워드·한글 문서의 변경 내용 확인",
       "title": "워드·한글 문서 비교",
       "shortTitle": "문서 비교",
       "description": "DOCX·DOC 또는 HWP·HWPX 문서의 문단·표·서식 차이를 비교하고 변경된 내용을 쉽게 확인하세요.",
@@ -177,6 +187,7 @@
       "synonyms": ["문서", "워드", "한글", "docx", "hwp", "diff", "diff checker"]
     },
     "pdf-compare": {
+      "tagline": "PDF의 화면·텍스트 차이 확인",
       "title": "PDF 파일 차이 비교",
       "shortTitle": "PDF 비교",
       "description": "여러 수정 전후 PDF 쌍을 비교하여 페이지별 렌더 픽셀 및 추출 텍스트 차이를 파악하세요.",
@@ -190,6 +201,7 @@
       "synonyms": ["pdf 비교", "diff", "diff checker"]
     },
     "hwp-editor": {
+      "tagline": "한글 문서를 열어 편집하고 저장",
       "title": "온라인 한글 문서 편집",
       "shortTitle": "한글 편집",
       "description": "HWP와 HWPX 문서를 브라우저에서 바로 열어 본문과 서식을 편집하고 저장하세요.",
@@ -203,6 +215,7 @@
       "synonyms": ["한글", "hwp", "hwpx", "한글 편집", "한글 뷰어", "hwp 뷰어", "hwp viewer", "Hangul viewer"]
     },
     "office-editor": {
+      "tagline": "워드·엑셀·발표 자료를 브라우저에서 편집",
       "title": "온라인 오피스 문서 편집",
       "shortTitle": "오피스 편집",
       "description": "Word, Excel, PowerPoint 문서를 브라우저에서 간편하게 편집하고 저장할 수 있습니다.",
@@ -216,6 +229,7 @@
       "synonyms": ["워드 온라인", "엑셀 온라인", "word", "excel", "powerpoint", "office", "word online", "excel online"]
     },
     "video-studio": {
+      "tagline": "영상 구간 편집과 형식 변환",
       "title": "온라인 동영상 편집",
       "shortTitle": "동영상 편집",
       "description": "영상 자르기, 이어붙이기, 음원 추출을 지원합니다. 브라우저에서 빠르고 간편하게 영상을 편집하세요.",
@@ -230,6 +244,7 @@
       "synonyms": ["video studio"]
     },
     "audio-studio": {
+      "tagline": "음악을 자르고 음성 효과 적용",
       "title": "온라인 오디오 편집",
       "shortTitle": "오디오 편집",
       "description": "오디오 파형에서 구간을 자르고 음소거, 복사, 붙여넣기를 하거나 피치 조절 효과를 적용하세요.",
@@ -243,6 +258,7 @@
       "synonyms": ["음악 자르기", "mp3 cutter", "오디오", "mp3", "음악", "녹음", "music cutter"]
     },
     "image-studio": {
+      "tagline": "사진 크기 조절·모자이크·그리기",
       "title": "온라인 사진 편집",
       "shortTitle": "사진 편집",
       "description": "사진 크기 조절, 자르기, 모자이크, 필터 적용 및 자유 그리기 기능을 제공하는 다목적 사진 편집기입니다.",
@@ -258,6 +274,7 @@
       "synonyms": ["사진", "이미지", "png", "jpg", "리사이즈", "image resizer", "블러", "얼굴 모자이크", "pixelate", "mosaic", "resize", "blur", "face mosaic"]
     },
     "text-merger": {
+      "tagline": "여러 글과 텍스트 파일을 하나로",
       "title": "텍스트 파일 일괄 합치기",
       "shortTitle": "텍스트 병합",
       "description": "여러 TXT 파일을 원하는 순서대로 정렬하고 줄바꿈이나 쉼표 등의 구분자로 하나로 합치세요.",
@@ -271,6 +288,7 @@
       "synonyms": ["text merger"]
     },
     "text-tools": {
+      "tagline": "공백·줄바꿈·중복 줄 정리",
       "title": "텍스트 줄바꿈·공백 제거",
       "shortTitle": "텍스트 정돈",
       "description": "불필요한 공백과 줄바꿈, 중복 줄을 제거하고 대소문자 변환 및 한국어 문장 검사를 실행하세요.",
@@ -284,6 +302,7 @@
       "synonyms": ["text tools"]
     },
     "text-formatter": {
+      "tagline": "JSON·SQL·XML을 읽기 좋게 정돈",
       "title": "JSON·SQL·XML 포맷터",
       "shortTitle": "코드 포맷터",
       "description": "JSON, SQL, XML 텍스트의 문법 오류를 확인하고 읽기 좋게 들여쓰기하여 깔끔하게 정돈하세요.",
@@ -297,6 +316,7 @@
       "synonyms": ["text formatter"]
     },
     "work-calculator": {
+      "tagline": "공휴일을 반영해 영업일·연차 계산",
       "title": "영업일 및 연차 계산기",
       "shortTitle": "영업일 계산",
       "description": "주말과 대한민국 법정 공휴일을 제외한 정확한 영업일과 입사일 기준 예상 연차를 계산하세요.",
@@ -310,6 +330,7 @@
       "synonyms": ["work calculator"]
     },
     "timezone-calculator": {
+      "tagline": "도시별 시각과 회의 가능 시간 비교",
       "title": "세계지도 시차 계산기",
       "shortTitle": "시차 계산",
       "description": "세계지도에서 도시를 선택해 국제 표준 시간대와 서머타임을 반영한 현지 시각 및 회의 시간을 비교하세요.",
@@ -323,6 +344,7 @@
       "synonyms": ["timezone calculator"]
     },
     "payroll-calculator": {
+      "tagline": "실수령액·주휴수당·퇴직금 계산",
       "title": "실수령액·퇴직금 계산기",
       "shortTitle": "급여 계산",
       "description": "최신 사회보험 기준으로 주휴수당, 월급 실수령액과 법정 퇴직금을 간편하게 계산하세요.",
@@ -336,6 +358,7 @@
       "synonyms": ["4대보험", "급여", "실수령액", "퇴직금", "payroll", "salary", "social insurance"]
     },
     "image-privacy": {
+      "tagline": "사진의 GPS·촬영 정보 지우기",
       "title": "사진 메타데이터·위치정보 삭제",
       "shortTitle": "위치정보 삭제",
       "description": "사진에 숨겨진 GPS 위치 및 촬영 기기 정보(EXIF)를 확인하고 완전히 삭제하세요.",
@@ -349,6 +372,7 @@
       "synonyms": ["사진 메타데이터", "exif", "gps", "위치정보", "metadata", "photo metadata"]
     },
     "security-tools": {
+      "tagline": "무작위 비밀번호 생성과 강도 확인",
       "title": "안전한 비밀번호 생성기",
       "shortTitle": "비밀번호 생성",
       "description": "보안 난수를 기반으로 무작위 비밀번호를 생성하고, 예상 해독 시간과 패턴으로 안전성을 측정하세요.",
@@ -362,6 +386,7 @@
       "synonyms": ["랜덤 비밀번호", "비밀번호", "password", "random", "random password"]
     },
     "qr-studio": {
+      "tagline": "QR 생성·일괄 제작·사진 스캔",
       "title": "QR 코드 만들기 및 스캔",
       "shortTitle": "QR 스튜디오",
       "description": "URL, 텍스트 등으로 QR 코드를 만들거나 카메라 및 사진 업로드로 기존 QR 코드를 스캔하세요.",
@@ -375,6 +400,7 @@
       "synonyms": ["QR 스튜디오", "QR 만들기", "QR 스캔", "QR코드", "qr", "qrcode", "qr code"]
     },
     "data-converter": {
+      "tagline": "CSV·JSON·HTML 표를 서로 변환",
       "title": "CSV·JSON·HTML 데이터 변환기",
       "shortTitle": "데이터 변환",
       "description": "CSV 파일, JSON 배열, HTML 표 데이터를 브라우저 환경에서 자유롭게 변환하고 저장하세요.",
@@ -388,6 +414,7 @@
       "synonyms": ["데이터 변환", "csv", "json", "html", "table"]
     },
     "document-generator": {
+      "tagline": "양식과 데이터로 문서 일괄 생성",
       "title": "워드 문서 일괄 생성",
       "shortTitle": "워드 메일머지",
       "description": "워드 템플릿의 변수를 엑셀 데이터로 치환하여 한 번에 수많은 개별 문서를 자동으로 완성하세요.",
@@ -401,6 +428,7 @@
       "synonyms": ["워드 메일머지", "메일머지", "mail merge", "문서 일괄 생성", "양식 자동 채우기", "DOCX", "Word", "워드 온라인", "엑셀 온라인"]
     },
     "market-calendar": {
+      "tagline": "휴장일과 거래 시간을 한눈에",
       "title": "주식시장 거래 달력",
       "shortTitle": "주식시장 거래 달력",
       "description": "KRX·NXT·NYSE·Nasdaq의 휴장일과 거래 시간을 확인하세요. 미국 시장은 한국 시간도 함께 보여줍니다.",
@@ -413,6 +441,7 @@
       "synonyms": ["증시", "휴장일", "krx", "nxt", "nyse", "nasdaq", "stock", "market", "calendar", "market holidays", "stock exchange calendar"]
     },
     "text-compare": {
+      "tagline": "두 글의 차이를 줄·단어별로 확인",
       "title": "텍스트 비교",
       "shortTitle": "텍스트 비교",
       "description": "두 글의 차이를 줄·단어·글자 단위로 확인하고, 필요한 변경만 옮겨 저장하세요.",
@@ -425,6 +454,7 @@
       "synonyms": ["텍스트", "비교", "diff", "diff checker"]
     },
     "image-compare": {
+      "tagline": "두 이미지의 차이를 나란히 확인",
       "title": "이미지 비교",
       "shortTitle": "이미지 비교",
       "description": "두 이미지의 색상·투명도·글자 차이를 확인하고 정렬 후보를 검토합니다.",
@@ -437,6 +467,7 @@
       "synonyms": ["이미지 비교", "diff", "diff checker"]
     },
     "folder-compare": {
+      "tagline": "폴더·ZIP 안의 파일 차이 확인",
       "title": "폴더·ZIP 비교",
       "shortTitle": "폴더 비교",
       "description": "두 폴더나 ZIP의 파일 내용을 확인하고 필요한 파일 쌍만 상세 비교합니다.",
@@ -448,5 +479,14 @@
       ],
       "synonyms": ["폴더 비교", "diff", "diff checker"]
     }
+  },
+  "scenarios": {
+    "spreadsheets": { "label": "표 데이터 정리" },
+    "documents": { "label": "문서·PDF 다루기" },
+    "media": { "label": "사진·음악 편집" },
+    "text-data": { "label": "글·코드 다듬기" },
+    "work": { "label": "날짜·급여 계산" },
+    "security-share": { "label": "개인정보 보호·공유" },
+    "investment-research": { "label": "거래 일정·공시 확인" }
   }
 }

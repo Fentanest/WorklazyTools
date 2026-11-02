@@ -49,6 +49,7 @@
   },
   "items": {
     "product-banner": {
+      "tagline": "Build ad banners from a product list",
       "title": "AliExpress Ad Banner Builder",
       "shortTitle": "AliExpress Ad Banner Builder",
       "description": "Build five AliExpress ad banner designs from Excel or CSV lists and save HTML or iframe code, or convert a banner URL to iframe code. Files and URLs are processed in your browser.",
@@ -61,6 +62,7 @@
       "synonyms": ["aliexpress", "affiliate", "ad", "banner", "builder", "excel", "csv", "html", "iframe"]
     },
     "document-markdown": {
+      "tagline": "Save document content as Markdown",
       "title": "Document to Markdown",
       "shortTitle": "Document to Markdown",
       "description": "Save text and tables from Word, Excel, PPTX and PDFs with selectable text as Markdown.",
@@ -73,6 +75,7 @@
       "synonyms": ["Word to Markdown", "Excel to Markdown", "PowerPoint to Markdown", "PDF to Markdown", "DOCX", "XLSX", "XLS", "PPTX", "MarkItDown", "markdown"]
     },
     "pdf-converter": {
+      "tagline": "Convert documents, images and PDFs",
       "title": "PDF Converter",
       "shortTitle": "PDF Converter",
       "description": "Convert Word, Excel and PowerPoint to PDF, or PDFs to DOCX, XLSX, PPTX, HWPX and images. HWP input uses browser printing.",
@@ -86,6 +89,7 @@
       "synonyms": ["HWP", "HWPX", "Word", "Office", "Excel", "PPT", "PPTX", "PowerPoint", "JPG", "PNG", "image to pdf", "pdf to image", "convert word to pdf", "pdf to word", "pdf to powerpoint", "word to pdf", "pdf to docx", "pdf to xlsx", "pdf to pptx", "pdf to hwpx", "searchable pdf", "scanned pdf ocr", "hwp to pdf"]
     },
     "foliotrace": {
+      "tagline": "Explore portfolio changes from public filings",
       "title": "FolioTrace",
       "shortTitle": "FolioTrace",
       "description": "Explore an estimate of NPS Korean equity holdings based on public filings.",
@@ -98,6 +102,7 @@
       "synonyms": ["foliotrace"]
     },
     "document-redactor": {
+      "tagline": "Cover sensitive areas in documents and photos",
       "title": "Redact Personal Info from PDF and Images",
       "shortTitle": "Redact Document",
       "description": "Safely blackout sensitive personal information on PDF and image files, and save the redacted copies securely.",
@@ -111,6 +116,7 @@
       "synonyms": ["document redactor"]
     },
     "excel-merger": {
+      "tagline": "Combine spreadsheets and CSV files",
       "title": "Merge Excel Files and Sheets",
       "shortTitle": "Excel Merger",
       "description": "Combine multiple Excel files or sheets into a single XLSX file. Preserves formulas and formatting, and supports password-protected files.",
@@ -124,6 +130,7 @@
       "synonyms": ["xls", "xlsx"]
     },
     "excel-compare": {
+      "tagline": "Compare values, formulas and formatting",
       "title": "Compare Excel Files and Data",
       "shortTitle": "Excel Compare",
       "description": "Compare pairs of Excel or CSV files by position or key columns. View differences in values, formulas, and formatting in an XLSX report.",
@@ -138,6 +145,7 @@
       "synonyms": ["xls", "xlsx", "diff", "diff checker", "spreadsheet reconciliation"]
     },
     "excel-cleaner": {
+      "tagline": "Clean empty rows, duplicates and spaces",
       "title": "Batch Clean Excel Data",
       "shortTitle": "Excel Cleaner",
       "description": "Apply 28 different rules such as removing spaces, blank rows, and duplicates to clean up your Excel and CSV files systematically.",
@@ -151,6 +159,7 @@
       "synonyms": ["xls", "xlsx", "remove duplicates", "trim spaces"]
     },
     "pdf-editor": {
+      "tagline": "Organize PDF pages, add numbers and stamps",
       "title": "Edit PDF Pages",
       "shortTitle": "PDF Editor",
       "description": "Merge, split, extract, and rotate PDF pages, then add page numbers, watermarks, or stamps.",
@@ -164,6 +173,7 @@
       "synonyms": ["pdf", "stamp", "watermark"]
     },
     "document-compare": {
+      "tagline": "Find changes in Word and Hangul documents",
       "title": "Compare Word and HWP Documents",
       "shortTitle": "Document Compare",
       "description": "Compare DOCX, DOC, HWP, or HWPX documents to easily identify differences in paragraphs, tables, and formatting.",
@@ -177,6 +187,7 @@
       "synonyms": ["docx", "hwp", "diff", "diff checker"]
     },
     "pdf-compare": {
+      "tagline": "Compare PDF pages and extracted text",
       "title": "Compare PDF File Differences",
       "shortTitle": "PDF Compare",
       "description": "Compare original and revised PDF pairs to identify page-by-page rendering differences and extracted text changes.",
@@ -190,6 +201,7 @@
       "synonyms": ["diff", "diff checker"]
     },
     "hwp-editor": {
+      "tagline": "Open, edit and save Hangul documents",
       "title": "Online HWP Document Editor",
       "shortTitle": "HWP Editor",
       "description": "Open and view HWP/HWPX files without installing software, then edit them. Save as HWP, HWPX or HML with formatting support.",
@@ -203,6 +215,7 @@
       "synonyms": ["hwp", "hwpx", "hwp viewer", "Hangul viewer"]
     },
     "office-editor": {
+      "tagline": "Edit documents, spreadsheets and slides",
       "title": "Online Office Document Editor",
       "shortTitle": "Office Editor",
       "description": "Easily view, edit, and save Word, Excel, and PowerPoint documents directly in your web browser.",
@@ -216,6 +229,7 @@
       "synonyms": ["word", "excel", "powerpoint", "office", "word online", "excel online"]
     },
     "video-studio": {
+      "tagline": "Edit video clips and convert formats",
       "title": "Online Video Editor",
       "shortTitle": "Video Studio",
       "description": "Trim, merge, and extract audio from videos. Quickly and easily edit your videos directly in your browser.",
@@ -230,6 +244,7 @@
       "synonyms": ["video studio"]
     },
     "audio-studio": {
+      "tagline": "Trim audio and apply voice effects",
       "title": "Online Audio Editor",
       "shortTitle": "Audio Studio",
       "description": "Cut, mute, copy, and paste sections of an audio waveform, or apply pitch adjustment effects to your recordings.",
@@ -243,6 +258,7 @@
       "synonyms": ["mp3 cutter", "mp3", "music cutter"]
     },
     "image-studio": {
+      "tagline": "Resize, mosaic and draw on photos",
       "title": "Online Photo Editor",
       "shortTitle": "Photo Editor",
       "description": "A versatile photo editor providing image resizing, cropping, mosaic, filtering, and free-hand drawing features.",
@@ -258,6 +274,7 @@
       "synonyms": ["png", "jpg", "image resizer", "pixelate", "mosaic", "resize", "blur", "face mosaic"]
     },
     "text-merger": {
+      "tagline": "Combine text and TXT files",
       "title": "Batch Merge Text Files",
       "shortTitle": "Text Merger",
       "description": "Order multiple TXT files and combine them into a single file using custom separators like line breaks or commas.",
@@ -271,6 +288,7 @@
       "synonyms": ["text merger"]
     },
     "text-tools": {
+      "tagline": "Tidy spaces, line breaks and duplicate lines",
       "title": "Remove Line Breaks and Spaces",
       "shortTitle": "Text Cleaner",
       "description": "Remove unnecessary spaces, line breaks, and duplicate lines. Also supports case conversion and Korean grammar checks.",
@@ -284,6 +302,7 @@
       "synonyms": ["text tools"]
     },
     "text-formatter": {
+      "tagline": "Format and validate JSON, SQL and XML",
       "title": "JSON, SQL, and XML Formatter",
       "shortTitle": "Code Formatter",
       "description": "Check syntax errors and beautifully indent JSON, SQL, and XML text to make your code neat and readable.",
@@ -297,6 +316,7 @@
       "synonyms": ["text formatter"]
     },
     "work-calculator": {
+      "tagline": "Calculate workdays and annual leave",
       "title": "Business Day and PTO Calculator",
       "shortTitle": "Business Days",
       "description": "Calculate exact business days excluding weekends and Korean public holidays, and estimate PTO based on your start date.",
@@ -310,6 +330,7 @@
       "synonyms": ["work calculator"]
     },
     "timezone-calculator": {
+      "tagline": "Compare city times and plan meetings",
       "title": "World Map Timezone Converter",
       "shortTitle": "Timezone Converter",
       "description": "Select cities on the world map to compare local times and meeting schedules, automatically accounting for UTC and Daylight Saving Time.",
@@ -323,6 +344,7 @@
       "synonyms": ["timezone calculator"]
     },
     "payroll-calculator": {
+      "tagline": "Estimate take-home pay and severance",
       "title": "Net Salary and Severance Calculator",
       "shortTitle": "Payroll Calculator",
       "description": "Easily estimate net monthly salary, weekly holiday pay, and legal severance pay based on the latest social insurance rates.",
@@ -336,6 +358,7 @@
       "synonyms": ["payroll", "salary", "social insurance"]
     },
     "image-privacy": {
+      "tagline": "Remove GPS and camera metadata from photos",
       "title": "Delete Photo Metadata and Location",
       "shortTitle": "Remove EXIF",
       "description": "View and completely remove hidden GPS coordinates and camera device information (EXIF) from your photos.",
@@ -349,6 +372,7 @@
       "synonyms": ["exif", "gps", "metadata", "photo metadata"]
     },
     "security-tools": {
+      "tagline": "Generate passwords and check their strength",
       "title": "Secure Password Generator",
       "shortTitle": "Password Generator",
       "description": "Generate random passwords using cryptographically secure numbers, and evaluate their strength with estimated crack times.",
@@ -362,6 +386,7 @@
       "synonyms": ["password", "random", "random password"]
     },
     "qr-studio": {
+      "tagline": "Create QR codes in batches or scan photos",
       "title": "Create and Scan QR Codes",
       "shortTitle": "QR Studio",
       "description": "Generate QR codes for URLs and text, or scan existing QR codes using your camera or by uploading images.",
@@ -375,6 +400,7 @@
       "synonyms": ["qr", "qrcode", "qr code"]
     },
     "data-converter": {
+      "tagline": "Convert CSV, JSON and HTML tables",
       "title": "CSV, JSON, and HTML Data Converter",
       "shortTitle": "Data Converter",
       "description": "Freely convert between CSV files, JSON arrays, and HTML table data directly in your browser environment.",
@@ -388,6 +414,7 @@
       "synonyms": ["csv", "json", "html", "table"]
     },
     "document-generator": {
+      "tagline": "Generate documents from a template and data",
       "title": "Batch Generate Word Documents",
       "shortTitle": "Word Mail Merge",
       "description": "Automatically generate multiple individualized Word documents at once by replacing template variables with your Excel data.",
@@ -401,6 +428,7 @@
       "synonyms": ["mail merge", "DOCX", "Word"]
     },
     "market-calendar": {
+      "tagline": "Check market holidays and trading hours",
       "title": "Stock market calendar",
       "shortTitle": "Stock market calendar",
       "description": "Check holidays and trading hours for KRX, NXT, NYSE and Nasdaq. U.S. market hours are also shown in Korea time.",
@@ -413,6 +441,7 @@
       "synonyms": ["krx", "nxt", "nyse", "nasdaq", "stock", "market", "calendar", "market holidays", "stock exchange calendar"]
     },
     "text-compare": {
+      "tagline": "Compare text by line, word and character",
       "title": "Text Compare",
       "shortTitle": "Text Compare",
       "description": "Find line, word and character changes between two texts, copy selected changes and save your result.",
@@ -425,6 +454,7 @@
       "synonyms": ["diff", "diff checker"]
     },
     "image-compare": {
+      "tagline": "Compare two images side by side",
       "title": "Image Compare",
       "shortTitle": "Image Compare",
       "description": "Inspect color, opacity and recognized-text differences, and review alignment suggestions.",
@@ -437,6 +467,7 @@
       "synonyms": ["diff", "diff checker"]
     },
     "folder-compare": {
+      "tagline": "Compare files inside folders and ZIPs",
       "title": "Folder & ZIP Compare",
       "shortTitle": "Folder Compare",
       "description": "Compare file contents in two folders or ZIP archives, then inspect selected pairs with existing tools.",
@@ -448,5 +479,14 @@
       ],
       "synonyms": ["diff", "diff checker"]
     }
+  },
+  "scenarios": {
+    "spreadsheets": { "label": "Work with spreadsheets" },
+    "documents": { "label": "Work with documents and PDFs" },
+    "media": { "label": "Edit photos and audio" },
+    "text-data": { "label": "Tidy text and code" },
+    "work": { "label": "Calculate dates and pay" },
+    "security-share": { "label": "Protect and share" },
+    "investment-research": { "label": "Check markets and filings" }
   }
 }

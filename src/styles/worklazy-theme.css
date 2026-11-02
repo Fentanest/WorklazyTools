@@ -755,3 +755,11 @@ input:focus-visible {
 .home-drop-actions a { color: var(--brand-on-bg); text-decoration: underline; }
 .home-dropzone .home-drop-bundle-note { margin-bottom: 0; }
 @media (max-width: 620px) { .home-dropzone { padding: 18px; } .home-drop-actions button { min-height: 44px; } }
+
+/* U1: task links use the existing catalog, colors and focus behavior. */
+.home-scenarios { margin: 28px 0; }
+.home-scenarios h2 { margin: 0 0 12px; font-size: 17px; font-weight: 800; }
+.home-scenarios > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-scenarios a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 9px 14px; border: 1px solid var(--brand-border); border-radius: 999px; background: var(--bg-elevated); color: var(--label-primary); font-size: 13px; font-weight: 650; }
+.home-scenarios a:hover { background: var(--brand-soft); color: var(--brand-on-bg); }
+.home-scenarios a:focus-visible { outline: 2px solid var(--brand-on-bg); outline-offset: 3px; }

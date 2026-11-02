@@ -10,6 +10,7 @@ const catalog = (language: string) => {
   const locale = JSON.parse(readFileSync(new URL(`../../src/locales/${language}/tools.json`, import.meta.url), "utf8"));
   return registry.map((tool) => ({ ...tool, ...locale.items[tool.id],
     highlights: locale.items[tool.id].highlights.map((label: string) => ({ label })),
+    scenarioLabels: tool.scenarios.map((id) => ({ id, label: locale.scenarios[id].label })),
     categoryLabel: locale.categories[tool.category].label,
     categoryShortLabel: locale.categories[tool.category].shortLabel,
   }));
@@ -92,6 +93,15 @@ test("matcher consumes caller-localized tagline, scenario labels and synonyms wi
   const snapshot = JSON.stringify(input);
   for (const query of ["UNIQUE-ALIAS", "unique-tagline", "unique-scenario"]) assert.equal(matchTools(input, query)[0], input[0]);
   assert.equal(JSON.stringify(input), snapshot);
+});
+
+test("dedicated localized tagline and scenario copy reach the search corpus", () => {
+  for (const language of ["ko", "en"]) for (const tool of catalog(language)) {
+    assert.equal(typeof tool.tagline, "string");
+    assert.ok(tool.tagline && tool.tagline !== tool.description);
+    assert.ok(matchTools([tool], tool.tagline).includes(tool));
+    for (const scenario of tool.scenarioLabels) assert.ok(matchTools([tool], scenario.label).includes(tool));
+  }
 });
 
 // Fixed pre-U0 alias inventory (47f0678), not derived from current synonyms.
