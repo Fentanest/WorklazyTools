@@ -30,6 +30,13 @@ try {
         assert.ok((await editor.locator('.asp-panel__title').allTextContents()).some(value => value.includes(label)), path);
       }
     });
+    await scenario('global header drop routes to one editor without duplicate choices', async () => {
+      await fresh();
+      const data = await p.evaluateHandle(base64 => { const transfer = new DataTransfer(); const bytes=Uint8Array.from(atob(base64), value=>value.charCodeAt(0)); transfer.items.add(new File([bytes], 'ie1-global.png', {type:'image/png'})); return transfer; }, input.buffer.toString('base64'));
+      await p.locator('h1').dispatchEvent('drop', {dataTransfer:data});
+      await editor.getByText('1 files selected',{exact:true}).waitFor();
+      assert.equal(await p.locator('[data-testid=file-drop-target-choice]').count(),0);
+    });
     await scenario('source intake creates a forced PNG result and preserves the editing scene', async () => {
       await fresh(); await put();
       await editor.locator('.asp-commit').click(); await p.locator('[data-testid=image-editor-result] img').waitFor();
@@ -43,7 +50,7 @@ try {
       await size.locator('input[type=checkbox]').uncheck();
       await size.locator('input[type=number]').nth(0).fill('200'); await size.locator('input[type=number]').nth(1).fill('120');
       await editor.locator('.asp-commit').click(); await p.locator('[data-testid=image-editor-result] img').waitFor();
-      const dimensions = await p.locator('[data-testid=image-editor-result] img').evaluate(image => [image.naturalWidth,image.naturalHeight]);
+      const dimensions = await p.locator('[data-testid=image-editor-result] img').evaluate(async image => { await image.decode(); return [image.naturalWidth,image.naturalHeight]; });
       assert.deepEqual(dimensions,[200,120]); assert.equal(await editor.locator('.lower-canvas').count(),1);
       await size.getByRole('button',{name:'Automatic size',exact:true}).click();
     });
@@ -75,11 +82,13 @@ try {
       const dialog = p.getByRole('dialog', { name: 'Download background removal files' }); await dialog.waitFor();
       assert.match(await dialog.innerText(), /40,737,492/);
       assert.equal(requests.filter(url => /\/vendor\/(bg-removal|onnxruntime-web)\//.test(url)).length, 0);
-      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
+      await dialog.getByRole('button', { name: 'Cancel operation', exact: true }).click(); await dialog.waitFor({ state: 'hidden' });
       assert.equal(await editor.locator('[role=alert]').count(), 0);
     });
     await scenario('390px keyboard redaction can export with flatten/proceed/cancel warning', async () => {
       await p.setViewportSize({ width: 390, height: 844 }); await fresh('mosaic/'); await put();
+      const geometry = await editor.evaluate(node => { const options=node.querySelector('.asp-options-panel').getBoundingClientRect(), layers=node.querySelector('.asp-layer-list').getBoundingClientRect(); return {optionsBottom:options.bottom,layersTop:layers.top}; });
+      assert.ok(geometry.optionsBottom <= geometry.layersTop + 1, JSON.stringify(geometry));
       await editor.getByRole('button', { name: 'Solid', exact: true }).click();
       for (const [label, value] of [['Left','100'],['Top','100'],['Width','100'],['Height','80']]) await editor.getByRole('spinbutton', { name: label, exact: true }).fill(value);
       await editor.getByRole('button', { name: 'Apply redaction', exact: true }).click();
@@ -90,7 +99,7 @@ try {
       };
       await chooseJSON(); const warning = p.getByRole('dialog', { name: 'This format may retain the original' }); await warning.waitFor();
       let downloadCount=0; const listener=()=>downloadCount++; p.on('download',listener);
-      await warning.getByRole('button',{name:'Cancel',exact:true}).click(); await warning.waitFor({state:'hidden'}); assert.equal(downloadCount,0);
+      await warning.getByRole('button',{name:'Cancel operation',exact:true}).click(); await warning.waitFor({state:'hidden'}); assert.equal(downloadCount,0);
       await chooseJSON(); await warning.waitFor(); const downloading=p.waitForEvent('download');
       await warning.getByRole('button',{name:'Flatten layers and export',exact:true}).click();
       const file=await downloading; const json=JSON.parse(await fs.readFile(await file.path(),'utf8'));
@@ -98,6 +107,16 @@ try {
       p.off('download',listener);
       await p.screenshot({path:`${out}/mobile-editor.png`,fullPage:true});
       assert.ok(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+    });
+    await scenario('accepted direct-entry changes preserve edited layers and history', async () => {
+      await p.setViewportSize({width:1365,height:900}); await fresh('watermark/'); await put();
+      const text=editor.locator('#asp-text-input'); assert.equal(await text.inputValue(),''); await text.fill('Preserve this layer');
+      await editor.locator('.asp-text-add .asp-btn-accent').click(); const before=await editor.locator('.asp-layers__row').count(); assert.equal(before,2);
+      await p.evaluate(()=>{history.pushState({},'', '/en/tools/image-studio/mosaic/');dispatchEvent(new PopStateEvent('popstate'));});
+      await p.locator('[data-testid=direct-entry-confirm][open]').waitFor(); await p.locator('[data-testid=direct-entry-accept]').click();
+      if(await p.locator('[data-testid=unsaved-work-dialog][open]').count())await p.locator('[data-testid=unsaved-stay]').click();
+      await editor.getByRole('button',{name:'Apply redaction',exact:true}).waitFor();
+      assert.equal(await editor.locator('.asp-layers__row').count(),before); assert.equal(await editor.getByRole('button',{name:'Undo',exact:true}).isEnabled(),true);
     });
     await scenario('H1 receives through the home drop zone and cold library chunk', async () => {
       await p.setViewportSize({width:1365,height:900}); await p.goto(`${base}/en/`);

@@ -13,7 +13,8 @@
 
 @container aspeditor (max-width: 600px) {
   .library-image-editor .asp-workspace { height: auto; }
-  .library-image-editor .asp-workspace__panel { max-height: 520px; overflow: auto; }
+  .library-image-editor .asp-workspace__panel { max-height: none; overflow: visible; }
+  .library-image-editor .asp-options-panel { flex: none; }
 }
 [data-testid="image-background-controls"] select { min-width: 0; max-width: 100%; }
 [data-testid="image-background-controls"] label { min-width: 0; max-width: 100%; flex-wrap: wrap; }

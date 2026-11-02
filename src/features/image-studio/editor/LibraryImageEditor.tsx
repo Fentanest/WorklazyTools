@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '../../../components/ui';
 import { Button } from '../../../components/ui/button';
 import { UtilityNotice, UtilitySectionCard } from '../../../components/UtilitySurface';
-import { useFileDropTarget } from '../../../components/FileDropProvider';
 import type { IntakeContext } from '../../../app/memoryHandoff';
 import { setUnsavedWork } from '../../../app/toolState';
 import type { ImageEditorDirectHandle } from '../ImageStudioPage';
@@ -74,6 +73,8 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     maxTouchPoints: navigator.maxTouchPoints, screenShortEdgeCssPx: Math.min(screen.width, screen.height),
   })));
   const labels = t('image.library.labels', { returnObjects: true }) as Record<string, string>;
+  const labelsRef = useRef(labels); labelsRef.current = labels;
+  const applyPresetRef = useRef<(next?: ImageDirectPreset) => void>(() => {});
 
   const dismissPending = useCallback(() => {
     exportPending.current?.resolve('cancel'); exportPending.current = undefined; setExportPrompt(undefined);
@@ -138,7 +139,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     const handle: ImageEditorDirectHandle = {
       receive: (file, context) => receiveRef.current(file, context), cancel,
       invalidate: cancel,
-      apply: next => { cancel(); setSelectedPreset(next); setResult(undefined); setLoaded(false); setGeneration(value => value + 1); },
+      apply: next => applyPresetRef.current(next),
     };
     handleRef.current = handle;
     return () => { if (handleRef.current === handle) handleRef.current = undefined; };
@@ -154,9 +155,36 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     return () => document.removeEventListener('paste', paste, true);
   }, []);
   const editorArea = useRef<HTMLDivElement>(null);
-  useFileDropTarget({ element: () => editorArea.current, label: () => t('image.editor.title'), accept: RASTER_IMAGE_ACCEPT,
-    disabled: !active || loading || bgBusy, receive: files => receiveRef.current(files.at(-1)!).then(() => {}),
-  }, active);
+  const clearWatermarkDraft = () => {
+    const input = editorArea.current?.querySelector<HTMLInputElement>('#asp-text-input');
+    if (!input) return;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(input, '');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  applyPresetRef.current = next => {
+    cancel(); setSelectedPreset(next); setResult(undefined);
+    const request = version.current;
+    requestAnimationFrame(() => {
+      if (request !== version.current || !activeRef.current) return;
+      // The pinned fork has no imperative tool API. Select its existing chrome
+      // without remounting: direct-entry changes must keep layers and history.
+      const english = next?.purpose === 'mosaic' ? 'Redact' : next?.purpose === 'watermark' ? 'Text' : next?.purpose === 'resize' ? 'Crop & rotate' : 'Select';
+      const label = labelsRef.current[english] ?? english;
+      const button = Array.from(editorArea.current?.querySelectorAll<HTMLButtonElement>('.asp-rail__slot > button:first-child') ?? []).find(node => node.textContent?.trim() === label);
+      button?.click();
+      requestAnimationFrame(() => {
+        if (request !== version.current || !activeRef.current) return;
+        if (next?.purpose === 'watermark') clearWatermarkDraft();
+        if (next?.purpose === 'mosaic') {
+          const label = labelsRef.current.Pixelate ?? 'Pixelate';
+          Array.from(editorArea.current?.querySelectorAll<HTMLButtonElement>('.asp-options-panel .asp-chip') ?? []).find(node => node.textContent?.trim() === label)?.click();
+        }
+      });
+    });
+  };
+  // FileDropZone registers the single global target through useFileDropTarget.
+  // A second canvas target would create duplicate choices for the same editor.
+
 
   const beforeExport = async ({ format, hasConcealment }: BeforeExportContext): Promise<ExportDecision> => {
     if (!hasConcealment || !['svg', 'json'].includes(format)) return 'proceed';
@@ -254,7 +282,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           exportFormats={FORMATS} exportQuality={92} jpegExportQuality={95} commitFormat="png" showCommit commitLabel={t('image.library.makeResult')}
           resolutionLimits={policy.resolutionLimits} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
           labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
-          onImageLoaded={() => { if (generation !== latestGeneration.current) return; lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false); loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false); }}
+          onImageLoaded={() => { if (generation !== latestGeneration.current) return; lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false); loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false); if (selectedPreset?.purpose === 'watermark') requestAnimationFrame(clearWatermarkDraft); }}
           onDirtyChange={value => { if (generation !== latestGeneration.current) return; setDirty(value); if (value) setResult(undefined); }}
           onHistoryChange={() => { if (generation === latestGeneration.current) { documentRevision.current++; setResult(undefined); } }}
           onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
