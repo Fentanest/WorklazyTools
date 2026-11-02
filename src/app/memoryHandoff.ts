@@ -221,14 +221,16 @@ export function retainDelivery(record: Delivery): () => void {
 function recoveryFiles(files: File[], text?: string): File[] {
   return text === undefined ? files : [...files, new File([text], "handoff.txt", { type: "text/plain;charset=utf-8" })];
 }
-export function transferToRecovery(reason = "route-error", extra: Delivery[] = []): void {
+export function transferToRecovery(reason = "route-error", extra?: Delivery[]): void {
   const candidates: { files: File[]; source: string; release?: () => void }[] = [];
-  if (slot?.origin === "generated") {
+  // Explicit records are a scoped expiry/unmount transfer. Route errors omit
+  // this argument and collect every generated owner, including the staging slot.
+  if (!extra && slot?.origin === "generated") {
     candidates.push({ files: recoveryFiles(slot.files, slot.text), source: slot.source, release: slotRelease });
     slotRelease = undefined; clearSlot();
   }
-  const records = new Set([...deliveries.values(), ...extra]);
-  for (const reference of mountedChips) {
+  const records = new Set(extra ?? deliveries.values());
+  if (!extra) for (const reference of mountedChips) {
     const record = reference.deref();
     if (record) records.add(record); else mountedChips.delete(reference);
   }
