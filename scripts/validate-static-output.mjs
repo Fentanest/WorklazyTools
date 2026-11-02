@@ -59,6 +59,31 @@ export function assertStaticPrivacyRecipesHtml(html, { title, description, fileP
   }
 }
 
+export function assertStaticPrivacySectionsHtml(html, { sections, cleanerRecipes, filePath = "static privacy output" }) {
+  if (!Array.isArray(sections) || !sections.length || sections.some((section) => typeof section?.title !== "string" || !section.title.trim())) {
+    throw new Error(`${filePath}: missing privacy policy sections`);
+  }
+  assertStaticPrivacyRecipesHtml(html, { ...cleanerRecipes, filePath });
+  const document = new JSDOM(html).window.document;
+  const headings = [...document.querySelectorAll("main.seo-static-fallback > h2")];
+  const expectedTitles = [...sections.map((section) => section.title), cleanerRecipes.title];
+  if (JSON.stringify(headings.map((heading) => heading.textContent)) !== JSON.stringify(expectedTitles)
+    || new Set(expectedTitles).size !== expectedTitles.length || headings.some((heading) => heading.closest("[hidden]"))) {
+    throw new Error(`${filePath}: missing, duplicated, hidden or out-of-order static privacy sections`);
+  }
+  for (const [index, section] of sections.entries()) {
+    const nodes = [];
+    for (let node = headings[index].nextElementSibling; node && node !== headings[index + 1]; node = node.nextElementSibling) nodes.push(node);
+    const paragraphs = nodes.filter((node) => node.tagName === "P").map((node) => node.textContent);
+    const items = nodes.filter((node) => node.tagName === "UL").flatMap((node) => [...node.children].map((item) => item.textContent));
+    if (JSON.stringify(paragraphs) !== JSON.stringify(section.paragraphs ?? [])
+      || JSON.stringify(items) !== JSON.stringify(section.items ?? [])
+      || nodes.some((node) => node.closest("[hidden]") || node.querySelector("[hidden]"))) {
+      throw new Error(`${filePath}: missing, hidden or mismatched static privacy content: ${section.title}`);
+    }
+  }
+}
+
 async function main() {
 const { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonPathPublished } = await import("../src/app/publicServiceConfig.mjs");
 
@@ -632,8 +657,10 @@ const [koreanPages, englishPages] = await Promise.all([
 ]);
 for (const [language, pages] of [["ko", koreanPages], ["en", englishPages]]) {
   const filePath = path.join("dist", language, "privacy", "index.html");
-  assertStaticPrivacyRecipesHtml(await fs.readFile(filePath, "utf8"), {
-    ...JSON.parse(pages).privacy.cleanerRecipes,
+  const privacy = JSON.parse(pages).privacy;
+  assertStaticPrivacySectionsHtml(await fs.readFile(filePath, "utf8"), {
+    sections: privacy.sections,
+    cleanerRecipes: privacy.cleanerRecipes,
     filePath,
   });
 }
