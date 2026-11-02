@@ -284,5 +284,16 @@
     "selectPages": "Choose page images to edit",
     "limit": "Choose 1–50 page images. The ZIP file is not transferred.",
     "page": "Page {{page}}"
+  },
+  "personalization": {
+    "title": "Your tools",
+    "recent": "Recent tools",
+    "favorites": "Favorites",
+    "clear": "Clear",
+    "recentEmpty": "Tools you open will appear here.",
+    "favoritesEmpty": "Select the star on a tool to add it to your favorites.",
+    "addFavorite": "Add {{tool}} to favorites",
+    "removeFavorite": "Remove {{tool}} from favorites",
+    "unavailable": "This saved list is disabled because browser storage is unavailable."
   }
 }

@@ -26,7 +26,7 @@ try {
         assert.equal(await page.locator(".wl-hero-copy > p").innerText(), common.home.description);
         assert.equal(await page.getByTestId("home-dropzone").count(), 1);
         assert.equal(await page.locator(".home-how-grid > div").count(), 3);
-        assert.equal(await page.locator(".tool-grid > a").count(), language === "ko" ? 12 : 13);
+        assert.equal(await page.locator(".tool-grid a.ui-tool-card").count(), language === "ko" ? 12 : 13);
         const links = nav.locator("a"); assert.equal(await links.count(), 7);
         for (const link of await links.all()) {
           const id = await link.getAttribute("data-scenario-id");

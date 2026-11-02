@@ -1,3 +1,4 @@
+import { PERSONALIZATION_KEYS, personalization, toolIdForPersonalization } from "../app/personalization";
 import { purgeExpired } from "../app/persistentHandoff";
 import { FileDropProvider } from "./FileDropProvider";
 import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
@@ -316,6 +317,15 @@ export function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
   const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
+  const recentToolId = toolIdForPersonalization(normalizedPath);
+  useEffect(() => { if (recentToolId) personalization.record(recentToolId); }, [recentToolId]);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || (event.key === PERSONALIZATION_KEYS.recent || event.key === PERSONALIZATION_KEYS.favorites)) personalization.refresh();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
   const redactorActive = isRedactorPath(location.pathname);
   const redactorDocument = isRedactorDocument();
   useEffect(() => { if (import.meta.env.PROD && redactorActive !== redactorDocument) window.location.replace(window.location.href); }, [redactorActive, redactorDocument]);

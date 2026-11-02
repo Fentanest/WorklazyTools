@@ -9,7 +9,7 @@ import { normalizeToolsSearch, toolFilterValues } from "../app/publicService";
 import { useAppLanguage } from "../i18n/routing";
 import { trackToolOpen } from "../components/AnalyticsLoader";
 import { PrivacyBanner } from "../components/PrivacyBanner";
-import { ToolCard } from "../components/ToolCard";
+import { FavoriteToolButton, ToolCard } from "../components/ToolCard";
 import { getToolIconTone } from "../components/toolAccentStyles";
 import { PageHeader } from "../components/ui";
 import { useToolCatalog } from "../i18n/useToolCatalog";
@@ -134,7 +134,7 @@ export function ToolsPage() {
               <div className={view === "list" ? "tool-list" : "tool-grid all-tools-grid"} data-testid="tool-results" data-view={view}>
                 {categoryTools.map((tool) => {
                   const Icon = tool.icon;
-                  return view === "grid" ? <ToolCard key={tool.id} tool={tool} /> : <Link key={tool.id} to={tool.path} className="tool-list-row" data-ui-component="tool-card" onClick={() => trackToolOpen(tool.id, "tools_card", language)}><span className="tool-list-icon tone-icon-badge" data-icon-tone={getToolIconTone(tool.id)}><Icon size={22} aria-hidden="true" /></span><span><h3>{tool.title}</h3><p data-testid="tool-tagline">{tool.tagline}</p></span><ArrowRight size={18} aria-hidden="true" /></Link>;
+                  return view === "grid" ? <ToolCard key={tool.id} tool={tool} /> : <div key={tool.id} className="relative"><Link to={tool.path} className="tool-list-row" style={{ paddingRight: 64 }} data-ui-component="tool-card" onClick={() => trackToolOpen(tool.id, "tools_card", language)}><span className="tool-list-icon tone-icon-badge" data-icon-tone={getToolIconTone(tool.id)}><Icon size={22} aria-hidden="true" /></span><span><h3>{tool.title}</h3><p data-testid="tool-tagline">{tool.tagline}</p></span><ArrowRight size={18} aria-hidden="true" /></Link><FavoriteToolButton tool={tool} list /></div>;
                 })}
               </div>
             </section>

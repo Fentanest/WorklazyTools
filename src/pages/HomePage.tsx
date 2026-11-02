@@ -1,3 +1,4 @@
+import { personalization, usePersonalization } from "../app/personalization";
 import { ArrowRight, Download, ExternalLink, FileUp, LockKeyhole, MessageSquarePlus, ScanSearch, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -42,6 +43,7 @@ export function HomePage() {
   const { t } = useTranslation("common");
   const language = useAppLanguage();
   const { tools, toolCategories } = useToolCatalog();
+  const personal = usePersonalization();
   const scenarioLabels = new Map(tools.flatMap((tool) => tool.scenarioLabels.map(({ id, label }) => [id, label] as const)));
   
   const targetIds = language === "ko" ? HOME_TOOL_IDS_KO : HOME_TOOL_IDS_EN;
@@ -81,6 +83,23 @@ export function HomePage() {
           return <Link key={category.id} data-scenario-id={category.id} to={`${localizedPath(language, "/tools")}?category=${category.id}`}><Icon size={16} aria-hidden="true" />{scenarioLabels.get(category.id)}</Link>;
         })}</div>
       </nav>
+
+      <section className="home-section grid gap-4 md:grid-cols-2" aria-label={t("personalization.title")} data-testid="home-personalization">
+        {(["favorites", "recent"] as const).map(kind => <div key={kind} className="min-w-0 rounded-2xl border border-[var(--separator)] bg-card p-4">
+          <div className="flex min-h-11 items-center justify-between gap-2">
+            <h2 className="m-0 text-base font-bold">{t(`personalization.${kind}`)}</h2>
+            <button type="button" className="min-h-11 shrink-0 rounded-lg px-3 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-40" disabled={!personal[`${kind}Enabled`] || !personal[kind].length} onClick={() => personalization.clear(kind)}>{t("personalization.clear")}</button>
+          </div>
+          <div className="h-32 overflow-y-auto" data-personalization={kind}>
+            {!personal[`${kind}Enabled`] ? <p className="text-sm text-muted-foreground">{t("personalization.unavailable")}</p> : !personal[kind].length ? <p className="text-sm text-muted-foreground">{t(`personalization.${kind}Empty`)}</p> : <ul className="m-0 grid list-none gap-1 p-0">
+              {personal[kind].map(id => {
+                const tool = tools.find(item => item.id === id);
+                return tool ? <li key={id}><Link className="flex min-h-11 items-center justify-between gap-2 rounded-lg px-2 text-sm hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-[-2px]" to={tool.path}>{tool.title}<ArrowRight size={16} aria-hidden="true" /></Link></li> : null;
+              })}
+            </ul>}
+          </div>
+        </div>)}
+      </section>
 
       <section className="home-section">
         <div className="home-section-head">
