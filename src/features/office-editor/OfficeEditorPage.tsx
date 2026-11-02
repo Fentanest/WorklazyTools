@@ -11,12 +11,12 @@ import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { UtilityNotice, UtilityPage, UtilitySectionCard } from "../../components/UtilitySurface";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
-import { stagePendingOfficeFile } from "./pendingOfficeFile";
+import { openInOfficeEditor, OFFICE_EXTENSIONS } from "./openInOfficeEditor";
+import { PersistentHandoffError } from "../../app/persistentHandoff";
 import { OFFICE_DOWNLOAD_BYTES } from "./officeAssets";
 import { withSiteBasePath } from "../../app/siteBasePath";
 
 const OFFICE_ACCEPT = ".docx,.doc,.odt,.xlsx,.xls,.ods,.pptx,.ppt,.odp";
-const OFFICE_EXTENSIONS = new Set(["docx", "doc", "odt", "xlsx", "xls", "ods", "pptx", "ppt", "odp"]);
 
 export function OfficeEditorPage() {
  const language = useAppLanguage();
@@ -46,11 +46,12 @@ export function OfficeEditorPage() {
   setHandoffBusy(true);
   setHandoffError(undefined);
   try {
-   await stagePendingOfficeFile(file);
-   window.location.assign(appDocumentPath);
-  } catch {
+   await openInOfficeEditor(file, appDocumentPath);
+  } catch (error) {
    setHandoffBusy(false);
-   setHandoffError(L("브라우저에 파일을 임시 보관하지 못했습니다. 저장 공간을 허용한 뒤 다시 시도해 주세요.", "The file could not be held temporarily in this browser. Allow site storage and try again."));
+   setHandoffError(error instanceof PersistentHandoffError && error.code === "blocked"
+    ? L("다른 탭의 오피스 편집 화면을 닫은 뒤 다시 시도하세요.", "Close the Office editor in other tabs, then try again.")
+    : L("브라우저에 파일을 임시 보관하지 못했습니다. 저장 공간을 허용한 뒤 다시 시도해 주세요.", "The file could not be held temporarily in this browser. Allow site storage and try again."));
   }
  };
  return <UtilityPage toolId="office-editor">
