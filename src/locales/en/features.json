@@ -1,4 +1,8 @@
 {
+  "documentPdf": {
+    "timeout": "This document could not be converted to PDF. Open it in Word or LibreOffice and use Export as PDF. Reload the page before trying another file.",
+    "reload": "Reload page"
+  },
   "documentCompare": {
     "side": {
       "before": "before",
