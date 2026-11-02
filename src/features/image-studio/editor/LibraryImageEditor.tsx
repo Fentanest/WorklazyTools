@@ -14,6 +14,9 @@ import { BackgroundRemovalController, BgRemovalError, messages, type BgMode, typ
 import { actualShrinkNotice, classifyD6, draftD6Props, flattenWorkingSceneTarget } from './d6Policy';
 import { prepareImage, type PreparedImage } from './prepareImage';
 import { resizeResult } from './resizeResult';
+import { useImageSend } from './useImageSend';
+import { encodeSendImage } from './encodeSendImage';
+import type { ImageOutputFormat } from '../types';
 import type { PixelSize } from './d6Policy';
 import './libraryImageEditor.css';
 
@@ -31,6 +34,9 @@ const initialTool = (preset?: ImageDirectPreset) => preset?.purpose === 'mosaic'
 
 export default function LibraryImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: Props) {
   const { t, i18n } = useTranslation('features');
+  const { t: sendT } = useTranslation('common');
+  const { preparedSend, reason: sendReason, prepareAndSend, retryPrepared, downloadPrepared, invalidatePrepared, captureSendRevision } = useImageSend();
+  const [sendFormat, setSendFormat] = useState<ImageOutputFormat>('png');
   const language = i18n.language === 'en' ? 'en' : 'ko';
   const root = useRef<HTMLDivElement>(null);
   const [source, setSource] = useState<PreparedImage>();
@@ -42,7 +48,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [outputSize, setOutputSize] = useState<PixelSize>();
   const [ratioLocked, setRatioLocked] = useState(true);
   const documentRevision = useRef(0);
-  const pendingCommits = useRef<{ version: number; revision: number; destination: 'result' | 'batch' | 'download'; size?: PixelSize }[]>([]);
+  const pendingCommits = useRef<{ version: number; revision: number; destination: 'result' | 'batch' | 'download' | 'privacy' | 'pdf'; size?: PixelSize; sendFormat: ImageOutputFormat; sendRevision: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [hasTemplateInput, setHasTemplateInput] = useState(false);
@@ -69,7 +75,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const activeRef = useRef(active); activeRef.current = active;
   const onDirtyRef = useRef(onDirty); onDirtyRef.current = onDirty;
   const loadedAck = useRef<{ resolve: (ok: boolean) => void; version: number } | undefined>(undefined);
-  const destination = useRef<'result' | 'batch' | 'download'>('result');
+  const destination = useRef<'result' | 'batch' | 'download' | 'privacy' | 'pdf'>('result');
   const batchLock = useRef(false);
   const batchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const saving = useRef(false);
@@ -106,8 +112,8 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   }, [language, dismissPending]);
   useEffect(() => { if (!active) cancel(); }, [active, cancel]);
   useEffect(() => {
-    onDirtyRef.current(!!source || hasTemplateInput || dirty || loading || bgBusy || !!result);
-  }, [source, hasTemplateInput, dirty, loading, bgBusy, result]);
+    onDirtyRef.current(!!source || hasTemplateInput || dirty || loading || bgBusy || !!result || !!preparedSend);
+  }, [source, hasTemplateInput, dirty, loading, bgBusy, result, preparedSend]);
   useEffect(() => () => { version.current++; loadedAck.current?.resolve(false); clearTimeout(batchTimer.current); onDirtyRef.current(false); }, []);
   useEffect(() => {
     if (!result) { setResultUrl(undefined); return; }
@@ -119,10 +125,12 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] }); return () => observer.disconnect();
   }, []);
 
+  useEffect(() => { invalidatePrepared(); }, [sendFormat, outputSize?.width, outputSize?.height, invalidatePrepared]);
+
   const receive = async (file: File, context?: IntakeContext) => {
     if (!filterRasterImages([file]).length || context?.signal.aborted) return false;
     cancel(); const request = version.current;
-    setLoading(true); setError(''); setErrorCode(undefined); setNotice(''); setResult(undefined); setOutputSize(undefined);
+    invalidatePrepared(); setLoading(true); setError(''); setErrorCode(undefined); setNotice(''); setResult(undefined); setOutputSize(undefined);
     const abort = () => { if (request === version.current) cancel(); };
     context?.signal.addEventListener('abort', abort, { once: true });
     try {
@@ -184,7 +192,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     input.dispatchEvent(new Event('input', { bubbles: true }));
   };
   applyPresetRef.current = next => {
-    cancel(); setSelectedPreset(next); setResult(undefined);
+    cancel(); invalidatePrepared(); setSelectedPreset(next); setResult(undefined);
     const request = version.current;
     requestAnimationFrame(() => {
       if (request !== version.current || !activeRef.current) return;
@@ -212,7 +220,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     // Commit may apply a pending crop before this hook. Snapshot the resulting
     // revision and each request's destination/size before asynchronous encoding.
     if (path === 'commit') {
-      pendingCommits.current.push({ version: version.current, revision: documentRevision.current, destination: destination.current, size: outputSize });
+      pendingCommits.current.push({ version: version.current, revision: documentRevision.current, destination: destination.current, size: outputSize, sendFormat, sendRevision: captureSendRevision() });
       destination.current = 'result';
     }
     if (!hasConcealment || !['svg', 'json'].includes(format)) return 'proceed';
@@ -239,11 +247,18 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     if (!intent) return;
     const { version: request, revision, size: target } = intent;
     try {
-      const encoded = await resizeResult(blob, target);
+      let encoded = await resizeResult(blob, target);
+      const sending = intent.destination === 'privacy' || intent.destination === 'pdf';
+      if (sending) encoded = await encodeSendImage(encoded, intent.sendFormat);
       if (!activeRef.current || request !== version.current) return;
       if (revision !== documentRevision.current) { setNotice(t('image.library.resultChanged')); return; }
-      const file = new File([encoded], `${(sourceRef.current?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited.png`, { type: 'image/png' });
-      if (intent.destination === 'batch') onEditedResult(file);
+      const extension = encoded.type === 'image/jpeg' ? 'jpg' : encoded.type === 'image/webp' ? 'webp' : 'png';
+      const file = new File([encoded], `${(sourceRef.current?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited.${extension}`, { type: encoded.type });
+      if (sending) {
+        if (intent.destination === 'pdf' && intent.sendFormat === 'webp') return;
+        const ok = prepareAndSend({ receiverId: intent.destination === 'pdf' ? 'image-to-pdf' : 'image-privacy', entryPath: intent.destination === 'pdf' ? '/tools/pdf-converter/image-to-pdf' : '/tools/image-privacy', files:[file], origin:'generated', source:'image-studio' }, intent.sendRevision);
+        if (!ok) setNotice(t('image.library.resultChanged'));
+      } else if (intent.destination === 'batch') onEditedResult(file);
       else {
         setResultSize(undefined); setResult(file);
         if (intent.destination === 'download') {
@@ -266,7 +281,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     if (next[other] > edge) { next[axis] = Math.max(1, Math.round(next[axis] * edge / next[other])); next[other] = edge; }
     setOutputSize(next); setResult(undefined);
   };
-  const commit = (target: 'result' | 'batch' | 'download') => {
+  const commit = (target: 'result' | 'batch' | 'download' | 'privacy' | 'pdf') => {
     if (target === 'batch') {
       clearTimeout(batchTimer.current);
       batchTimer.current = setTimeout(() => { batchLock.current = false; setAdding(false); }, 600);
@@ -274,7 +289,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       batchLock.current = true; setAdding(true);
       if (batchCount >= 50) { setNotice(t('image.handoff.limit')); return; }
     }
-    if (saving.current || !loaded || loading || bgBusy) return;
+    if (saving.current || !loaded || loading || bgBusy || (target === 'pdf' && sendFormat === 'webp')) return;
     destination.current = target; saving.current = true;
     // The fork's public commit action owns export hooks and forced PNG encoding.
     const button = editorArea.current?.querySelector<HTMLButtonElement>('.asp-commit');
@@ -315,7 +330,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         // user file. Protect it and cancel any operation on the previous scene.
         if (input instanceof HTMLInputElement && input.type === 'file' && input.accept.includes('.json') && input.files?.length) {
           if (loading) { event.stopPropagation(); input.value = ''; setNotice(t('image.library.loading')); return; }
-          cancel(); setHasTemplateInput(true); setResult(undefined);
+          cancel(); invalidatePrepared(); setHasTemplateInput(true); setResult(undefined);
           setUnsavedWork('image-studio', { hasWork: true, kind: 'files', scopePath: '/tools/image-studio' });
         }
         // Route source replacement through the host's measured File-only import.
@@ -329,7 +344,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
           onImageLoaded={() => { if (generation !== latestGeneration.current) return; lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false); loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false); if (selectedPreset?.purpose === 'watermark') requestAnimationFrame(clearWatermarkDraft); }}
           onDirtyChange={value => { if (generation !== latestGeneration.current) return; setDirty(value); if (value) setResult(undefined); }}
-          onHistoryChange={() => { if (generation === latestGeneration.current) { documentRevision.current++; setResult(undefined); } }}
+          onHistoryChange={() => { if (generation === latestGeneration.current) { documentRevision.current++; invalidatePrepared(); setResult(undefined); } }}
           onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
             if (generation !== latestGeneration.current) return true;
             saving.current = false; destination.current = 'result'; pendingCommits.current = []; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);
@@ -340,6 +355,15 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="image-editor-result-actions">
         <Button variant="outline" type="button" data-testid="image-editor-add-to-batch" aria-disabled={adding} className={adding ? 'opacity-60' : ''} disabled={!loaded || loading || bgBusy} onClick={() => commit('batch')}>{t('image.handoff.add', { count: batchCount })}</Button>
         {batchNotice && <span role="status">{t(`image.handoff.${batchNotice}`)}</span>}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="image-editor-send-actions" data-prepared-send={!!preparedSend}>
+        <div role="group" aria-label={t('image.editor.format')} className="flex gap-1">
+          {(['png','jpeg','webp'] as const).map(format => <Button key={format} type="button" variant={sendFormat === format ? 'secondary' : 'outline'} aria-pressed={sendFormat === format} onClick={() => setSendFormat(format)}>{format === 'jpeg' ? 'JPG' : format === 'webp' ? 'WebP' : 'PNG'}</Button>)}
+        </div>
+        <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-privacy" disabled={!loaded || loading || bgBusy} onClick={() => commit('privacy')}>{sendT('sendTo.privacy')}</Button>
+        <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-pdf" disabled={sendFormat === 'webp' || !loaded || loading || bgBusy} aria-describedby={sendFormat === 'webp' ? 'image-send-webp-reason' : undefined} onClick={() => commit('pdf')}>{sendT('sendTo.imagePdf')}</Button>
+        {sendFormat === 'webp' && <p id="image-send-webp-reason" className="w-full text-sm text-muted-foreground">{sendT('sendTo.webp')}</p>}
+        {sendReason && preparedSend && <div role="alert" className="w-full"><p>{sendT('sendTo.failed')}</p><Button type="button" variant="outline" onClick={downloadPrepared}>{sendT('sendTo.download')}</Button><Button type="button" variant="outline" onClick={retryPrepared}>{sendT('sendTo.retry')}</Button></div>}
       </div>
       <div className="mt-3" data-testid="image-editor-export-action"><Button type="button" variant="outline" disabled={!loaded || loading || bgBusy} onClick={() => commit('download')}>{t('image.editor.download')}</Button></div>
       {result && resultUrl && <div className="mt-3 rounded-xl border border-border p-3" data-testid="image-editor-export-result" data-width={resultSize?.width} data-height={resultSize?.height}><div data-testid="image-editor-result">

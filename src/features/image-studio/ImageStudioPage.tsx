@@ -1,5 +1,5 @@
-import { useMemoryHandoff } from "../../components/AppShell";
 import type { HandoffInput } from "../../app/memoryHandoff";
+import { useImageSend } from "./editor/useImageSend";
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -270,12 +270,8 @@ interface EditorHistorySnapshot {
 }
 
 function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: { onEditedResult: (file: File) => void; batchCount: number; batchNotice?: "added" | "limit"; active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>; onDirty: (dirty: boolean) => void }) {
-  const sender = useMemoryHandoff();
   const { t: sendT } = useTranslation("common");
-  const [preparedSend, setPreparedSend] = useState<HandoffInput>();
-  const downloadPrepared = () => {
-    for (const file of preparedSend?.files ?? []) { const url = URL.createObjectURL(file); const anchor = document.createElement("a"); anchor.href = url; anchor.download = file.name; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
-  };
+  const { preparedSend, reason: sendReason, prepareAndSend, retryPrepared, downloadPrepared, invalidatePrepared } = useImageSend();
   const batchAddLock = useRef(false);
   const batchAddTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [addingToBatch, setAddingToBatch] = useState(false);
@@ -361,6 +357,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const mobilePanelLayout = useEditorMobilePanelLayout();
   mobilePanelLayoutRef.current = mobilePanelLayout;
   const effectivePanelCollapsed = panelCollapsed && !mobilePanelLayout;
+  useEffect(() => { invalidatePrepared(); }, [format, exportMode, exportDimensions.width, exportDimensions.height, exportRatioLocked, invalidatePrepared]);
   const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
   editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
   cropRatioRef.current = cropRatio;
@@ -541,6 +538,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   }, [updateFloatingOverlays]);
 
   const pushSnapshot = useCallback((immediate = false, reset = false) => {
+    invalidatePrepared();
     const save = () => {
       const instance = canvas.current;
       if (!instance || restoringRef.current) return;
@@ -571,7 +569,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     window.clearTimeout(snapshotTimerRef.current);
     if (immediate) save();
     else snapshotTimerRef.current = window.setTimeout(save, 80);
-  }, []);
+  }, [invalidatePrepared]);
 
   const syncSelectedObject = useCallback((object?: FabricObject) => {
     const role = object && (object as EditorFabricObject).worklazyRole;
@@ -1641,6 +1639,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   };
 
   const restore = async (index: number) => {
+    invalidatePrepared();
     const instance = canvas.current;
     const serialized = historyRef.current[index];
     if (!instance || !serialized) return;
@@ -1762,7 +1761,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         else {
           if (destination === "pdf" && actualFormat === "webp") return;
           const input: HandoffInput = { receiverId: destination === "pdf" ? "image-to-pdf" : "image-privacy", entryPath: destination === "pdf" ? "/tools/pdf-converter/image-to-pdf" : "/tools/image-privacy", files: [output], origin: "generated", source: "image-studio" };
-          setPreparedSend(input); protectImageInput(); sender.send(input);
+          prepareAndSend(input);
         }
       } else {
         const anchor = document.createElement("a");
@@ -1944,11 +1943,11 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         <Button type="button" variant="outline" className={cn("min-h-11 rounded-xl", addingToBatch && "opacity-60")} data-testid="image-editor-add-to-batch" aria-disabled={addingToBatch} disabled={loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("batch")}>{t("image.handoff.add", { count: batchCount })}</Button>
         <span role="status" data-testid="image-batch-notice" className="text-sm text-muted-foreground">{batchNotice ? t(`image.handoff.${batchNotice}`, { max: 50 }) : ""}</span>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2" data-testid="image-editor-send-actions">
+      <div className="mt-3 flex flex-wrap gap-2" data-testid="image-editor-send-actions" data-prepared-send={!!preparedSend}>
         <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-privacy" disabled={loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("privacy")}>{sendT("sendTo.privacy")}</Button>
         <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-pdf" disabled={format === "webp" || loadingImage || regionEffectBusy || stickerBusy} aria-describedby={format === "webp" ? "image-send-webp-reason" : undefined} onClick={() => exportImage("pdf")}>{sendT("sendTo.imagePdf")}</Button>
         {format === "webp" && <p id="image-send-webp-reason" className="w-full text-sm text-muted-foreground">{sendT("sendTo.webp")}</p>}
-        {sender.reason && preparedSend && <div role="alert" className="w-full"><p>{sendT("sendTo.failed")}</p><Button type="button" variant="outline" onClick={downloadPrepared}>{sendT("sendTo.download")}</Button><Button type="button" variant="outline" onClick={() => sender.send(preparedSend)}>{sendT("sendTo.retry")}</Button></div>}
+        {sendReason && preparedSend && <div role="alert" className="w-full"><p>{sendT("sendTo.failed")}</p><Button type="button" variant="outline" onClick={downloadPrepared}>{sendT("sendTo.download")}</Button><Button type="button" variant="outline" onClick={retryPrepared}>{sendT("sendTo.retry")}</Button></div>}
       </div>
       <div className="export-row image-editor-export-row mt-3.5 grid grid-cols-[minmax(260px,1fr)_minmax(230px,310px)] items-end gap-3 max-[620px]:grid-cols-1">
         <div className="image-editor-export-settings grid min-w-0 gap-3">

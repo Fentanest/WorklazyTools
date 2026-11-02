@@ -1607,7 +1607,7 @@
       "retryPerson": "Retry portrait mode",
       "retryReady": "Portrait mode selected. Press Remove background again.",
       "pngSize": "PNG result size",
-      "pngSizeHelp": "Applies to Create edited result and Add to batch. The Export menu uses the editor’s own output settings.",
+      "pngSizeHelp": "Applies to Create edited result, PNG download, Add to batch and Send-to. The Export menu uses the editor’s own output settings.",
       "keepRatio": "Keep aspect ratio",
       "autoSize": "Automatic size",
       "resultChanged": "The edit changed while the result was being prepared. Create the result again."
