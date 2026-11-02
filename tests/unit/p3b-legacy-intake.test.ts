@@ -12,18 +12,22 @@ function fixture(outcome: "ready" | "empty" | "throw") {
   const handle = (nodes.find(node => ts.isVariableDeclaration(node) && node.name.getText(source) === "handleFiles") as ts.VariableDeclaration).initializer!.getText(source);
   const call = nodes.find(node => ts.isCallExpression(node) && node.expression.getText(source) === "useHandoffReceiver") as ts.CallExpression;
   const adapter = call.arguments[1] as ts.ObjectLiteralExpression;
-  const invalidate = (adapter.properties.find(node => ts.isPropertyAssignment(node) && node.name.getText(source) === "invalidate") as ts.PropertyAssignment).initializer.getText(source);
+  const invalidateNode = (adapter.properties.find(node => ts.isPropertyAssignment(node) && node.name.getText(source) === "invalidate") as ts.PropertyAssignment).initializer;
+  const invalidate = ts.isIdentifier(invalidateNode)
+    ? (nodes.find(node => ts.isVariableDeclaration(node) && node.name.getText(source) === invalidateNode.text) as ts.VariableDeclaration).initializer!.getText(source)
+    : invalidateNode.getText(source);
   const input = new File(["xls"], "incoming.xls"), generation = { current: 0 }, rollback = { current: null as any };
-  let entries: any[] = [], cleared = 0, finish!: () => void;
+  let entries: any[] = [], cleared = 0, error: string | null = "previous error", finish!: () => void;
   const pending = new Promise<void>(resolve => { finish = resolve; });
   const context: Record<string, any> = { intakeGeneration: generation, handoffRollback: rollback, entries, precisionPreparing: false,
-    fileKey: (file: File) => file.name, SUPPORTED_EXTENSIONS: new Set(["xls"]), createFileId: () => "incoming", setFileNotice() {}, setError() {},
+    fileKey: (file: File) => file.name, SUPPORTED_EXTENSIONS: new Set(["xls"]), createFileId: () => "incoming", setFileNotice() {}, setError(value: string | null) { error = value; },
+    precisionControllerRef: { current: undefined }, setPrecisionPreparing() {}, operation: { reset() {} },
     setEntries: (fn: Function) => { entries = fn(entries); }, clearResult: () => { cleared++; },
     preserveLegacyXls: true, getExtension: () => "xls", requiresLegacySpreadsheetConversion: async () => true,
-    prepareLegacyInputs: async (additions: any[]) => { await pending; if (outcome === "throw") throw Error("fixture failure"); return outcome === "ready" ? additions.map(entry => entry.file) : []; },
+    prepareLegacyInputs: async (additions: any[]) => { await pending; if (outcome === "throw") throw Error("fixture failure"); if (outcome === "empty") error = "legacy preparation failed"; return outcome === "ready" ? additions.map(entry => entry.file) : []; },
   };
   vm.runInNewContext(ts.transpileModule(`globalThis.api={receive:(${handle}),invalidate:(${invalidate})}`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context);
-  return { input, generation, rollback, finish, receive: context.api.receive, invalidate: context.api.invalidate, entries: () => entries, cleared: () => cleared };
+  return { input, generation, rollback, finish, receive: context.api.receive, invalidate: context.api.invalidate, entries: () => entries, cleared: () => cleared, error: () => error };
 }
 for (const outcome of ["ready", "empty", "throw"] as const) test(`P3b legacy ${outcome} completion releases only its rollback; late invalidate preserves inputs`, async () => {
   const f = fixture(outcome), abort = new AbortController();
@@ -33,6 +37,7 @@ for (const outcome of ["ready", "empty", "throw"] as const) test(`P3b legacy ${o
   assert.ok(f.rollback.current); f.finish(); await checked;
   assert.equal(f.rollback.current, null); abort.abort(); f.invalidate();
   assert.equal(f.entries()[0].file, f.input); assert.equal(f.cleared(), outcome === "ready" ? 1 : 0);
+  assert.equal(f.error(), outcome === "ready" ? null : outcome === "empty" ? "legacy preparation failed" : "previous error");
 });
 test("P3b pending legacy abort retains rollback until invalidate removes only its additions", async () => {
   const f = fixture("empty"), abort = new AbortController();
