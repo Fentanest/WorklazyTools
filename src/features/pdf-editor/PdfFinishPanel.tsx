@@ -289,14 +289,17 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
    * via the normal inspection path and acks only on inspection success.
    */
   handoffIntake?: { blob: Blob; name: string; generation: number; attempt: number } | null;
-  onHandoffAccepted?: (generation: number) => void;
+  onHandoffAccepted?: (generation: number, attempt: number) => void;
   /**
-   * G3-2: reports whether the intake failure implicates the shared pdfjs
-   * runtime (worker/module unloadable) as opposed to bad content. Only the
-   * former can poison the module and justify spending a fresh epoch on
-   * retry; unknown failures default to true (previous behavior).
+   * G3-2/G4-2: reports the completed intake inspection's failure, bound to
+   * the exact (generation, attempt) that ran it, plus whether the failure
+   * implicates the shared pdfjs runtime (worker/module unloadable) as
+   * opposed to bad content. Only the former can poison the module and
+   * justify spending a fresh epoch on retry. Unknown shapes count as
+   * content: every completed inspection notifies exactly once, so nothing
+   * hangs in silence.
    */
-  onHandoffFailed?: (generation: number, isWorkerFailure: boolean) => void;
+  onHandoffFailed?: (generation: number, attempt: number, isWorkerFailure: boolean) => void;
   /** Localized organize path for [① 정리로 돌아가기]. */
   organizePath?: string;
   /**
@@ -456,6 +459,9 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     executionOwnerRef.current += 1;
     controllerRef.current?.abort();
     fileLifecycleControllerRef.current?.abort();
+    // G4-1: invalidate in-flight inspections so a late completion cannot
+    // commit or notify after unmount (leave/discard paths rely on this).
+    fileRequestRef.current += 1;
     if (fileRef.current) void releasePdf(fileRef.current);
   }, []);
 
@@ -589,7 +595,14 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     }
   }, []);
 
-  const replaceFile = async (incoming: File[]) => {
+  // G4-1/G4-2: request id of the in-flight intake inspection (null when the
+  // latest request is not an intake or has settled). Both handoff signals are
+  // emitted from the completion of exactly this request, never inferred from
+  // render state, so an earlier attempt's error/inspecting cannot leak into a
+  // newer attempt.
+  const pendingIntakeRequestRef = useRef<number | null>(null);
+
+  const replaceFile = async (incoming: File[], intake?: { generation: number; attempt: number }) => {
     if (!incoming.length) return;
     if (incoming.some((next) => !/\.pdf$/iu.test(next.name) && next.type !== "application/pdf")) {
       setError(copy.invalidFile);
@@ -597,6 +610,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     }
     const requestId = fileRequestRef.current + 1;
     fileRequestRef.current = requestId;
+    pendingIntakeRequestRef.current = intake ? requestId : null;
     executionOwnerRef.current += 1;
     fileLifecycleControllerRef.current?.abort();
     controllerRef.current?.abort();
@@ -624,6 +638,9 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
         inspectedSources.push({ key: createLocalId("finish-source"), file: next, pageCount: inspected.pageCount });
       }
       const first = inspectedSources[0];
+      // G4-1: re-check ownership right before committing: a discard, leave,
+      // or newer request may have invalidated this run after its last await.
+      if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
       if (previous && !retainPrimary) void releasePdf(previous);
       fileRef.current = first.file;
       setFile(first.file);
@@ -631,16 +648,31 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
       setFileKey(first.key);
       setPageCount(first.pageCount);
       if (!retainPrimary) { setRangeText(`1-${first.pageCount}`); setParity("all"); }
+      if (intake) {
+        // Ack only after this exact intake request inspected successfully.
+        // Order (plan §4.1): finish protection first (direct registry write),
+        // then the ack, which lets the parent release the result guard.
+        pendingIntakeRequestRef.current = null;
+        setUnsavedWork("pdf-finish", {
+          hasWork: true,
+          kind: "files",
+          scopePath: "/tools/pdf-editor/finish",
+          safePaths: [...PDF_FINISH_SAFE_PATHS],
+          messageKey: "pdf.messages.PdfEditorPage.unsavedFinish",
+        });
+        onHandoffAccepted?.(intake.generation, intake.attempt);
+      }
     } catch (reason) {
       if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
-      // G3-2: remember whether THIS failure implicates the shared runtime.
-      // Only the pending intake's own bytes count; other batches re-decide.
-      const failedFirst = incoming[0];
-      const expected = intakeFileRef.current;
-      if (expected && failedFirst && failedFirst.name === expected.name && failedFirst.size === expected.size) {
-        // Structural (not instanceof): the preview module may be duplicated
-        // across lazy chunks, but the failure shape still classifies.
-        intakeFailedWorkerRef.current = isWorkerSetupFailure(reason);
+      if (intake) {
+        // G4-2: the failure of this completed intake request, bound to its
+        // own (generation, attempt). Every completed intake inspection
+        // notifies exactly once; unknown shapes classify as content (no
+        // epoch), so nothing waits in silence. Structural classification
+        // (not instanceof): the preview module may be duplicated across lazy
+        // chunks, but the failure shape still classifies.
+        pendingIntakeRequestRef.current = null;
+        onHandoffFailed?.(intake.generation, intake.attempt, isWorkerSetupFailure(reason));
       }
       setError(inspectionErrorMessage(reason, language, copy));
       for (const next of incoming) if (!retainedSources.has(next)) await releasePdf(next);
@@ -685,44 +717,29 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
   // treating the aborted run as consumed leaves the intake empty forever.
   // Superseded runs exit silently through the fileRequestRef generation
   // check inside replaceFile, so re-running is always safe.
-  const intakeAckedRef = useRef<number | null>(null);
-  const intakeFailedRef = useRef<number | null>(null);
-  const intakeFileRef = useRef<{ name: string; size: number } | null>(null);
-  // G3-2: whether the latest intake failure implicates the shared runtime
-  // (reset-worthy) or the content (reset-futile). Unknown defaults to worker
-  // (previous behavior) at the call site.
-  const intakeFailedWorkerRef = useRef<boolean | null>(null);
   useEffect(() => {
-    if (!handoffIntake) return;
-    intakeAckedRef.current = null;
-    intakeFailedRef.current = null;
-    intakeFailedWorkerRef.current = null;
-    intakeFileRef.current = { name: handoffIntake.name, size: handoffIntake.blob.size };
-    void replaceFile([new File([handoffIntake.blob], handoffIntake.name, { type: "application/pdf" })]);
+    if (!handoffIntake) {
+      // G4-1: the intake was withdrawn (discard/back/accepted). If its
+      // inspection is still in flight, invalidate it so a late completion
+      // can neither commit nor notify, and drop the pending inspection flag
+      // so the finish guard does not stick on. A settled request (e.g. an
+      // acked intake whose file is now live) is left alone: its lifecycle
+      // signal drives the committed file's preview.
+      if (pendingIntakeRequestRef.current !== null && pendingIntakeRequestRef.current === fileRequestRef.current) {
+        pendingIntakeRequestRef.current = null;
+        fileRequestRef.current += 1;
+        fileLifecycleControllerRef.current?.abort();
+        fileLifecycleControllerRef.current = undefined;
+        setInspecting(false);
+      }
+      return;
+    }
+    void replaceFile(
+      [new File([handoffIntake.blob], handoffIntake.name, { type: "application/pdf" })],
+      { generation: handoffIntake.generation, attempt: handoffIntake.attempt },
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handoffIntake]);
-  useEffect(() => {
-    if (!handoffIntake || inspecting || !file || pageCount === 0 || error) return;
-    if (intakeAckedRef.current === handoffIntake.generation) return;
-    const expected = intakeFileRef.current;
-    if (!expected || file.name !== expected.name || file.size !== expected.size) return;
-    intakeAckedRef.current = handoffIntake.generation;
-    setUnsavedWork("pdf-finish", {
-      hasWork: true,
-      kind: "files",
-      scopePath: "/tools/pdf-editor/finish",
-      safePaths: [...PDF_FINISH_SAFE_PATHS],
-      messageKey: "pdf.messages.PdfEditorPage.unsavedFinish",
-    });
-    onHandoffAccepted?.(handoffIntake.generation);
-  }, [handoffIntake, inspecting, file, pageCount, error, onHandoffAccepted]);
-  useEffect(() => {
-    if (!handoffIntake || inspecting || !error) return;
-    if (intakeFailedRef.current === handoffIntake.attempt) return;
-    intakeFailedRef.current = handoffIntake.attempt;
-    onHandoffFailed?.(handoffIntake.generation, intakeFailedWorkerRef.current ?? true);
-  }, [handoffIntake, inspecting, error, onHandoffFailed]);
-
   const backToOrganizePath = organizePath ?? localizedPath(language, "/tools/pdf-editor");
   const backToOrganize = () => {
     requestGuardedNavigate(backToOrganizePath, () => {

@@ -13,7 +13,7 @@ import { ToolReady } from "../../components/RouteErrorBoundary";
 import { useGuardedNavigate } from "../../components/AppShell";
 import { holdAutoReload, release } from "../../app/chunkRecovery";
 import { clearUnsavedWork, grantOneShotSafeTarget, isDevTestEnvironment, setUnsavedWork } from "../../app/toolState";
-import { isPdfWorkerLoadable, resetPdfDisplayModule } from "./pdfPreview";
+import { resetPdfDisplayModule } from "./pdfPreview";
 import { featureMessage, featureResource } from "../../i18n/featureMessages";
 import { localizedPath, stripLanguagePrefix } from "../../i18n/languages";
 import { useAppLanguage } from "../../i18n/routing";
@@ -401,6 +401,12 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
   const failedAttemptRef = useRef<number | null>(null);
   failedAttemptRef.current = failedAttempt;
   const failedKindRef = useRef<"worker" | "content" | null>(null);
+  // G4-1: at most one intake insert in flight. Set synchronously when an
+  // insert starts, cleared only when that insert settles (ack/failure/ack
+  // deadline), is discarded, or its host unmounts. A second click while set is ignored
+  // (and the button is disabled) so rapid retries cannot stack attempts,
+  // holds, timers, or epochs on one handoff.
+  const insertInFlightRef = useRef(false);
   // G3-2: epoch cap reached — in-page recovery is impossible (the poisoned
   // module cannot be replaced), so offer the explicit reload path instead
   // of a futile retry. The result stays guarded + downloadable throughout.
@@ -440,6 +446,10 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
       const current = handoffSlot;
       if (current && current.generation === generation && current.attempt === attempt) {
         releaseHold();
+        // The deadline expired this insert's ownership of the retry control:
+        // a retry now supersedes it (the panel invalidates the older request,
+        // and no epoch is spent because no failure was classified).
+        insertInFlightRef.current = false;
         setTimedOut(true);
       }
     }, ackTimeoutMs());
@@ -484,6 +494,7 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
       if (slot.auto) {
         slot.auto = false;
         setAdoptKind("auto");
+        insertInFlightRef.current = true;
         setIntake({ blob: slot.blob, name: slot.name, generation: slot.generation, attempt: slot.attempt });
         armAckTimerFor(slot.generation, slot.attempt);
       } else {
@@ -496,7 +507,9 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
       armedTimerRef.current.attempt === slot.attempt
     ) {
       // StrictMode re-setup cleared the first timer while the same intake
-      // is still pending: re-arm its deadline (F1).
+      // is still pending: re-arm its deadline (F1). The intake is still in
+      // flight, so keep the single-flight mark (the cleanup just cleared it).
+      insertInFlightRef.current = true;
       armAckTimerFor(slot.generation, slot.attempt);
     }
     return () => {
@@ -506,6 +519,9 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
         window.clearTimeout(ackTimerRef.current);
         ackTimerRef.current = undefined;
       }
+      // G4-1: an unmounted host cannot settle anything; drop the in-flight
+      // mark so a late completion cannot act through it.
+      insertInFlightRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -539,10 +555,11 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slotTick, intake, timedOut, failedAttempt, boundaryKey, resultSaved]);
 
-  const handleAccepted = useCallback((generation: number) => {
+  const handleAccepted = useCallback((generation: number, attempt: number) => {
     const slot = handoffSlot;
-    // A stale ack (generation mismatch) must not move the protection.
-    if (!slot || slot.generation !== generation) return;
+    // A stale ack (superseded generation/attempt) must not move the protection.
+    if (!slot || slot.generation !== generation || slot.attempt !== attempt) return;
+    insertInFlightRef.current = false;
     clearAckTimer();
     // Order (plan §4.1): finish true (set by the panel) -> ack -> result false.
     setUnsavedWork("pdf-result", { hasWork: false, ...RESULT_GUARD });
@@ -556,9 +573,12 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     setSlotTick((tick) => tick + 1);
   }, []);
 
-  const handleFailed = useCallback((generation: number, isWorkerFailure: boolean) => {
+  const handleFailed = useCallback((generation: number, attempt: number, isWorkerFailure: boolean) => {
     const slot = handoffSlot;
-    if (!slot || slot.generation !== generation) return;
+    // Bind the notification to the completed inspection: a stale failure
+    // (superseded generation/attempt) must not move anything.
+    if (!slot || slot.generation !== generation || slot.attempt !== attempt) return;
+    insertInFlightRef.current = false;
     clearAckTimer();
     // The result stays; hold is released; the chip offers retry/download.
     releaseHold();
@@ -566,57 +586,53 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     // (reset-futile) failed, so retry spends a fresh epoch only when the
     // former could actually be poisoned.
     failedKindRef.current = isWorkerFailure ? "worker" : "content";
+    failedAttemptRef.current = slot.attempt;
     setFailedAttempt(slot.attempt);
     setSlotTick((tick) => tick + 1);
   }, []);
 
   const requestInsert = useCallback(() => {
-    void (async () => {
-      const slot = handoffSlot;
-      if (!slot || reloadRequiredRef.current) return;
-      // G3-2: a failed attempt may have poisoned the pdfjs module (worker
-      // failure disables workers page-wide); reset it before re-inspecting —
-      // but only when the failure implicates the runtime. Content failures
-      // (corrupt/encrypted bytes) must not burn epochs, and a fresh epoch is
-      // only worth spending while the worker is actually reachable (otherwise
-      // the preflight fails fast with no poisoning and no accumulation).
-      if (failedAttemptRef.current !== null && failedKindRef.current !== "content") {
-        let reachable = false;
-        try {
-          reachable = await isPdfWorkerLoadable();
-        } catch {
-          reachable = false;
-        }
-        if (reachable && !resetPdfDisplayModule()) {
-          // G3-2 cap: no fresh runtime is available in-page. Stop here with
-          // explicit reload guidance instead of a dead retry loop. The guard
-          // effect below keeps the result protected until download/reload.
-          clearAckTimer();
-          setReloadRequired(true);
-          setSlotTick((tick) => tick + 1);
-          return;
-        }
-      }
-      // F1: bump the attempt first, then arm the deadline bound to the new
-      // attempt — an old arm must never outlive the handoff it was made for.
-      slot.attempt += 1;
-      slot.auto = false;
-      // R1: (re)inserting re-acquires the hold and a fresh ack deadline —
-      // the intake window is protected again until ack / failure / timeout.
-      acquireHold();
-      armAckTimerFor(slot.generation, slot.attempt);
-      setTimedOut(false);
-      setFailedAttempt(null);
-      failedKindRef.current = null;
-      setReloadRequired(false);
-      setIntake({ blob: slot.blob, name: slot.name, generation: slot.generation, attempt: slot.attempt });
+    const slot = handoffSlot;
+    // G4-1: single flight — an in-flight insert owns the handoff until it
+    // settles. Synchronous check-and-set: no await between here and the
+    // insert below, so rapid clicks cannot stack attempts/holds/timers.
+    if (!slot || reloadRequiredRef.current || insertInFlightRef.current) return;
+    // G3-2: a failed attempt may have poisoned the pdfjs module (worker
+    // failure disables workers page-wide); reset it before re-inspecting —
+    // but only when the failure implicates the runtime. Content failures
+    // (corrupt/encrypted bytes) must not burn epochs; the cap refuses a
+    // fresh runtime with explicit reload guidance instead of a dead retry.
+    if (failedAttemptRef.current !== null && failedKindRef.current !== "content" && !resetPdfDisplayModule()) {
+      // G3-2 cap: no fresh runtime is available in-page. Stop here with
+      // explicit reload guidance instead of a dead retry loop. The guard
+      // effect below keeps the result protected until download/reload.
+      clearAckTimer();
+      setReloadRequired(true);
       setSlotTick((tick) => tick + 1);
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    })();
+      return;
+    }
+    insertInFlightRef.current = true;
+    // F1: bump the attempt first, then arm the deadline bound to the new
+    // attempt — an old arm must never outlive the handoff it was made for.
+    slot.attempt += 1;
+    slot.auto = false;
+    // R1: (re)inserting re-acquires the hold and a fresh ack deadline —
+    // the intake window is protected again until ack / failure / timeout.
+    acquireHold();
+    armAckTimerFor(slot.generation, slot.attempt);
+    setTimedOut(false);
+    failedAttemptRef.current = null;
+    setFailedAttempt(null);
+    failedKindRef.current = null;
+    setReloadRequired(false);
+    setIntake({ blob: slot.blob, name: slot.name, generation: slot.generation, attempt: slot.attempt });
+    setSlotTick((tick) => tick + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const discardSlot = useCallback(() => {
     clearAckTimer();
+    insertInFlightRef.current = false;
     handoffSlot = null;
     setIntake(null);
     setFailedAttempt(null);
@@ -655,6 +671,7 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
       return null;
     }
     clearAckTimer();
+    insertInFlightRef.current = false;
     releaseHold();
     setIntake(null);
     setFailedAttempt(null);
@@ -698,7 +715,7 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
               </Button>
             ) : (
               (failedAttempt !== null || timedOut || !intake) && (
-                <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs font-bold" data-testid="pdf-handoff-retry" onClick={requestInsert}>
+                <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs font-bold" data-testid="pdf-handoff-retry" onClick={requestInsert} disabled={!!intake && failedAttempt === null && !timedOut}>
                   {isSuggestion
                     ? featureMessage(language, "pdf.finish.suggestionInsert")
                     : featureMessage(language, "pdf.messages.PdfEditorPage.retryIntake")}

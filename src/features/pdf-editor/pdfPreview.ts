@@ -61,9 +61,6 @@ export async function openOwnedPdfDocument(
   throwIfAborted(signal, "PDF loading cancelled");
   let pdfDisplayModule: PdfDisplayModule;
   try {
-    if (!(await waitWithAbort(isPdfWorkerLoadable(signal), signal))) {
-      throw new PdfDisplayLoadError(featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable"));
-    }
     pdfDisplayModule = await waitWithAbort(loadPdfDisplayModule(), signal);
   } catch (error) {
     if (signal?.aborted || error instanceof DOMException && error.name === "AbortError") throw error;
@@ -112,37 +109,17 @@ const thumbnailRenderQueue: Array<() => void> = [];
 const THUMBNAIL_RENDER_CONCURRENCY = 3;
 let activeThumbnailRenders = 0;
 
-/**
- * G3-1: probe the exact worker script the pdfjs loader will fetch, with a
- * plain GET. A HEAD probe rejects runnable setups (403/abort/offline SW
- * without HEAD handling) while missing real GET failures; the GET result
- * matches what getDocument itself would hit, so failing here means the
- * worker genuinely cannot load (no false rejection) and proceeding would
- * only poison the shared module. Unreachability returns false (callers
- * raise PdfDisplayLoadError); only aborts throw.
- */
-export async function isPdfWorkerLoadable(signal?: AbortSignal): Promise<boolean> {
-  try {
-    if (typeof location === "undefined" || !/^https?:$/.test(location.protocol)) return true;
-  } catch {
-    return true;
-  }
-  try {
-    const response = await fetch(pdfWorkerUrl, { signal });
-    return response.ok;
-  } catch (error) {
-    if (signal?.aborted || (error instanceof DOMException && error.name === "AbortError")) throw error;
-    return false;
-  }
-}
+// G3-1/G4-2: no network preflight. The fetch status of the worker script
+// is not the same as the module runtime state (cached/ready runtimes run fine
+// offline; a passing probe does not prevent a later in-flight failure), so a
+// probe can only wrongly reject runnable PDFs or add per-file cost. Run the
+// real loader and classify the outcome instead: only a worker setup failure
+// implicates the shared runtime (see isWorkerSetupFailure).
 
 export async function getPdfDocument(file: File, language: AppLanguage = "ko", signal?: AbortSignal) {
   throwIfAborted(signal, "PDF loading cancelled");
   const cached = documentCache.get(file);
   if (cached) return waitWithAbort(cached.promise, signal);
-  if (!(await waitWithAbort(isPdfWorkerLoadable(signal), signal))) {
-    throw new PdfDisplayLoadError(featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable"));
-  }
   let pdfDisplayModule: PdfDisplayModule;
   try {
     pdfDisplayModule = await waitWithAbort(loadPdfDisplayModule(), signal);
@@ -824,6 +801,14 @@ function normalizePdfOpenError(error: unknown, language: AppLanguage) {
   }
   if (error instanceof Error && /password|encrypted/i.test(error.message)) {
     return new Error(featureMessage(language, "pdf.messages.pdfPreview.thisPdfIsPasswordProtectedTryAgainWith"));
+  }
+  // Without a network preflight, a worker outage surfaces here as a raw
+  // fake-worker/import failure. Report it as the display-files failure it is
+  // (connection/reload guidance, worker classification) instead of telling
+  // the user to check a healthy file.
+  if (error instanceof PdfDisplayLoadError) return error;
+  if (isWorkerSetupFailure(error)) {
+    return new PdfDisplayLoadError(featureMessage(language, "pdf.messages.pdfPreview.displayFilesUnavailable"));
   }
   return error instanceof Error ? error : new Error(featureMessage(language, "pdf.messages.pdfPreview.unableToOpenThePdfFile"));
 }

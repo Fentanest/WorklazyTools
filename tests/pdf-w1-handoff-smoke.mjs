@@ -147,6 +147,29 @@ async function downloadAndParse(page, clickFn, label, expectedPages) {
   return { savePath, bytes: bytes.length };
 }
 
+// Wait until the observed pdfjs epoch-URL set grows past a size (proves a
+// retry's reset actually ran). Deterministic single-flight pacing: each
+// committed retry mints exactly one epoch.
+async function waitEpochs(epochUrls, size, timeout = 30000) {
+  const start = Date.now();
+  for (;;) {
+    if (epochUrls.size >= size) return;
+    if (Date.now() - start > timeout) throw new Error(`epoch URLs stuck at ${epochUrls.size}, wanted ${size}`);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
+// Wait until a node-side condition holds (for cross-context signals such as
+// a request route flipping a local flag, which page.evaluate cannot see).
+async function waitForTrue(check, timeout = 60000) {
+  const start = Date.now();
+  for (;;) {
+    if (await check()) return;
+    if (Date.now() - start > timeout) throw new Error("waitForTrue timed out");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
+
 async function run() {
   const browser = await launch();
   // W1_SKIP="case-substring,...": skip matching cases (used for the normal
@@ -458,8 +481,11 @@ async function run() {
       await context.close();
     }
 
-    // R1/F4: real corrupt intake bytes fail the inspection; hold is released,
-    // the valid result stays downloadable; un-corrupting + retry acks.
+    // R1/F4/G4-2: real corrupt intake bytes fail the inspection with a
+    // *content* failure (same byte length so the intake identity still
+    // matches, but invalid PDF magic): no epoch is minted no matter how
+    // often it retries, and no reload guidance appears. The valid result
+    // stays downloadable; un-corrupting + retry acks.
     if (!skipCase("R1-corrupt-intake-failure-retry")) {
       const { page, context } = await newPage(browser, { noCache: true });
       await context.addInitScript(() => { globalThis.__w1corruptIntake = true; });
@@ -469,10 +495,14 @@ async function run() {
         let body = await response.text();
         const next = body.replace(
           /new File\(\[\s*([A-Za-z_$][\w$]*)\.blob\s*\]\s*,\s*\1\.name/,
-          "new File([globalThis.__w1corruptIntake?\"NOT-A-PDF\":$1.blob],$1.name",
+          "new File([globalThis.__w1corruptIntake?new Uint8Array($1.blob.size):$1.blob],$1.name",
         );
         if (next !== body) patched += 1;
         await route.fulfill({ response, body: next });
+      });
+      const epochUrls = new Set();
+      page.on("request", (request) => {
+        if (/w1-pdfjs=/.test(request.url())) epochUrls.add(request.url());
       });
       const navigations = [];
       page.on("request", (request) => {
@@ -486,6 +516,16 @@ async function run() {
       const failed = await page.locator("[data-testid='pdf-handoff-chip'] p").innerText();
       assert.match(failed, /could not accept|받지 못했습니다/);
       assert.equal(await readUnload(page), true, "R1: failed intake keeps the result guarded");
+      // Content failures must never spend epochs nor demand a reload, no
+      // matter how often retry is pressed.
+      for (let i = 0; i < 3; i += 1) {
+        await page.locator("[data-testid='pdf-handoff-retry']").click();
+        await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 30000 });
+        await page.waitForTimeout(1500);
+      }
+      assert.equal(epochUrls.size, 0, `G4-2: corrupt retries must not mint epochs (saw ${epochUrls.size})`);
+      assert.equal(await page.locator("[data-testid='pdf-handoff-reload']").count(), 0, "G4-2: no reload guidance for content failures");
+      assert.equal(await page.locator("[data-testid='pdf-display-reload']").count(), 0, "G4-2: content failures do not read as display-files failures");
       // The retained slot bytes are still the valid merged PDF.
       await downloadAndParse(page, () => page.locator("[data-testid='pdf-handoff-download']").click(), "R1-corrupt-intake", 2);
       await waitUnload(page, false); // R1: downloading the retained result counts as saved
@@ -503,9 +543,9 @@ async function run() {
       await context.close();
     }
 
-    // F4/G3-2a: blocked-worker retries must not accumulate pdfjs runtimes.
-    // The GET preflight fails before touching pdfjs, so no epoch is minted
-    // while the worker is down; recovery after unblock mints exactly one.
+    // F4/G4-1: blocked-worker retries each mint exactly one epoch (bounded,
+    // one per committed retry — no preflight, so every worker failure goes
+    // through the kind-gated reset). Single-flight pacing via epoch counts.
     if (!skipCase("F4-no-epoch-accumulation")) {
       const { page, context } = await newPage(browser, { noCache: true, timeoutMs: 120000 });
       const cdp = await context.newCDPSession(page);
@@ -520,6 +560,9 @@ async function run() {
       blockWorker = true;
       await clickHandoff(page);
       await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 120000 });
+      // Without a preflight the raw loader failure must still read as a
+      // display-files (connection/reload) failure, not as a bad file.
+      await page.locator("[data-testid='pdf-display-reload']").waitFor({ timeout: 30000 });
       const heapUsed = async () => {
         try {
           await cdp.send("HeapProfiler.collectGarbage");
@@ -532,10 +575,11 @@ async function run() {
       const heapBefore = await heapUsed();
       for (let i = 0; i < 5; i += 1) {
         await page.locator("[data-testid='pdf-handoff-retry']").click();
-        await page.waitForTimeout(650);
+        await waitEpochs(epochUrls, i + 1);
         await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 30000 });
+        await page.waitForTimeout(2000);
       }
-      assert.equal(epochUrls.size, 0, `F4: blocked retries must not mint pdfjs epochs (saw ${epochUrls.size})`);
+      assert.equal(epochUrls.size, 5, `F4: five blocked retries mint five epochs, no more (saw ${epochUrls.size})`);
       await cdp.send("HeapProfiler.collectGarbage").catch(() => undefined);
       const heapAfter = await heapUsed();
       blockWorker = false;
@@ -546,14 +590,16 @@ async function run() {
         { timeout: 120000 },
       );
       assert.equal(await page.locator("[data-testid='pdf-handoff-chip']").count(), 0, "F4: recovery after unblock acks");
-      assert.equal(epochUrls.size, 1, `F4: recovery mints exactly one fresh epoch (saw ${epochUrls.size})`);
+      assert.equal(epochUrls.size, 6, `F4: recovery mints exactly one fresh epoch (saw ${epochUrls.size})`);
       results.push({ case: "F4-no-epoch-accumulation", epochModuleUrls: [...epochUrls], heapBefore, heapAfter });
       await context.close();
     }
 
-    // G3-1: a HEAD-blocked worker script must not reject a runnable PDF.
-    // The GET probe uses the same URL the loader fetches, so blocking HEAD
-    // alone changes nothing: the intake still opens.
+    // G3-1: HEAD-blocking the worker script must not matter at all — there is
+    // no network preflight anymore; the real loader decides. The intake
+    // opens exactly as if nothing were blocked. (The offline+warmed-module
+    // variant needs a main-thread module-map warm-up that only direct
+    // module calls can do, so it lives in the dev evidence script instead.)
     if (!skipCase("G3-1-head-blocked-worker-opens")) {
       const { page, context } = await newPage(browser, { timeoutMs: 120000 });
       await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
@@ -578,8 +624,8 @@ async function run() {
 
     // G3-2: import-blocked worker poisons runtimes up to the cap, then the
     // explicit reload path appears instead of a dead retry loop. Only the
-    // real worker *import* (script) is blocked; the GET preflight (fetch)
-    // passes, so every retry genuinely poisons exactly one epoch.
+    // real worker *import* (script) is blocked, so every committed retry
+    // genuinely poisons exactly one epoch (single-flight pacing below).
     if (!skipCase("G3-2-cap-offers-reload")) {
       const { page, context } = await newPage(browser, { noCache: true, timeoutMs: 180000 });
       let blockImport = false;
@@ -605,16 +651,15 @@ async function run() {
       blockImport = true;
       await clickHandoff(page);
       await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 120000 });
-      // Eight futile retries: the probe passes each time, so each retry mints
-      // exactly one epoch before failing on the blocked import. A retry
-      // click that lands while the previous intake is still pending would
-      // skip its reset (no failed attempt yet), so iterations are spaced
-      // beyond a full cycle; the chip-visible wait then confirms that
-      // cycle's failure before the next click.
+      // Eight futile retries, each minting exactly one epoch before failing
+      // on the blocked import. waitEpochs proves each click started a fresh
+      // insert; the sleep guarantees its failure settled (the chip stays
+      // visible across re-renders, so a bare visible-wait cannot pace this).
       for (let i = 0; i < 8; i += 1) {
         await page.locator("[data-testid='pdf-handoff-retry']").click();
+        await waitEpochs(epochUrls, i + 1);
         await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ state: "visible", timeout: 60000 });
-        await page.waitForTimeout(2500);
+        await page.waitForTimeout(2000);
       }
       assert.equal(epochUrls.size, 8, `G3-2: eight poisoned retries mint eight epochs (saw ${epochUrls.size})`);
       // Ninth retry: the cap refuses a fresh runtime, so the reload guidance
@@ -670,6 +715,210 @@ async function run() {
       await page.locator("[data-testid='unsaved-work-dialog']").waitFor({ state: "visible", timeout: 15000 });
       await page.locator("[data-testid='unsaved-stay']").click();
       results.push({ case: "G3-3-guard-next-back-dialog" });
+      await context.close();
+    }
+
+    // G4-1: a retry whose worker import is still gated must not resurrect a
+    // discarded result when the gate opens (single in-flight intake + request
+    // binding: the discard invalidates the pending inspection).
+    if (!skipCase("G4-1-discard-during-retry")) {
+      const { page, context } = await newPage(browser, { noCache: true, timeoutMs: 120000 });
+      // Phase 1 ("abort"): fail the auto intake fast. Phase 2 ("gate"): hold
+      // the retry's worker import mid-flight. Anything else passes through.
+      let workerMode = "pass";
+      const gateWaiters = [];
+      await page.route("**/pdf.worker.min*", (route) => {
+        // Every worker request type is gated (not only the script import),
+        // so whichever request a retry awaits first is the one held.
+        if (workerMode === "abort") return route.abort();
+        if (workerMode === "gate") {
+          workerMode = "held";
+          // Releasing the gate lets the held request actually complete, so
+          // the stale inspection really finishes after the user action.
+          return new Promise((resolve) => { gateWaiters.push(() => resolve(route.continue().catch(() => undefined))); });
+        }
+        return route.continue();
+      });
+      const epochUrls = new Set();
+      page.on("request", (request) => {
+        if (/w1-pdfjs=/.test(request.url())) epochUrls.add(request.url());
+      });
+      const navigations = [];
+      const dialogs = [];
+      page.on("request", (request) => {
+        if (request.isNavigationRequest() && request.frame() === page.mainFrame()) navigations.push(request.url());
+      });
+      page.on("dialog", async (dialog) => {
+        dialogs.push(dialog.type());
+        await dialog.dismiss().catch(() => undefined);
+      });
+      await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
+      navigations.length = 0;
+      workerMode = "abort";
+      await clickHandoff(page);
+      await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 120000 });
+      workerMode = "gate";
+      await page.locator("[data-testid='pdf-handoff-retry']").click();
+      await waitForTrue(() => workerMode === "held");
+      // Discard while the worker import is still gated.
+      await page.locator("[data-testid='pdf-handoff-discard']").click();
+      assert.equal(await page.locator("[data-testid='pdf-handoff-chip']").count(), 0, "G4-1: discard clears the chip");
+      await waitUnload(page, false); // discard releases the guard (after the guard effect flushes)
+      // Release the gate: the stale intake must neither commit nor notify.
+      workerMode = "pass";
+      gateWaiters.splice(0).forEach((release) => release());
+      await page.waitForTimeout(4000);
+      assert.equal(await page.locator("[data-testid='pdf-handoff-chip']").count(), 0, "G4-1: no resurrected result after resume");
+      assert.equal(await page.locator("[data-testid='pdf-finish-ready'][data-preflight-status='ready']").count(), 0, "G4-1: finish does not mount the discarded intake");
+      await waitUnload(page, false); // guard stays released after resume
+      assert.deepEqual(navigations, [], "G4-1: no document navigation");
+      assert.deepEqual(dialogs, [], "G4-1: no native dialog");
+      results.push({ case: "G4-1-discard-during-retry", epochs: [...epochUrls] });
+      await context.close();
+    }
+
+    // G4-1: same, but leaving to another tool mid-retry. The unmounted host
+    // must not hold the global auto-reload suppression either.
+    if (!skipCase("G4-1-leave-during-retry")) {
+      const { page, context } = await newPage(browser, { noCache: true, timeoutMs: 120000 });
+      let workerMode = "pass";
+      const gateWaiters = [];
+      await page.route("**/pdf.worker.min*", (route) => {
+        // Every worker request type is gated (not only the script import),
+        // so whichever request a retry awaits first is the one held.
+        if (workerMode === "abort") return route.abort();
+        if (workerMode === "gate") {
+          workerMode = "held";
+          // Releasing the gate lets the held request actually complete, so
+          // the stale inspection really finishes after the user action.
+          return new Promise((resolve) => { gateWaiters.push(() => resolve(route.continue().catch(() => undefined))); });
+        }
+        return route.continue();
+      });
+      await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
+      workerMode = "abort";
+      await clickHandoff(page);
+      await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 120000 });
+      workerMode = "gate";
+      await page.locator("[data-testid='pdf-handoff-retry']").click();
+      await waitForTrue(() => workerMode === "held");
+      await page.evaluate(() => {
+        const anchor = document.createElement("a");
+        anchor.href = "/en/tools/text-merger";
+        document.body.append(anchor);
+        anchor.click();
+        anchor.remove();
+      });
+      await page.locator("[data-testid='unsaved-leave']").click();
+      await page.locator("textarea:not([readonly])").first().waitFor({ timeout: 60000 });
+      await waitUnload(page, false); // leave releases the guard (after the guard effect flushes)
+      workerMode = "pass";
+      gateWaiters.splice(0).forEach((release) => release());
+      await page.waitForTimeout(4000);
+      const hold = await tryReadHold(page);
+      if (hold.available) assert.equal(hold.value, false, "G4-1: no leaked auto-reload hold on another tool (dev)");
+      await waitUnload(page, false); // guard stays released after resume
+      const slot = await tryPeekSlot(page);
+      if (slot.available) assert.equal(slot.slot, null, "G4-1: no resurrected handoff slot (dev)");
+      assert.equal(page.url().includes("/tools/text-merger"), true, "G4-1: stays on the destination tool");
+      results.push({ case: "G4-1-leave-during-retry" });
+      await context.close();
+    }
+
+    // G4-1: ten rapid retries collapse into one in-flight insert (no attempt
+    // skew, no epoch burst). Real clicks would serialize on re-renders, so
+    // the burst is dispatched synchronously to model the worst case.
+    if (!skipCase("G4-1-rapid-retries-single-flight")) {
+      const { page, context } = await newPage(browser, { noCache: true, timeoutMs: 120000 });
+      const epochUrls = new Set();
+      page.on("request", (request) => {
+        if (/w1-pdfjs=/.test(request.url())) epochUrls.add(request.url());
+      });
+      // Organize needs a working worker to render page cards; block only
+      // from the handoff on.
+      let blockWorker = false;
+      await page.route("**/pdf.worker.min*", (route) => {
+        if (!blockWorker) return route.continue();
+        return route.request().resourceType() === "script" ? route.abort() : route.continue();
+      });
+      await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
+      blockWorker = true;
+      await clickHandoff(page);
+      await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 120000 });
+      await page.evaluate(() => {
+        const retry = document.querySelector("[data-testid='pdf-handoff-retry']");
+        if (!retry) throw new Error("retry button missing for burst");
+        for (let i = 0; i < 10; i += 1) retry.click();
+      });
+      // The single committed insert mints exactly one epoch; the nine
+      // collapsed clicks mint none. The chip-visible wait confirms a settled
+      // failure and the sleep covers the worst-case in-flight tail, so the
+      // count below cannot race with a pending insert.
+      await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ state: "visible", timeout: 60000 });
+      await page.waitForTimeout(2000);
+      await waitEpochs(epochUrls, 1);
+      assert.equal(epochUrls.size, 1, `G4-1: ten rapid retries mint a single epoch (saw ${epochUrls.size})`);
+      // The epoch *counter* must not have been burned by collapsed clicks
+      // either (only the last minted URL is ever fetched): the cap guidance
+      // must not appear and retry must still be offered.
+      assert.equal(await page.locator("[data-testid='pdf-handoff-reload']").count(), 0, "G4-1: a retry burst must not exhaust the epoch cap");
+      assert.equal(await page.locator("[data-testid='pdf-handoff-retry']").count(), 1, "G4-1: retry stays available after the burst");
+      blockWorker = false;
+      await page.locator("[data-testid='pdf-handoff-retry']").click();
+      await page.waitForFunction(
+        () => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready",
+        null,
+        { timeout: 120000 },
+      );
+      assert.equal(epochUrls.size, 2, `G4-1: recovery after the burst mints one more epoch (saw ${epochUrls.size})`);
+      results.push({ case: "G4-1-rapid-retries-single-flight", epochs: epochUrls.size });
+      await context.close();
+    }
+
+    // G4-2: while a worker retry is still being inspected, the hold stays on;
+    // completion releases it. The epoch gate proves the insert started.
+    if (!skipCase("G4-2-hold-during-inspection")) {
+      const { page, context } = await newPage(browser, { noCache: true, timeoutMs: 120000 });
+      let workerMode = "pass";
+      const gateWaiters = [];
+      await page.route("**/pdf.worker.min*", (route) => {
+        if (route.request().resourceType() !== "script") return route.continue();
+        if (workerMode === "abort") return route.abort();
+        if (workerMode === "gate") {
+          workerMode = "held";
+          // Releasing the gate lets the held request actually complete, so
+          // the stale inspection really finishes after the user action.
+          return new Promise((resolve) => { gateWaiters.push(() => resolve(route.continue().catch(() => undefined))); });
+        }
+        return route.continue();
+      });
+      const epochUrls = new Set();
+      page.on("request", (request) => {
+        if (/w1-pdfjs=/.test(request.url())) epochUrls.add(request.url());
+      });
+      await produceMerged(page, [{ name: "A.pdf", buffer: onePagePdf, pages: 1 }]);
+      workerMode = "abort";
+      await clickHandoff(page);
+      await page.locator("[data-testid='pdf-handoff-chip']").waitFor({ timeout: 120000 });
+      workerMode = "gate";
+      await page.locator("[data-testid='pdf-handoff-retry']").click();
+      await waitForTrue(() => workerMode === "held");
+      await waitEpochs(epochUrls, 1);
+      assert.equal(await readUnload(page), true, "G4-2: guard holds during the worker inspection");
+      const hold = await tryReadHold(page);
+      if (hold.available) assert.equal(hold.value, true, "G4-2: hold stays on during the worker inspection (dev)");
+      workerMode = "pass";
+      gateWaiters.splice(0).forEach((release) => release());
+      await page.waitForFunction(
+        () => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready",
+        null,
+        { timeout: 120000 },
+      );
+      assert.equal(await page.locator("[data-testid='pdf-handoff-chip']").count(), 0, "G4-2: retry after the hold window acks");
+      const holdAfter = await tryReadHold(page);
+      if (holdAfter.available) assert.equal(holdAfter.value, false, "G4-2: hold releases after completion (dev)");
+      assert.equal(epochUrls.size, 1, `G4-2: exactly one epoch for one committed retry (saw ${epochUrls.size})`);
+      results.push({ case: "G4-2-hold-during-inspection" });
       await context.close();
     }
 
