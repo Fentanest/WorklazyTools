@@ -7,6 +7,7 @@ import { FileDropZone, FileList, PrimaryButton, SectionCard } from "../../compon
 import { Button } from "../../components/ui/button";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage } from "../../i18n/routing";
+import { featureMessage } from "../../i18n/featureMessages";
 import { createSafeFileName } from "../../utils/fileNameSafety";
 import { convertOfficePdf } from "./officePdfClient";
 import { BatchConversionPanel } from "../conversion-batch/BatchConversionPanel";
@@ -15,6 +16,8 @@ import { HwpPdfPanel } from "./HwpPdfPanel";
 
 const supported = new Set(["hwp", "hwpx", "doc", "docx", "xls", "xlsx", "ppt", "pptx"]);
 const maxBytes = 50 * 1024 * 1024;
+// SPA tab changes must not revive a failed Office session in the same page.
+let officeSessionNeedsReload = false;
 export function DocumentPdfPanel() {
   const language = useAppLanguage();
   const L = (ko: string, en: string) => language === "en" ? en : ko;
@@ -26,6 +29,7 @@ export function DocumentPdfPanel() {
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [needsReload, setNeedsReload] = useState(() => officeSessionNeedsReload);
   const [saved, setSaved] = useState(false);
   const controller = useRef<AbortController | undefined>(undefined);
   const operation = useOperationProgress();
@@ -39,6 +43,11 @@ export function DocumentPdfPanel() {
   }, [bytes]);
   const choose = (files: File[]) => {
     if (loading) return;
+    // A timed-out native session cannot be recovered by changing its input.
+    if (needsReload) {
+      if (!files.length) { setFile(undefined); setBytes(undefined); }
+      return;
+    }
     if (files.length > 1) { controller.current?.abort(); setFile(undefined); setBytes(undefined); setBatchFiles(files); return; }
     const next = files.at(-1);
     setBytes(undefined); setFile(undefined); setError(""); setSaved(false); operation.reset();
@@ -55,7 +64,7 @@ export function DocumentPdfPanel() {
     setLoading(false); operation.reset();
   };
   const run = async () => {
-    if (!file || isHwp || loading) return;
+    if (!file || isHwp || loading || needsReload) return;
     const active = new AbortController(); controller.current = active;
     setLoading(true); setBytes(undefined); setError(""); setSaved(false);
     operation.start(L("문서 변환을 준비합니다.", "Preparing document conversion."));
@@ -71,12 +80,16 @@ export function DocumentPdfPanel() {
     } catch (reason) {
       if (active.signal.aborted) return;
       const code = (reason as Error).message;
+      if (code === "office-operation-timeout") {
+        officeSessionNeedsReload = true;
+        setNeedsReload(true);
+      }
       const message = code === "encrypted-document"
         ? L("암호화된 Office 파일은 지원하지 않습니다. 암호를 해제한 사본을 선택해 주세요.", "Encrypted Office files are not supported. Choose an unlocked copy.")
         : code === "isolation-required"
         ? L("이 브라우저에서는 변환 준비를 완료하지 못했습니다. 최신 데스크톱 브라우저에서 다시 열어 주세요.", "This browser could not prepare conversion. Open this page in a current desktop browser.")
         : code === "office-operation-timeout"
-          ? L("변환 대기 시간이 초과됐습니다. 초기화한 뒤 더 작은 파일로 다시 시도해 주세요.", "Conversion timed out. Reset and try a smaller file.")
+          ? featureMessage(language, "documentPdf.timeout")
           : L("문서를 변환하지 못했습니다. 손상되지 않은 암호 해제 사본으로 다시 시도해 주세요.", "The document could not be converted. Try an intact, unlocked copy.");
       setError(message); operation.fail(message);
     } finally {
@@ -86,18 +99,20 @@ export function DocumentPdfPanel() {
   if (batchFiles) return <BatchConversionPanel mode="document-pdf" files={batchFiles} onClose={() => setBatchFiles(undefined)} />;
   return <div data-document-pdf-ready={crossOriginIsolated}>
     <SectionCard step={1} title={L("문서 선택", "Choose a document")} description="HWP · HWPX · DOC · DOCX · XLS · XLSX · PPT · PPTX">
-      <FileDropZone disabled={!crossOriginIsolated || loading} multiple files={file ? [file] : []} accept=".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onFiles={choose} accent="coral" hint={L("여러 파일 선택 가능 · 파일당 최대 50 MiB", "Choose one or more files · up to 50 MiB each")} />
+      <FileDropZone disabled={!crossOriginIsolated || loading || needsReload} multiple files={file ? [file] : []} accept=".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onFiles={choose} accent="coral" hint={L("여러 파일 선택 가능 · 파일당 최대 50 MiB", "Choose one or more files · up to 50 MiB each")} />
       {file && <FileList files={[file]} accent="coral" onRemove={() => choose([])} />}
     </SectionCard>
     {!isHwp && <UtilityNotice kind="info" className="my-4"><FileText className="shrink-0" size={18} /><span>{L(
       "첫 변환에는 파일을 내려받아 준비하므로 시간이 걸릴 수 있습니다. 워드·엑셀·PPT는 PDF를 바로 내려받을 수 있고, HWP·HWPX는 브라우저 인쇄에서 PDF로 저장해야 합니다. 암호 파일은 지원하지 않습니다.",
       "The first conversion downloads files needed in your browser and may take longer. Word, Excel and PowerPoint produce a downloadable PDF; HWP and HWPX require Save as PDF in the browser print dialog. Password-protected files are not supported.")}</span></UtilityNotice>}
     {!isHwp && <div className="my-4 flex flex-wrap gap-2">
-      <PrimaryButton accent="coral" disabled={!file || loading} loading={loading} onClick={() => void run()}>{L("PDF 만들기", "Create PDF")}</PrimaryButton>
+      {needsReload
+        ? <PrimaryButton accent="coral" onClick={() => window.location.reload()}>{featureMessage(language, "documentPdf.reload")}</PrimaryButton>
+        : <PrimaryButton accent="coral" disabled={!file || loading} loading={loading} onClick={() => void run()}>{L("PDF 만들기", "Create PDF")}</PrimaryButton>}
       {loading && <Button variant="outline" onClick={cancel}><X size={16} />{L("취소 및 초기화", "Cancel and reset")}</Button>}
     </div>}
     {isHwp && file && <HwpPdfPanel file={file} onClear={() => choose([])} />}
-    {error && <UtilityNotice kind="error" role="alert">{error}</UtilityNotice>}
+    {(error || needsReload) && <UtilityNotice kind="error" role="alert">{needsReload ? featureMessage(language, "documentPdf.timeout") : error}</UtilityNotice>}
     <OperationProgress status={operation.status} progress={operation.progress} message={operation.message} logs={operation.logs} accent="coral" />
     {url && <SectionCard step={2} title={L("PDF 저장", "Save PDF")} description={L("다운로드 후 원본과 비교해 주세요.", "Compare the downloaded PDF with your original.")}>
       <label className="my-3 flex items-center gap-2 text-sm">{L("파일명", "File name")}<UtilityInput value={name} onChange={event => { setName(event.target.value); setSaved(false); }} /><span>.pdf</span></label>

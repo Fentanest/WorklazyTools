@@ -1,4 +1,8 @@
 {
+  "documentPdf": {
+    "timeout": "이 문서의 PDF 변환을 완료하지 못했습니다. Word 또는 LibreOffice에서 파일을 열어 ‘PDF로 내보내기’를 이용해 주세요. 다른 파일을 시도하려면 페이지를 새로 열어 주세요.",
+    "reload": "페이지 새로 열기"
+  },
   "documentCompare": {
     "side": {
       "before": "수정 전",

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { before, after, test } from 'node:test';
+import { before, beforeEach, after, test } from 'node:test';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -19,6 +19,13 @@ before(async () => {
     if (url.origin === new URL(base).origin || ['blob:', 'data:'].includes(url.protocol)) return route.continue();
     external.push(url.href); return route.abort();
   });
+  page = await context.newPage();
+});
+beforeEach(async () => {
+  // File selection appends in this UI; a fresh page keeps each single-file
+  // case independent and also resets a session that requires a reload.
+  const context = page.context();
+  await page.close();
   page = await context.newPage(); page.setDefaultTimeout(180000);
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') console.error('[browser]', message.text()); });
@@ -86,15 +93,27 @@ test('cancel stops a cold download and permits a subsequent conversion', async (
   const context = await browser.newContext();
   await context.addInitScript(() => localStorage.setItem('worklazy_privacy_consent_v2', 'denied'));
   let held;
-  await context.route('**/vendor/zetaoffice/**/soffice.wasm', route => { held = route; });
+  await context.route('**/*', route => {
+    const url = new URL(route.request().url());
+    if (url.origin === new URL(base).origin || ['blob:', 'data:'].includes(url.protocol)) return route.continue();
+    return route.abort();
+  });
+  const wasmRoute = '**/vendor/libreoffice-converter/2.3.1/soffice.wasm.gz';
+  let resolveHeld;
+  const heldRequest = new Promise(resolve => { resolveHeld = resolve; });
+  await context.route(wasmRoute, route => { held = route; resolveHeld(); });
   const cancelPage = await context.newPage(); cancelPage.setDefaultTimeout(180000);
   try {
     await cancelPage.goto(base + '/en/tools/pdf-converter/document-to-pdf/');
     await cancelPage.waitForFunction(() => crossOriginIsolated);
     await cancelPage.locator('input[type=file]').setInputFiles(path.join(fixtures, 'sample.docx'));
     await cancelPage.getByRole('button', { name: 'Create PDF', exact: true }).click();
+    // Bound a broken interception instead of silently testing an ordinary cancel.
+    await Promise.race([heldRequest, cancelPage.waitForTimeout(30000).then(() => {
+      throw new Error('The Office WASM download was not intercepted');
+    })]);
     await cancelPage.getByRole('button', { name: 'Cancel and reset', exact: true }).click();
-    await context.unroute('**/vendor/zetaoffice/**/soffice.wasm');
+    await context.unroute(wasmRoute);
     if (held) await held.abort().catch(() => {});
     assert.equal(await cancelPage.getByTestId('document-pdf-download').count(), 0);
     await cancelPage.getByRole('button', { name: 'Create PDF', exact: true }).click();
