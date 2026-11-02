@@ -142,7 +142,10 @@
         "image-edit": "Edit image",
         "image-batch": "Batch edit images",
         "image-privacy": "Remove image metadata",
-        "office": "Open in Office"
+        "office": "Open in Office",
+        "document-redactor": "Redact documents",
+        "document-to-pdf": "Convert documents to PDF",
+        "xls-preserve": "Preserve XLS formulas · formatting"
       },
       "hints": {
         "excel": "Add another spreadsheet to merge files.",

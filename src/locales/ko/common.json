@@ -142,7 +142,10 @@
         "image-edit": "이미지 편집",
         "image-batch": "이미지 일괄 편집",
         "image-privacy": "이미지 개인정보 제거",
-        "office": "Office에서 열기"
+        "office": "Office에서 열기",
+        "document-redactor": "개인정보 가리기",
+        "document-to-pdf": "문서를 PDF로",
+        "xls-preserve": "XLS 수식·서식 보존"
       },
       "hints": {
         "excel": "엑셀 파일을 하나 더 넣으면 병합할 수 있어요.",

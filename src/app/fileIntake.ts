@@ -1,7 +1,7 @@
-import { fileAccepts, type ReceiverId } from "./fileAccepts.ts";
+import { fileAccepts, isolatedFileAccepts, type IsolatedReceiverId, type ReceiverId } from "./fileAccepts.ts";
 
 export type FileKind = "spreadsheet" | "pdf" | "image" | "office" | "video" | "other";
-export interface IntakeCandidate { receiverId: ReceiverId | "office"; entryPath: string; files: File[]; roles?: ("template" | "data")[]; tab?: "edit" | "batch" }
+export interface IntakeCandidate { receiverId: ReceiverId | IsolatedReceiverId | "office"; entryPath: string; files: File[]; roles?: ("template" | "data")[]; tab?: "edit" | "batch" }
 export interface IntakeGroup { kind: FileKind | "mailmerge"; files: File[]; candidates: IntakeCandidate[]; hint?: "excel" | "data" | "pdf" | "image" | "template" }
 export interface FileIntake { groups: IntakeGroup[]; count: number; tooMany: boolean; mixed: boolean }
 const sheets = fileAccepts["excel-cleaner"].extensions as readonly string[];
@@ -23,7 +23,7 @@ export async function classifyFile(file: File): Promise<{ file: File; kind: File
     if (ext) file = new File([file], `${file.name}.${ext}`, { type: file.type, lastModified: file.lastModified });
   }
   const kind = sheets.includes(ext) ? "spreadsheet" : ext === "pdf" ? "pdf" : images.includes(ext) ? "image"
-    : office.includes(ext) ? "office" : /^(mp4|webm|mov|avi|mkv|m4v|mpeg|mpg|ogv)$/.test(ext) ? "video" : "other";
+    : office.includes(ext) || ["hwp", "hwpx"].includes(ext) ? "office" : /^(mp4|webm|mov|avi|mkv|m4v|mpeg|mpg|ogv)$/.test(ext) ? "video" : "other";
   return { file, kind };
 }
 function candidate(receiverId: ReceiverId, files: File[], extra: Partial<IntakeCandidate> = {}): IntakeCandidate {
@@ -45,8 +45,15 @@ function group(kind: FileKind, files: File[]): IntakeGroup {
     candidates.push(candidate(files.length === 1 ? "image-edit" : "image-batch", files, { tab: files.length === 1 ? "edit" : "batch" }), candidate("image-privacy", files));
     if (files.length === 1) { candidates.push(candidate("image-batch", files, { tab: "batch" })); hint = "image"; }
   } else if (kind === "office" && files.length === 1) {
-    candidates.push({ receiverId: "office", entryPath: "/tools/office-editor/app", files });
+    if (office.includes(extension(first))) candidates.push({ receiverId: "office", entryPath: "/tools/office-editor/app", files });
     if (extension(first) === "docx") hint = "template";
+  }
+  // H2: append isolated choices without changing the existing primary choices.
+  for (const receiverId of Object.keys(isolatedFileAccepts) as IsolatedReceiverId[]) {
+    const definition = isolatedFileAccepts[receiverId];
+    if (receiverId === "xls-preserve" && !files.some(file => extension(file) === "xls")) continue;
+    if (files.length <= definition.max && files.every(file => (definition.extensions as readonly string[]).includes(extension(file))))
+      candidates.push({ receiverId, entryPath: definition.path, files });
   }
   return { kind, files, candidates, hint };
 }
