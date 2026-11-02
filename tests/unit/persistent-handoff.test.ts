@@ -8,25 +8,25 @@ const source = (path: string) => readFileSync(`src/${path}.ts`, "utf8");
 function load(path: string, globals = {}, dependencies = {}) {
   const exports = {};
   vm.runInNewContext(ts.transpileModule(source(path), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText,
-    { exports, require: (id: string) => { assert.ok(id in dependencies, id); return dependencies[id]; }, File, crypto, ...globals });
+    { exports, IDBKeyRange: { upperBound: (value: number) => value }, require: (id: string) => { assert.ok(id in dependencies, id); return dependencies[id]; }, File, crypto, ...globals });
   return exports as any;
 }
 const corePath = "app/persistentHandoff";
 const pendingPath = "features/office-editor/pendingOfficeFile";
 const file = new File(["synthetic-private-content"], "a.docx");
-function transactionHarness() {
+function transactionHarness(globals = {}) {
   const requests: any[] = [];
   const deleted: string[] = [];
   const inserted: any[] = [];
   const store = {
-    getAll: () => request(), get: (id: string) => { assert.equal(id, "id"); return request(); },
-    openCursor: () => request(), delete: (id: string) => deleted.push(id), add: (value: any) => inserted.push(value),
+    getAll: () => request(), get: (_id: string) => request(),
+    index: () => ({ openCursor: () => request() }), openCursor: () => request(), delete: (id: string) => deleted.push(id), add: (value: any) => inserted.push(value),
   };
   const transaction: any = { objectStore: () => store, abort: () => queueMicrotask(() => transaction.onabort()) };
   const database: any = { transaction: () => transaction, close: () => { database.closed = true; } };
   const open: any = { result: database };
   function request() { const r = {}; requests.push(r); return r; }
-  const core = load(corePath, { indexedDB: { open: () => { queueMicrotask(() => open.onsuccess()); return open; } } });
+  const core = load(corePath, { indexedDB: { open: () => { queueMicrotask(() => open.onsuccess()); return open; } }, ...globals });
   return { core, open, database, transaction, requests, deleted, inserted };
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
@@ -122,4 +122,87 @@ test("missing, malformed and already-consumed tokens cannot fall back to another
 test("unavailable sessionStorage cancels the just-staged file", async () => {
   const h = tokenHarness(); h.sessionStorage.setItem = () => { throw new Error("quota"); };
   await assert.rejects(h.module.stagePendingOfficeFile(file), { code: "unavailable" }); assert.deepEqual(h.events, ["cancel"]);
+});
+
+const isolated = ["document-redactor", "document-to-pdf", "xls-preserve"];
+test("all isolated receivers stage files under the exact registered destination", async () => {
+  for (const receiverId of isolated) {
+    const h = transactionHarness();
+    const promise = h.core.stagePersistentFiles({ receiverId, entryPath: h.core.PERSISTENT_RECEIVERS[receiverId], files: [file, file] });
+    await tick(); h.requests[0].result = []; h.requests[0].onsuccess(); h.transaction.oncomplete();
+    const token = await promise, record = h.inserted[0];
+    assert.equal(record.receiverId, receiverId); assert.equal(record.id, token.id);
+    assert.equal(record.files.length, 2); assert.equal(record.files[0], file); assert.equal(record.files[1], file); assert.equal(record.file, undefined);
+  }
+});
+test("isolated preflight rejects empty, over-count, oversized and inexact destinations before opening DB", async () => {
+  const core = load(corePath, { indexedDB: { open: () => assert.fail("must reject before DB") } });
+  const huge = new File([], "large.pdf"); Object.defineProperty(huge, "size", { value: core.HANDOFF_RECORD_BYTES + 1 });
+  const input = { receiverId: "document-redactor", entryPath: core.PERSISTENT_RECEIVERS["document-redactor"], files: [file] };
+  for (const patch of [{ files: [] }, { files: Array(21).fill(file) }, { files: [huge] }, { files: [{}] },
+    { entryPath: input.entryPath + "/" }, { receiverId: "toString" }, { entryPath: "/tools/office-editor/app" }]) {
+    await assert.rejects(core.stagePersistentFiles({ ...input, ...patch }), { code: "invalid" });
+  }
+});
+test("global bytes include live Office records, preserve them at overflow and admit exact limits", async () => {
+  for (const extra of [0, 1]) {
+    const h = transactionHarness();
+    const incoming = new File([], "incoming.pdf"); Object.defineProperty(incoming, "size", { value: h.core.HANDOFF_RECORD_BYTES });
+    const office = new File([], "office.docx"); Object.defineProperty(office, "size", { value: h.core.HANDOFF_TOTAL_BYTES - incoming.size + extra });
+    const promise = h.core.stagePersistentFiles({ receiverId: "document-redactor", entryPath: h.core.PERSISTENT_RECEIVERS["document-redactor"], files: [incoming] });
+    const checked = extra ? assert.rejects(promise, { code: "full" }) : promise;
+    await tick(); h.requests[0].result = [{ id: "office", receiverId: "office-editor", file: office, expiresAt: Date.now() + 10000 }];
+    h.requests[0].onsuccess(); h.transaction.oncomplete(); await checked;
+    assert.equal(h.inserted.length, extra ? 0 : 1); assert.deepEqual(h.deleted, []);
+  }
+});
+test("isolated consume commits one matching files payload; expiry is strict and mismatches survive", async () => {
+  for (const receiverId of isolated) for (const offset of [0, 1]) for (const mismatch of [false, true]) {
+    const now = 1000000, h = transactionHarness();
+    const RealDate = Date;
+    // Load deterministic time without mutating the host test clock.
+    const core = load(corePath, { Date: class extends RealDate { static now() { return now; } },
+      indexedDB: { open: () => { queueMicrotask(() => h.open.onsuccess()); return h.open; } } });
+    const promise = core.consumePersistentFiles({ id: "id", nonce: mismatch ? "wrong" : "nonce" }, receiverId, core.PERSISTENT_RECEIVERS[receiverId]);
+    await tick(); h.requests[0].result = { id: "id", nonce: "nonce", receiverId, entryPath: core.PERSISTENT_RECEIVERS[receiverId], schema: 1,
+      files: [file], createdAt: now - core.HANDOFF_TTL_MS - offset, expiresAt: now - offset };
+    h.requests[0].onsuccess(); h.transaction.oncomplete();
+    assert.equal((await promise)?.[0], mismatch || offset ? undefined : file);
+    assert.deepEqual(h.deleted, mismatch ? [] : ["id"]);
+  }
+});
+test("version 3 adds expiry index in-place while keeping Office records store", () => {
+  let requestedVersion = 0, created = 0;
+  const store = { indexNames: { contains: () => false }, createIndex: (name: string, path: string) => { assert.equal(name, "expiresAt"); assert.equal(path, "expiresAt"); created++; } };
+  const open: any = { result: { objectStoreNames: { contains: (name: string) => name === "records" },
+    createObjectStore: () => assert.fail("must preserve existing records") }, transaction: { objectStore: () => store } };
+  const core = load(corePath, { indexedDB: { open: (name: string, version: number) => { assert.equal(name, "worklazy-office-handoff"); requestedVersion = version; return open; } } });
+  void core.purgeExpired(); open.onupgradeneeded(); assert.equal(requestedVersion, 3); assert.equal(created, 1);
+});
+test("Office token reads report blocked session storage as unavailable", async () => {
+  const h = tokenHarness(); h.sessionStorage.getItem = () => { throw new Error("denied"); };
+  await assert.rejects(h.module.takePendingOfficeFile(), { code: "unavailable" });
+});
+test("legacy single-file consume cannot delete an isolated multi-file case", async () => {
+  const core = load(corePath, { indexedDB: { open: () => assert.fail("legacy Office API must refuse other receivers") } });
+  assert.equal(await core.consumePersistentHandoff({ id: "id", nonce: "nonce" }, "document-redactor", "/tools/document-redactor"), undefined);
+});
+test("generic tab token snapshots destination and rolls back a sessionStorage failure", async () => {
+  for (const fail of [false, true]) {
+    let key: string | undefined;
+    const h = transactionHarness({ sessionStorage: { setItem: (next: string, value: string) => {
+      key = next; assert.deepEqual(Object.keys(JSON.parse(value)).sort(), ["id", "nonce"]);
+      if (fail) throw new Error("quota");
+    } } });
+    const input = { receiverId: "document-redactor", entryPath: "/tools/document-redactor", files: [file] };
+    const promise = h.core.stagePendingPersistentHandoff(input);
+    const checked = fail ? assert.rejects(promise, { code: "unavailable" }) : promise;
+    input.receiverId = "xls-preserve";
+    await tick(); h.requests[0].result = []; h.requests[0].onsuccess(); h.transaction.oncomplete();
+    await tick();
+    if (fail) { h.requests[1].result = h.inserted[0]; h.requests[1].onsuccess(); h.transaction.oncomplete(); }
+    await checked;
+    assert.equal(key, "worklazy-handoff-token:document-redactor");
+    assert.deepEqual(h.deleted, fail ? [h.inserted[0].id] : []);
+  }
 });

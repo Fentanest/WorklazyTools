@@ -187,6 +187,7 @@ async function receiverFixture(run: (fixture: {
     if (id === "react") return React;
     if (id === "react-router-dom") return { useLocation: () => location };
     if (id === "./memoryHandoff") return handoff;
+    if (id === "./persistentHandoff") return {}; // Memory tests never invoke the isolated hook.
     if (id === "../i18n/languages") return { stripLanguagePrefix: (path: string) => path.replace(/^\/(ko|en)(?=\/|$)/, "") };
     throw new Error(`unexpected hook dependency ${id}`);
   } });
