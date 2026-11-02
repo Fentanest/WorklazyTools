@@ -1,3 +1,4 @@
+import { useMemoryHandoff } from "../../components/AppShell";
 import { acceptsFile } from "../../app/fileAccepts";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
 import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
@@ -16,6 +17,8 @@ interface PrivacyMetadata { make: string; model: string; software: string; dateT
 interface PrivacyResult { url: string; fileName: string; mimeType: string; metadata: PrivacyMetadata; items: Array<{ sourceName: string; metadata: PrivacyMetadata }> }
 
 export function ImagePrivacyPage() {
+  const sender = useMemoryHandoff();
+  const [sendError, setSendError] = useState(false);
   const { t: ht } = useTranslation("common");
   const intakeRoot = useRef<HTMLDivElement>(null);
   const intakeGeneration = useRef(0);
@@ -23,16 +26,17 @@ export function ImagePrivacyPage() {
   useEffect(() => { const mount = ++intakeMount.current; return () => { queueMicrotask(() => { if (mount === intakeMount.current) intakeGeneration.current++; }); }; }, []);
   const { t, i18n } = useTranslation("features");
   const [files, setFiles] = useState<File[]>([]); const [result, setResult] = useState<PrivacyResult>(); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
+  const currentResult = useRef(result); currentResult.current = result;
   const workerRef = useRef<Worker | undefined>(undefined);
   useEffect(() => () => { workerRef.current?.terminate(); if (result) URL.revokeObjectURL(result.url); }, [result]);
-  const selectFiles = (next: File[], received = false) => { setFiles(next.filter(file => acceptsFile("image-privacy", file)).slice(0, 50)); setError(""); if (!received && next.some(file => acceptsFile("image-privacy", file))) handoff.dismiss(); if (result) { URL.revokeObjectURL(result.url); setResult(undefined); } };
-  useUnsavedWorkGuard("image-privacy", files.length > 0 || !!result, { kind: "files", scopePath: "/tools/image-privacy" });
+  const selectFiles = (next: File[], received = false) => { intakeGeneration.current++; setFiles(next.filter(file => acceptsFile("image-privacy", file)).slice(0, 50)); setError(""); if (!received && handoff.notReceived && next.some(file => acceptsFile("image-privacy", file))) handoff.dismiss(); if (result) { URL.revokeObjectURL(result.url); setResult(undefined); } };
   const handoff = useHandoffReceiver("image-privacy", { kind: "selection", receive: entry => {
     const accepted = entry.files.filter(file => acceptsFile("image-privacy", file)).slice(0, 50);
     selectFiles(accepted, true);
     if (accepted.length) setUnsavedWork("image-privacy", { hasWork: true, kind: "files", scopePath: "/tools/image-privacy" });
     return { status: accepted.length === entry.files.length ? "accepted" : accepted.length ? "partial" : "rejected", accepted, rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "format" })) };
   } });
+  useUnsavedWorkGuard("image-privacy", files.length > 0 || !!result || handoff.recoveryFiles.length > 0, { kind: "files", scopePath: "/tools/image-privacy" });
   const execute = async () => {
     if (!files.length) return;
     workerRef.current?.terminate(); setBusy(true); setError("");
@@ -46,6 +50,16 @@ export function ImagePrivacyPage() {
       setBusy(false);
       setError(t("imagePrivacy.readError"));
     }
+  };
+  const sendResult = async () => {
+    if (!result || result.items.length !== 1) return;
+    const generation = intakeGeneration.current;
+    setSendError(false);
+    try {
+      const blob = await (await fetch(result.url)).blob();
+      if (generation !== intakeGeneration.current || currentResult.current !== result) return;
+      sender.send({ receiverId: "image-edit", entryPath: "/tools/image-studio", tab: "edit", files: [new File([blob], result.fileName, { type: result.mimeType })], origin: "generated", source: "image-privacy" });
+    } catch { if (generation === intakeGeneration.current) setSendError(true); }
   };
   return <UtilityPage toolId="image-privacy"><div ref={intakeRoot} className="contents">
       {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
@@ -68,6 +82,7 @@ export function ImagePrivacyPage() {
       title={t("imagePrivacy.result")}
       description={t("imagePrivacy.found", { count: result.items.reduce<number>((sum, item) => sum + item.metadata.foundCount, 0) })}
     >
+      {result.items.length === 1 && <div className="mb-3 flex flex-wrap gap-2"><Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="privacy-send-to-image" onClick={() => void sendResult()}>{ht(sender.reason || sendError ? "sendTo.retry" : "sendTo.editImage")}</Button>{(sender.reason || sendError) && <p role="alert">{ht("sendTo.failed")}</p>}</div>}
       {result.items.length === 1
         ? <div className="grid grid-cols-3 gap-2.5 max-[620px]:grid-cols-1"><Meta icon={<MapPin />} label={t("imagePrivacy.gps")} value={result.metadata.latitude || result.metadata.longitude ? `${result.metadata.latitude}, ${result.metadata.longitude}` : t("imagePrivacy.noLocation")} /><Meta icon={<Smartphone />} label={t("imagePrivacy.device")} value={[result.metadata.make, result.metadata.model].filter(Boolean).join(" ") || t("imagePrivacy.noDevice")} /><Meta icon={<Camera />} label={t("imagePrivacy.date")} value={result.metadata.dateTime || t("imagePrivacy.noDate")} /></div>
         : <div className="my-2.5 grid gap-2">{result.items.map((item) => <div className="flex justify-between gap-3 rounded-xl border border-border bg-muted p-3" key={item.sourceName}><strong className="overflow-hidden text-ellipsis whitespace-nowrap">{item.sourceName}</strong><span className="shrink-0 text-muted-foreground">{t("imagePrivacy.fileFound", { count: item.metadata.foundCount })}</span></div>)}</div>}

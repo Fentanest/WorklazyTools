@@ -1,3 +1,9 @@
+import { useTranslation } from "react-i18next";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { acceptsFile } from "../../app/fileAccepts";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import type { IntakeContext } from "../../app/memoryHandoff";
+import { PdfHandoffRecovery } from "./PdfImagePanel";
 import { BatchConversionPanel } from "../conversion-batch/BatchConversionPanel";
 import { FileOutput, Languages, ScanText, Wifi } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -26,6 +32,8 @@ import { pdfConvertDirty, type PdfConvertPreset } from "./pdfConvertDirect";
 import { usePdfConvert } from "./pdfConvertDirectLifecycle";
 export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   const language = useAppLanguage();
+  const intakeRoot = useRef<HTMLDivElement>(null);
+  const intakeGeneration = useRef(0);
   const [batchFiles, setBatchFiles] = useState<File[]>();
   const batchInputs = useRef<File[]>([]);
   const [batchGeneration, setBatchGeneration] = useState(0);
@@ -64,9 +72,11 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   useEffect(() => () => { resumeGeneration.current += 1; activeController.current?.abort(); }, []);
   useEffect(() => () => { if (file) void releasePdf(file); }, [file]);
 
-  const acquireInput = async (files: File[]) => {
+  const acquireInput = async (files: File[], context?: IntakeContext): Promise<boolean> => {
+    const generation = ++intakeGeneration.current;
     const next = files.at(-1);
-    if (!next || next === file) return;
+    if (!next) return false;
+    if (next === file) return true;
     activeController.current?.abort();
     pendingInputs.current = [next];
     const controller = new AbortController();
@@ -77,27 +87,36 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
     operation.start(featureMessage(language, "pdf.messages.PdfConvertPanel.checkingPagesAndSecuritySettingsIn", { p0: next.name }));
     try {
       const inspected = await inspectPdf(next, language, { signal: controller.signal });
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || context?.signal.aborted || generation !== intakeGeneration.current) return false;
       setFile(next);
       setPageCount(inspected.pageCount);
       setPageRange("");
       setOutputName(`${next.name.replace(/\.pdf$/i, "")}-${featureMessage(language, "pdf.messages.PdfConvertPanel.converted")}`);
       operation.succeed(featureMessage(language, "pdf.messages.PdfConvertPanel.pagesAreReadyToConvert", { p0: inspected.pageCount }));
+      setUnsavedWork("pdf-to-document", { hasWork: true, kind: "files", scopePath: "/tools/pdf-converter/pdf-to-document" });
+      return true;
     } catch (reason) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || context?.signal.aborted || generation !== intakeGeneration.current) return false;
       const message = pdfConversionMessage(reason, language, "INPUT");
       setError(message);
-      operation.fail(message);
-    } finally { if (activeController.current === controller) { setLoading(false); pendingInputs.current = []; } }
+      operation.fail(message); return false;
+    } finally { if (activeController.current === controller && generation === intakeGeneration.current && !context?.signal.aborted) { setLoading(false); pendingInputs.current = []; } }
   };
 
   const setInput = (files: File[]) => {
     if (files.length > 1) { activeController.current?.abort(); setFile(null); download.clearResult(); setBatchFiles(files); return Promise.resolve(); }
     const task = acquireInput(files);
-    inputTask.current = task;
+    inputTask.current = task.then(() => {});
     return task;
   };
-  inputHandler.current = setInput;
+  inputHandler.current = files => setInput(files).then(() => {});
+  const handoff = useHandoffReceiver("pdf-to-document", { kind: "inspection", invalidate: () => {
+    intakeGeneration.current++; resumeGeneration.current++; activeController.current?.abort(); pendingInputs.current = []; setFile(null); setPageCount(0); setLoading(false); download.clearResult(); operation.reset();
+  }, receive: async (entry, context) => {
+    const next = entry.files[0]; const ok = !!next && acceptsFile("pdf-to-document", next) && await acquireInput([next], context);
+    return { status: ok ? "accepted" : "rejected", accepted: ok ? [next] : [], rejected: ok ? [] : entry.files.map(file => ({ file, reasonCode: "inspection" })) };
+  } });
+  useUnsavedWorkGuard("pdf-to-document", !!file || loading || !!batchFiles || !!download.result || handoff.recoveryFiles.length > 0, { kind: "files", scopePath: "/tools/pdf-converter/pdf-to-document" });
 
   const convert = async () => {
     if (!file) return;
@@ -136,12 +155,13 @@ export function PdfConvertPanel({ preset }: { preset?: PdfConvertPreset }) {
   if (batchFiles) return <><DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} /><BatchConversionPanel key={batchGeneration} mode="pdf-document" files={batchFiles} onFilesChange={files => { batchInputs.current = files; }} initialOptions={{ format, ocrMode, ocrLayout, outputMode, pageRange }} onClose={() => setBatchFiles(undefined)} /></>;
   return (
     <>
+      <PdfHandoffRecovery handoff={handoff} onSelect={() => intakeRoot.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()} />
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
       {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? (direct.acceptedPreset.purpose === "ocr" ? "PDF OCR" : "PDF 변환") : (direct.acceptedPreset.purpose === "ocr" ? "Make a searchable PDF" : "Convert a PDF")} description={language === "ko" ? (direct.acceptedPreset.purpose === "ocr" ? "스캔 페이지를 자동으로 인식하고 원본 페이지를 보존해 검색 가능한 PDF를 만드세요." : "PDF를 DOCX 등 다른 형식으로 저장하세요.") : (direct.acceptedPreset.purpose === "ocr" ? "Recognize scanned pages automatically while preserving source pages." : "Save a PDF as DOCX or another format.")} />}
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
-        <div>
+        <div ref={intakeRoot}>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfConvertPanel.chooseAPdf")} description={featureMessage(language, "pdf.messages.PdfConvertPanel.convertTextOrScannedPdfsToDocxXlsx")} className="">
-            <FileDropZone accept=".pdf,application/pdf" multiple files={file ? [file] : []} disabled={loading || operation.status === "running"} onFiles={setInput} accent="violet" hint={language === "ko" ? "여러 PDF를 한 번에 선택할 수 있습니다." : "Choose one or more PDFs."} />
+            <FileDropZone accept=".pdf,application/pdf" multiple files={file ? [file] : []} disabled={loading || operation.status === "running"} onFiles={files => { if (handoff.notReceived) handoff.dismiss(); void setInput(files); }} accent="violet" hint={language === "ko" ? "여러 PDF를 한 번에 선택할 수 있습니다." : "Choose one or more PDFs."} />
             {file && <FileList files={[file]} accent="violet" onRemove={() => { activeController.current?.abort(); void releasePdf(file); setLoading(false); operation.reset(); setFile(null); setPageCount(0); download.clearResult(); }} />}
           </SectionCard>
           {file && (

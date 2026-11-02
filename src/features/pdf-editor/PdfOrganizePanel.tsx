@@ -1,3 +1,4 @@
+import { useMemoryHandoff } from "../../components/AppShell";
 import { useTranslation } from "react-i18next";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
 import { acceptsFile } from "../../app/fileAccepts";
@@ -68,6 +69,10 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   initialFiles?: File[] | null;
   onInitialFilesConsumed?: () => void;
 }) {
+  const sender = useMemoryHandoff();
+  const sendGeneration = useRef(0);
+  useEffect(() => () => { sendGeneration.current++; }, []);
+  const [sendError, setSendError] = useState(false);
   const language = useAppLanguage();
   const { t } = useTranslation("common");
   const intakeElementRef = useRef<HTMLDivElement>(null);
@@ -658,6 +663,18 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     requestAnimationFrame(() => mobileWorkspaceTriggerRef.current?.focus());
   }
 
+  const latestResult = useRef(download.result); latestResult.current = download.result;
+  const sendResult = async (receiverId: "pdf-to-document" | "pdf-to-image") => {
+    const result = download.result;
+    if (!result || outputMode !== "merged") return;
+    const generation = ++sendGeneration.current;
+    setSendError(false);
+    try {
+      const blob = await (await fetch(result.url)).blob();
+      if (latestResult.current !== result || generation !== sendGeneration.current) return;
+      sender.send({ receiverId, entryPath: `/tools/pdf-converter/${receiverId}`, files: [new File([blob], result.fileName, { type: "application/pdf" })], origin: "generated", source: "pdf-organize" });
+    } catch { if (generation === sendGeneration.current) setSendError(true); }
+  };
   const exportDisabled = !pages.length || !resultFileCount || inspecting || operation.status === "running" || quickSplitOpen;
   const includedPageCount = outputMode === "ranges" ? rangePageCount : selectedPages.length;
   const createLabel = outputMode === "merged"
@@ -820,6 +837,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
                 <PdfError message={error} />
                 {download.result && <div ref={downloadResultRef}>
                   <PdfDownloadCard result={download.result} compact onSaved={onResultSaved} />
+                  {outputMode === "merged" && <div className="mt-2 grid gap-2" data-testid="pdf-organize-send-actions"><Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={locked} data-testid="pdf-send-to-document" onClick={() => void sendResult("pdf-to-document")}>{sender.reason || sendError ? `${t("sendTo.retry")} · ` : ""}{t("sendTo.pdfDocument")}</Button><Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={locked} data-testid="pdf-send-to-images" onClick={() => void sendResult("pdf-to-image")}>{sender.reason || sendError ? `${t("sendTo.retry")} · ` : ""}{t("sendTo.pdfImages")}</Button>{(sender.reason || sendError) && <p role="alert">{t("sendTo.failed")}</p>}</div>}
                   {/* W1 [② 마무리로 넘기기] (plan §4.1): merged + current result only. */}
                   <Button type="button" className="mt-2 min-h-11 w-full rounded-xl" variant="secondary" data-testid="pdf-organize-send-to-finish" disabled={locked || outputMode !== "merged"} onClick={onHandoffRequest}>
                     {featureMessage(language, "pdf.messages.PdfEditorPage.sendToFinish")}
