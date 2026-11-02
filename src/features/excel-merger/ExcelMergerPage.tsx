@@ -308,6 +308,7 @@ export function ExcelMergerPage() {
         csvEncoding,
       })), language);
       if (!checkIntake()) return [];
+      if (context) { handoffRollback.current = null; clearResult(); setError(null); }
       const byId = new Map(inspectionResults.map((item) => [item.id, item]));
       setEntries((current) => current.map((entry) => {
         const inspectionResult = byId.get(entry.id);
@@ -321,6 +322,7 @@ export function ExcelMergerPage() {
       return additions.filter(entry => inspectionResults.some(result => result.id === entry.id && !result.error && !result.encrypted && result.sheetNames.length)).map(entry => entry.file);
     } catch (reason) {
       if (!ownsIntake()) return [];
+      if (context) handoffRollback.current = null;
       const message = xlsPreserveError(reason, language);
       failEntries(additionIds, message);
       setError(message);
@@ -506,16 +508,25 @@ export function ExcelMergerPage() {
     });
   };
 
+  const invalidateHandoff = () => {
+    const rollback = handoffRollback.current;
+    if (!rollback?.signal.aborted) return;
+    handoffRollback.current = null;
+    if (rollback.generation === intakeGeneration.current) {
+      intakeGeneration.current++;
+      if (precisionControllerRef.current) {
+        precisionControllerRef.current.abort();
+        setPrecisionPreparing(false);
+        operation.reset();
+      }
+    }
+    setEntries(current => current.filter(item => !rollback.ids.has(item.id)));
+  };
+
   useUnsavedWorkGuard("excel-merger", entries.length > 0 || !!result, { kind: "files", scopePath: "/tools/excel-merger", safePaths: ["/tools/excel-merger", "/tools/excel-merger/xls-preserve"] });
   const memoryHandoff = useHandoffReceiver("excel-merger", {
     kind: "inspection",
-    invalidate: () => {
-      const rollback = handoffRollback.current;
-      if (!rollback?.signal.aborted) return;
-      handoffRollback.current = null;
-      if (rollback.generation === intakeGeneration.current) intakeGeneration.current++;
-      setEntries(current => current.filter(item => !rollback.ids.has(item.id)));
-    },
+    invalidate: invalidateHandoff,
     receive: async (entry, context) => {
       const eligible = entry.files.filter(file => acceptsFile("excel-merger", file)).slice(0, Math.max(0, 50 - entries.length));
       const accepted = await handleFiles(eligible, context);
@@ -526,7 +537,7 @@ export function ExcelMergerPage() {
   });
   const persistentHandoff = usePersistentHandoffReceiver("xls-preserve", {
     kind: "inspection",
-    invalidate: () => { intakeGeneration.current++; precisionControllerRef.current?.abort(); setPrecisionPreparing(false); setEntries([]); clearResult(); setError(null); operation.reset(); },
+    invalidate: invalidateHandoff,
     receive: async (files, context) => {
       const accepted = await handleFiles(files.filter(file => acceptsFile("excel-merger", file)), context);
       if (context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };

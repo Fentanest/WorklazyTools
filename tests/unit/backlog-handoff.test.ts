@@ -11,8 +11,8 @@ import { JSDOM } from "jsdom";
 
 // Execute the actual page and React effects. Only the parser boundary and UI
 // shells are fixtures; intake, state writes, adapter and notice are production.
-async function mountPage(tool: string, overrides: Record<string, unknown> = {}, language = "en") {
-  const dom = new JSDOM('<div id="root"></div>', { url: `http://localhost/${language}/tools/${tool}` });
+async function mountPage(tool: string, overrides: Record<string, unknown> = {}, language = "en", persistent = false) {
+  const dom = new JSDOM('<div id="root"></div>', { url: `http://localhost/${language}/tools/${tool}${persistent ? "/xls-preserve" : ""}` });
   const originals = ["window", "document", "navigator", "IS_REACT_ACT_ENVIRONMENT"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)] as const);
   for (const key of ["window", "document", "navigator"]) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key as "window"] });
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -30,7 +30,7 @@ async function mountPage(tool: string, overrides: Record<string, unknown> = {}, 
     if (id === "react") return React;
     if (id === "react/jsx-runtime") return jsx;
     if (id === "react-i18next") return { useTranslation: () => ({ t, i18n: { language, resolvedLanguage: language } }) };
-    if (id.includes("useHandoffReceiver")) return { useHandoffReceiver: (_id: string, value: any) => { adapter = value; const [result, setResult] = React.useState<any>(); publish = setResult; return { result, notReceived: false, recoveryFiles: result?.rejected.map((item: any) => item.file) ?? [], dismiss() {} }; }, usePersistentHandoffReceiver: () => ({ pending: false, notReceived: false, result: undefined, recoveryFiles: [], dismiss() {} }) };
+    if (id.includes("useHandoffReceiver")) return { useHandoffReceiver: (_id: string, value: any) => { adapter = value; const [result, setResult] = React.useState<any>(); publish = setResult; return { result, notReceived: false, recoveryFiles: result?.rejected.map((item: any) => item.file) ?? [], dismiss() {} }; }, usePersistentHandoffReceiver: (_id: string, value: any) => { if (persistent) adapter = { ...value, receive: (entry: any, context: any) => value.receive(entry.files, context) }; return { pending: false, notReceived: false, result: undefined, recoveryFiles: [], dismiss() {} }; } };
     if (id.includes("toolState")) return { setUnsavedWork: (id: string, value: any) => guards.set(id, value.hasWork), useUnsavedWorkGuard: (id: string, work: boolean) => { guards.set(id, work); } };
     if (id.includes("fileAccepts")) return { acceptsFile: () => true };
     if (id === "./client") return { createDocumentGeneratorClient: () => typeof overrides.clientFactory === "function" ? (overrides.clientFactory as Function)() : client };
@@ -50,7 +50,7 @@ async function mountPage(tool: string, overrides: Record<string, unknown> = {}, 
   const name = tool === "document-generator" ? "DocumentGeneratorPage" : tool === "excel-cleaner" ? "ExcelCleanerPage" : "ExcelMergerPage";
   const file = path.resolve(process.env.BACKLOG_SOURCE_ROOT ?? ".", `src/features/${tool}/${name}.tsx`);
   const code = ts.transpileModule(fs.readFileSync(file, "utf8").replaceAll("import.meta.env", "({ DEV: true })"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
-  vm.runInNewContext(code, { require, exports, console, crypto, setTimeout, clearTimeout, queueMicrotask, window: dom.window, URL, File, AbortController }, { filename: file });
+  vm.runInNewContext(code, { require, exports, console, crypto, setTimeout, clearTimeout, queueMicrotask, window: dom.window, URL, URLSearchParams, File, AbortController }, { filename: file });
   const root = createRoot(dom.window.document.getElementById("root")!);
   await React.act(async () => root.render(React.createElement(React.StrictMode, null, React.createElement(exports[name]))));
   return { zones, client, guards, text: () => dom.window.document.body.textContent!,
@@ -133,3 +133,25 @@ for (const tool of ["excel-cleaner", "excel-merger", "document-generator"]) {
     } finally { finish(); await page.close(); }
   });
 }
+
+for (const lateFailure of [false, true]) test(`persistent XLS abort preserves manual input and ignores late ${lateFailure ? "failure" : "success"}`, async () => {
+  let finish!: () => void;
+  const delayed = new Promise<void>(resolve => { finish = resolve; });
+  const page = await mountPage("excel-merger", {
+    "./excelWorkerClient": { inspectExcelFiles: async (files: any[]) => {
+      if (files[0].file.name === "incoming.xlsx") { await delayed; if (lateFailure) throw new Error("late parser failure"); }
+      return files.map(item => ({ id: item.id, sheetNames: ["Sheet1"], encrypted: false }));
+    } },
+  }, "en", true);
+  try {
+    await React.act(async () => { await [...page.zones.values()][0].onFiles([new File(["old"], "manual.xlsx")]); });
+    const job = await page.start([new File(["new"], "incoming.xlsx")]);
+    await job.abort();
+    assert.match(page.text(), /manual.xlsx/);
+    assert.doesNotMatch(page.text(), /incoming.xlsx/);
+    await React.act(async () => { finish(); await job.promise; });
+    assert.match(page.text(), /manual.xlsx/);
+    assert.doesNotMatch(page.text(), /incoming.xlsx/);
+    assert.equal(page.guards.get("excel-merger"), true);
+  } finally { finish(); await page.close(); }
+});
