@@ -61,6 +61,24 @@ try {
       assert.deepEqual(dimensions,[200,120]); assert.equal(await editor.locator('.lower-canvas').count(),1);
       await size.getByRole('button',{name:'Automatic size',exact:true}).click();
     });
+    await scenario('commit applies a pending crop and still delivers its PNG', async () => {
+      await fresh(); await put(); await editor.getByRole('button',{name:'Crop & rotate',exact:true}).click();
+      for(const [label,value]of [['Left','50'],['Top','50'],['Width','120'],['Height','100']])await editor.getByRole('spinbutton',{name:label,exact:true}).fill(value);
+      await editor.locator('.asp-commit').click();await p.locator('[data-testid=image-editor-result] img').waitFor();
+      const dimensions=await p.locator('[data-testid=image-editor-result] img').evaluate(async image=>{await image.decode();return[image.naturalWidth,image.naturalHeight]});assert.ok(dimensions.every(value=>value>0));
+    });
+    await scenario('overlapping PNG encodes retain their own size and W2 destination', async () => {
+      await fresh();await put();const size=p.locator('[data-testid=image-editor-png-size]');await size.locator('input[type=checkbox]').uncheck();
+      await size.locator('input[type=number]').nth(0).fill('200');await size.locator('input[type=number]').nth(1).fill('120');
+      await p.evaluate(()=>{window.__ie1OriginalBlob=HTMLCanvasElement.prototype.toBlob;window.__ie1Hold=true;HTMLCanvasElement.prototype.toBlob=function(callback,...args){if(window.__ie1Hold){window.__ie1Hold=false;window.__ie1Release=()=>window.__ie1OriginalBlob.call(this,callback,...args)}else window.__ie1OriginalBlob.call(this,callback,...args)}});
+      await p.locator('[data-testid=image-editor-add-to-batch]').click();await p.waitForFunction(()=>typeof window.__ie1Release==='function');
+      await size.locator('input[type=number]').nth(0).fill('240');await size.locator('input[type=number]').nth(1).fill('140');await editor.locator('.asp-commit').click();
+      await p.locator('[data-testid=image-editor-result] img').waitFor();const dimensions=await p.locator('[data-testid=image-editor-result] img').evaluate(async image=>{await image.decode();return[image.naturalWidth,image.naturalHeight]});assert.deepEqual(dimensions,[240,140]);
+      await p.evaluate(()=>window.__ie1Release());await p.waitForFunction(()=>document.querySelector('[data-testid=image-editor-add-to-batch]').textContent.includes('(1)'));await p.evaluate(()=>HTMLCanvasElement.prototype.toBlob=window.__ie1OriginalBlob);
+      await tab(1);assert.equal(await p.locator('[data-testid=image-batch-list]').getAttribute('data-count'),'1');await p.locator('[data-image-owner=batch] select').first().selectOption('original');
+      const downloading=p.waitForEvent('download');await p.locator('[data-testid=image-batch-action] button').click();const download=await downloading;const zip=await JSZip.loadAsync(await fs.readFile(await download.path()));const entry=Object.values(zip.files).find(value=>!value.dir);const {PNG}=await import('pngjs');const image=PNG.sync.read(await entry.async('nodebuffer'));assert.deepEqual([image.width,image.height],[200,120]);
+      await fresh();await put();
+    });
     await scenario('W2 repeated trusted activations extend 600ms burst and enqueue one image', async () => {
       const add = p.locator('[data-testid=image-editor-add-to-batch]');
       await add.focus();

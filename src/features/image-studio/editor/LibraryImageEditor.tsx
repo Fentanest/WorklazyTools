@@ -42,7 +42,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [outputSize, setOutputSize] = useState<PixelSize>();
   const [ratioLocked, setRatioLocked] = useState(true);
   const documentRevision = useRef(0);
-  const exportRevision = useRef(0);
+  const pendingCommits = useRef<{ version: number; revision: number; destination: 'result' | 'batch'; size?: PixelSize }[]>([]);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [hasTemplateInput, setHasTemplateInput] = useState(false);
@@ -88,7 +88,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       loadedAck.current.resolve(false); loadedAck.current = undefined;
       setSource(lastStableSource.current); setGeneration(value => value + 1);
     }
-    saving.current = false; destination.current = 'result';
+    saving.current = false; destination.current = 'result'; pendingCommits.current = [];
     setBgBusy(false); setLoading(false);
   }, [dismissPending]);
   useEffect(() => {
@@ -188,7 +188,13 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   // A second canvas target would create duplicate choices for the same editor.
 
 
-  const beforeExport = async ({ format, hasConcealment }: BeforeExportContext): Promise<ExportDecision> => {
+  const beforeExport = async ({ format, path, hasConcealment }: BeforeExportContext): Promise<ExportDecision> => {
+    // Commit may apply a pending crop before this hook. Snapshot the resulting
+    // revision and each request's destination/size before asynchronous encoding.
+    if (path === 'commit') {
+      pendingCommits.current.push({ version: version.current, revision: documentRevision.current, destination: destination.current, size: outputSize });
+      destination.current = 'result';
+    }
     if (!hasConcealment || !['svg', 'json'].includes(format)) return 'proceed';
     if (exportPending.current) return 'cancel';
     return new Promise(resolve => { const pending = { resolve }; exportPending.current = pending; setExportPrompt(pending); });
@@ -209,12 +215,14 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     } finally { if (request === version.current) setBgBusy(false); }
   } });
   const saved = async (blob: Blob) => {
-    const request = version.current, revision = exportRevision.current, target = outputSize;
+    const intent = pendingCommits.current.shift();
+    if (!intent) return;
+    const { version: request, revision, size: target } = intent;
     try {
       const encoded = await resizeResult(blob, target);
       if (!activeRef.current || request !== version.current || revision !== documentRevision.current) return;
       const file = new File([encoded], `${(sourceRef.current?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited.png`, { type: 'image/png' });
-      if (destination.current === 'batch') onEditedResult(file); else setResult(file);
+      if (intent.destination === 'batch') onEditedResult(file); else setResult(file);
     } catch { if (request === version.current) setError(t('image.library.exportFailed')); }
     finally { if (request === version.current) { destination.current = 'result'; saving.current = false; } }
   };
@@ -238,10 +246,10 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       if (batchCount >= 50) { setNotice(t('image.handoff.limit')); return; }
     }
     if (saving.current || !loaded || loading || bgBusy) return;
-    destination.current = target; saving.current = true; exportRevision.current = documentRevision.current;
+    destination.current = target; saving.current = true;
     // The fork's public commit action owns export hooks and forced PNG encoding.
     const button = editorArea.current?.querySelector<HTMLButtonElement>('.asp-commit');
-    if (button) button.click(); else { saving.current = false; setError(t('image.library.exportFailed')); }
+    if (button) button.click(); else { saving.current = false; destination.current = 'result'; setError(t('image.library.exportFailed')); }
   };
   const shrink = source && actualShrinkNotice(source.original, source.decoded, language);
   return <UtilitySectionCard title={t('image.editor.title')} description={t('image.library.description')}>
@@ -271,9 +279,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           {outputSize && <Button type="button" variant="ghost" onClick={() => { setOutputSize(undefined); setResult(undefined); }}>{t('image.library.autoSize')}</Button>}
         </div>
       </fieldset>
-      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onClickCapture={event => {
-        if (event.target instanceof Element && event.target.closest('.asp-commit')) exportRevision.current = documentRevision.current;
-      }} onChangeCapture={event => {
+      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onChangeCapture={event => {
         const input = event.target;
         // Template loading establishes a clean library baseline, but still owns a
         // user file. Protect it and cancel any operation on the previous scene.
@@ -296,7 +302,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           onHistoryChange={() => { if (generation === latestGeneration.current) { documentRevision.current++; setResult(undefined); } }}
           onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
             if (generation !== latestGeneration.current) return true;
-            saving.current = false; destination.current = 'result'; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);
+            saving.current = false; destination.current = 'result'; pendingCommits.current = []; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);
             if (!failure.code.endsWith('cancelled')) setError(messages[language][failure.code as keyof typeof messages.ko] || labels[ERROR_MESSAGES[failure.code]] || t('image.library.failed'));
             return true;
           }} />
