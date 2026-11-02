@@ -1,3 +1,4 @@
+import { purgeExpired } from "../app/persistentHandoff";
 import { FileDropProvider } from "./FileDropProvider";
 import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
@@ -103,6 +104,7 @@ const primaryNavigation = [
   { to: "/about", labelKey: "navigation.about", icon: CircleHelp, end: true },
 ];
 export function AppShell() {
+  useEffect(() => { void purgeExpired().catch(() => undefined); }, []);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusMode, setFocusMode] = useState<"standard" | "editor">("standard");
   useEffect(() => {

@@ -1,3 +1,4 @@
+import { purgeExpired, PersistentHandoffError } from "../../app/persistentHandoff";
 import { FileInput } from "../../components/FileDropProvider";
 import { useFocusMode } from "../../components/AppShell";
 import { AlertCircle, Download, FileText, FileUp, Save } from "lucide-react";
@@ -314,13 +315,16 @@ export function OfficeEditorAppPage() {
   useEffect(() => {
     if (pendingFileCheckedRef.current) return;
     pendingFileCheckedRef.current = true;
+    void purgeExpired().catch(() => undefined);
     void takePendingOfficeFile()
       .then((pendingFile) => {
         if (pendingFile) chooseFile(pendingFile);
         else void start(undefined);
       })
-      .catch(() => {
-        const message = L(
+      .catch((error) => {
+        const message = error instanceof PersistentHandoffError && error.code === "blocked"
+          ? L("다른 탭의 오피스 편집 화면을 닫은 뒤 아래에서 파일을 다시 선택하세요.", "Close the Office editor in other tabs, then choose your file again below.")
+          : L(
           "이전에 선택한 파일을 가져오지 못했습니다. 아래 영역에서 파일을 다시 선택해 주세요.",
           "The previously selected file could not be retrieved. Choose it again below.",
         );

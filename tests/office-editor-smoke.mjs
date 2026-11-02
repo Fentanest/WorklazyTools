@@ -1,4 +1,6 @@
 import fs from "node:fs/promises";
+import assert from "node:assert/strict";
+import ts from "typescript";
 import os from "node:os";
 import path from "node:path";
 
@@ -22,7 +24,10 @@ const browser = await puppeteer.launch({
 });
 
 try {
+  await checkPersistentHandoff(browser);
+  if (process.env.OFFICE_HANDOFF_ONLY !== "1") {
   const page = await browser.newPage();
+  await fenceNetwork(page);
   page.setDefaultTimeout(420_000);
   await page.setViewport({ width: 1440, height: 950, deviceScaleFactor: 1 });
   const client = await page.createCDPSession();
@@ -169,6 +174,7 @@ try {
   }
   if (pageErrors.length) throw new Error(`Office browser errors:\n${pageErrors.join("\n")}`);
   console.log(`Office editor smoke passed: ${progress.samples.length} download states, ${cachedMessages.length} cached states, Korean Calc keyboard edit and ${saved.length} saved DOCX bytes.`);
+  }
 } finally {
   await browser.close();
   await fs.rm(temporaryDirectory, { recursive: true, force: true });
@@ -247,4 +253,182 @@ async function createKoreanSpreadsheet(filePath) {
   sheet.getCell("A2").value = "이동 전";
   sheet.getColumn(1).width = 28;
   await workbook.xlsx.writeFile(filePath);
+}
+
+// Native IndexedDB contract samples, using compiled product modules without a
+// storage mock. Kept in the Office smoke so the existing runtime checks remain.
+async function fenceNetwork(page) {
+  await page.setRequestInterception(true);
+  page.on("request", (request) => {
+    const url = request.url();
+    if (/^(data:|blob:)/.test(url) || new URL(url).origin === new URL(baseUrl).origin) void request.continue();
+    else void request.abort();
+  });
+}
+async function checkPersistentHandoff(browser) {
+  const compile = async (name) => ts.transpileModule(await fs.readFile(`src/${name}.ts`, "utf8"), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  }).outputText;
+  const pending = await compile("features/office-editor/pendingOfficeFile");
+  const core = await compile("app/persistentHandoff").catch((error) => { if (error.code === "ENOENT") return null; throw error; });
+  const tabs = await Promise.all([browser.newPage(), browser.newPage()]);
+  let passed = 0;
+  try {
+    for (const page of tabs) {
+      await page.setRequestInterception(true);
+      page.on("request", (request) => {
+        if (request.url() === `${baseUrl}/__handoff-contract__`) void request.respond({ status: 200, contentType: "text/html", body: "<title>Office handoff contract</title>" });
+        else void request.abort();
+      });
+      await page.goto(`${baseUrl}/__handoff-contract__`);
+      await page.evaluate(({ pending, core }) => {
+        const load = (code, dependencies = {}) => {
+          const exports = {}; new Function("exports", "require", code)(exports, (id) => {
+            if (!(id in dependencies)) throw new Error(`Unknown dependency ${id}`);
+            return dependencies[id];
+          }); return exports;
+        };
+        window.handoffCore = core ? load(core) : null;
+        window.handoffPending = load(pending, { "../../app/persistentHandoff": window.handoffCore });
+        window.openHandoffDB = (version = 2) => new Promise((resolve, reject) => {
+          const request = indexedDB.open("worklazy-office-handoff", version);
+          request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
+        });
+        window.handoffRecords = async () => {
+          const db = await window.openHandoffDB();
+          try { return await new Promise((resolve, reject) => {
+            const tx = db.transaction("records", "readonly"); const req = tx.objectStore("records").getAll();
+            tx.oncomplete = () => resolve(req.result); tx.onabort = () => reject(tx.error);
+          }); } finally { db.close(); }
+        };
+        window.resetHandoff = async () => {
+          sessionStorage.clear();
+          await new Promise((resolve, reject) => {
+            const req = indexedDB.deleteDatabase("worklazy-office-handoff"); req.onsuccess = resolve; req.onerror = () => reject(req.error);
+          });
+        };
+      }, { pending, core });
+    }
+    const [a, b] = tabs;
+    await a.evaluate(() => window.resetHandoff());
+    // This regression deliberately precedes new-module-only tests. The legacy
+    // implementation fails on returned file names, rather than a missing import.
+    await Promise.all(tabs.map((page, index) => page.evaluate((index) => window.handoffPending.stagePendingOfficeFile(new File([`private-${index}`], `tab-${index}.docx`)), index)));
+    const received = await Promise.all(tabs.map((page) => page.evaluate(async () => (await window.handoffPending.takePendingOfficeFile())?.name)));
+    assert.deepEqual(received, ["tab-0.docx", "tab-1.docx"], "independent tabs must receive their own case"); passed++;
+    assert.equal(await a.evaluate(async () => (await window.handoffRecords()).length), 0);
+    await a.evaluate(async () => {
+      await window.handoffPending.stagePendingOfficeFile(new File(["first"], "first.docx"));
+      await window.handoffPending.stagePendingOfficeFile(new File(["second"], "second.docx"));
+      const token = JSON.parse(sessionStorage.getItem("worklazy-handoff-token:office-editor"));
+      if (Object.keys(token).sort().join() !== "id,nonce") throw new Error("token leaked metadata");
+      if ((await window.handoffPending.takePendingOfficeFile()).name !== "second.docx") throw new Error("wrong sequential case");
+      if (await window.handoffPending.takePendingOfficeFile()) throw new Error("reused tab token");
+    }); passed++;
+    await a.evaluate(() => window.resetHandoff());
+    const token = await a.evaluate(() => window.handoffCore.stagePersistentHandoff(new File(["clone"], "clone.docx")));
+    const duplicate = await Promise.all(tabs.map((page) => page.evaluate(async (token) => (await window.handoffCore.consumePersistentHandoff(token))?.name ?? null, token)));
+    assert.equal(duplicate.filter(Boolean).length, 1); passed++;
+    await a.evaluate(async () => {
+      const c = window.handoffCore;
+      const token = await c.stagePersistentHandoff(new File(["exact"], "exact.docx"));
+      for (const [t, receiver, path] of [[{ ...token, nonce: "wrong" }, "office-editor", c.OFFICE_HANDOFF_PATH], [token, "other", c.OFFICE_HANDOFF_PATH], [token, "office-editor", "/wrong"]]) {
+        if (await c.consumePersistentHandoff(t, receiver, path)) throw new Error("mismatch accepted");
+      }
+      if (!(await c.consumePersistentHandoff(token))) throw new Error("mismatch deleted live case");
+    }); passed++;
+    await a.evaluate(async () => {
+      await window.resetHandoff(); const c = window.handoffCore;
+      const now = Date.now; let clock = 1000000; Date.now = () => clock;
+      try {
+        const live = await c.stagePersistentHandoff(new File(["boundary"], "boundary.docx"));
+        clock += c.HANDOFF_TTL_MS;
+        await c.purgeExpired(); if ((await window.handoffRecords()).length !== 1) throw new Error("purged at equality");
+        if (!(await c.consumePersistentHandoff(live))) throw new Error("refused at equality");
+        const expired = await c.stagePersistentHandoff(new File(["expired"], "expired.docx"));
+        clock += c.HANDOFF_TTL_MS + 1;
+        if (await c.consumePersistentHandoff({ ...expired, nonce: "wrong" })) throw new Error("expired mismatch accepted");
+        if ((await window.handoffRecords()).length !== 1) throw new Error("expired mismatch deleted");
+        if (await c.consumePersistentHandoff(expired)) throw new Error("expired accepted");
+        if ((await window.handoffRecords()).length) throw new Error("expired consume did not delete");
+        await c.purgeExpired(); if ((await window.handoffRecords()).length) throw new Error("expired retained");
+      } finally { Date.now = now; }
+    }); passed++;
+    await a.evaluate(async () => {
+      await window.resetHandoff(); const c = window.handoffCore;
+      const attempts = await Promise.allSettled(Array.from({ length: 21 }, (_, i) => c.stagePersistentHandoff(new File([`${i}`], `${i}.docx`))));
+      if (attempts.filter((r) => r.status === "fulfilled").length !== 20 || attempts.filter((r) => r.status === "rejected" && r.reason.code === "full").length !== 1) throw new Error("non-atomic cap");
+      const now = Date.now; Date.now = () => now() + c.HANDOFF_TTL_MS + 1;
+      try { await c.stagePersistentHandoff(new File(["new"], "new.docx")); } finally { Date.now = now; }
+      if ((await window.handoffRecords()).length !== 1) throw new Error("expired cap cleanup");
+    }); passed++;
+    for (const expired of [false, true]) {
+      await a.evaluate(() => window.resetHandoff());
+      const token = await a.evaluate(() => window.handoffCore.stagePersistentHandoff(new File(["race"], "race.docx")));
+      const results = await Promise.all(tabs.map((page, index) => page.evaluate(async ({ token, index, expired }) => {
+        const now = Date.now; if (expired) Date.now = () => now() + 900001;
+        try { return index ? (await window.handoffCore.purgeExpired(), null) : (await window.handoffCore.consumePersistentHandoff(token))?.name ?? null; }
+        finally { Date.now = now; }
+      }, { token, index, expired })));
+      assert.equal(results[0], expired ? null : "race.docx");
+      assert.equal(await a.evaluate(async () => (await window.handoffRecords()).length), 0); passed++;
+    }
+    await a.evaluate(async () => {
+      await window.resetHandoff();
+      await new Promise((resolve, reject) => {
+        const req = indexedDB.open("worklazy-office-handoff", 1);
+        req.onupgradeneeded = () => req.result.createObjectStore("pending-files");
+        req.onsuccess = () => {
+          const db = req.result; const tx = db.transaction("pending-files", "readwrite");
+          tx.objectStore("pending-files").put({ file: new File(["legacy"], "legacy.docx") }, "office-editor");
+          tx.oncomplete = () => { window.legacyDB = db; resolve(); }; tx.onabort = () => reject(tx.error);
+        };
+      });
+    });
+    assert.deepEqual(await b.evaluate(async () => {
+      const c = window.handoffCore;
+      const attempts = [c.purgeExpired(), c.stagePersistentHandoff(new File(["blocked"], "blocked.docx"))];
+      const results = await Promise.race([Promise.all(attempts.map((p) => p.then(() => "unexpected", (e) => e.code))), new Promise((resolve) => setTimeout(() => resolve("hung"), 2000))]);
+      const retry = await c.purgeExpired().then(() => "unexpected", (e) => e.code);
+      return [results, retry];
+    }), [["blocked", "blocked"], "blocked"]);
+    await a.evaluate(() => window.legacyDB.close());
+    await b.evaluate(async () => { const db = await window.openHandoffDB(1); db.close(); await window.handoffCore.purgeExpired(); });
+    const upgraded = await a.evaluate(async () => { const db = await window.openHandoffDB(); const result = { version: db.version, stores: [...db.objectStoreNames] }; db.close(); return result; });
+    assert.deepEqual(upgraded, { version: 2, stores: ["records"] }); passed++;
+    assert.equal(await a.evaluate(() => new Promise((resolve) => { const r = indexedDB.open("worklazy-office-handoff", 1); r.onerror = () => resolve(r.error.name); r.onsuccess = () => { r.result.close(); resolve("unexpected"); }; })), "VersionError"); passed++;
+    await a.evaluate(async () => {
+      await window.resetHandoff();
+      await new Promise((resolve) => { const r = indexedDB.open("worklazy-office-handoff", 1); r.onupgradeneeded = () => r.result.createObjectStore("pending-files"); r.onsuccess = () => { r.result.close(); resolve(); }; });
+      await new Promise((resolve, reject) => { const r = indexedDB.open("worklazy-office-handoff", 2); r.onupgradeneeded = () => { r.result.deleteObjectStore("pending-files"); r.result.createObjectStore("records", { keyPath: "id" }); r.transaction.abort(); }; r.onerror = () => resolve(); r.onsuccess = () => { r.result.close(); reject(new Error("upgrade did not abort")); }; });
+      const old = await window.openHandoffDB(1);
+      if (old.version !== 1 || !old.objectStoreNames.contains("pending-files") || old.objectStoreNames.contains("records")) throw new Error("partial upgrade"); old.close();
+      await window.handoffCore.purgeExpired();
+      const complete = await window.openHandoffDB();
+      if (complete.version !== 2 || complete.objectStoreNames.contains("pending-files") || !complete.objectStoreNames.contains("records")) throw new Error("restart failed"); complete.close();
+    }); passed++;
+    await a.evaluate(async () => {
+      // Hold a genuine product connection open until a later native versionchange.
+      const close = IDBDatabase.prototype.close; let held; let requested = false;
+      IDBDatabase.prototype.close = function () { held = this; };
+      try { await window.handoffCore.purgeExpired(); } finally { IDBDatabase.prototype.close = close; }
+      const original = held.onversionchange;
+      held.onversionchange = function (event) { requested = true; original.call(this, event); };
+      const upgraded = await window.openHandoffDB(3); upgraded.close();
+      if (!requested) throw new Error("product connection did not close on versionchange");
+    }); passed++;
+    await a.evaluate(async () => {
+      await window.resetHandoff(); const c = window.handoffCore;
+      const token = await c.stagePersistentHandoff(new File(["abort"], "abort.docx"));
+      const original = IDBObjectStore.prototype.delete;
+      IDBObjectStore.prototype.delete = function (...args) { const result = original.apply(this, args); this.transaction.abort(); return result; };
+      try {
+        const result = await c.consumePersistentHandoff(token).then(() => "success", (e) => e.code);
+        if (result !== "unavailable") throw new Error("aborted delete delivered a file");
+      } finally { IDBObjectStore.prototype.delete = original; }
+      if (!(await c.consumePersistentHandoff(token))) throw new Error("abort lost the original record");
+    }); passed++;
+    console.log(`Office persistent handoff: ${passed} native Chromium contract samples passed.`);
+    if (process.env.OFFICE_HANDOFF_ONLY === "1") console.log(`# tests ${passed}`);
+  } finally { for (const page of tabs) await page.close(); }
 }
