@@ -237,6 +237,7 @@ export function DocumentGeneratorPage() {
       }
     },
   });
+  const templateOnlyHandoff = handoff.result?.status === "partial" && !!templateFile && !dataFiles.length;
   const successfulRows = snapshot.results.length;
   const attemptIsPublished = snapshot.attempt?.id === snapshot.resultAttemptId;
   const progressRows = snapshot.attempt?.rows ?? [];
@@ -245,7 +246,7 @@ export function DocumentGeneratorPage() {
 
   return <UtilityPage toolId="document-generator"><div ref={intakeRoot} className="contents">
       {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
-        <p>{handoff.result?.status === "partial" && templateFile && !dataFiles.length
+        <p>{templateOnlyHandoff
           ? tr("features:documentGenerator.handoffTemplateOnly")
           : ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
         <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
@@ -254,7 +255,7 @@ export function DocumentGeneratorPage() {
             for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
             setTimeout(() => handoff.dismiss(), 0);
           }}>{ht("handoff.downloadReceived")}</Button>}
-          <Button type="button" variant="outline" disabled={busy} onClick={() => intakeRoot.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>{ht("handoff.selectAgain")}</Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => intakeRoot.current?.querySelectorAll<HTMLInputElement>('input[type="file"]')[templateOnlyHandoff ? 1 : 0]?.click()}>{ht("handoff.selectAgain")}</Button>
           <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{ht("handoff.close")}</Button>
         </div>
       </UtilityNotice>}
