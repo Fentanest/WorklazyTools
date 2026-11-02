@@ -454,8 +454,8 @@ test("U5a rejected text hook retains raw text locally until dismiss; route clean
   });
 });
 
-test("U5a all twelve file receiver definitions remain file-only and their file paths/tabs validate", () => {
-  assert.equal(Object.keys(fileAccepts).length, 12);
+test("U5a all thirteen file receiver definitions remain file-only and their file paths/tabs validate", () => {
+  assert.equal(Object.keys(fileAccepts).length, 13);
   for (const [id, definition] of Object.entries(fileAccepts)) {
     assert.equal((definition as HandoffReceiverDefinition).payload, undefined);
     const files = id === "document-generator" ? [new File([], "template.docx"), new File([], "data.csv")] : [new File([], `input.${definition.extensions[0]}`)];

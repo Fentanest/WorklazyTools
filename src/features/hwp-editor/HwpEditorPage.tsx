@@ -1,3 +1,7 @@
+import { acceptsFile } from "../../app/fileAccepts";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import type { IntakeContext } from "../../app/memoryHandoff";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import { FileInput } from "../../components/FileDropProvider";
 import { Download, FileCheck2, FileText, FolderOpen, RefreshCw, X } from "lucide-react";
 import { createEditor, type HmlSaveState, type RhwpEditor } from "@rhwp/editor";
@@ -11,7 +15,7 @@ import { RhwpVersionNotice } from "../../components/RhwpVersionNotice";
 import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { FileDropZone, FileList, PageHeader, PrimaryButton, SectionCard } from "../../components/ui";
 import { Button } from "../../components/ui/button";
-import { UtilityPage } from "../../components/UtilitySurface";
+import { UtilityNotice, UtilityPage } from "../../components/UtilitySurface";
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { getRhwpStudioUrl } from "../../config/rhwp";
 import { cn } from "../../lib/utils";
@@ -23,6 +27,7 @@ type ProgressTranslate = (key: ProgressMessageKey, options?: Record<string, stri
 
 export function HwpEditorPage() {
   const { t, i18n } = useTranslation("features");
+  const { t: ht } = useTranslation("common");
   const [files, setFiles] = useState<File[]>([]);
   const [editorReady, setEditorReady] = useState(false);
   const [documentOpen, setDocumentOpen] = useState(false);
@@ -33,6 +38,10 @@ export function HwpEditorPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const editorRef = useRef<RhwpEditor | undefined>(undefined);
   const editorPromiseRef = useRef<Promise<RhwpEditor> | undefined>(undefined);
+  const openGeneration = useRef(0);
+  const pendingOpen = useRef(false);
+  const pendingHandoff = useRef<number | undefined>(undefined);
+  const restartEditorRef = useRef<(() => void) | undefined>(undefined);
   const progress = useOperationProgress();
   const file = files[0];
   // Retain translation inputs for the current operation when the locale changes.
@@ -62,38 +71,45 @@ export function HwpEditorPage() {
 
   useEffect(() => {
     let disposed = false;
-    const initialize = async () => {
-      if (!containerRef.current) throw new Error(initializationRef.current.t("hwpEditor.missingContainer"));
-      progressCopyRef.current.clear();
-      initializationRef.current.progress.start(initializationRef.current.progressT("hwpEditor.preparing"));
-      const editor = await createEditor(containerRef.current, {
-        studioUrl: getRhwpStudioUrl(),
-        renderer: "canvas2d",
-        width: "100%",
-        height: "100%",
-        requestTimeoutMs: 120_000,
-        handshakeTimeoutMs: 4_000,
+    let instance = 0;
+    const restart = () => {
+      const attempt = ++instance;
+      editorRef.current?.destroy();
+      editorRef.current = undefined;
+      containerRef.current?.replaceChildren();
+      setEditorReady(false);
+      if (!pendingOpen.current) {
+        progressCopyRef.current.clear();
+        initializationRef.current.progress.start(initializationRef.current.progressT("hwpEditor.preparing"));
+      }
+      const initialize = async () => {
+        if (!containerRef.current) throw new Error(initializationRef.current.t("hwpEditor.missingContainer"));
+        const editor = await createEditor(containerRef.current, {
+          studioUrl: getRhwpStudioUrl(), renderer: "canvas2d", width: "100%", height: "100%",
+          requestTimeoutMs: 120_000, handshakeTimeoutMs: 4_000,
+        });
+        if (disposed || attempt !== instance) {
+          editor.destroy();
+          throw new DOMException("Closed", "AbortError");
+        }
+        editor.element.title = initializationRef.current.t("hwpEditor.frameTitle");
+        editorRef.current = editor;
+        setEditorReady(true);
+        if (!pendingOpen.current) initializationRef.current.progress.succeed(initializationRef.current.progressT("hwpEditor.ready"));
+        return editor;
+      };
+      editorPromiseRef.current = initialize();
+      editorPromiseRef.current.catch((error) => {
+        if (!disposed && attempt === instance && !pendingOpen.current && !(error instanceof DOMException && error.name === "AbortError")) {
+          initializationRef.current.progress.fail(normalizeEditorError(error, initializationRef.current.progressT, initializationRef.current.i18n.resolvedLanguage === "en"));
+        }
       });
-      if (disposed) {
-        editor.destroy();
-        throw new DOMException(initializationRef.current.t("hwpEditor.closed"), "AbortError");
-      }
-      editor.element.title = initializationRef.current.t("hwpEditor.frameTitle");
-      editorRef.current = editor;
-      setEditorReady(true);
-      initializationRef.current.progress.succeed(initializationRef.current.progressT("hwpEditor.ready"));
-      return editor;
     };
-
-    editorPromiseRef.current = initialize();
-    editorPromiseRef.current.catch((error) => {
-      if (!disposed && !(error instanceof DOMException && error.name === "AbortError")) {
-        initializationRef.current.progress.fail(normalizeEditorError(error, initializationRef.current.progressT, initializationRef.current.i18n.resolvedLanguage === "en"));
-      }
-    });
-
+    restartEditorRef.current = restart;
+    restart();
     return () => {
-      disposed = true;
+      disposed = true; instance++; openGeneration.current++; pendingOpen.current = false;
+      restartEditorRef.current = undefined;
       editorRef.current?.destroy();
       editorRef.current = undefined;
       editorPromiseRef.current = undefined;
@@ -110,34 +126,69 @@ export function HwpEditorPage() {
     return editor;
   };
 
-  const openDocument = async (nextFile: File) => {
+  // Destroying a cancelled instance also prevents late loadFile mutations inside
+  // its iframe. Generation checks alone would protect only the React labels.
+  const cancelOpen = () => {
+    openGeneration.current++; pendingOpen.current = false;
+    setFiles([]); setDocumentOpen(false); setDocumentName(""); setPageCount(0); setHmlSaveState(undefined);
+    progress.reset();
+    restartEditorRef.current?.();
+  };
+  const openDocument = async (nextFile: File, context?: IntakeContext) => {
+    if (pendingOpen.current) cancelOpen();
+    const generation = ++openGeneration.current;
+    pendingOpen.current = true;
+    const current = () => generation === openGeneration.current && !context?.signal.aborted;
     progressCopyRef.current.clear();
     progress.start(progressT("hwpEditor.opening", { name: nextFile.name }));
     try {
       const editor = await getEditor();
-      const result = await editor.loadFile(await nextFile.arrayBuffer(), nextFile.name, {
-        skipUnsavedGuard: false,
-        suppressDialogs: false,
+      if (!current()) return false;
+      const bytes = await nextFile.arrayBuffer();
+      if (!current()) return false;
+      const result = await editor.loadFile(bytes, nextFile.name, {
+        skipUnsavedGuard: false, suppressDialogs: Boolean(context),
       });
-      setPageCount(result.pageCount);
-      setDocumentOpen(true);
-      setDocumentName(nextFile.name);
-      try {
-        setHmlSaveState(await editor.getHmlSaveState());
-      } catch {
-        setHmlSaveState(undefined);
-      }
+      if (!current()) return false;
+      let saveState: HmlSaveState | undefined;
+      try { saveState = await editor.getHmlSaveState(); } catch { /* Optional capability. */ }
+      if (!current()) return false;
+      setFiles([nextFile]); setPageCount(result.pageCount); setDocumentOpen(true);
+      setDocumentName(nextFile.name); setHmlSaveState(saveState);
+      // Install ownership synchronously, before the delivery releases originals.
+      setUnsavedWork("hwp-editor", { hasWork: true, kind: "files", scopePath: "/tools/hwp-editor" });
       progress.succeed(progressT("hwpEditor.opened", { count: result.pageCount }));
+      return true;
     } catch (error) {
-      progress.fail(normalizeEditorError(error, progressT, i18n.resolvedLanguage === "en"));
+      if (current()) progress.fail(context ? progressT("hwpEditor.operationError") : normalizeEditorError(error, progressT, i18n.resolvedLanguage === "en"));
+      return false;
+    } finally {
+      if (generation === openGeneration.current) pendingOpen.current = false;
     }
   };
+  const handoff = useHandoffReceiver("hwp-editor", {
+    kind: "inspection",
+    invalidate: () => { if (pendingHandoff.current === openGeneration.current) cancelOpen(); },
+    receive: async (entry, context) => {
+      const input = entry.files[0];
+      if (context.signal.aborted || entry.files.length !== 1 || !acceptsFile("hwp-editor", input))
+        return { status: "rejected", accepted: [], rejected: entry.files.map(file => ({ file, reasonCode: "format" })) };
+      const opening = openDocument(input, context);
+      pendingHandoff.current = openGeneration.current;
+      const accepted = await opening;
+      return { status: accepted ? "accepted" : "rejected", accepted: accepted ? [input] : [],
+        rejected: accepted ? [] : [{ file: input, reasonCode: "inspection" }] };
+    },
+  });
+  useUnsavedWorkGuard("hwp-editor", files.length > 0 || documentOpen, { kind: "files", scopePath: "/tools/hwp-editor" });
 
   const selectFiles = (next: File[]) => {
+    if (pendingOpen.current) cancelOpen();
+    // A manual selection supersedes the delivery even after its inspection ends.
+    openGeneration.current++;
     const selected = next.slice(-1);
     setFiles(selected);
-    const nextFile = selected[0];
-    if (nextFile) void openDocument(nextFile);
+    if (selected[0]) void openDocument(selected[0]);
   };
 
   const exportDocument = async (format: ExportFormat) => {
@@ -197,6 +248,17 @@ export function HwpEditorPage() {
       flush={documentOpen}
       className={documentOpen ? "relative z-20 m-0 flex h-dvh w-full max-w-none flex-col overflow-hidden bg-background p-2 [animation:none] max-[820px]:p-0" : undefined}
     >
+      {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 shrink-0 flex-col items-start gap-2" data-handoff-recovery>
+        <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+        <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+        <div className="flex flex-wrap gap-2">
+          {!!handoff.recoveryFiles.length && <Button type="button" variant="outline" onClick={() => {
+            for (const file of handoff.recoveryFiles) downloadBlob(file, file.name);
+            setTimeout(handoff.dismiss, 0);
+          }}>{ht("handoff.downloadReceived")}</Button>}
+          <Button type="button" variant="ghost" onClick={handoff.dismiss}>{ht("handoff.close")}</Button>
+        </div>
+      </UtilityNotice>}
       {!documentOpen && <>
         <PageHeader eyebrow="HWP EDITOR" title={t("hwpEditor.title")} description={t("hwpEditor.description")}>
           <PrivacyBanner compact />
@@ -204,7 +266,7 @@ export function HwpEditorPage() {
 
         <SectionCard step={1} title={t("hwpEditor.openTitle")} description={t("hwpEditor.openDescription")}>
           <FileDropZone files={files} onFiles={selectFiles} accept=".hwp,.hwpx,.hml,application/x-hwp,application/xml,text/xml" hint={t("hwpEditor.dropHint")} accent="orange" />
-          <FileList files={files} onRemove={() => setFiles([])} accent="orange" />
+          <FileList files={files} onRemove={() => { if (pendingOpen.current) cancelOpen(); else setFiles([]); }} accent="orange" />
           {file && editorReady && (
             <div className="mt-[11px] flex flex-wrap items-center gap-2 max-[620px]:[&>*]:w-full">
               <PrimaryButton accent="orange" loading={progress.status === "running"} onClick={() => void openDocument(file)}><RefreshCw size={18} /> {t("hwpEditor.reopen")}</PrimaryButton>

@@ -143,6 +143,7 @@
         "image-batch": "이미지 일괄 편집",
         "image-privacy": "이미지 개인정보 제거",
         "office": "Office에서 열기",
+        "hwp-editor": "$t(tools:items.hwp-editor.title)",
         "excel-compare": "$t(u5CompareHandoff.receivers.excel-compare)",
         "pdf-compare": "$t(u5CompareHandoff.receivers.pdf-compare)",
         "image-compare": "$t(u5CompareHandoff.receivers.image-compare)",

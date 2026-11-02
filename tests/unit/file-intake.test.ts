@@ -95,7 +95,8 @@ test("U5 (a)(b)(c) comparison pairs map roles in input order and honor shared re
       assert.equal(candidate.entryPath,fileAccepts[expected].paths[0]);
       assert.equal(fileAccepts[expected].max,2); assert.equal(fileAccepts[expected].kind,"inspection");
       assert.ok(candidate.files.every(file=>acceptsFile(expected,file)));
-      if (groups[0].candidates.length>1) assert.ok(groups[0].candidates.indexOf(candidate)>=1);
+      if (kind === "office") assert.equal(groups[0].candidates.indexOf(candidate), 0);
+      else assert.ok(groups[0].candidates.indexOf(candidate) >= 1);
     }
   }
   for (const files of [[file("xlsx"),file("csv")],[file("png"),file("webp")],[file("docx"),file("doc")],[file("hwp"),file("hwpx")],[file("pptx"),file("pptx")]]) {
@@ -121,4 +122,36 @@ test("H2 exact isolated recommendations and count limits preserve every input", 
   }
   const mixed=await intakeFiles([file("xls"),file("xlsx")]);
   assert.equal(mixed.groups[0].candidates.find(item=>item.receiverId==="xls-preserve")!.files.length,2);
+});
+
+// HWP: route the whole single input, preserving the H2 PDF fallback and U5 pairs.
+test("HWP (a)(b)(c) primary editor, PDF fallback, mixed groups and exact count/case boundaries", async () => {
+  for (const ext of ["hwp", "hwpx", "hml", "HWP", "HwPx", "HML"]) {
+    const input = file(ext);
+    const result = await intakeFiles([input]);
+    assert.equal(result.groups[0].kind, "office");
+    const expected = ["hwp-editor", ...(ext.toLowerCase() === "hml" ? [] : ["document-to-pdf"])];
+    assert.deepEqual(result.groups[0].candidates.map(item => item.receiverId), expected);
+    for (const candidate of result.groups[0].candidates) assert.deepEqual(candidate.files, [input]);
+    assert.ok(acceptsFile("hwp-editor", input));
+    assert.deepEqual(fileAccepts["hwp-editor"].paths, ["/tools/hwp-editor"]);
+    for (const count of [0, 2, 3, 20, 21, 49, 50, 51]) {
+      const batch = await intakeFiles(Array.from({ length: count }, () => file(ext)));
+      const candidates = batch.groups.flatMap(group => group.candidates);
+      assert.ok(!candidates.some(item => item.receiverId === "hwp-editor"), `${ext}:${count}`);
+      assert.equal(candidates.some(item => item.receiverId === "document-compare"), count === 2 && ext.toLowerCase() !== "hml");
+      assert.equal(candidates.some(item => item.receiverId === "document-to-pdf"), count > 0 && count <= 20 && ext.toLowerCase() !== "hml");
+      assert.equal(batch.tooMany, count > 50);
+      for (const candidate of candidates) assert.equal(candidate.files.length, count);
+    }
+    const pdf = file("pdf");
+    const mixed = await intakeFiles([input, pdf]);
+    assert.equal(mixed.mixed, true);
+    assert.deepEqual(mixed.groups[0].candidates[0].files, [input]);
+    assert.deepEqual(mixed.groups[1].candidates[0].files, [pdf]);
+  }
+  assert.deepEqual(await receivers([new File([], "hwp")]), []);
+  for (const name of ["hidden.hwp.exe", "document.hwpx "]) assert.equal(acceptsFile("hwp-editor", new File([], name)), false);
+  const mixedFormats = await intakeFiles([file("hwp"), file("hwpx")]);
+  assert.deepEqual(mixedFormats.groups[0].candidates.map(item => item.receiverId), ["document-to-pdf"]);
 });

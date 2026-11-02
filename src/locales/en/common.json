@@ -143,6 +143,7 @@
         "image-batch": "Batch edit images",
         "image-privacy": "Remove image metadata",
         "office": "Open in Office",
+        "hwp-editor": "$t(tools:items.hwp-editor.title)",
         "excel-compare": "$t(u5CompareHandoff.receivers.excel-compare)",
         "pdf-compare": "$t(u5CompareHandoff.receivers.pdf-compare)",
         "image-compare": "$t(u5CompareHandoff.receivers.image-compare)",

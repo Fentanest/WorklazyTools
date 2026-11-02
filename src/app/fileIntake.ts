@@ -23,7 +23,7 @@ export async function classifyFile(file: File): Promise<{ file: File; kind: File
     if (ext) file = new File([file], `${file.name}.${ext}`, { type: file.type, lastModified: file.lastModified });
   }
   const kind = sheets.includes(ext) ? "spreadsheet" : ext === "pdf" ? "pdf" : images.includes(ext) ? "image"
-    : [...office, ...fileAccepts["document-compare"].extensions].includes(ext) ? "office" : /^(mp4|webm|mov|avi|mkv|m4v|mpeg|mpg|ogv)$/.test(ext) ? "video" : "other";
+    : [...office, ...fileAccepts["document-compare"].extensions, ...fileAccepts["hwp-editor"].extensions].includes(ext) ? "office" : /^(mp4|webm|mov|avi|mkv|m4v|mpeg|mpg|ogv)$/.test(ext) ? "video" : "other";
   return { file, kind };
 }
 function candidate(receiverId: ReceiverId, files: File[], extra: Partial<IntakeCandidate> = {}): IntakeCandidate {
@@ -44,6 +44,8 @@ function group(kind: FileKind, files: File[]): IntakeGroup {
   } else if (kind === "image") {
     candidates.push(candidate(files.length === 1 ? "image-edit" : "image-batch", files, { tab: files.length === 1 ? "edit" : "batch" }), candidate("image-privacy", files));
     if (files.length === 1) { candidates.push(candidate("image-batch", files, { tab: "batch" })); hint = "image"; }
+  } else if (kind === "office" && files.length === 1 && fileAccepts["hwp-editor"].extensions.some(ext => ext === extension(first))) {
+    candidates.push(candidate("hwp-editor", files));
   } else if (kind === "office" && files.length === 1 && office.includes(extension(first))) {
     candidates.push({ receiverId: "office", entryPath: "/tools/office-editor/app", files });
     if (extension(first) === "docx") hint = "template";

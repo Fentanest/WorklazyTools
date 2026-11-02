@@ -8,6 +8,7 @@ export interface HandoffReceiverDefinition {
 const spreadsheets = ["xlsx", "xlsm", "xls", "xlsb", "csv"];
 const images = ["jpg", "jpeg", "png", "webp"];
 export const fileAccepts = {
+  "hwp-editor": { paths: ["/tools/hwp-editor"], extensions: ["hwp", "hwpx", "hml"], max: 1, kind: "inspection" },
   "excel-compare": { paths: ["/tools/excel-compare"], extensions: spreadsheets, max: 2, kind: "inspection" },
   "pdf-compare": { paths: ["/tools/pdf-compare"], extensions: ["pdf"], max: 2, kind: "inspection" },
   "image-compare": { paths: ["/tools/image-compare"], extensions: images, max: 2, kind: "inspection" },

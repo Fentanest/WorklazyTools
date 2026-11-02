@@ -524,7 +524,7 @@ const toolMetadata: Record<string, { actions: ToolAction[]; receiverIds?: Receiv
   "document-markdown": { actions: ["convert"] },
   "document-redactor": { actions: ["protect"] },
   "product-banner": { actions: ["create"] },
-  "hwp-editor": { actions: ["create"] },
+  "hwp-editor": { actions: ["create"], receiverIds: ["hwp-editor"] },
   "office-editor": { actions: ["create"] },
   "video-studio": { actions: ["cut", "merge", "convert"] },
   "audio-studio": { actions: ["cut", "merge", "convert"] },
