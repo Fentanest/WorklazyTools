@@ -2,7 +2,6 @@ import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation } from "react-router-dom";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
 import { acceptsFile } from "../../app/fileAccepts";
 import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
@@ -77,9 +76,6 @@ function protectImageInput() {
 export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
   const { t, i18n } = useTranslation("features");
   const { t: commonT } = useTranslation("common");
-  const location = useLocation();
-  const [handoffDismissed, setHandoffDismissed] = useState(false);
-  useEffect(() => setHandoffDismissed(false), [location.key]);
   const pageElement = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<StudioTab>("editor");
   const progress = useOperationProgress();
@@ -149,7 +145,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
   // Both receivers share a route. A token rejected by one can belong to the other.
   const notReceived = editHandoff.notReceived && batchHandoff.notReceived;
   const recoveryFiles = [editHandoff, batchHandoff].flatMap(receiver => receiver.result ? receiver.recoveryFiles : []);
-  const dismissHandoff = () => { editHandoff.dismiss(); batchHandoff.dismiss(); setHandoffDismissed(true); };
+  const dismissHandoff = () => { editHandoff.dismiss(); batchHandoff.dismiss(); };
   const downloadReceived = () => {
     for (const file of recoveryFiles) {
       const url = URL.createObjectURL(file);
@@ -188,7 +184,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       <UtilityNotice className="image-format-notice mb-2">{t("image.heic")}</UtilityNotice>
       {(tab === "batch" || tab === "collage" || tab === "gif") && <UtilityNotice className="image-worker-notice mb-2">{t("image.offscreen")}</UtilityNotice>}
 
-      {!handoffDismissed && (notReceived || recoveryFiles.length > 0) && <UtilityNotice role="status" className="mb-3" data-testid="image-handoff-recovery">
+      {(notReceived || recoveryFiles.length > 0) && <UtilityNotice role="status" className="mb-3" data-testid="image-handoff-recovery">
         <p>{recoveryFiles.length ? commonT("handoff.partial", { count: recoveryFiles.length }) : commonT("handoff.notReceived")}</p>
         {recoveryFiles.map((file, index) => <p className="break-all" key={index}>{file.name}</p>)}
         <div className="mt-2 flex flex-wrap gap-2">

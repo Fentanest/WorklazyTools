@@ -684,6 +684,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
         });
         if (intake) onHandoffAccepted?.(intake.generation, intake.attempt);
       }
+      if (!context && handoff.notReceived) handoff.dismiss();
       return result;
     } catch (reason) {
       if (!isCurrent()) return;
@@ -1014,7 +1015,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
         <div className="flex flex-wrap gap-2">
           {handoff.recoveryFiles.length > 0 && <Button type="button" variant="outline" onClick={downloadReceived}>{t("handoff.downloadReceived")}</Button>}
           <Button type="button" variant="outline" disabled={locked} onClick={() => intakeElementRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>{t("handoff.selectAgain")}</Button>
-          {handoff.recoveryFiles.length > 0 && <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{t("handoff.close")}</Button>}
+          <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{t("handoff.close")}</Button>
         </div>
       </UtilityNotice>}
       <div className="mb-4 grid grid-cols-4 gap-1 rounded-2xl bg-muted p-1" role="tablist" aria-label={copy.tabsLabel}>

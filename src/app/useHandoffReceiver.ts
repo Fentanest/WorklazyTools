@@ -49,5 +49,5 @@ export function useHandoffReceiver(receiverId: ReceiverId, adapter: HandoffAdapt
     return () => { active = false; for (const release of detach) release(); };
   }, [location.key, location.pathname, location.search, receiverId]);
   return { notReceived, result, recoveryFiles: owned.current.flatMap(item => item.closed ? [] : item.files),
-    dismiss: () => { for (const item of owned.current) closeDelivery(item); owned.current = []; record.current = null; setResult(undefined); } };
+    dismiss: () => { for (const item of owned.current) closeDelivery(item); owned.current = []; record.current = null; setResult(undefined); setNotReceived(false); } };
 }

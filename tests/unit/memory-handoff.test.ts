@@ -174,6 +174,7 @@ test("recovery: explicit download or discard executes deferred assign exactly on
 async function receiverFixture(run: (fixture: {
   mount: (token: { id: string; nonce: string }, receiverId?: "pdf-organize" | "pdf-finish") => Promise<ReturnType<typeof import("../../src/app/useHandoffReceiver").useHandoffReceiver>>;
   unmount: () => Promise<void>; calls: () => number;
+  current: () => ReturnType<typeof import("../../src/app/useHandoffReceiver").useHandoffReceiver>;
 }) => Promise<void>, receive: (entry: handoff.HandoffEntry) => DeliveryResult = entry => accepted(entry.files)) {
   const dom = new JSDOM("<div id='root'></div>", { url: "https://example.test/ko/tools/pdf-editor" });
   const saved = new Map(["window", "document", "IS_REACT_ACT_ENVIRONMENT"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
@@ -195,7 +196,7 @@ async function receiverFixture(run: (fixture: {
   let calls = 0;
   const unmount = async () => { if (root) { const current = root; root = undefined; await React.act(async () => current.unmount()); await wait(); } };
   try {
-    await run({ calls: () => calls, unmount, mount: async (token, receiverId = "pdf-organize") => {
+    await run({ calls: () => calls, current: () => state!, unmount, mount: async (token, receiverId = "pdf-organize") => {
       const pathname = receiverId === "pdf-organize" ? "/ko/tools/pdf-editor" : "/ko/tools/pdf-editor/watermark";
       dom.window.history.replaceState({ key: "remount-key", idx: 2, usr: { wlHandoff: token, other: "preserved" } }, "", pathname);
       location = { pathname, search: "", key: "remount-key", state: { wlHandoff: token } };
@@ -259,6 +260,27 @@ test("receiver hook: absent, expired, wrong nonce and another tab tokens still s
     });
   }
 });
+
+for (const receiverId of ["pdf-organize", "pdf-finish"] as const) {
+  test(`receiver hook: dismiss clears notReceived for ${receiverId} without consuming the missing token`, async () => {
+    await receiverFixture(async fixture => {
+      const token = { id: crypto.randomUUID(), nonce: crypto.randomUUID() };
+      const state = await fixture.mount(token, receiverId);
+      assert.equal(state.notReceived, true);
+      await React.act(async () => state.dismiss());
+      assert.equal(fixture.current().notReceived, false);
+      assert.equal(fixture.current().result, undefined);
+      assert.equal(fixture.current().recoveryFiles.length, 0);
+      await React.act(async () => fixture.current().dismiss());
+      assert.equal(fixture.current().notReceived, false, "repeated dismissal stays cleared");
+      assert.equal(fixture.calls(), 0, "dismiss must not deliver a missing token");
+      await fixture.unmount();
+      const remount = await fixture.mount(token, receiverId);
+      assert.equal(remount.notReceived, true, "dismiss must not remember an unreceived token as consumed");
+      assert.equal(fixture.calls(), 0);
+    });
+  });
+}
 
 test("consumed token identity includes nonce, receiver, route and location key; failures are not remembered", async () => {
   const path = "/ko/tools/pdf-editor";

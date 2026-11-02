@@ -352,6 +352,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
       if (direct.acceptedPreset?.purpose === "split") setRangeRows(current => current.some(row => row.range.trim()) ? current : [{ ...current[0], range: compactPdfPageRange([...pages, ...addedPages].map((_, index) => index)), pageIds: [...pages, ...addedPages].map(page => page.id), orderIds: undefined }]);
       setSelectedPageIds((current) => new Set([...current, ...addedPages.map((page) => page.id)]));
       operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.addedAndSelectedAllPages", { p0: addedPages.length }));
+      if (!context && handoff.notReceived) handoff.dismiss();
       if (context) {
         if (addedSources.length) setUnsavedWork("pdf-organize", {
           hasWork: true, kind: "files", scopePath: "/tools/pdf-editor",
@@ -681,7 +682,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
         <div className="flex flex-wrap gap-2">
           {handoff.recoveryFiles.length > 0 && <Button type="button" variant="outline" onClick={downloadReceived}>{t("handoff.downloadReceived")}</Button>}
           <Button type="button" variant="outline" disabled={locked} onClick={() => intakeElementRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>{t("handoff.selectAgain")}</Button>
-          {handoff.recoveryFiles.length > 0 && <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{t("handoff.close")}</Button>}
+          <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{t("handoff.close")}</Button>
         </div>
       </UtilityNotice>}
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
