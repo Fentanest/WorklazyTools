@@ -1,4 +1,10 @@
 // Shared intake contract. Keep this module independent of feature/page code.
+export interface HandoffReceiverDefinition {
+  paths: readonly string[]; extensions: readonly string[]; max: number;
+  kind: "inspection" | "selection";
+  // Future text receivers must opt in; the existing eight remain file-only.
+  payload?: "text";
+}
 const spreadsheets = ["xlsx", "xlsm", "xls", "xlsb", "csv"];
 const images = ["jpg", "jpeg", "png", "webp"];
 export const fileAccepts = {
@@ -10,7 +16,7 @@ export const fileAccepts = {
   "pdf-finish": { paths: ["/tools/pdf-editor/watermark"], extensions: ["pdf"], max: 50, kind: "inspection" },
   "image-edit": { paths: ["/tools/image-studio", "/tools/image-studio/resize", "/tools/image-studio/mosaic", "/tools/image-studio/watermark"], extensions: images, max: 1, kind: "inspection" },
   "image-batch": { paths: ["/tools/image-studio"], extensions: images, max: 50, kind: "selection" },
-} as const;
+} as const satisfies Record<string, HandoffReceiverDefinition>;
 export type ReceiverId = keyof typeof fileAccepts;
 export function acceptsFile(receiverId: ReceiverId, file: File): boolean {
   return (fileAccepts[receiverId].extensions as readonly string[]).includes(file.name.split(".").pop()?.toLowerCase() ?? "");

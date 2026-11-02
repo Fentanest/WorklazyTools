@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import type { ReceiverId } from "./fileAccepts";
-import { claimHandoff, closeDelivery, deliverHandoff, findDelivery, getDelivery, retainDelivery, subscribeHandoff, wasHandoffConsumed, type Delivery, type DeliveryResult, type HandoffAdapter, type HandoffToken } from "./memoryHandoff";
+import { claimHandoff, closeDelivery, deliverHandoff, findDelivery, getDelivery, retainDelivery, subscribeHandoff, wasHandoffConsumed, type Delivery, type DeliveryResult, type HandoffAdapter, type HandoffToken, type IntakeContext } from "./memoryHandoff";
 import { stripLanguagePrefix } from "../i18n/languages";
 
 /** Attach this hook to the tool's existing intake; it never runs its main job. */
@@ -48,6 +48,24 @@ export function useHandoffReceiver(receiverId: ReceiverId, adapter: HandoffAdapt
     update(value => value + 1);
     return () => { active = false; for (const release of detach) release(); };
   }, [location.key, location.pathname, location.search, receiverId]);
-  return { notReceived, result, recoveryFiles: owned.current.flatMap(item => item.closed ? [] : item.files),
+  return { notReceived, result, recoveryTexts: owned.current.flatMap(item => item.closed || item.text === undefined ? [] : [item.text]), recoveryFiles: owned.current.flatMap(item => item.closed ? [] : item.files),
     dismiss: () => { for (const item of owned.current) closeDelivery(item); owned.current = []; record.current = null; setResult(undefined); setNotReceived(false); } };
+}
+
+export type TextHandoffAdapter = {
+  receiveText: (text: string, context: IntakeContext) => boolean | Promise<boolean>;
+} & ({ kind: "selection"; invalidate?: () => void } | { kind: "inspection"; invalidate: () => void });
+
+/** Future text receivers share the token, StrictMode and cleanup lifecycle.
+ * Return true only after storing the input and registering its own protection.
+ * Inspection callbacks must check signal/generation before any late state write.
+ */
+export function useTextHandoffReceiver(receiverId: ReceiverId, adapter: TextHandoffAdapter) {
+  return useHandoffReceiver(receiverId, {
+    kind: adapter.kind, invalidate: adapter.invalidate!, payload: "text",
+    receive: async (entry, context) => {
+      const textAccepted = entry.text !== undefined && await adapter.receiveText(entry.text, context);
+      return { status: textAccepted ? "accepted" : "rejected", textAccepted, accepted: [], rejected: [] };
+    },
+  });
 }

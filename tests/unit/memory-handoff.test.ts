@@ -8,11 +8,11 @@ import { createRoot } from "react-dom/client";
 import { JSDOM } from "jsdom";
 import * as handoff from "../../src/app/memoryHandoff.ts";
 import { isAutoReloadHeld } from "../../src/app/chunkRecovery.ts";
-import { acceptsFile } from "../../src/app/fileAccepts.ts";
+import { acceptsFile, fileAccepts, type HandoffReceiverDefinition } from "../../src/app/fileAccepts.ts";
 import { clearUnsavedWork, hasUnsavedWork } from "../../src/app/toolState.ts";
 import { claimHandoff, stageHandoff, deliverHandoff, closeDelivery, retainDelivery, cancelStagedHandoff,
   clearRecovery, getRecovery, transferToRecovery, deferErrorNavigation, purgeExpiredHandoffs, reconcileHandoffLocation,
-  selectHandoffFiles, validateHandoff, type HandoffInput, type DeliveryResult } from "../../src/app/memoryHandoff.ts";
+  selectHandoffFiles, validateHandoff, MAX_HANDOFF_TEXT_BYTES, type HandoffInput, type DeliveryResult } from "../../src/app/memoryHandoff.ts";
 const file = new File(["synthetic-result"], "result.pdf", { type: "application/pdf" });
 const input = (overrides: Partial<HandoffInput> = {}): HandoffInput => ({ receiverId: "pdf-organize", entryPath: "/tools/pdf-editor", files: [file], origin: "generated", source: "unit", ...overrides });
 const accepted = (files: File[]): DeliveryResult => ({ status: "accepted", accepted: files, rejected: [] });
@@ -175,7 +175,7 @@ async function receiverFixture(run: (fixture: {
   mount: (token: { id: string; nonce: string }, receiverId?: "pdf-organize" | "pdf-finish") => Promise<ReturnType<typeof import("../../src/app/useHandoffReceiver").useHandoffReceiver>>;
   unmount: () => Promise<void>; calls: () => number;
   current: () => ReturnType<typeof import("../../src/app/useHandoffReceiver").useHandoffReceiver>;
-}) => Promise<void>, receive: (entry: handoff.HandoffEntry) => DeliveryResult = entry => accepted(entry.files)) {
+}) => Promise<void>, receive: (entry: handoff.HandoffEntry) => DeliveryResult = entry => accepted(entry.files), textReceive?: (text: string, context: handoff.IntakeContext) => boolean | Promise<boolean>) {
   const dom = new JSDOM("<div id='root'></div>", { url: "https://example.test/ko/tools/pdf-editor" });
   const saved = new Map(["window", "document", "IS_REACT_ACT_ENVIRONMENT"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   Object.defineProperty(globalThis, "window", { configurable: true, value: dom.window });
@@ -201,7 +201,9 @@ async function receiverFixture(run: (fixture: {
       dom.window.history.replaceState({ key: "remount-key", idx: 2, usr: { wlHandoff: token, other: "preserved" } }, "", pathname);
       location = { pathname, search: "", key: "remount-key", state: { wlHandoff: token } };
       function Probe() {
-        state = context.exports.useHandoffReceiver(receiverId, { kind: "selection", receive: (entry: handoff.HandoffEntry) => { calls++; return receive(entry); } });
+        state = textReceive
+          ? context.exports.useTextHandoffReceiver(receiverId, { kind: "selection", receiveText: (text: string, context: handoff.IntakeContext) => { calls++; return textReceive(text, context); } })
+          : context.exports.useHandoffReceiver(receiverId, { kind: "selection", receive: (entry: handoff.HandoffEntry) => { calls++; return receive(entry); } });
         return null;
       }
       root = createRoot(dom.window.document.getElementById("root")!);
@@ -312,4 +314,193 @@ test("consumed token memory evicts old identities at its 256 entry bound", async
   assert.equal(seen(0), false);
   assert.equal(seen(1), true);
   assert.equal(seen(256), true);
+});
+
+// Contract fixture only: no production text receiver or route is installed.
+async function withTextReceiver(run: () => void | Promise<void>) {
+  const definition: HandoffReceiverDefinition = fileAccepts["pdf-organize"];
+  try { definition.payload = "text"; await run(); } finally { delete definition.payload; }
+}
+const textInput = (text = "synthetic private document 🧪", overrides: Partial<HandoffInput> = {}) => input({ files: [], text, ...overrides });
+const textAdapter = (success = true): handoff.HandoffAdapter => ({ payload: "text", kind: "selection", receive: () => ({ status: success ? "accepted" : "rejected", textAccepted: success, accepted: [], rejected: [] }) });
+
+test("U5a before/after cardinality, vocabulary and order; mailmerge keeps its own roles", () => {
+  for (const roles of [["before", "after"], ["after", "before"]] as const) {
+    const value = input({ files: [file, new File([], "after.pdf")], roles: [...roles] });
+    assert.equal(validateHandoff(value), null);
+    const token = stageHandoff(value); value.roles!.reverse();
+    const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+    assert.deepEqual(entry.roles, [...roles]);
+    closeDelivery(deliverHandoff(entry, "/ko/tools/pdf-editor", "roles", { kind: "selection", receive: entry => accepted(entry.files) }));
+  }
+  for (const roles of [["before"], ["before", "before"], ["after", "after"], ["before", "data"], ["before", "after", "after"], ["left", "right"]]) {
+    assert.equal(validateHandoff(input({ files: [file, file], roles: roles as HandoffInput["roles"] })), "roles");
+  }
+  assert.equal(validateHandoff(input({ receiverId: "document-generator", entryPath: "/tools/document-generator", files: [file, file], roles: ["before", "after"] })), "roles");
+});
+
+test("U5a text is opt-in, exclusive and bounded by UTF-8 bytes including emoji", async () => {
+  assert.equal(validateHandoff(textInput()), "destination");
+  await withTextReceiver(() => {
+    assert.equal(validateHandoff(textInput()), null);
+    for (const value of [textInput(""), textInput(null as unknown as string), textInput("text", { files: [file] }), textInput("text", { roles: [] }), textInput("text", { tab: "edit" })]) assert.equal(validateHandoff(value), "text");
+    for (const [unit, bytes] of [["x", 1], ["가", 3], ["🧪", 4]] as const) {
+      const atLimit = unit.repeat(Math.floor(MAX_HANDOFF_TEXT_BYTES / bytes)) + "x".repeat(MAX_HANDOFF_TEXT_BYTES % bytes);
+      assert.equal(new TextEncoder().encode(atLimit).byteLength, MAX_HANDOFF_TEXT_BYTES);
+      assert.equal(validateHandoff(textInput(atLimit)), null);
+      assert.equal(validateHandoff(textInput(atLimit + "x")), "text-size");
+    }
+  });
+});
+
+test("U5a text token has identity only, nonce/path bind claim and 60-second slot expiry", async context => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  try { await withTextReceiver(() => {
+    const secret = "synthetic-private-text-never-in-token";
+    const token = stageHandoff(textInput(secret));
+    assert.deepEqual(Object.keys(token).sort(), ["id", "nonce"]);
+    assert.ok(!JSON.stringify(token).includes(secret));
+    assert.equal(claimHandoff({ ...token, nonce: "wrong" }, "pdf-organize", "/tools/pdf-editor"), null);
+    assert.equal(claimHandoff(token, "pdf-organize", "/tools/pdf-editor/merge"), null);
+    assert.equal(isAutoReloadHeld(), true);
+    context.mock.timers.tick(60_000);
+    assert.equal(claimHandoff(token, "pdf-organize", "/tools/pdf-editor"), null);
+    assert.equal(isAutoReloadHeld(), false);
+    const replaced = stageHandoff(textInput(secret)); const current = stageHandoff(textInput("replacement"));
+    assert.equal(claimHandoff(replaced, "pdf-organize", "/tools/pdf-editor"), null);
+    cancelStagedHandoff(current); assert.equal(isAutoReloadHeld(), false);
+  }); } finally { context.mock.timers.reset(); }
+});
+
+test("U5a text delivery requires explicit adapter acknowledgement, clears accepted refs", async () => {
+  await withTextReceiver(async () => {
+    for (const mode of ["accepted", "rejected", "file-adapter", "false-ack"] as const) {
+      const token = stageHandoff(textInput()); const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+      const adapter = mode === "file-adapter" ? { kind: "selection" as const, receive: () => accepted([]) } : mode === "false-ack" ? { payload: "text" as const, kind: "selection" as const, receive: () => ({ ...accepted([]), textAccepted: false }) } : textAdapter(mode === "accepted");
+      const record = deliverHandoff(entry, "/ko/tools/pdf-editor", mode, adapter);
+      const result = await record.promise;
+      assert.equal(result.status, mode === "accepted" ? "accepted" : "rejected");
+      assert.equal(result.textAccepted, mode === "accepted");
+      assert.equal(entry.text, undefined);
+      assert.equal(record.text, mode === "accepted" ? undefined : textInput().text);
+      assert.ok(!JSON.stringify(result).includes(textInput().text!));
+      closeDelivery(record); assert.equal(record.text, undefined); assert.equal(isAutoReloadHeld(), false);
+    }
+  });
+});
+
+test("U5a generated text recovery uses downloadable bytes, holds and deferred navigation", async () => {
+  await withTextReceiver(async () => {
+    for (const claimed of [false, true]) {
+      const secret = "private recovery 🧪\nline two";
+      const token = stageHandoff(textInput(secret));
+      let record: handoff.Delivery | undefined;
+      if (claimed) { const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!; record = deliverHandoff(entry, "/ko/tools/pdf-editor", "recovery-text", textAdapter(false)); await record.promise; }
+      transferToRecovery();
+      assert.equal(getRecovery()?.files.length, 1);
+      assert.equal(getRecovery()?.files[0].name, "handoff.txt");
+      assert.equal(await getRecovery()!.files[0].text(), secret);
+      if (record) assert.equal(record.text, undefined);
+      let navigation = 0; assert.equal(deferErrorNavigation(() => navigation++), true);
+      purgeExpiredHandoffs(Date.now() + 90_000); assert.equal(getRecovery()?.files.length, 1);
+      assert.equal(isAutoReloadHeld(), true); clearRecovery(); clearRecovery();
+      assert.equal(navigation, 1); assert.equal(isAutoReloadHeld(), false); assert.equal(hasUnsavedWork(), false);
+    }
+  });
+});
+
+test("U5a text expiry closes user-input cache and moves generated cache to explicit recovery", async context => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  try { await withTextReceiver(async () => {
+    for (const origin of ["user-input", "generated"] as const) {
+      const token = stageHandoff(textInput("expiry-private-text", { origin }));
+      const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+      const record = deliverHandoff(entry, "/ko/tools/pdf-editor", "expiry", textAdapter(false)); await record.promise;
+      context.mock.timers.tick(60_000);
+      assert.equal(record.closed, true); assert.equal(record.text, undefined); assert.equal(entry.text, undefined);
+      assert.equal(getRecovery()?.files.length ?? 0, origin === "generated" ? 1 : 0);
+      clearRecovery(); assert.equal(isAutoReloadHeld(), false);
+    }
+  }); } finally { clearRecovery(false); context.mock.timers.reset(); }
+});
+
+test("U5a real text hook applies once in StrictMode, keeps history token-only and remounts silently", async () => {
+  await withTextReceiver(async () => {
+    const secret = "private hook text 🧪"; let received: string | undefined;
+    await receiverFixture(async fixture => {
+      const token = stageHandoff(textInput(secret));
+      const first = await fixture.mount(token);
+      assert.equal(received, secret); assert.equal(fixture.calls(), 1); assert.equal(first.result?.textAccepted, true);
+      assert.equal(first.recoveryTexts.length, 0);
+      assert.ok(!JSON.stringify(window.history.state).includes(secret)); assert.ok(!window.location.href.includes(secret));
+      await fixture.unmount(); const remount = await fixture.mount(token);
+      assert.equal(remount.notReceived, false); assert.equal(fixture.calls(), 1);
+    }, undefined, text => { received = text; return true; });
+    assert.equal(isAutoReloadHeld(), false);
+  });
+});
+
+test("U5a rejected text hook retains raw text locally until dismiss; route cleanup releases it", async () => {
+  await withTextReceiver(async () => {
+    await receiverFixture(async fixture => {
+      const token = stageHandoff(textInput("rejected-private", { origin: "user-input" }));
+      const state = await fixture.mount(token); assert.equal(state.result?.status, "rejected");
+      assert.deepEqual([...state.recoveryTexts], ["rejected-private"]);
+      assert.ok(!JSON.stringify(window.history.state).includes("rejected-private"));
+      await React.act(async () => state.dismiss()); assert.equal(fixture.current().recoveryTexts.length, 0);
+      await fixture.unmount(); assert.equal(isAutoReloadHeld(), false);
+    }, undefined, () => false);
+  });
+});
+
+test("U5a all eight file receiver definitions remain file-only and their file paths/tabs validate", () => {
+  assert.equal(Object.keys(fileAccepts).length, 8);
+  for (const [id, definition] of Object.entries(fileAccepts)) {
+    assert.equal((definition as HandoffReceiverDefinition).payload, undefined);
+    const files = id === "document-generator" ? [new File([], "template.docx"), new File([], "data.csv")] : [new File([], `input.${definition.extensions[0]}`)];
+    const value = input({ receiverId: id as HandoffInput["receiverId"], entryPath: definition.paths[0], files, roles: id === "document-generator" ? ["template", "data"] : undefined, tab: id === "image-edit" ? "edit" : id === "image-batch" ? "batch" : undefined });
+    assert.equal(validateHandoff(value), null, id);
+    assert.equal(validateHandoff({ ...value, text: "private" }), "destination", id);
+  }
+});
+
+test("U5a text inspection timeout, late acknowledgement and route/error cleanup preserve ownership", async context => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  try { await withTextReceiver(async () => {
+    let finish!: (value: DeliveryResult) => void; let resets = 0;
+    const token = stageHandoff(textInput("timeout-private"));
+    const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+    const record = deliverHandoff(entry, "/ko/tools/pdf-editor", "timeout-text", { payload: "text", kind: "inspection", invalidate: () => resets++, receive: () => new Promise(resolve => { finish = resolve; }) });
+    await Promise.resolve(); context.mock.timers.tick(30_000);
+    const result = await record.promise;
+    assert.equal(result.status, "rejected"); assert.equal(result.textReason, "timeout"); assert.equal(resets, 1);
+    finish({ ...accepted([]), textAccepted: true }); await Promise.resolve();
+    assert.equal(record.text, "timeout-private"); assert.equal(isAutoReloadHeld(), true);
+    transferToRecovery("route-error", [record]); assert.equal(record.text, undefined); assert.equal(getRecovery()?.files.length, 1);
+    clearRecovery(); assert.equal(isAutoReloadHeld(), false);
+    // Pending generated input is moved by error cleanup; a real location exit cancels.
+    for (const leaving of [false, true]) {
+      const token = stageHandoff(textInput("unmount-private"));
+      const value = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+      const pending = deliverHandoff(value, "/ko/tools/pdf-editor", "pending-text", { payload: "text", kind: "inspection", invalidate: () => {}, receive: () => new Promise(() => {}) });
+      await Promise.resolve(); const detach = retainDelivery(pending);
+      window.location.pathname = leaving ? "/ko/" : "/ko/tools/pdf-editor";
+      detach(); context.mock.timers.tick(0); await pending.promise;
+      assert.equal(pending.closed, true); assert.equal(pending.text, undefined); assert.equal(value.text, undefined);
+      assert.equal(getRecovery()?.files.length ?? 0, leaving ? 0 : 1);
+      clearRecovery(false); window.location.pathname = "/ko/tools/pdf-editor";
+    }
+  }); } finally { window.location.pathname = "/ko/tools/pdf-editor"; clearRecovery(false); context.mock.timers.reset(); }
+});
+
+test("U5a bfcache age purge preserves claimed generated text through the same recovery path", async () => {
+  await withTextReceiver(async () => {
+    const token = stageHandoff(textInput("bfcache-private"));
+    const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+    const record = deliverHandoff(entry, "/ko/tools/pdf-editor", "bfcache-text", textAdapter(false)); await record.promise;
+    purgeExpiredHandoffs(entry.expiresAt);
+    assert.equal(record.closed, true); assert.equal(record.text, undefined); assert.equal(entry.text, undefined);
+    assert.equal(await getRecovery()!.files[0].text(), "bfcache-private");
+    assert.equal(isAutoReloadHeld(), true); clearRecovery(); assert.equal(isAutoReloadHeld(), false);
+  });
 });
