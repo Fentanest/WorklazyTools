@@ -13,7 +13,8 @@ const measurements = [];
 const recentKey = "worklazy:recent-tools", favoriteKey = "worklazy:favorite-tools";
 async function setup({ language = "ko", width = 1280, theme = "light-coral", seed = {}, fault = "" } = {}) {
   const context = await browser.newContext({ viewport: { width, height: 940 }, serviceWorkers: "block", reducedMotion: "reduce" });
-  await context.addInitScript(({ seed, theme, fault }) => {
+  await context.addInitScript(({ seed, theme, fault, origin }) => {
+    if (location.origin !== origin) return;
     window.__WORKLAZY_MOCK_PROVIDERS__ = true;
     if (!sessionStorage.getItem("u6-seeded")) {
       for (const [key, value] of Object.entries(seed)) localStorage.setItem(key, value);
@@ -30,7 +31,11 @@ async function setup({ language = "ko", width = 1280, theme = "light-coral", see
       if (!panel || window.__u6Geometry.length) return;
       const frame = () => {
         const rect = panel.getBoundingClientRect();
-        window.__u6Geometry.push({ y: rect.y + scrollY, height: rect.height });
+        // Existing page-in uses translateY(9px); compositor animation is not CLS.
+        // Remove only that known transform, preserving all document-flow movement.
+        const transform = getComputedStyle(panel.closest(".page-enter")).transform;
+        const enterTranslateY = transform === "none" ? 0 : new DOMMatrixReadOnly(transform).m42;
+        window.__u6Geometry.push({ y: rect.y + scrollY - enterTranslateY, visualY: rect.y + scrollY, enterTranslateY, height: rect.height });
         if (window.__u6Geometry.length < 12) requestAnimationFrame(frame);
       };
       requestAnimationFrame(frame);
@@ -45,7 +50,7 @@ async function setup({ language = "ko", width = 1280, theme = "light-coral", see
       if (fault === "quota" && key.startsWith("worklazy:") && key.endsWith("tools")) throw new DOMException("Full", "QuotaExceededError");
       return set.call(this, key, value);
     };
-  }, { seed, theme, fault });
+  }, { seed, theme, fault, origin: new URL(server.url).origin });
   const external = [], errors = [];
   await context.route("**/*", route => {
     if (new URL(route.request().url()).origin === new URL(server.url).origin) return route.continue();
@@ -70,6 +75,7 @@ try {
         await page.waitForFunction(() => window.__u6Geometry.length === 12);
         const geometry = await page.evaluate(() => ({ frames: window.__u6Geometry, shifts: window.__u6Shifts, overflow: document.documentElement.scrollWidth > innerWidth }));
         assert.equal(geometry.overflow, false);
+        assert.equal(geometry.shifts.filter(shift => !shift.hadRecentInput).reduce((total, shift) => total + shift.value, 0), 0, "initial CLS must remain zero");
         assert.ok(geometry.frames.every(frame => Math.abs(frame.y - geometry.frames[0].y) < 1 && Math.abs(frame.height - geometry.frames[0].height) < 1), JSON.stringify(geometry));
         measurements.push({ language, width, theme, ...geometry });
         const toggle = page.locator('[data-favorite-tool="excel-merger"]').first();
