@@ -13,8 +13,11 @@ export async function stagePendingOfficeFile(file: File) {
 }
 
 export async function takePendingOfficeFile(): Promise<File | undefined> {
-  const raw = sessionStorage.getItem(TOKEN_KEY);
-  sessionStorage.removeItem(TOKEN_KEY); // One attempt, before any asynchronous work.
+  let raw: string | null;
+  try {
+    raw = sessionStorage.getItem(TOKEN_KEY);
+    sessionStorage.removeItem(TOKEN_KEY); // One attempt, before any asynchronous work.
+  } catch { throw new PersistentHandoffError("unavailable"); }
   if (raw === null) return undefined;
   let token: { id: string; nonce: string };
   try {

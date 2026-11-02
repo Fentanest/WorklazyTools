@@ -1,3 +1,7 @@
+import { usePersistentHandoffReceiver } from "../../app/useHandoffReceiver";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import type { IntakeContext } from "../../app/memoryHandoff";
+import { PersistentHandoffNotice } from "../../components/PersistentHandoffNotice";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Download, Eye, Plus, Redo2, Trash2, Undo2 } from 'lucide-react';
 import { FileDropZone, PrimaryButton } from '../../components/ui';
@@ -21,6 +25,7 @@ interface Failure { index:number; code:ErrorCode }
 export function DocumentRedactorPage() {
   const language=useAppLanguage(); const c=(resources[language].features.documentRedactor as Copy);
   const [ready,setReady]=useState(false); const [fatal,setFatal]=useState(false); const [imageEnabled,setImageEnabled]=useState(false); const client=useRef<RedactorClient|undefined>(undefined);
+  const intakeGeneration=useRef(0); const preparingTask=useRef<Promise<RedactorClient> | undefined>(undefined);
   const mounted=useRef(true); const urls=useRef(new Set<string>()); const lease=useRef<PreviewLease|undefined>(undefined); const previewToken=useRef(0); const previewSettled=useRef<Promise<void>>(Promise.resolve());
   const [files,setFiles]=useState<File[]>([]); const [inputs,setInputs]=useState<InputInfo[]>([]); const [failures,setFailures]=useState<Failure[]>([]);
   const [histories,setHistories]=useState<Record<string,MaskHistory>>({}); const [fileId,setFileId]=useState(''); const [pageIndex,setPageIndex]=useState(0);
@@ -40,7 +45,7 @@ export function DocumentRedactorPage() {
     let keep = true;
     const preparing = new AbortController();
     const release = () => {
-      keep = false; mounted.current = false; preparing.abort(); abort.current?.abort();
+      keep = false; mounted.current = false; intakeGeneration.current++; preparing.abort(); abort.current?.abort();
       document.querySelectorAll<HTMLInputElement>('input[type="file"]').forEach(input => { input.disabled = true; });
       previewToken.current++; lease.current?.release(); lease.current = undefined;
       urls.current.forEach(URL.revokeObjectURL); urls.current.clear();
@@ -49,18 +54,43 @@ export function DocumentRedactorPage() {
     };
     const onPageHide = () => { document.documentElement.inert = true; setReady(false); release(); };
     window.addEventListener('pagehide', onPageHide);
-    void prepareRedactorClient({signal: preparing.signal}).then(async value => {
-      if (!keep) { await value.dispose(); return; }
-      client.current = value; setImageEnabled(value.capabilities.image); setReady(true);
-    }).catch(() => { if (keep) setFatal(true); });
+    const task = prepareRedactorClient({signal: preparing.signal}).then(async value => {
+      if (!keep) { await value.dispose(); throw new Error("cancelled"); }
+      client.current = value; setImageEnabled(value.capabilities.image); setReady(true); return value;
+    });
+    preparingTask.current = task;
+    void task.catch(() => { if (keep) setFatal(true); });
     return () => { window.removeEventListener('pagehide', onPageHide); release(); };
   }, []);
 
   const releaseAllResults=useCallback(()=>{const value=client.current; Object.values(resultsRef.current).forEach(result=>{revoke(result.url);try{value?.releaseResult(result.info.id)}catch{}}); resultsRef.current={};setResults({});revokeZip();},[revoke,revokeZip]);
-  const replaceInputs=useCallback(async(next:File[])=>{const value=client.current;if(!value||running||selecting)return;setSelecting(true);setNotice('');setJobFailures([]);try{
-    const selection=await value.setInputs(next); if(!mounted.current)return; releaseAllResults(); const accepted=selection.inputs.map(info=>next[info.index]); setFiles(accepted);setInputs(selection.inputs);setFailures(selection.failures);
-    setHistories(old=>Object.fromEntries(selection.inputs.map(info=>[info.id,old[info.id]??emptyMaskHistory()])));setFileId(old=>selection.inputs.some(info=>info.id===old)?old:selection.inputs[0]?.id??'');if(!selection.inputs.some(info=>info.id===fileId)){setPageIndex(0);setSelectedMask(-1);}setConfirmed(false);setResultMode(false);
-  }catch(error){if(mounted.current)setNotice(c.errors[safeError(error).code]);}finally{if(mounted.current)setSelecting(false)}},[c,releaseAllResults,running,selecting,fileId]);
+  const replaceInputs=useCallback(async(next:File[], context?: IntakeContext): Promise<File[]> => {
+    const generation=++intakeGeneration.current;
+    const active=()=>mounted.current && generation===intakeGeneration.current && !context?.signal.aborted;
+    try {
+      const value=context ? await preparingTask.current : client.current;
+      if(!value||!active()||running||selecting)return [];
+      setSelecting(true);setNotice('');setJobFailures([]);
+      const selection=await value.setInputs(next);
+      if(!active())return [];
+      releaseAllResults(); const accepted=selection.inputs.map(info=>next[info.index]); setFiles(accepted);setInputs(selection.inputs);setFailures(selection.failures);
+      setHistories(old=>Object.fromEntries(selection.inputs.map(info=>[info.id,old[info.id]??emptyMaskHistory()])));setFileId(old=>selection.inputs.some(info=>info.id===old)?old:selection.inputs[0]?.id??'');
+      if(!selection.inputs.some(info=>info.id===fileId)){setPageIndex(0);setSelectedMask(-1);}setConfirmed(false);setResultMode(false);
+      return accepted;
+    }catch(error){if(active())setNotice(c.errors[safeError(error).code]);return [];}finally{if(active())setSelecting(false);}
+  },[c,releaseAllResults,running,selecting,fileId]);
+  const handoff=usePersistentHandoffReceiver("document-redactor", {
+    kind:"inspection",
+    invalidate:()=>{intakeGeneration.current++;client.current?.cancel();setSelecting(false);setFiles([]);setInputs([]);setFailures([]);setHistories({});setFileId('');releaseAllResults();},
+    receive:async(next,context)=>{
+      const accepted=await replaceInputs(next,context);
+      if(context.signal.aborted)return {status:"cancelled",accepted:[],rejected:[]};
+      if(accepted.length)setUnsavedWork("document-redactor",{hasWork:true,kind:"files",scopePath:"/tools/document-redactor"});
+      return {status:accepted.length===next.length?"accepted":accepted.length?"partial":"rejected",accepted,rejected:next.filter(file=>!accepted.includes(file)).map(file=>({file,reasonCode:"inspection"}))};
+    },
+  });
+  useUnsavedWorkGuard("document-redactor",files.length>0||handoff.recoveryFiles.length>0,{kind:"files",scopePath:"/tools/document-redactor"});
+  const recovery=<PersistentHandoffNotice handoff={handoff} disabled={busy||!ready} onSelectAgain={()=>document.querySelector<HTMLInputElement>('[data-tool-page="document-redactor"] input[type="file"]')?.click()}/>;
 
   const commit=useCallback((next:MasksByPage)=>{if(!input)return;setHistories(old=>({...old,[input.id]:commitMasks(old[input.id]??emptyMaskHistory(),next)}));setConfirmed(false);},[input]);
   const setPageMasks=(next:MaskRect[])=>commit({...history.present,[pageIndex]:next});
@@ -86,12 +116,12 @@ export function DocumentRedactorPage() {
   if(fatal) return (
     <UtilityPage toolId="document-redactor">
       <header className="mb-5"><h1 className="text-2xl font-extrabold">{c.title}</h1></header>
-      <UtilityNotice kind="error" role="alert">{c.errors['not-ready']}</UtilityNotice>
+      {recovery}<UtilityNotice kind="error" role="alert">{c.errors['not-ready']}</UtilityNotice>
       {<ToolGuideWrapper slug="documentRedactor">{c.fallbackNotice && <UtilityNotice className="mt-4" kind="warning">{c.fallbackNotice}</UtilityNotice>}</ToolGuideWrapper>}
     </UtilityPage>
   );
   return <UtilityPage toolId="document-redactor"><header className="mb-5"><h1 className="text-2xl font-extrabold">{c.title}</h1><p className="mt-2 text-muted-foreground">{c.description} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></header>
-    <UtilitySectionCard title={c.files.title} description={c.files.description}>{ready?<div className="redactor-file-picker"><FileDropZone label={c.files.label} hint={imageEnabled?c.files.hint:c.files.pdfHint} accept={imageEnabled?'application/pdf,image/jpeg,image/png,image/webp':'application/pdf'} multiple files={files} onFiles={replaceInputs} disabled={busy}/></div>:<p role="status">{c.preparing}</p>}<UtilityNotice>{c.files.limits}</UtilityNotice>{ready&&!imageEnabled&&<UtilityNotice kind="warning">{c.files.imageUnavailable}</UtilityNotice>}
+    {recovery}<UtilitySectionCard title={c.files.title} description={c.files.description}>{ready?<div className="redactor-file-picker"><FileDropZone label={c.files.label} hint={imageEnabled?c.files.hint:c.files.pdfHint} accept={imageEnabled?'application/pdf,image/jpeg,image/png,image/webp':'application/pdf'} multiple files={files} onFiles={async next=>{await replaceInputs(next)}} disabled={busy}/></div>:<p role="status">{c.preparing}</p>}<UtilityNotice>{c.files.limits}</UtilityNotice>{ready&&!imageEnabled&&<UtilityNotice kind="warning">{c.files.imageUnavailable}</UtilityNotice>}
       {failures.length>0&&<UtilityNotice  kind="error"><ul>{failures.map((f,i)=><li key={i}>{c.document.replace('{{number}}',String(f.index+1))}: {c.errors[f.code]}</li>)}</ul></UtilityNotice>}
       {inputs.length>0&&<ol className="redactor-document-list">{inputs.map((value,i)=><li key={value.id}><button type="button" disabled={busy} aria-current={value.id===fileId?'true':undefined} onClick={()=>{setFileId(value.id);setPageIndex(0);setResultMode(false)}}>{c.document.replace('{{number}}',String(i+1))} · {value.pages.length} {c.pages}</button><Button type="button" variant="ghost" disabled={busy} aria-label={`${c.remove} ${i+1}`} onClick={()=>void replaceInputs(files.filter((_,n)=>n!==i))}><Trash2 size={16}/></Button></li>)}</ol>}
     </UtilitySectionCard>

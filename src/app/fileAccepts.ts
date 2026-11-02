@@ -25,3 +25,11 @@ export type ReceiverId = keyof typeof fileAccepts;
 export function acceptsFile(receiverId: ReceiverId, file: File): boolean {
   return (fileAccepts[receiverId].extensions as readonly string[]).includes(file.name.split(".").pop()?.toLowerCase() ?? "");
 }
+
+// Persistent targets stay separate: adding them must not opt memory senders in.
+export const isolatedFileAccepts = {
+  "document-redactor": { path: "/tools/document-redactor", extensions: ["pdf", "jpg", "jpeg", "png", "webp"], max: 20 },
+  "document-to-pdf": { path: "/tools/pdf-converter/document-to-pdf", extensions: ["hwp", "hwpx", "doc", "docx", "xls", "xlsx", "ppt", "pptx"], max: 20 },
+  "xls-preserve": { path: "/tools/excel-merger/xls-preserve", extensions: spreadsheets, max: 20 },
+} as const;
+export type IsolatedReceiverId = keyof typeof isolatedFileAccepts;

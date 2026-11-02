@@ -1,7 +1,7 @@
-import { fileAccepts, type ReceiverId } from "./fileAccepts.ts";
+import { fileAccepts, isolatedFileAccepts, type IsolatedReceiverId, type ReceiverId } from "./fileAccepts.ts";
 
 export type FileKind = "spreadsheet" | "pdf" | "image" | "office" | "video" | "other";
-export interface IntakeCandidate { receiverId: ReceiverId | "office"; entryPath: string; files: File[]; roles?: ("template" | "data" | "before" | "after")[]; tab?: "edit" | "batch" }
+export interface IntakeCandidate { receiverId: ReceiverId | IsolatedReceiverId | "office"; entryPath: string; files: File[]; roles?: ("template" | "data" | "before" | "after")[]; tab?: "edit" | "batch" }
 export interface IntakeGroup { kind: FileKind | "mailmerge"; files: File[]; candidates: IntakeCandidate[]; hint?: "excel" | "data" | "pdf" | "image" | "template" }
 export interface FileIntake { groups: IntakeGroup[]; count: number; tooMany: boolean; mixed: boolean }
 const sheets = fileAccepts["excel-cleaner"].extensions as readonly string[];
@@ -56,6 +56,13 @@ function group(kind: FileKind, files: File[]): IntakeGroup {
     if (receiverId && files.every(file => (fileAccepts[receiverId].extensions as readonly string[]).includes(extension(file)))) {
       candidates.push(candidate(receiverId, files, { roles: ["before", "after"] }));
     }
+  }
+  // H2: append isolated choices without changing the existing primary choices.
+  for (const receiverId of Object.keys(isolatedFileAccepts) as IsolatedReceiverId[]) {
+    const definition = isolatedFileAccepts[receiverId];
+    if (receiverId === "xls-preserve" && !files.some(file => extension(file) === "xls")) continue;
+    if (files.length <= definition.max && files.every(file => (definition.extensions as readonly string[]).includes(extension(file))))
+      candidates.push({ receiverId, entryPath: definition.path, files });
   }
   return { kind, files, candidates, hint };
 }

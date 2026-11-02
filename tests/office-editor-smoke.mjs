@@ -290,7 +290,7 @@ async function checkPersistentHandoff(browser) {
         };
         window.handoffCore = core ? load(core) : null;
         window.handoffPending = load(pending, { "../../app/persistentHandoff": window.handoffCore });
-        window.openHandoffDB = (version = 2) => new Promise((resolve, reject) => {
+        window.openHandoffDB = (version = 3) => new Promise((resolve, reject) => {
           const request = indexedDB.open("worklazy-office-handoff", version);
           request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error);
         });
@@ -395,7 +395,7 @@ async function checkPersistentHandoff(browser) {
     await a.evaluate(() => window.legacyDB.close());
     await b.evaluate(async () => { const db = await window.openHandoffDB(1); db.close(); await window.handoffCore.purgeExpired(); });
     const upgraded = await a.evaluate(async () => { const db = await window.openHandoffDB(); const result = { version: db.version, stores: [...db.objectStoreNames] }; db.close(); return result; });
-    assert.deepEqual(upgraded, { version: 2, stores: ["records"] }); passed++;
+    assert.deepEqual(upgraded, { version: 3, stores: ["records"] }); passed++;
     assert.equal(await a.evaluate(() => new Promise((resolve) => { const r = indexedDB.open("worklazy-office-handoff", 1); r.onerror = () => resolve(r.error.name); r.onsuccess = () => { r.result.close(); resolve("unexpected"); }; })), "VersionError"); passed++;
     await a.evaluate(async () => {
       await window.resetHandoff();
@@ -405,7 +405,7 @@ async function checkPersistentHandoff(browser) {
       if (old.version !== 1 || !old.objectStoreNames.contains("pending-files") || old.objectStoreNames.contains("records")) throw new Error("partial upgrade"); old.close();
       await window.handoffCore.purgeExpired();
       const complete = await window.openHandoffDB();
-      if (complete.version !== 2 || complete.objectStoreNames.contains("pending-files") || !complete.objectStoreNames.contains("records")) throw new Error("restart failed"); complete.close();
+      if (complete.version !== 3 || complete.objectStoreNames.contains("pending-files") || !complete.objectStoreNames.contains("records")) throw new Error("restart failed"); complete.close();
     }); passed++;
     await a.evaluate(async () => {
       // Hold a genuine product connection open until a later native versionchange.
@@ -414,7 +414,7 @@ async function checkPersistentHandoff(browser) {
       try { await window.handoffCore.purgeExpired(); } finally { IDBDatabase.prototype.close = close; }
       const original = held.onversionchange;
       held.onversionchange = function (event) { requested = true; original.call(this, event); };
-      const upgraded = await window.openHandoffDB(3); upgraded.close();
+      const upgraded = await window.openHandoffDB(4); upgraded.close();
       if (!requested) throw new Error("product connection did not close on versionchange");
     }); passed++;
     await a.evaluate(async () => {
