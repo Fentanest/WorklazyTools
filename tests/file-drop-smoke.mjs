@@ -67,7 +67,7 @@ export async function runHomeAssets() {
         assert.ok(await page.locator('[data-receiver="excel-cleaner"]').isVisible());
         await drop.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,`mixed-${language}-${width}-${dark?"dark":"light"}.png`),fullPage:true});await drop.screenshot({path:path.join(output,`intake-${language}-${width}-${dark?"dark":"light"}.png`)});
         assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);
-        if(width===390){await page.locator(".home-drop-bundle-note").evaluate(node=>node.scrollIntoView({block:"center"}));assert.equal(await page.locator(".wl-hero").evaluate(node=>node.scrollTop),0,"intake focus must not scroll the hero internally");await page.screenshot({path:path.join(output,`bundle-visible-${language}-${dark?"dark":"light"}.png`)});}
+        if(width===390){await page.locator(".home-drop-bundle-note").evaluate(node=>node.scrollIntoView({block:"center",behavior:"instant"}));assert.equal(await page.locator(".wl-hero").evaluate(node=>node.scrollTop),0,"intake focus must not scroll the hero internally");await page.screenshot({path:path.join(output,`bundle-visible-${language}-${dark?"dark":"light"}.png`)});}
       } finally {await context.close();}
     });
   } finally {await env.close();}
