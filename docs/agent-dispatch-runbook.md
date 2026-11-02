@@ -4,17 +4,17 @@
 
 ## 0. 기본 실행 표면 — herdr (2026-10-26 사용자 지시)
 
-사용자가 herdr 화면에서 직접 지켜볼 수 있도록 **외부 에이전트는 모두 herdr 페인에서 대화형 세션으로 띄운다.** 대상은 Codex(Sol·Astra·Luna), Gemini(agy), Muse(OpenCode), Claude 작업자(Sonnet 등)다. 헤드리스 `codex exec`·companion `--background`·`agy -p`·`opencode run`·`nohup`, Claude `Agent` 서브에이전트로 다른 모델 몫을 대신 돌리는 방식은 기본 경로가 아니다. herdr를 쓸 수 없을 때(`HERDR_ENV` 없음, herdr 서버 장애)만 §2~§5의 기존 경로를 쓰고 그 이유를 작업 기록에 남긴다.
+사용자가 herdr 화면에서 직접 지켜볼 수 있도록 **외부 에이전트는 모두 herdr 페인에서 대화형 세션으로 띄운다.** 대상은 Codex(Sol·Reviewer(sol)·Reviewer(Astra)·Luna), Gemini(agy), Muse(OpenCode), Claude 작업자(Sonnet 등)다. 헤드리스 `codex exec`·companion `--background`·`agy -p`·`opencode run`·`nohup`, Claude `Agent` 서브에이전트로 다른 모델 몫을 대신 돌리는 방식은 기본 경로가 아니다. herdr를 쓸 수 없을 때(`HERDR_ENV` 없음, herdr 서버 장애)만 §2~§5의 기존 경로를 쓰고 그 이유를 작업 기록에 남긴다.
 
 **권한 — 사용자 명시 승인(2026-10-26: "권한 차단당하지 말고", opencode 호출 포함).** 권한 질문이나 샌드박스 때문에 작업자가 멈추거나, 질문이 자동 거부돼 빈 결과로 끝나지 않도록 아래 플래그로 시작한다.
 
 | 역할 | `--kind` | `--` 뒤 인자 |
 |---|---|---|
 | Muse(주 구현) | `opencode` | `--auto "$WT"` — 모델은 `~/.config/opencode/opencode.jsonc`의 `model`(`opencode-go/muse-spark-1.3-contributor`). Muse는 codex로 띄울 수 없다. 실제 ID를 `muse_runtime_id`와 대조한다 |
-| Sol(보조 구현)·Astra(검수) | `codex` | `-C "$WT" -m <gpt-6.1-sol / gpt-6-astra> --dangerously-bypass-approvals-and-sandbox` |
+| Sol(보조 구현)·Reviewer(sol)·Reviewer(Astra) | `codex` | `-C "$WT" -m <gpt-6.1-sol / gpt-6-astra> --dangerously-bypass-approvals-and-sandbox` |
 | Luna | `codex` | `-C "$WT" -m gpt-6.1-luna --dangerously-bypass-approvals-and-sandbox` |
 | Gemini | `agy` | `--add-dir "$WT" --model gemini-4-argon-high --dangerously-skip-permissions` |
-| Claude 작업자 | `claude` | `--model sonnet --dangerously-skip-permissions` |
+| Claude 작업자·Reviewer(sonnet) | `claude` | `--model sonnet --dangerously-skip-permissions` |
 
 - 권한 플래그와 아래 「최대 허용」 범위를 따른다(2026-10-31). 남기는 금지는 아래 목록뿐이며 작업서와 사후 검사(`git status --short`, `find <경로> -newer <marker>`)로 지킨다.
 **권한 범위 — 최대 허용(2026-10-31 사용자 지시 「권한은 최대한 허락하는 쪽으로 모두 맞추고」).** 위 플래그로 띄운 작업자는 작업서의 일을 끝내는 데 필요한 명령을 질문 없이 실행한다.
@@ -44,7 +44,8 @@ herdr agent read "$NAME" --source recent-unwrapped --lines 200
 - 완료 판정: `idle`/`done`은 입력 대기일 뿐이다. 결과 파일·diff·검사 출력으로 확인한다. agy는 내부 백그라운드 작업이 남아 있어도 idle로 보일 수 있다.
 - 후속: 같은 작업의 후속은 같은 에이전트 이름으로 `agent prompt`해 세션을 잇는다. 다른 작업·다른 worktree는 새 페인·새 세션으로 띄운다.
 - 정리: 결과를 회수해 보고한 뒤 **자기가 만든 페인만** `herdr pane close <pane>`로 닫는다. 사용자가 보는 중이거나 남겨 달라고 하면 둔다. 다른 페인·탭·워크스페이스와 `herdr server stop`은 건드리지 않는다.
-- 묶음 검수: herdr 경로로 띄운 Astra 검수는 `agent_ops.py dispatch-review`/`finish-review`(companion 잡 ID 기반)를 거치지 않는다. 검수 프롬프트에 정식 결과 JSON 경로를 지정하고, 에이전트 이름·worktree·고정 후보·결과 경로를 `docs/jobs`에 기록한다. `agent_ops.py`의 herdr 연동은 아직 없다.
+- 검수자 배정(2026-11-02): 정식 결과 검수는 Muse·Sonnet 구현분 Reviewer(sol), Sol 구현분 Reviewer(sonnet), `!계획!`·`!계획만!` 계획 검토와 같은 지적 3회 수정 실패 시 Reviewer(Astra)다(`PROJECT_RULES.md` 「검수자 배정」). herdr 이름은 `reviewer-sol`·`reviewer-sonnet`·`reviewer-astra`, 탭 라벨은 `Reviewer(sol)` 등. 새 잡부터 적용.
+- 묶음 검수: herdr 경로로 띄운 정식 검수는 `agent_ops.py dispatch-review`/`finish-review`(companion 잡 ID 기반)를 거치지 않는다. 검수 프롬프트에 정식 결과 JSON 경로를 지정하고, 에이전트 이름·worktree·고정 후보·결과 경로를 `docs/jobs`에 기록한다. `agent_ops.py`의 herdr 연동은 아직 없다.
 
 ### agy가 시작 직후 꺼지거나 빈 결과로 끝날 때
 
@@ -58,7 +59,7 @@ herdr agent read "$NAME" --source recent-unwrapped --lines 200
 | 유형 | 모델·용도 | 실제 권한 |
 |---|---|---|
 | 조사/순수 원문 대조 | Gemini, 한도 초과 조사 대체 Luna(`gpt-6.1-luna`), 순수 계획 판독 Astra | 원문 읽기·검색·허용 조사 스크립트. 제품 수정 없음. Luna의 DART 원문·판정·검증물 열람 금지 |
-| 격리 검수 재현 | Astra | 검수 worktree의 임시 빌드·테스트·보고 쓰기. 제품 원본·커밋·push·배포 금지 |
+| 격리 검수 재현 | 정식 검수자(Reviewer) | 검수 worktree의 임시 빌드·테스트·보고 쓰기. 제품 원본·커밋·push·배포 금지 |
 | 구현 | Muse(주) 또는 Sol(보조) | 승인된 자기 구현 worktree의 제품 수정·국소 검사·보존 커밋. Muse 우선 배정 |
 
 쓰기 sandbox와 제품 구현 허가는 별개다. 검수에 필요한 쓰기를 막아 증거가 0개인 상태를 정상 검수로 만들지 않는다. 반대로 `--write`를 주고 ‘수정하지 마’라는 프롬프트만으로 운영·다른 worktree까지 보호됐다고 주장하지 않는다.
@@ -144,7 +145,7 @@ agy --add-dir "$WORKTREE" --dangerously-skip-permissions \
 
 ## 4. 정식 검수 발주
 
-`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비하고 `dispatch-review`를 실행한다. `--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다. 담당 모델은 Astra로 고정되며 정식 검수 결과는 `finish-review`로 회수한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
+`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비하고 `dispatch-review`를 실행한다. `--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다. companion 대체 경로의 담당 모델은 `agent-ops-config.json`의 `models.review`(`gpt-6.1-sol`)다. Sol 구현분은 herdr Reviewer(sonnet)로 발주한다. 정식 검수 결과는 `finish-review`로 회수한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
 
 이 코드 설치는 전역 Stop hook·MCP·새 daemon을 설치하지 않는다. 구현 종료/영역 전환 단계가 해당 명령을 실제 호출해야 작동한다. 기존 플러그인의 자동 review gate가 켜져 있으면 건별 중복 검수가 발생할 수 있으므로 현재 설정을 확인해 이번 묶음 정책과 충돌하는지 기록한다. 관련 설정을 조용히 바꾸거나 CI 필수 검사와 혼동하지 않는다.
 
