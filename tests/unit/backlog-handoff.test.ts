@@ -80,6 +80,25 @@ for (const language of ["ko", "en"]) test(`template-only partial explains that d
 });
 
 const source = (file: File) => ({ id: file.name, fileName: file.name, book: { sheets: [{ name: "Sheet1", rowCount: 2, columnCount: 1, cells: [{ row: 1, column: 1, value: "name" }] }] } });
+test("document adoption ignores retired client disposal and enables file selection", async () => {
+  const page = await mountPage("document-generator", { clientFactory: () => {
+    const listeners = new Set<(value: any) => void>();
+    return {
+      snapshot: () => ({ state: "idle", results: [], version: 0 }),
+      subscribe: (listener: (value: any) => void) => { listeners.add(listener); return () => listeners.delete(listener); },
+      inspectTemplate: async () => ({ variables: ["name"] }),
+      loadSources: async ([file]: File[]) => [source(file)],
+      // Production dispose can emit before React replaces the subscription.
+      dispose: async () => { for (const listener of listeners) listener({ state: "disposed", results: [], version: 0 }); },
+    };
+  } });
+  try {
+    const result = await page.receive([new File(["t"], "template.docx"), new File(["d"], "data.csv")], ["template", "data"]);
+    assert.equal(result.status, "accepted");
+    assert.equal([...page.zones.values()].every(zone => !zone.disabled), true);
+  } finally { await page.close(); }
+});
+
 for (const tool of ["excel-cleaner", "excel-merger", "document-generator"]) {
   for (const lateFailure of [false, true]) test(`${tool}: abort preserves existing input and ignores late ${lateFailure ? "failure" : "success"}`, async () => {
     let finish!: () => void;

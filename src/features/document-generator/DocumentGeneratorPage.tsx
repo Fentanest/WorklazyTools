@@ -53,7 +53,9 @@ export function DocumentGeneratorPage() {
   const operation = useOperationProgress();
 
   const releaseDownload = useCallback((value?: GeneratorDownload) => value?.release(), []);
-  useEffect(() => client.subscribe(setSnapshot), [client]);
+  useEffect(() => client.subscribe(value => {
+    if (clientRef.current === client) setSnapshot(value);
+  }), [client]);
   useEffect(() => () => { releaseDownload(sample); }, [releaseDownload, sample]);
   useEffect(() => () => { releaseDownload(zip); }, [releaseDownload, zip]);
   useEffect(() => {
