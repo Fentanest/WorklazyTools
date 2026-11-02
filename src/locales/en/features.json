@@ -2838,6 +2838,28 @@
       "PROCESSING_FAILED": "The file could not be cleaned. Check the file and rule settings.",
       "cells": "{{count}} affected: {{cells}}",
       "rule": "Rule ID: {{id}}"
+    },
+    "recipes": {
+      "title": "Saved cleaning rules",
+      "description": "Only rules you explicitly save remain in this browser. Save up to 20 recipes, with names of 1–40 characters and a total size of 256KB. Rules may include find-and-replace text; take care on shared devices.",
+      "name": "Recipe name",
+      "save": "Save these rules",
+      "load": "Load",
+      "delete": "Delete",
+      "deleteNamed": "Delete {{name}} recipe",
+      "empty": "No saved recipes yet.",
+      "messages": {
+        "ok": "",
+        "saved": "Rules saved.",
+        "loaded": "Rules loaded. Check the target columns before applying them to a file.",
+        "deleted": "Rules deleted.",
+        "storage": "Could not save because browser storage is full or blocked.",
+        "corrupt": "Saved rules could not be read and were ignored. The existing value is unchanged. Clear saved rules on the Privacy Policy page before saving again.",
+        "name": "Enter a recipe name of 1–40 characters.",
+        "limit": "You can save up to 20 recipes. Delete an existing recipe and try again.",
+        "size": "Saved rules exceed the total limit of 256KB. Reduce or delete rules.",
+        "invalid": "Check the rule format. Rules could not be saved."
+      }
     }
   },
   "documentRedactor": {

@@ -109,7 +109,14 @@
     "localTitle": "Documents & passwords",
     "localText": "Processed locally in your browser",
     "networkTitle": "Web, analytics & ads",
-    "networkText": "Disclosed separately under this policy"
+    "networkText": "Disclosed separately under this policy",
+    "cleanerRecipes": {
+      "title": "Excel cleaning rules stored in your browser",
+      "description": "Selecting Save these rules stores the recipe name, save time and cleaning rules in this browser. User files and processing results are not stored, but rules may contain find-and-replace text, column names or other text you enter. Saved rules are not sent to a server and remain until you delete them individually or clear them below.",
+      "clear": "Clear all saved Excel cleaning rules",
+      "ok": "All saved Excel cleaning rules have been cleared.",
+      "storage": "Could not clear rules because browser storage is blocked."
+    }
   },
   "terms": {
     "title": "Terms of Use",

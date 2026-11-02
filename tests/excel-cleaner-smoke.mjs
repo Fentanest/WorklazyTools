@@ -47,6 +47,15 @@ try {
   const browser = await puppeteer.launch({ executablePath: "/usr/bin/google-chrome", headless: true, protocolTimeout: 300_000, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
   try {
     const page = await browser.newPage();
+    // Each openCleaner call intentionally replaces the previous fixture.
+    // H1 now registers file/result protection, so acknowledge only its native
+    // document-exit prompt when this test explicitly navigates to the next case.
+    const navigationDialogs = [];
+    page.on("dialog", (dialog) => {
+      navigationDialogs.push(dialog.type());
+      if (dialog.type() === "beforeunload") void dialog.accept();
+      else void dialog.dismiss();
+    });
     await page.setViewport({ width: 1360, height: 940, deviceScaleFactor: 1 });
     page.setDefaultTimeout(240_000);
     const interceptedExternalRequests = [];
@@ -81,6 +90,8 @@ try {
       isolated: Boolean(document.querySelector('meta[name="worklazy-video-isolation"], meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"]')),
     }));
     if (initial.title !== "Excel 데이터 정리" || initial.rules !== 28 || initial.fileInputs !== 1 || !initial.ads || initial.isolated) throw new Error(`Initial UI or ad boundary failed: ${JSON.stringify(initial)}`);
+
+    const recipeChecks = await verifyRecipes(page);
 
     await upload(page, path.join(temporaryDirectory, "formula.xlsx"), 1);
     await page.click("[data-testid='excel-cleaner-add-rule'] button");
@@ -238,10 +249,14 @@ try {
     if (mobile.overflow > 1 || mobile.addButtonHeight < 40 || mobile.fileButtonHeight < 40) throw new Error(`Mobile overflow or button alternative failed: ${JSON.stringify(mobile)}`);
 
     if (!(await fs.readFile(path.join(temporaryDirectory, "formula.xlsx"))).equals(originalFormula)) throw new Error("Input file bytes changed during browser processing.");
+    if (await page.evaluate(() => localStorage.getItem("worklazy:excel-cleaner-recipes")) !== null) throw new Error("File processing implicitly saved a recipe");
+    if (navigationDialogs.some(type => type !== "beforeunload")) throw new Error(`Unexpected dialog: ${navigationDialogs.join(",")}`);
     if (pageErrors.length) throw new Error(`Browser page errors:\n${pageErrors.join("\n")}`);
     if (failedRequests.length) throw new Error(`Same-origin request failures:\n${failedRequests.join("\n")}`);
     console.log(JSON.stringify({
       initial,
+      recipeChecks,
+      navigationDialogs,
       externalHttpRequestsBlockedBeforeExecution: interceptedExternalRequests.length,
       ruleOrderAfterDrag: order,
       actionGeometry,
@@ -257,6 +272,7 @@ try {
       inputUnchanged: true,
       mobile,
     }, null, 2));
+    console.log("# tests 7\n# pass 7\n# fail 0");
   } finally { await browser.close(); }
 } finally {
   await fs.rm(temporaryDirectory, { recursive: true, force: true });
@@ -322,4 +338,58 @@ async function inspectCleanerWorkbook(bytes, cleanedSheetName) {
   const cleaned = workbook.getWorksheet(cleanedSheetName);
   const reports = ["변경 요약", "처리 규칙", "오류 행", "제외 행"].filter((name) => workbook.getWorksheet(name));
   return { sheetCount: workbook.worksheets.length, reportSheets: reports.length, formula: cleaned?.getCell("D2").formula, visibility };
+}
+
+async function verifyRecipes(page) {
+  const key = "worklazy:excel-cleaner-recipes";
+  await page.evaluate(key => localStorage.removeItem(key), key);
+  await openCleaner(page);
+  await page.select("[data-testid='excel-cleaner-add-rule'] select", "remove-empty-rows");
+  await page.click("[data-testid='excel-cleaner-add-rule'] button");
+  if (await page.evaluate(key => localStorage.getItem(key), key) !== null) throw new Error("Rule editing auto-saved without explicit action");
+  await page.type('[data-testid="recipe-name"]', "Daily cleaning");
+  await page.click('[data-testid="recipe-save"]');
+  await page.waitForSelector('[data-testid="recipe-item"]');
+  const saved = await page.evaluate(key => localStorage.getItem(key), key);
+  const records = JSON.parse(saved);
+  if (records.length !== 1 || records[0].name !== "Daily cleaning" || records[0].pipeline.rules[0].type !== "remove-empty-rows" || Object.keys(records[0]).sort().join(",") !== "name,pipeline,savedAt") throw new Error("Explicit recipe save contract failed");
+  console.log("ok 1 - W4 explicit save; no file/result state stored");
+  await replaceTextarea(page, "[data-testid='excel-cleaner-rule'] textarea", "{invalid");
+  await page.click('[data-testid="recipe-load"]');
+  await page.waitForFunction(() => JSON.parse(document.querySelector("[data-testid='excel-cleaner-rule'] textarea").value).type === "remove-empty-rows");
+  await openCleaner(page);
+  await page.click('[data-testid="recipe-load"]');
+  await page.waitForSelector('[data-testid="excel-cleaner-rule"]');
+  console.log("ok 2 - W4 load validated saved rules after reload");
+  await page.evaluate(key => {
+    const original = Storage.prototype.setItem;
+    window.__restoreRecipeStorage = () => { Storage.prototype.setItem = original; };
+    Storage.prototype.setItem = function(k, value) { if (k === key) throw new DOMException("test quota", "QuotaExceededError"); return original.call(this, k, value); };
+  }, key);
+  await page.type('[data-testid="recipe-name"]', "Quota test");
+  await page.click('[data-testid="recipe-save"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="recipe-message"]')?.textContent.includes("저장 공간"));
+  if (await page.evaluate(key => localStorage.getItem(key), key) !== saved) throw new Error("Quota error changed existing recipe bytes");
+  await page.evaluate(() => window.__restoreRecipeStorage());
+  console.log("ok 3 - W4 quota exception preserves original bytes and shows notice");
+  await page.click('[data-testid="recipe-delete"]');
+  await page.waitForFunction(() => !document.querySelector('[data-testid="recipe-item"]'));
+  if (await page.evaluate(key => localStorage.getItem(key), key) !== "[]") throw new Error("Recipe deletion failed");
+  console.log("ok 4 - W4 individual deletion");
+  await page.evaluate(key => localStorage.setItem(key, "{damaged"), key);
+  await openCleaner(page);
+  if (await page.$('[data-testid="recipe-item"]')) throw new Error("Corrupt recipe was shown");
+  await page.type('[data-testid="recipe-name"]', "Must not overwrite");
+  await page.click('[data-testid="recipe-save"]');
+  await page.waitForFunction(() => document.querySelector('[data-testid="recipe-message"]')?.textContent.includes("기존 값"));
+  if (await page.evaluate(key => localStorage.getItem(key), key) !== "{damaged") throw new Error("Corrupt recipe bytes were overwritten");
+  console.log("ok 5 - W4 damaged storage ignored and preserved on save");
+  await page.goto(`${baseUrl}/ko/privacy/`, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector('[data-testid="privacy-cleaner-recipes"]');
+  await page.click('[data-testid="privacy-cleaner-recipes"] button');
+  await page.waitForFunction(() => document.querySelector('[data-testid="privacy-cleaner-recipes"] [role=status]')?.textContent.includes("지웠습니다"));
+  if (await page.evaluate(key => localStorage.getItem(key), key) !== null) throw new Error("Privacy clear did not remove corrupt recipes");
+  console.log("ok 6 - W4 Privacy clears even damaged stored rules");
+  await openCleaner(page);
+  return { explicitSave: true, validatedLoadAfterReload: true, quotaAtomic: true, deletion: true, corruptionPreserved: true, privacyClear: true };
 }

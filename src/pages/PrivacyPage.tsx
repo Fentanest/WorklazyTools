@@ -1,4 +1,7 @@
 import { FileLock2, Globe2, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { clearRecipes } from "../features/excel-cleaner/recipeStore";
+import { Button } from "../components/ui/button";
 import { useTranslation } from "react-i18next";
 
 import { PageHeader } from "../components/ui";
@@ -7,6 +10,7 @@ interface PolicySection { title: string; paragraphs: string[]; items?: string[] 
 
 export function PrivacyPage() {
   const { t } = useTranslation("pages");
+  const [clearStatus, setClearStatus] = useState<"ok" | "storage">();
   const sections = t("privacy.sections", { returnObjects: true }) as PolicySection[];
   return (
     <div className="page standard-page page-enter content-page">
@@ -15,6 +19,12 @@ export function PrivacyPage() {
       <article className="prose-card">
         <p className="policy-date">{t("privacy.date")}</p>
         {sections.map((section) => <section key={section.title}><h2>{section.title}</h2>{section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}{section.items && <ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul>}</section>)}
+        <section data-testid="privacy-cleaner-recipes">
+          <h2>{t("privacy.cleanerRecipes.title")}</h2>
+          <p>{t("privacy.cleanerRecipes.description")}</p>
+          <Button type="button" variant="outline" onClick={() => setClearStatus(clearRecipes().status === "ok" ? "ok" : "storage")}>{t("privacy.cleanerRecipes.clear")}</Button>
+          {clearStatus && <p role="status">{t(`privacy.cleanerRecipes.${clearStatus}`)}</p>}
+        </section>
         <section>
           <h2>{t("privacy.providerLinksTitle")}</h2>
           <p>{t("privacy.providerLinksDescription")}</p>
