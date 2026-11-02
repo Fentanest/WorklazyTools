@@ -10,7 +10,7 @@ function sender(stage: (input: any) => Promise<void>, assign: (path: string) => 
   const exports: any = {};
   vm.runInNewContext(ts.transpileModule(readFileSync("src/app/openInIsolatedTool.ts", "utf8"), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText,
     { exports, window: { location: { assign } }, require: (id: string) => id === "./fileAccepts" ? { isolatedFileAccepts } : {
-      stagePendingPersistentHandoff: stage, cancelPendingPersistentHandoff: cancel, PersistentHandoffError: class extends Error { code: string; constructor(code: string) { super(code); this.code = code; } },
+      stagePendingPersistentHandoff: stage, replacePendingPersistentHandoff: stage, cancelPendingPersistentHandoff: cancel, PersistentHandoffError: class extends Error { code: string; constructor(code: string) { super(code); this.code = code; } },
     } });
   return exports;
 }
@@ -45,20 +45,15 @@ test("document intake rejects wrong, encrypted, oversized, empty and cancelled i
 });
 
 
-test("P3 H2 retry cancels its receiver's previous record before stage and navigation", async () => {
-  let release!: () => void; const events: string[] = []; let occupied = true;
-  const s = sender(async () => { assert.equal(occupied, false, "old record would block quota"); events.push("stage"); }, () => events.push("assign"), async id => {
-    assert.equal(id, "document-redactor"); events.push("cancel"); await new Promise<void>(resolve => { release = resolve; }); occupied = false;
-  });
-  const sent = s.openInIsolatedTool("document-redactor", [new File(["new"], "new.pdf")], "/en/tools/document-redactor");
-  void sent.catch(() => undefined);
-  assert.deepEqual(events, ["cancel"]); release(); await sent; assert.deepEqual(events, ["cancel", "stage", "assign"]);
-});
-test("P3 old-record cancellation failure keeps H2 on source and permits retry", async () => {
-  let failing = true, stages = 0, moves = 0;
-  const s = sender(async () => { stages++; }, () => { moves++; }, async () => { if (failing) throw new Error("blocked"); });
-  const files = [new File(["new"], "new.xls")];
-  await assert.rejects(s.openInIsolatedTool("xls-preserve", files, "/target"), /blocked/);
-  assert.equal(stages, 0); assert.equal(moves, 0);
-  failing = false; await s.openInIsolatedTool("xls-preserve", files, "/target"); assert.equal(stages, 1); assert.equal(moves, 1);
+test("P3E failed replacement preserves the old case and token and permits retry", async () => {
+  let occupied = true, token = "old", failing = true, moves = 0;
+  const s = sender(async () => {
+    if (failing) throw new Error("quota");
+    occupied = true; token = "new";
+  }, () => { moves++; }, async () => { occupied = false; token = ""; });
+  const files = [new File(["new"], "new.pdf")];
+  await assert.rejects(s.openInIsolatedTool("document-redactor", files, "/target"), /quota/);
+  assert.equal(occupied, true); assert.equal(token, "old"); assert.equal(moves, 0);
+  failing = false; await s.openInIsolatedTool("document-redactor", files, "/target");
+  assert.equal(token, "new"); assert.equal(moves, 1);
 });
