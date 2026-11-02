@@ -66,17 +66,33 @@ for (const language of ['ko', 'en']) {
         assert.equal(await page.getByTestId('document-pdf-download').count(), 0);
         assert.equal(workers.length, 1);
         await page.screenshot({ path: path.join(output, `${language}-${mode}.png`), fullPage: true });
-        // Removing the failed file must not clear the session failure state.
-        const remove = page.getByRole('button', { name: language === 'ko' ? 'sample.docx 제거' : 'Remove sample.docx', exact: true });
-        await remove.click(); await remove.waitFor({ state: 'detached' });
-        assert.equal(await page.getByRole('button', { name: create, exact: true }).count(), 0);
-        assert.equal(await page.locator('input[type=file]').isDisabled(), true);
-        // SPA navigation must not reset the failed native session's UI guard.
-        await page.locator(`.pdf-tool-navigation a[href$='/pdf-to-image/'], .pdf-tool-navigation a[href$='/pdf-to-image']`).click();
-        await page.locator(`.pdf-tool-navigation a[href$='/document-to-pdf/'], .pdf-tool-navigation a[href$='/document-to-pdf']`).click();
-        await page.getByRole('alert').filter({ hasText: locales[language].timeout }).waitFor();
-        assert.equal(await page.getByRole('button', { name: create, exact: true }).count(), 0);
-        assert.equal(await page.locator('input[type=file]').isDisabled(), true);
+        if (mode === 'cleanup') {
+          // Removing the failed file must not clear the session failure state.
+          const remove = page.getByRole('button', { name: language === 'ko' ? 'sample.docx 제거' : 'Remove sample.docx', exact: true });
+          await remove.click(); await remove.waitFor({ state: 'detached' });
+          assert.equal(await page.getByRole('button', { name: create, exact: true }).count(), 0);
+          assert.equal(await page.locator('input[type=file]').isDisabled(), true);
+          // Dedicated isolation documents navigate via location.assign, so
+          // these tabs intentionally create a fresh document (not an SPA reset).
+          await page.evaluate(() => { window.__documentPdfRealm = 'failed-document'; });
+          await Promise.all([page.waitForNavigation(), page.locator(`.pdf-tool-navigation a[href$='/pdf-to-image/'], .pdf-tool-navigation a[href$='/pdf-to-image']`).click()]);
+          await Promise.all([page.waitForNavigation(), page.locator(`.pdf-tool-navigation a[href$='/document-to-pdf/'], .pdf-tool-navigation a[href$='/document-to-pdf']`).click()]);
+          await page.getByRole('button', { name: create, exact: true }).waitFor();
+          assert.equal(await page.evaluate(() => window.__documentPdfRealm), undefined);
+          assert.equal(await page.getByRole('alert').count(), 0);
+          assert.equal(await page.locator('input[type=file]').isEnabled(), true);
+          // Reproduce cleanup failure in the fresh document before checking
+          // its explicit reload action as well.
+          await page.locator('input[type=file]').setInputFiles(fixture);
+          const waitingAgain = page.waitForEvent('console', { predicate: message => message.text() === 'recovery-probe-cleanup' });
+          await page.getByRole('button', { name: create, exact: true }).click();
+          await waitingAgain; await page.clock.fastForward(10001);
+          await page.getByRole('alert').filter({ hasText: locales[language].timeout }).waitFor();
+          assert.equal(await page.getByRole('button', { name: create, exact: true }).count(), 0);
+          assert.equal(await page.locator('input[type=file]').isDisabled(), true);
+        }
+        // The deadline case reloads with the failed file still selected and
+        // accepts the app's existing native unsaved-work confirmation.
         const navigation = page.waitForNavigation();
         await page.getByRole('button', { name: locales[language].reload, exact: true }).click();
         await navigation;
