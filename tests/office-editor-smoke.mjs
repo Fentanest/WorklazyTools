@@ -347,7 +347,10 @@ async function checkPersistentHandoff(browser) {
         if (!(await c.consumePersistentHandoff(live))) throw new Error("refused at equality");
         const expired = await c.stagePersistentHandoff(new File(["expired"], "expired.docx"));
         clock += c.HANDOFF_TTL_MS + 1;
+        if (await c.consumePersistentHandoff({ ...expired, nonce: "wrong" })) throw new Error("expired mismatch accepted");
+        if ((await window.handoffRecords()).length !== 1) throw new Error("expired mismatch deleted");
         if (await c.consumePersistentHandoff(expired)) throw new Error("expired accepted");
+        if ((await window.handoffRecords()).length) throw new Error("expired consume did not delete");
         await c.purgeExpired(); if ((await window.handoffRecords()).length) throw new Error("expired retained");
       } finally { Date.now = now; }
     }); passed++;

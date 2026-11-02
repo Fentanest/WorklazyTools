@@ -111,10 +111,11 @@ export function consumePersistentHandoff(token: PersistentHandoffToken, receiver
       const record = request.result as PersistentHandoffRecord | undefined;
       if (!record || record.id !== token.id || record.nonce !== token.nonce || record.receiverId !== receiverId
         || record.entryPath !== entryPath || record.schema !== 1 || !Number.isFinite(record.createdAt)
-        || record.expiresAt !== record.createdAt + HANDOFF_TTL_MS || record.expiresAt < Date.now()
+        || record.expiresAt !== record.createdAt + HANDOFF_TTL_MS
         || !(record.file instanceof File)) return;
+      const expired = record.expiresAt < Date.now();
       store.delete(record.id);
-      result(record.file);
+      if (!expired) result(record.file);
     };
   });
 }

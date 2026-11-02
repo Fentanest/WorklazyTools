@@ -49,11 +49,24 @@ test("an aborted consume never returns a file even after get succeeds", async ()
   h.requests[0].result = undefined; h.requests[0].onsuccess(); h.transaction.onabort(); await rejected;
   assert.equal(h.database.closed, true);
 });
-test("mismatched or expired records are not deleted or delivered", async () => {
+test("mismatched or malformed records are not deleted or delivered", async () => {
   for (const patch of [{ nonce: "wrong" }, { receiverId: "other" }, { entryPath: "/wrong" }, { schema: 2 }, { expiresAt: 1 }, { file: {} }]) {
     const h = transactionHarness(); const promise = h.core.consumePersistentHandoff({ id: "id", nonce: "nonce" }); await tick();
     const now = Date.now(); h.requests[0].result = { id: "id", nonce: "nonce", receiverId: "office-editor", entryPath: h.core.OFFICE_HANDOFF_PATH, schema: 1, file, createdAt: now, expiresAt: now + h.core.HANDOFF_TTL_MS, ...patch };
     h.requests[0].onsuccess(); h.transaction.oncomplete(); assert.equal(await promise, undefined); assert.deepEqual(h.deleted, []);
+  }
+});
+test("matching expired consume deletes in its transaction without delivering; mismatches remain", async () => {
+  for (const patch of [{}, { id: "other" }, { nonce: "wrong" }, { receiverId: "other" }, { entryPath: "/wrong" }]) {
+    const h = transactionHarness(); const promise = h.core.consumePersistentHandoff({ id: "id", nonce: "nonce" }); await tick();
+    const createdAt = Date.now() - h.core.HANDOFF_TTL_MS - 1;
+    h.requests[0].result = { id: "id", nonce: "nonce", receiverId: "office-editor", entryPath: h.core.OFFICE_HANDOFF_PATH,
+      schema: 1, file, createdAt, expiresAt: createdAt + h.core.HANDOFF_TTL_MS, ...patch };
+    let settled = false; void promise.then(() => { settled = true; });
+    h.requests[0].onsuccess();
+    assert.deepEqual(h.deleted, Object.keys(patch).length ? [] : ["id"]);
+    await tick(); assert.equal(settled, false);
+    h.transaction.oncomplete(); assert.equal(await promise, undefined);
   }
 });
 test("capacity refuses a 21st live record without replacing existing records", async () => {

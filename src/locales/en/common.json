@@ -83,7 +83,7 @@
     "title": "Your work files are never uploaded to our server.",
     "description": "Selected files are processed in your browser, and file contents are not sent for advertising or visit analytics. We use ads and analytics to operate this site; see the Privacy Policy for details and your choices.",
     "local": "Local processing",
-    "removed": "Office handoff: deleted on receipt or a visit after 15 minutes"
+    "removed": "Never uploaded"
   },
   "home": {
     "kicker": "Small tools for everyday work",
