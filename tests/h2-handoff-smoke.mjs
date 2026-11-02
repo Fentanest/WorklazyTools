@@ -107,3 +107,48 @@ for(const id of ids)test('30-second timeout blocks late intake writes: '+id,asyn
  await p.locator('[data-handoff-recovery]').getByRole('button',{name:'Close',exact:true}).click();assert.equal(await p.locator('[data-handoff-recovery]').count(),0);
  }finally{await p.close();}});
 test('file data never enters outbound provider URL/body',()=>{for(const row of external)assert.doesNotMatch(row.url+row.body,/SYNTHETIC|LATE_input|broken\.|tab-0|tab-1|newer\./);assert.deepEqual(errors,[]);});
+
+
+for (const fault of ['add', 'token', 'commit', 'none']) test(`P3E pending replacement at capacity: ${fault}`, async () => {
+ const p = await page();
+ try {
+  await p.goto(base+'/en/');
+  await p.getByTestId('home-dropzone').locator('input[type=file]').setInputFiles({name:'replacement.docx', buffer:doc, mimeType:'application/octet-stream'});
+  await p.locator('[data-receiver="document-to-pdf"]').waitFor();
+  await p.evaluate(async ({bytes, fault}) => {
+   const key='worklazy-handoff-token:document-to-pdf', token={id:'owned',nonce:'owned-nonce'};
+   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('worklazy-office-handoff',3);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('records'))r.result.createObjectStore('records',{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+   await new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite'),store=tx.objectStore('records');store.clear();
+    for(let i=0;i<20;i++){const now=Date.now();store.add({id:i?'unrelated-'+i:token.id,nonce:i?'other-'+i:token.nonce,receiverId:'document-to-pdf',entryPath:'/tools/pdf-converter/document-to-pdf',schema:1,files:[new File([new Uint8Array(bytes)],i?'unrelated.docx':'old.docx')],createdAt:now,expiresAt:now+900000});}
+    tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);
+   });db.close();sessionStorage.setItem(key,JSON.stringify(token));
+   window.__p3eFault=fault;
+   const add=IDBObjectStore.prototype.add, set=Storage.prototype.setItem;
+   let active;
+   IDBObjectStore.prototype.add=function(...args){
+    if(this.name==='records'&&window.__p3eFault==='add')throw new DOMException('Synthetic quota','QuotaExceededError');
+    active=this.transaction;return add.apply(this,args);
+   };
+   Storage.prototype.setItem=function(k,v){
+    if(k===key&&window.__p3eFault==='token')throw new DOMException('Synthetic storage denial','QuotaExceededError');
+    const result=set.call(this,k,v);
+    if(k===key&&window.__p3eFault==='commit'){window.__p3eFault='';active.abort();}
+    return result;
+   };
+  },{bytes:[...doc],fault});
+  await p.locator('[data-receiver="document-to-pdf"]').click();
+  if(fault!=='none'){
+   await p.getByTestId('home-dropzone').getByRole('alert').waitFor();
+   assert.equal(new URL(p.url()).pathname,'/en/');
+   assert.deepEqual(await p.evaluate(()=>JSON.parse(sessionStorage.getItem('worklazy-handoff-token:document-to-pdf'))),{id:'owned',nonce:'owned-nonce'});
+   const old=await p.evaluate(()=>new Promise((resolve,reject)=>{const r=indexedDB.open('worklazy-office-handoff');r.onsuccess=()=>{const db=r.result,tx=db.transaction('records'),q=tx.objectStore('records').get('owned');tx.oncomplete=async()=>{const record=q.result;db.close();resolve(record?{name:record.files[0].name,bytes:[...new Uint8Array(await record.files[0].arrayBuffer())]}:null);};};r.onerror=()=>reject(r.error);}));
+   assert.equal(old.name,'old.docx');assert.deepEqual(old.bytes,[...doc]);assert.equal((await records(p)).length,20);
+   await p.evaluate(()=>{window.__p3eFault='';});
+   await p.locator('[data-receiver="document-to-pdf"]').click();
+  }
+  await p.waitForURL(url=>url.pathname.includes('document-to-pdf'));
+  await ready(p,'document-to-pdf','replacement.docx');
+  const remaining=await records(p);assert.equal(remaining.length,19);assert.ok(remaining.every(row=>row.id.startsWith('unrelated-')));
+  assert.deepEqual(errors,[]);
+ } finally {await p.close();}
+});
