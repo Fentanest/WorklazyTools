@@ -78,6 +78,8 @@ try {
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(60_000);
+    // The later video navigation deliberately leaves four inspected inputs.
+    page.on("dialog", async (dialog) => { console.log(`First-load navigation dialog: ${dialog.type()}`); await dialog.accept(); });
     const responseTrace = [];
     const requestFailures = [];
     const pageErrors = [];

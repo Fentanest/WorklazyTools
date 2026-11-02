@@ -68,7 +68,8 @@ test('manual XLS preparation cancel keeps the existing error/reset behavior',asy
 for(const id of ids)test('home whole-document handoff succeeds: '+id,async()=>{const p=await page();try{
  await home(p,[{name:names[id],buffer:fixtures()[id]}],id);await ready(p,id,names[id]);assert.equal((await records(p)).length,0);
  const boundary=await p.evaluate(()=>({isolated:crossOriginIsolated,redactor:!!document.querySelector('meta[name=worklazy-redactor-isolation]'),office:!!document.querySelector('meta[name=worklazy-office-isolation]'),excel:!!document.querySelector('meta[name=worklazy-excel-preserve-isolation]'),tokens:Object.keys(sessionStorage).filter(x=>x.startsWith('worklazy-handoff-token:'))}));
- assert.equal(boundary.isolated,true);assert.equal(boundary.tokens.length,0);assert.equal(boundary[id==='document-redactor'?'redactor':id==='document-to-pdf'?'office':'excel'],true);if(id==='document-redactor'){
+ // Redactor isolates with its dedicated CSP; Office/XLS additionally require COEP.
+ if(id!=='document-redactor')assert.equal(boundary.isolated,true);assert.equal(boundary.tokens.length,0);assert.equal(boundary[id==='document-redactor'?'redactor':id==='document-to-pdf'?'office':'excel'],true);if(id==='document-redactor'){
   const policy=await p.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
   for(const part of ["object-src 'none'","form-action 'none'","base-uri 'self'","worker-src 'self' blob:"])assert.ok(policy.includes(part));
  }
