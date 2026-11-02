@@ -17,9 +17,11 @@ export async function assertLibraryDirectTool(page, purpose, language) {
 }
 export async function runLibraryImageSmoke(base, output, { deviceScaleFactor = 1 } = {}) {
   await fs.mkdir(output, { recursive: true });
-  const result = await exec(process.execPath, [fileURLToPath(new URL('./ie1/ui.mjs', import.meta.url))], {
+  const childEnv = { ...process.env, TEST_BASE_URL:base, IE1_OUTPUT:path.resolve(output), IE1_DPR:String(deviceScaleFactor) };
+  delete childEnv.NODE_TEST_CONTEXT; // A parent node --test process uses an internal V8 reporter.
+  const result = await exec(process.execPath, ['--test', '--test-reporter=tap', fileURLToPath(new URL('./ie1/ui.mjs', import.meta.url))], {
     cwd: fileURLToPath(new URL('../', import.meta.url)),
-    env: { ...process.env, TEST_BASE_URL:base, IE1_OUTPUT:path.resolve(output), IE1_DPR:String(deviceScaleFactor) }, maxBuffer: 8 * 1024 * 1024,
+    env: childEnv, maxBuffer: 8 * 1024 * 1024,
   });
   process.stdout.write(result.stdout);
   if (result.stderr) process.stderr.write(result.stderr);

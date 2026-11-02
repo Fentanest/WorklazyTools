@@ -93,6 +93,7 @@ try{
  assert.equal(await page.locator('.pdf-page-card').count(),3);check('PDF back/forward use the same approval contract and retain pages');
  }
  if(selected.has('image')) {
+ const settleSyntheticImageBack = async () => { if(await page.locator('[data-testid=unsaved-work-dialog][open]').count()) await page.locator('[data-testid=unsaved-stay]').click(); };
  await page.goto(`${base}/en/tools/image-studio/resize/`);
  if(await isLibraryImageEditor(page)) { await runLibraryImageSmoke(base,path.join(out,'library'));check('library image direct-entry, W2, H1 and export contracts'); } else {
  await page.goto(`${base}/en/tools/image-studio/resize/`);await purpose('resize');
@@ -105,15 +106,15 @@ try{
  await page.locator('[data-image-owner=editor]').getByText('1 files selected',{exact:true}).waitFor();await page.locator('[data-testid=image-editor-options-panel][data-panel=effect]').waitFor();
  await page.locator('[data-testid=image-editor-panel-size]').click();
  await page.setViewportSize({width:1280,height:850});assert.equal(await page.locator('[data-testid=image-editor-options-panel]').getAttribute('data-panel'),'size');
- await navigate('/en/tools/image-studio/watermark/');await confirm('reject');assert.equal(await page.locator('[data-testid=image-editor-options-panel]').getAttribute('data-panel'),'size');
- await navigate('/en/tools/image-studio/watermark/');await confirm('accept');await page.locator('[data-testid=image-editor-options-panel][data-panel=text]').waitFor();
+ await navigate('/en/tools/image-studio/watermark/');await confirm('reject');await settleSyntheticImageBack();assert.equal(await page.locator('[data-testid=image-editor-options-panel]').getAttribute('data-panel'),'size');
+ await navigate('/en/tools/image-studio/watermark/');await confirm('accept');await settleSyntheticImageBack();await page.locator('[data-testid=image-editor-options-panel][data-panel=text]').waitFor();
  assert.equal(await page.locator('[data-testid=image-editor-text-input]').inputValue(),'');
  await page.locator('[data-image-owner=editor]').getByText('1 files selected',{exact:true}).waitFor();
  await page.locator('[data-testid=image-editor-panel-layers]').click();assert.equal(await page.locator('[data-layer-id]').count(),1);assert.equal(await page.locator('[data-layer-base=true]').count(),1);await page.locator('[data-testid=image-editor-panel-text]').click();
  const imageDownload=page.waitForEvent('download');await page.locator('[data-testid=image-editor-export-action] button').click();await (await imageDownload).saveAs(path.join(out,'watermark-empty.png'));const exportedPng=PNG.sync.read(await fs.readFile(path.join(out,'watermark-empty.png')));assert.equal(exportedPng.width,900);assert.equal(exportedPng.height,600);
  await page.screenshot({path:path.join(out,'image-watermark-en.png')});check('image file/panel survive rejection; language/search/hash/resize do not reset; watermark empty');
  await page.getByRole('button',{name:'Batch edit',exact:true}).click();await page.locator('[data-image-owner=batch] input[type=file]').first().setInputFiles(path.join(out,'input.png'));
- await navigate('/en/tools/image-studio/resize/');await confirm('accept');
+ await navigate('/en/tools/image-studio/resize/');await confirm('accept');await settleSyntheticImageBack();
  await page.getByRole('button',{name:'Batch edit',exact:true}).click();assert.equal(await page.locator('[data-image-owner=batch]').getByText('input.png',{exact:true}).count(),1);
  await page.keyboard.press('Delete');
  await page.getByRole('button',{name:'Image editor',exact:true}).click();await page.locator('[data-image-owner=editor]').getByText('1 files selected',{exact:true}).waitFor();check('image other-tab inputs retained after purpose acceptance; hidden editor key listener gated');
