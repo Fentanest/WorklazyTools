@@ -4,11 +4,10 @@ import { useTranslation } from "react-i18next";
 
 import { ToolCard } from "../components/ToolCard";
 import { GITHUB_ISSUES_URL } from "../constants/links";
-import { useWorklazyTheme } from "../hooks/useWorklazyTheme";
+import { HomeDropzone } from "../components/HomeDropzone";
 import { localizedPath } from "../i18n/languages";
 import { useAppLanguage } from "../i18n/routing";
 import { useToolCatalog } from "../i18n/useToolCatalog";
-import { cn } from "../lib/utils";
 
 const HOME_TOOL_IDS_KO = [
   "market-calendar",
@@ -43,9 +42,6 @@ export function HomePage() {
   const { t } = useTranslation("common");
   const language = useAppLanguage();
   const { tools } = useToolCatalog();
-  const { theme } = useWorklazyTheme();
-  
-  const heroArt = `${import.meta.env.BASE_URL}${theme.includes("mint") ? "hero-mint.png" : "hero-coral.png"}`;
   
   const targetIds = language === "ko" ? HOME_TOOL_IDS_KO : HOME_TOOL_IDS_EN;
   const featuredTools = targetIds
@@ -73,7 +69,7 @@ export function HomePage() {
           </div>
         </div>
         <div className="wl-hero-art">
-          <img src={heroArt} alt="" aria-hidden="true" loading="eager" />
+          <HomeDropzone />
         </div>
       </section>
 

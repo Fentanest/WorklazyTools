@@ -1,3 +1,7 @@
+import { acceptsFile } from "../../app/fileAccepts";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
 import {
   AlertCircle,
   ArrowDown,
@@ -75,6 +79,11 @@ const SUPPORTED_EXTENSIONS = new Set(["xlsx", "xls", "xlsb", "xlsm", "csv"]);
 let fileIdSequence = 0;
 
 export function ExcelMergerPage() {
+  const { t: ht } = useTranslation("common");
+  const intakeRoot = useRef<HTMLDivElement>(null);
+  const intakeGeneration = useRef(0);
+  const intakeMount = useRef(0);
+  useEffect(() => { const mount = ++intakeMount.current; return () => { queueMicrotask(() => { if (mount === intakeMount.current) intakeGeneration.current++; }); }; }, []);
   const { t, i18n } = useTranslation("features");
   const language = i18n.resolvedLanguage === "en" ? "en" : "ko";
   const location = useLocation();
@@ -143,8 +152,10 @@ export function ExcelMergerPage() {
   const mergeModeLabel = t(`excel.modes.${mergeMode}`);
   const visibleFiles = useMemo(() => entries.map((entry) => entry.file), [entries]);
 
-  const handleFiles = async (nextFiles: File[]) => {
-    if (precisionPreparing) return;
+  const handleFiles = async (nextFiles: File[], context?: IntakeContext): Promise<File[]> => {
+    const generation = ++intakeGeneration.current;
+    const currentIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
+    if (precisionPreparing) return [];
     const accepted: File[] = [];
     const rejected: string[] = [];
     const existingKeys = new Set(entries.map((entry) => fileKey(entry.file)));
@@ -162,7 +173,7 @@ export function ExcelMergerPage() {
 
     if (rejected.length) setFileNotice(t("excel.unsupportedFiles", { files: rejected.join(", ") }));
     else setFileNotice(null);
-    if (!accepted.length) return;
+    if (!accepted.length) return [];
 
     const additions = accepted.map((file) => ({
       id: createFileId(),
@@ -185,22 +196,29 @@ export function ExcelMergerPage() {
       : [];
     if (legacyAdditions.length) {
       void prepareLegacyInputs(additions, legacyAdditions);
-      return;
+      return [];
     }
+    if (!currentIntake()) return [];
 
-    void inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
+    return await inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
       .then((inspectionResults) => {
+        if (!currentIntake()) return [];
         const byId = new Map(inspectionResults.map((item) => [item.id, item]));
         setEntries((current) => current.map((entry) => {
           const inspectionResult = byId.get(entry.id);
           if (!inspectionResult) return entry;
           return applyInspectionResult(entry, inspectionResult);
         }));
+        const ready = additions.filter(entry => inspectionResults.some(result => result.id === entry.id && !result.error && !result.encrypted && result.sheetNames.length)).map(entry => entry.file);
+        if (ready.length && handoff.notReceived && !context) handoff.dismiss();
+        return ready;
       })
       .catch((inspectionError: Error) => {
+        if (!currentIntake()) return [];
         setEntries((current) => current.map((entry) => additions.some((item) => item.id === entry.id)
           ? { ...entry, inspection: "error", error: inspectionError.message }
           : entry));
+        return [];
       });
   };
 
@@ -469,8 +487,33 @@ export function ExcelMergerPage() {
     });
   };
 
+  useUnsavedWorkGuard("excel-merger", entries.length > 0 || !!result, { kind: "files", scopePath: "/tools/excel-merger" });
+  const handoff = useHandoffReceiver("excel-merger", {
+    kind: "inspection",
+    invalidate: () => { intakeGeneration.current++; setEntries([]); clearResult(); setError(null); },
+    receive: async (entry, context) => {
+      const eligible = entry.files.filter(file => acceptsFile("excel-merger", file)).slice(0, Math.max(0, 50 - entries.length));
+      const accepted = await handleFiles(eligible, context);
+      if (context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };
+      if (accepted.length) setUnsavedWork("excel-merger", { hasWork: true, kind: "files", scopePath: "/tools/excel-merger" });
+      return { status: accepted.length === entry.files.length ? "accepted" : accepted.length ? "partial" : "rejected", accepted, rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
+  });
   return (
-    <UtilityPage toolId="excel-merger">
+    <UtilityPage toolId="excel-merger"><div ref={intakeRoot} className="contents">
+      {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
+        <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+        <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+        <div className="flex flex-wrap gap-2">
+          {!!handoff.recoveryFiles.length && <Button type="button" variant="outline" onClick={() => {
+            for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+            setTimeout(() => handoff.dismiss(), 0);
+          }}>{ht("handoff.downloadReceived")}</Button>}
+          <Button type="button" variant="outline" disabled={loading || precisionPreparing} onClick={() => intakeRoot.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>{ht("handoff.selectAgain")}</Button>
+          <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{ht("handoff.close")}</Button>
+        </div>
+      </UtilityNotice>}
+
       <div className="contents" data-testid="excel-merger-page">
       <PageHeader eyebrow="SPREADSHEET TOOL" title={t("excel.title")} description={t("excel.description")}>
         <div className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-3 py-1.5 text-xs font-bold text-green-800 dark:text-green-300"><span className="size-2 rounded-full bg-green-600 dark:bg-green-300" /> {t("excel.ready")}</div>
@@ -485,7 +528,7 @@ export function ExcelMergerPage() {
               hint={t("excel.steps.files.hint")}
               multiple
               files={visibleFiles}
-              onFiles={handleFiles}
+              onFiles={async files => { await handleFiles(files); }}
               disabled={precisionPreparing || operation.status === "running"}
               accent="green"
             />
@@ -750,7 +793,7 @@ export function ExcelMergerPage() {
       <ToolGuideWrapper slug="excel" />
       {preserveLegacyXls && <canvas ref={converterCanvasRef} id="qtcanvas" className="pointer-events-none fixed size-px opacity-0" aria-hidden="true" />}
       </div>
-    </UtilityPage>
+    </div></UtilityPage>
   );
 }
 

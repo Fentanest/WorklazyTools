@@ -1,11 +1,148 @@
-import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-import { chromium } from 'playwright';
-import { PDFDocument, StandardFonts } from 'pdf-lib';
-import { PNG } from 'pngjs';
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import test from "node:test";
+import { chromium } from "playwright";
+import * as XLSX from "xlsx";
+import JSZip from "jszip";
+import { PDFDocument } from "pdf-lib";
+import { spawn } from "node:child_process";
 
-const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:5183';
+const output = process.env.FILE_DROP_OUTPUT || "/tmp/sol-h1core/browser";
+const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=", "base64");
+const payload = (name, buffer, mimeType = "application/octet-stream") => ({ name, buffer: Buffer.from(buffer), mimeType });
+export async function dropFiles(page, files) {
+  await page.evaluate(items => {
+    const data = new DataTransfer();
+    for (const item of items) data.items.add(new File([new Uint8Array(item.bytes)], item.name, { type: item.type }));
+    document.querySelector(".wl-hero-art").dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+  }, files.map(file => ({ name: file.name, bytes: [...file.buffer], type: file.mimeType })));
+  await page.waitForFunction(() => !document.querySelector('[data-testid="home-dropzone"] button:disabled'));
+}
+async function environment() {
+  await fs.mkdir(output, { recursive: true });
+  const base = process.env.TEST_BASE_URL || `http://127.0.0.1:${process.env.FILE_DROP_PORT || 5370}`;
+  const server = process.env.TEST_BASE_URL ? null : spawn(process.execPath, ["node_modules/vite/bin/vite.js", "preview", "--host", "127.0.0.1", "--port", new URL(base).port, "--strictPort"], { stdio: "ignore" });
+  if (server) { for (let attempt = 0; attempt < 150; attempt++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); } }
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+  return { browser, base, close: async () => { await browser.close(); if (server) { server.kill("SIGTERM"); await new Promise(resolve => server.once("exit", resolve)); } } };
+}
+async function home(env, language = "ko", width = 1280, dark = false) {
+  const context = await env.browser.newContext({ viewport: { width, height: 940 }, serviceWorkers: "block" });
+  await context.addInitScript(dark => { if (dark) localStorage.setItem("worklazy-theme", "dark-mint"); }, dark);
+  const requests = []; const errors = [];
+  context.on("request", request => requests.push({ url: request.url(), body: request.postData() }));
+  await context.route("**/*", route => new URL(route.request().url()).origin === new URL(env.base).origin ? route.continue() : route.abort());
+  const page = await context.newPage(); page.setDefaultTimeout(45000); page.on("pageerror", error => errors.push(error.message)); page.on("dialog", dialog => dialog.accept());
+  await page.goto(`${env.base}/${language}/`, { waitUntil: "networkidle" });
+  await page.locator(".home-page .wl-hero").waitFor();
+  return { context, page, requests, errors };
+}
+export async function runHomeAssets() {
+  const env = await environment();
+  try {
+    for (const language of ["ko", "en"]) for (const width of [390,1280]) for (const dark of [false,true]) await test(`H1 home ${language} ${width} ${dark?"dark":"light"}: copy, catalog, responsive intake`, async () => {
+      const {context,page,errors}=await home(env,language,width,dark);
+      try {
+        const copy=JSON.parse(await fs.readFile(`src/locales/${language}/common.json`,"utf8")).home;
+        assert.equal(await page.locator(".wl-hero h1 .wl-accent").innerText(),copy.titleAccent);
+        assert.equal(await page.locator(".wl-hero-badge").innerText(),copy.kicker);
+        assert.equal(await page.locator(".wl-hero-copy > p").innerText(),copy.description);
+        assert.equal(await page.locator(".wl-hero-assure strong").innerText(),copy.noUploadTitle);
+        assert.equal(await page.locator(".wl-hero-assure small").innerText(),copy.noUploadBody);
+        assert.equal(await page.locator(".wl-hero-art img").count(),0);
+        assert.equal(await page.locator('[data-testid="home-dropzone"]').count(),1);
+        assert.equal(await page.locator(".tool-grid > a").count(),language==="ko"?12:13);
+        assert.equal(await page.locator(".home-how-grid > div").count(),3);
+        assert.ok((await page.locator(".wl-cta").getAttribute("href")).endsWith(`/${language}/tools`));
+        assert.equal(await page.locator("h1").count(),1);
+        const geometry=await page.evaluate(()=>({width:innerWidth,scroll:document.documentElement.scrollWidth,theme:document.documentElement.dataset.theme}));
+        assert.ok(geometry.scroll<=width,JSON.stringify(geometry));
+        const drop=page.locator('[data-testid="home-dropzone"]');await drop.scrollIntoViewIfNeeded();
+        await page.screenshot({path:path.join(output,`home-${language}-${width}-${dark?"dark":"light"}.png`),fullPage:true});
+        await dropFiles(page,[payload("private-sheet.csv","name,value\nA,1"),payload("private-image.png",png)]);
+        assert.equal(await page.locator(".home-drop-bundle-note").innerText(),copy.dropzone.bundle);
+        assert.equal(await page.locator(".home-drop-group").count(),2);
+        assert.ok(await page.locator('[data-receiver="excel-cleaner"]').isVisible());
+        await drop.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(output,`mixed-${language}-${width}-${dark?"dark":"light"}.png`),fullPage:true});await drop.screenshot({path:path.join(output,`intake-${language}-${width}-${dark?"dark":"light"}.png`)});
+        assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual(errors,[]);
+        if(width===390){await page.locator(".home-drop-bundle-note").evaluate(node=>node.scrollIntoView({block:"center"}));assert.equal(await page.locator(".wl-hero").evaluate(node=>node.scrollTop),0,"intake focus must not scroll the hero internally");await page.screenshot({path:path.join(output,`bundle-visible-${language}-${dark?"dark":"light"}.png`)});}
+      } finally {await context.close();}
+    });
+  } finally {await env.close();}
+}
+async function runDropSmoke() {
+  const env=await environment(); const book=XLSX.utils.book_new();XLSX.utils.book_append_sheet(book,XLSX.utils.aoa_to_sheet([["name","value"],["A",1]]),"Data");
+  const xlsx=payload("sensitive-book.xlsx",XLSX.write(book,{type:"buffer",bookType:"xlsx"}));
+  const pdf=await PDFDocument.create();pdf.addPage();const pdfFile=payload("private-document.pdf",await pdf.save(),"application/pdf");
+  const zip=new JSZip();zip.file("[Content_Types].xml",'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>');zip.file("_rels/.rels",'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>');zip.file("word/document.xml",'<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>{name}</w:t></w:r></w:p></w:body></w:document>');
+  const docx=payload("private-template.docx",await zip.generateAsync({type:"nodebuffer"}));
+  const img=payload("private-image.png",png,"image/png");
+  try {
+    if(process.env.FILE_DROP_NEGATIVE) {
+      await test("baseline must support actual home drop to cleaner",async()=>{const {context,page}=await home(env);try{await dropFiles(page,[xlsx]);await page.locator('[data-receiver="excel-cleaner"]').waitFor({timeout:3000});}finally{await context.close();}});return;
+    }
+    for(const row of [
+      {name:"single Excel",files:[xlsx],receiver:"excel-cleaner",ready:'[data-testid="excel-cleaner-file"]'},
+      {name:"multiple Excel",files:[xlsx,payload("second.csv","name,value\nB,2")],receiver:"excel-merger",ready:'[data-testid="excel-file-item"][data-inspection="ready"]'},
+      {name:"mail merge",files:[docx,xlsx],receiver:"document-generator",ready:'[data-tool-page="document-generator"] input[value="name"]'},
+      {name:"single PDF",files:[pdfFile],receiver:"pdf-organize",ready:'[data-page-action="rotate"]'},
+      {name:"multiple images",files:[img,payload("second.png",png,"image/png")],receiver:"image-batch",ready:'.image-studio-page'},
+      {name:"selection privacy",files:[img],receiver:"image-privacy",ready:'[data-tool-page="image-privacy"]'},
+      {name:"mixed only selected group",files:[xlsx,pdfFile],receiver:"excel-cleaner",ready:'[data-testid="excel-cleaner-file"]'},
+    ].filter(row => !process.env.FILE_DROP_CASE || row.receiver === process.env.FILE_DROP_CASE)) await test(`home drop → ${row.name}`,async()=>{
+      const {context,page,requests,errors}=await home(env);try{
+        const start=requests.length;await dropFiles(page,row.files);
+        if(row.name.startsWith("mixed"))assert.ok(await page.locator(".home-drop-bundle-note").isVisible());
+        await page.locator(`[data-receiver="${row.receiver}"]`).click();await page.waitForURL(/\/tools\//);await page.locator(`[data-tool-page]`).first().waitFor();
+        // Readiness is checked on actual inspection state, not navigation alone.
+        if(row.receiver==="excel-cleaner") await page.waitForFunction(()=>document.querySelectorAll('[data-testid="excel-cleaner-sheets"]').length>0);
+        else if(row.receiver==="excel-merger")await page.waitForFunction(()=>document.querySelectorAll('[data-testid="excel-file-item"][data-inspection="ready"]').length===2);
+        else if(row.receiver==="document-generator")await page.waitForFunction(()=>document.querySelector('[data-tool-page="document-generator"]')?.textContent.includes("name")&&document.querySelectorAll('[data-tool-page="document-generator"] select').length>0);
+        else if(row.receiver==="pdf-organize")await page.locator('[data-page-action="rotate"]').first().waitFor();
+        else if(row.receiver==="image-batch")await page.waitForFunction(()=>document.body.textContent.includes("second.png"));
+        else await page.waitForFunction(()=>document.querySelector('[data-ui-component="file-drop-zone"] strong')?.textContent.includes("1"));
+        assert.equal(await page.locator('[data-handoff-recovery], [data-pdf-handoff-recovery]').count(),0);
+        if(row.name.startsWith("mixed"))assert.ok(!await page.locator('[data-tool-page]').first().innerText().then(text=>text.includes("private-document.pdf")));
+        const leaked=requests.slice(start).filter(request=>row.files.some(file=>JSON.stringify(request).includes(file.name)));
+        assert.deepEqual(leaked,[]);assert.deepEqual(errors,[]);
+        await fs.writeFile(path.join(output,`${row.receiver}-${row.name.split(" ")[0]}-requests.json`),JSON.stringify(requests.slice(start),null,2));
+      } catch (error) { await page.screenshot({path:path.join(output,`failure-${row.receiver}.png`),fullPage:true}); await fs.writeFile(path.join(output,`failure-${row.receiver}.txt`),await page.locator("body").innerText()); throw error; } finally {await context.close();}
+    });
+    await test("51 files refused; video/unknown browse; append/remove recompute rules; clipboard image",async()=>{
+      const {context,page}=await home(env);try{
+        await dropFiles(page,Array.from({length:51},(_,i)=>payload(`f${i}.csv`,"a\n1")));assert.ok((await page.locator('[role="alert"]').innerText()).includes("50"));assert.equal(await page.locator('[data-receiver]').count(),0);
+        await dropFiles(page,[payload("movie.mp4","video"),payload("other.bin","unknown")]);assert.equal(await page.locator('.home-drop-actions a').count(),2);assert.ok((await page.locator('[data-intake-kind="video"]').innerText()).includes("현재 제공하지"));
+        await page.locator('.home-drop-summary button').click();await dropFiles(page,[xlsx]);await page.locator('input[type="file"]').setInputFiles([payload("next.csv","name\nA")]);await page.locator('[data-receiver="excel-merger"]').waitFor();
+        await page.getByRole("button",{name:"next.csv 제거",exact:true}).click();assert.equal(await page.locator('[data-receiver="office"]').count(),1);
+        await page.locator('.home-drop-summary button').click();
+        await page.evaluate(bytes=>{const dt=new DataTransfer();dt.items.add(new File([new Uint8Array(bytes)],"pasted.png",{type:"image/png"}));document.body.dispatchEvent(new ClipboardEvent("paste",{bubbles:true,cancelable:true,clipboardData:dt}));},[...png]);await page.locator('[data-receiver="image-edit"]').waitFor();
+      }finally{await context.close();}
+    });
+    await test("Office uses persistent handoff and file-free URL",async()=>{
+      const {context,page,requests}=await home(env);try{
+        // Hold the application document: inspect the record after sender staging,
+        // before the existing Office receiver consumes it and loads its runtime.
+        await page.route('**/tools/office-editor/app',route=>route.fulfill({status:200,contentType:"text/html",body:"<title>Office handoff capture</title>"}));
+        await dropFiles(page,[docx]);await page.locator('[data-receiver="office"]').click();await page.waitForURL('**/tools/office-editor/app');
+        assert.ok(!page.url().includes("private"));
+        const record=await page.evaluate(async()=>{const db=await new Promise((resolve,reject)=>{const req=indexedDB.open("worklazy-office-handoff");req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});const rows=await new Promise(resolve=>{const req=db.transaction("records").objectStore("records").getAll();req.onsuccess=()=>resolve(req.result);});db.close();return rows.map(row=>({name:row.file?.name,receiver:row.receiverId}));});
+        assert.deepEqual(record,[{name:docx.name,receiver:"office-editor"}]);assert.ok(!requests.some(req=>JSON.stringify(req).includes(docx.name)));
+        await page.unroute('**/tools/office-editor/app');await page.reload({waitUntil:"domcontentloaded"});
+        const toolbar=page.locator('[data-testid="office-toolbar-document"]');await toolbar.waitFor();assert.ok((await toolbar.innerText()).includes(docx.name));
+        const remaining=await page.evaluate(async()=>{const db=await new Promise(resolve=>{const request=indexedDB.open("worklazy-office-handoff");request.onsuccess=()=>resolve(request.result)});const count=await new Promise(resolve=>{const request=db.transaction("records").objectStore("records").count();request.onsuccess=()=>resolve(request.result)});db.close();return count;});assert.equal(remaining,0);assert.ok(!requests.some(req=>JSON.stringify(req).includes(docx.name)));
+      }finally{await context.close();}
+    });
+    if (!process.env.FILE_DROP_HOME_ONLY) await runLegacyDropSmoke(env.base);
+  }finally{await env.close();}
+}
+if(import.meta.url===pathToFileURL(process.argv[1]).href)await runDropSmoke();
+
+async function runLegacyDropSmoke(serverBase) {
+  const { StandardFonts } = await import("pdf-lib");
+  const { PNG } = await import("pngjs");
+const base = serverBase;
 const output = process.env.FILE_DROP_OUTPUT || '/tmp/worklazy-file-drop';
 await fs.mkdir(output, { recursive: true });
 for (const name of ['A', 'B']) {
@@ -120,3 +257,5 @@ try {
   console.log(`PASS ${results.length} file-drop browser flows`);
   console.log(`1..${results.length}\n# tests ${results.length}\n# pass ${results.length}\n# fail 0`);
 } catch (error) { await page.screenshot({ path: path.join(output, "failure.png"), fullPage: true }); throw error; } finally { await browser.close(); }
+
+}

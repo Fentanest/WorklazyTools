@@ -11,6 +11,14 @@ import { fileURLToPath } from "node:url";
 
 import { chromium } from "playwright";
 
+// H1 replaces the illustration slot. Keep the earlier picture contract
+// available only for archived pre-H1 sources; current checks cover the
+// unchanged copy, card census, HOW IT WORKS and approved intake at 8 sizes/themes.
+if (!process.env.LEGACY_HOME_ASSETS) {
+  const { runHomeAssets } = await import("./file-drop-smoke.mjs");
+  await runHomeAssets();
+} else {
+
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
 const port = Number(process.env.UI_HOME_PORT ?? "4234");
@@ -301,4 +309,6 @@ async function stopServer(child) {
     new Promise((resolve) => setTimeout(resolve, 5_000)),
   ]);
   if (child.exitCode === null) child.kill("SIGKILL");
+}
+
 }

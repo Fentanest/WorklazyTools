@@ -1,3 +1,7 @@
+import { acceptsFile } from "../../app/fileAccepts";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
 import { BlobWriter } from "@zip.js/zip.js";
 import { AlertCircle, ArrowDown, ArrowUp, Download, FileSpreadsheet, GripVertical, LoaderCircle, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -35,6 +39,11 @@ interface DownloadItem { fileId: string; fileName: SafeFileName; blob: Blob; url
 interface FailedItem { fileName: string; message: string; }
 
 export function ExcelCleanerPage() {
+  const { t: ht } = useTranslation("common");
+  const intakeRoot = useRef<HTMLDivElement>(null);
+  const intakeGeneration = useRef(0);
+  const intakeMount = useRef(0);
+  useEffect(() => { const mount = ++intakeMount.current; return () => { queueMicrotask(() => { if (mount === intakeMount.current) intakeGeneration.current++; }); }; }, []);
   const { t, i18n } = useTranslation(["features", "common"]);
   const translate = t as unknown as LooseT;
   const language = i18n.language.startsWith("en") ? "en" : "ko";
@@ -80,18 +89,29 @@ export function ExcelCleanerPage() {
   const readyItems = items.filter((item) => item.inspection && !item.error && item.selectedSheets.length && !item.inspection.hardLimitExceeded);
   const busy = operation.status === "running";
 
-  const replaceFiles = async (files: File[]) => {
+  const replaceFiles = async (files: File[], context?: IntakeContext): Promise<File[]> => {
+    const generation = ++intakeGeneration.current;
+    const currentIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
     const current = new Map(items.map((item) => [item.file, item]));
     const next = files.map((file) => current.get(file) ?? { id: crypto.randomUUID(), file, inspecting: true, selectedSheets: [], headerRows: {} });
     setItems(next);
-    for (const item of next) if (!item.inspection && !item.error) await inspectItem(item);
+    const ready: File[] = [];
+    for (const item of next) {
+      if (!currentIntake()) return [];
+      if (item.inspection && !item.error && !item.inspection.hardLimitExceeded && item.selectedSheets.length) ready.push(item.file);
+      else if (!item.error && await inspectItem(item, [1], currentIntake)) ready.push(item.file);
+    }
+    if (!currentIntake()) return [];
     markPreviewStale();
+    if (ready.length && handoff.notReceived && !context) handoff.dismiss();
+    return ready;
   };
 
-  const inspectItem = async (item: FileItem, headerRows = [1]) => {
+  const inspectItem = async (item: FileItem, headerRows = [1], currentIntake = () => true) => {
     setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, inspecting: true } : candidate));
     try {
       const inspection = await inspectExcelCleanerFile(item.file, language, undefined, headerRows);
+      if (!currentIntake()) return false;
       setItems((current) => current.map((candidate) => {
         if (candidate.id !== item.id) return candidate;
         const first = candidate.selectedSheets[0] ?? inspection.sheets[0]?.name;
@@ -101,8 +121,11 @@ export function ExcelCleanerPage() {
         inspection.sheets.forEach((sheet) => { nextHeaders[sheet.name] ??= 1; });
         return { ...candidate, inspection, inspecting: false, error: undefined, selectedSheets, headerRows: nextHeaders };
       }));
+      return !!inspection.sheets.length && !inspection.hardLimitExceeded;
     } catch (error) {
+      if (!currentIntake()) return false;
       setItems((current) => current.map((candidate) => candidate.id === item.id ? { ...candidate, inspecting: false, error: safeError(error, translate) } : candidate));
+      return false;
     }
   };
 
@@ -213,14 +236,39 @@ export function ExcelCleanerPage() {
     controllerRef.current = undefined;
   };
 
+  useUnsavedWorkGuard("excel-cleaner", items.length > 0 || downloads.length > 0, { kind: "files", scopePath: "/tools/excel-cleaner" });
+  const handoff = useHandoffReceiver("excel-cleaner", {
+    kind: "inspection",
+    invalidate: () => { intakeGeneration.current++; setItems([]); markPreviewStale(); },
+    receive: async (entry, context) => {
+      const eligible = entry.files.filter(file => acceptsFile("excel-cleaner", file)).slice(0, 50);
+      const accepted = await replaceFiles(eligible, context);
+      if (context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };
+      if (accepted.length) setUnsavedWork("excel-cleaner", { hasWork: true, kind: "files", scopePath: "/tools/excel-cleaner" });
+      return { status: accepted.length === entry.files.length ? "accepted" : accepted.length ? "partial" : "rejected", accepted, rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
+  });
   const exported = parsedPipeline.pipeline ? JSON.stringify(parsedPipeline.pipeline, null, 2) : "";
   const csvRiskCount = downloads.reduce((sum, item) => sum + item.csvRiskCount, 0);
   return <UtilityPage toolId="excel-cleaner">
-    <div className="contents" data-testid="excel-cleaner-page">
+    <div className="contents" data-testid="excel-cleaner-page" ref={intakeRoot}>
+      {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
+        <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+        <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+        <div className="flex flex-wrap gap-2">
+          {!!handoff.recoveryFiles.length && <Button type="button" variant="outline" onClick={() => {
+            for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+            setTimeout(() => handoff.dismiss(), 0);
+          }}>{ht("handoff.downloadReceived")}</Button>}
+          <Button type="button" variant="outline" disabled={busy} onClick={() => intakeRoot.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>{ht("handoff.selectAgain")}</Button>
+          <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{ht("handoff.close")}</Button>
+        </div>
+      </UtilityNotice>}
+
       <PageHeader eyebrow="EXCEL CLEANER" title={t("features:excelCleaner.title")} description={t("features:excelCleaner.description")} />
 
       <UtilitySectionCard step={1} title={t("features:excelCleaner.files.title")} description={t("features:excelCleaner.files.description")}>
-        <FileDropZone hint={t("features:excelCleaner.files.hint")} accept={ACCEPT} multiple files={items.map((item) => item.file)} onFiles={replaceFiles} accent="green" disabled={busy} />
+        <FileDropZone hint={t("features:excelCleaner.files.hint")} accept={ACCEPT} multiple files={items.map((item) => item.file)} onFiles={async files => { await replaceFiles(files); }} accent="green" disabled={busy} />
         <div className="mt-3 grid gap-2.5" data-testid="excel-cleaner-files">
           {items.map((item, index) => <Card as="article" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" key={item.id} data-testid="excel-cleaner-file" data-inspecting={item.inspecting || undefined}>
             <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5"><FileSpreadsheet className="text-primary dark:text-primary" size={18} /><span className="min-w-0"><strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{item.file.name}</strong><small className="mt-0.5 block text-xs text-muted-foreground">{formatBytes(item.file.size)}{item.inspection ? ` · ${item.inspection.format.toUpperCase()}` : ""}</small></span><Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" data-testid="excel-cleaner-remove" aria-label={t("common:files.remove", { name: item.file.name })} onClick={() => void replaceFiles(items.filter((_candidate, position) => position !== index).map((candidate) => candidate.file))}><X size={16} /></Button></header>

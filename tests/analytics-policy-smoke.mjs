@@ -57,6 +57,24 @@ async function counts(page) {
 
 try {
   {
+    const { context, page } = await trackedContext();
+    try {
+      const requests = [];
+      context.on("request", request => requests.push({ url: request.url(), body: request.postData() }));
+      await page.goto(`${server.url}/ko/`, { waitUntil: "networkidle" });
+      await page.waitForFunction(() => window.__naverViews.length === 1);
+      const start = requests.length;
+      await page.locator('[data-testid="home-dropzone"] input').setInputFiles({ name: "sensitive-client-file.csv", mimeType: "text/csv", buffer: Buffer.from("secret-client-value\n42") });
+      await page.locator('[data-receiver="excel-cleaner"]').waitFor();
+      await page.waitForTimeout(500);
+      assert.deepEqual(requests.slice(start), [], "home classification must make zero network requests");
+      const analytics = await page.evaluate(() => JSON.stringify(window.dataLayer || []));
+      for (const value of ["sensitive-client-file", "secret-client-value", "text/csv"]) assert.ok(!analytics.includes(value));
+      assert.equal((await counts(page)).google, 1);
+      console.log("PASS H1 home drop: zero requests, no filename/content/type in analytics, unchanged page-view count");
+    } finally { await context.close(); }
+  }
+  {
     const context = await browser.newContext();
     const external = [];
     await context.route("**/*", (route) => {

@@ -110,6 +110,48 @@
       "processDescription": "작업 파일을 외부로 보내지 않고 진행률과 처리 로그를 보여줍니다.",
       "saveTitle": "3. 결과 저장",
       "saveDescription": "브라우저가 만든 결과를 확인하고 내 기기로 내려받습니다."
+    },
+    "dropzone": {
+      "title": "파일을 놓고 시작하세요",
+      "description": "파일에 맞는 도구를 찾아드립니다. 이미지 붙여넣기도 가능해요.",
+      "choose": "파일 선택",
+      "checking": "파일 확인 중…",
+      "local": "내 브라우저에서만 확인합니다 · 한 번에 50개까지",
+      "limit": "{{count}}개를 넣었습니다. 한 번에 50개까지 선택해 주세요. 파일은 넣지 않았습니다.",
+      "count": "선택한 파일 {{count}}개",
+      "failed": "파일을 열지 못했습니다. 다시 선택해 주세요.",
+      "video": "영상 도구는 현재 제공하지 않습니다.",
+      "allTools": "모든 도구 보기",
+      "bundle": "선택한 묶음만 엽니다. 나머지 파일은 홈으로 돌아와 다시 넣어야 합니다.",
+      "groups": {
+        "spreadsheet": "엑셀·CSV",
+        "pdf": "PDF",
+        "image": "이미지",
+        "office": "문서·슬라이드",
+        "video": "영상",
+        "other": "기타 파일",
+        "mailmerge": "양식 + 데이터"
+      },
+      "receivers": {
+        "excel-cleaner": "데이터 정리",
+        "excel-merger": "엑셀 병합",
+        "document-generator": "문서 일괄 생성",
+        "pdf-organize": "PDF 정리·합치기",
+        "pdf-finish": "PDF 워터마크",
+        "image-edit": "이미지 편집",
+        "image-batch": "이미지 일괄 편집",
+        "image-privacy": "이미지 개인정보 제거",
+        "office": "Office에서 열기"
+      },
+      "hints": {
+        "excel": "엑셀 파일을 하나 더 넣으면 병합할 수 있어요.",
+        "data": "엑셀·CSV를 더 넣으면 병합, DOCX 양식을 더 넣으면 문서 일괄 생성이 가능해요.",
+        "pdf": "PDF를 하나 더 넣으면 합칠 수 있어요.",
+        "image": "이미지를 더 넣으면 일괄 편집할 수 있어요.",
+        "template": "XLSX·CSV 데이터를 함께 넣으면 문서를 일괄 생성할 수 있어요."
+      },
+      "add": "파일 더 넣기",
+      "remove": "{{name}} 제거"
     }
   },
   "files": {
