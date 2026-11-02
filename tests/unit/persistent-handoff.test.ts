@@ -49,8 +49,8 @@ test("an aborted consume never returns a file even after get succeeds", async ()
   h.requests[0].result = undefined; h.requests[0].onsuccess(); h.transaction.onabort(); await rejected;
   assert.equal(h.database.closed, true);
 });
-test("mismatched or malformed records are not deleted or delivered", async () => {
-  for (const patch of [{ nonce: "wrong" }, { receiverId: "other" }, { entryPath: "/wrong" }, { schema: 2 }, { expiresAt: 1 }, { file: {} }]) {
+test("identity and metadata mismatches are not deleted or delivered", async () => {
+  for (const patch of [{ nonce: "wrong" }, { receiverId: "other" }, { entryPath: "/wrong" }, { schema: 2 }, { expiresAt: 1 }]) {
     const h = transactionHarness(); const promise = h.core.consumePersistentHandoff({ id: "id", nonce: "nonce" }); await tick();
     const now = Date.now(); h.requests[0].result = { id: "id", nonce: "nonce", receiverId: "office-editor", entryPath: h.core.OFFICE_HANDOFF_PATH, schema: 1, file, createdAt: now, expiresAt: now + h.core.HANDOFF_TTL_MS, ...patch };
     h.requests[0].onsuccess(); h.transaction.oncomplete(); assert.equal(await promise, undefined); assert.deepEqual(h.deleted, []);
@@ -204,5 +204,53 @@ test("generic tab token snapshots destination and rolls back a sessionStorage fa
     await checked;
     assert.equal(key, "worklazy-handoff-token:document-redactor");
     assert.deepEqual(h.deleted, fail ? [h.inserted[0].id] : []);
+  }
+});
+
+
+test("P3 matching corrupt payloads delete in the consume transaction without returning files", async () => {
+  const oversized = new File([], "large.pdf"); Object.defineProperty(oversized, "size", { value: 500 * 1024 * 1024 + 1 });
+  for (const receiverId of ["office-editor", ...isolated]) {
+    const invalid = receiverId === "office-editor" ? [{ file: undefined }, { file: {} }] : [{ files: [] }, { files: [{}] }, { files: Array(21).fill(file) }, { files: [oversized] }];
+    for (const payload of invalid) for (const mismatch of [false, true]) {
+      const h = transactionHarness();
+      const promise = h.core.consumePersistentFiles({ id: "id", nonce: mismatch ? "wrong" : "nonce" }, receiverId, h.core.PERSISTENT_RECEIVERS[receiverId]);
+      let settled = false; void promise.then(() => { settled = true; }); await tick();
+      const now = Date.now(); h.requests[0].result = { id: "id", nonce: "nonce", receiverId, entryPath: h.core.PERSISTENT_RECEIVERS[receiverId], schema: 1,
+        createdAt: now, expiresAt: now + h.core.HANDOFF_TTL_MS, ...payload };
+      h.requests[0].onsuccess(); await tick();
+      assert.deepEqual(h.deleted, mismatch ? [] : ["id"]); assert.equal(settled, false);
+      h.transaction.oncomplete(); assert.equal(await promise, undefined);
+    }
+  }
+});
+
+test("P3 pending cancellation removes only the matching receiver record after commit", async () => {
+  for (const mismatch of [undefined, "nonce", "receiver"] as const) {
+    const values = new Map([["worklazy-handoff-token:document-redactor", JSON.stringify({ id: "id", nonce: "nonce" })],
+      ["worklazy-handoff-token:xls-preserve", "other-token"]]);
+    const storage = { getItem: (key: string) => values.get(key) ?? null, removeItem: (key: string) => values.delete(key) };
+    const h = transactionHarness({ sessionStorage: storage });
+    const promise = h.core.cancelPendingPersistentHandoff("document-redactor"); await tick();
+    h.requests[0].result = { id: "id", nonce: mismatch === "nonce" ? "wrong" : "nonce", receiverId: mismatch === "receiver" ? "xls-preserve" : "document-redactor" };
+    h.requests[0].onsuccess();
+    assert.deepEqual(h.deleted, mismatch ? [] : ["id"]); assert.equal(values.size, 2);
+    h.transaction.oncomplete(); await promise;
+    assert.equal(values.has("worklazy-handoff-token:document-redactor"), false);
+    assert.equal(values.get("worklazy-handoff-token:xls-preserve"), "other-token");
+  }
+});
+test("P3 aborted pending cancellation preserves the old token; malformed/missing tokens never open DB", async () => {
+  const raw = JSON.stringify({ id: "id", nonce: "nonce" }); let removed = false;
+  const h = transactionHarness({ sessionStorage: { getItem: () => raw, removeItem: () => { removed = true; } } });
+  const promise = h.core.cancelPendingPersistentHandoff("document-redactor");
+  const rejected = assert.rejects(promise, { code: "unavailable" }); await tick();
+  h.requests[0].result = { id: "id", nonce: "nonce", receiverId: "document-redactor" }; h.requests[0].onsuccess(); h.transaction.onabort();
+  await rejected; assert.equal(removed, false);
+  for (const value of [null, "{", "null", '{"id":1}']) {
+    let cleared = false;
+    const core = load(corePath, { indexedDB: { open: () => assert.fail("no identifiable old record") },
+      sessionStorage: { getItem: () => value, removeItem: () => { cleared = true; } } });
+    await core.cancelPendingPersistentHandoff("document-redactor"); assert.equal(cleared, value !== null);
   }
 });

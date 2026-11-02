@@ -160,9 +160,10 @@ export function consumePersistentFiles(token: PersistentHandoffToken, receiverId
         || record.entryPath !== entryPath || record.schema !== 1 || !Number.isFinite(record.createdAt)
         || record.expiresAt !== record.createdAt + HANDOFF_TTL_MS) return;
       const files = recordFiles(record);
-      if (!files || !payloadFits(receiverId, files)) return;
+      // Identity/metadata matched: retire the owned case even if its payload
+      // is corrupt, so it cannot keep the shared quota occupied.
       store.delete(record.id);
-      if (!(record.expiresAt < Date.now())) result(files);
+      if (files && payloadFits(receiverId, files) && !(record.expiresAt < Date.now())) result(files);
     };
   });
 }
@@ -174,6 +175,24 @@ export async function consumePersistentHandoff(token: PersistentHandoffToken, re
 }
 
 const tokenKey = (receiverId: PersistentReceiverId) => `worklazy-handoff-token:${receiverId}`;
+/** H2 serializes send attempts. Retire the previous case before reserving quota
+ * for its replacement; a failed cancellation keeps the original token usable.
+ */
+export async function cancelPendingPersistentHandoff(receiverId: PersistentReceiverId): Promise<void> {
+  const key = tokenKey(receiverId);
+  let raw: string | null;
+  try { raw = sessionStorage.getItem(key); }
+  catch { throw new PersistentHandoffError("unavailable"); }
+  if (raw === null) return;
+  let token: PersistentHandoffToken | undefined;
+  try {
+    const value = JSON.parse(raw);
+    if (value && typeof value.id === "string" && typeof value.nonce === "string") token = value;
+  } catch { /* A malformed token cannot identify a record to cancel. */ }
+  if (token) await cancelPersistentHandoff(token, receiverId);
+  try { if (sessionStorage.getItem(key) === raw) sessionStorage.removeItem(key); }
+  catch { throw new PersistentHandoffError("unavailable"); }
+}
 export async function stagePendingPersistentHandoff(input: PersistentHandoffInput): Promise<void> {
   const receiverId = input.receiverId;
   const token = await stagePersistentFiles(input);
@@ -213,11 +232,11 @@ export function purgeExpired(): Promise<void> {
   });
 }
 
-export function cancelPersistentHandoff(token: PersistentHandoffToken): Promise<void> {
+export function cancelPersistentHandoff(token: PersistentHandoffToken, receiverId?: PersistentReceiverId): Promise<void> {
   return inTransaction((store, result) => {
     const request = store.get(token.id);
     request.onsuccess = () => {
-      if (request.result?.nonce === token.nonce) store.delete(token.id);
+      if (request.result?.nonce === token.nonce && (receiverId === undefined || request.result.receiverId === receiverId)) store.delete(token.id);
       result(undefined);
     };
   });
