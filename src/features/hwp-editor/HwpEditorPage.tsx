@@ -164,6 +164,7 @@ export function HwpEditorPage() {
       return false;
     } finally {
       if (generation === openGeneration.current) pendingOpen.current = false;
+      if (pendingHandoff.current === generation) pendingHandoff.current = undefined;
     }
   };
   const handoff = useHandoffReceiver("hwp-editor", {
@@ -173,6 +174,10 @@ export function HwpEditorPage() {
       const input = entry.files[0];
       if (context.signal.aborted || entry.files.length !== 1 || !acceptsFile("hwp-editor", input))
         return { status: "rejected", accepted: [], rejected: entry.files.map(file => ({ file, reasonCode: "format" })) };
+      // A route handoff must never replace an existing document or an active
+      // manual open. Keep the incoming original in the recovery notice instead.
+      if (documentOpen || pendingOpen.current || exporting)
+        return { status: "rejected", accepted: [], rejected: [{ file: input, reasonCode: "busy" }] };
       const opening = openDocument(input, context);
       pendingHandoff.current = openGeneration.current;
       const accepted = await opening;

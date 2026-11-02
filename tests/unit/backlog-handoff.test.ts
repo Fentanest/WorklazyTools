@@ -17,11 +17,12 @@ async function mountPage(tool: string, overrides: Record<string, unknown> = {}, 
   for (const key of ["window", "document", "navigator"]) Object.defineProperty(globalThis, key, { configurable: true, value: dom.window[key as "window"] });
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   const zones = new Map<string, any>();
+  const clicked: string[] = [];
   let adapter: any, publish: any;
   const guards = new Map<string, boolean>();
   const resources = JSON.parse(fs.readFileSync(`src/locales/${language}/features.json`, "utf8"));
   const t = (key: string) => key.replace(/^features:/, "").split(".").reduce((value, part) => value?.[part], resources) ?? key;
-  const shell = ({ children }: any) => React.createElement("div", null, children);
+  const shell = ({ children, ...props }: any) => React.createElement("div", Object.fromEntries(Object.entries(props).filter(([key]) => key.startsWith("data-"))), children);
   const snapshot = { state: "idle", results: [], version: 0 };
   const client = { snapshot: () => snapshot, subscribe: () => () => {}, dispose: async () => {}, acknowledgeResults: async () => {}, cancel: () => {}, reset: async () => {}, inspectTemplate: async () => ({ variables: ["name"] }), loadSources: async () => { throw new Error("bad data"); }, ...overrides.client as object };
   const exports: any = {};
@@ -43,7 +44,8 @@ async function mountPage(tool: string, overrides: Record<string, unknown> = {}, 
     if (id === "./types.ts") return { EXCEL_CLEANER_RULE_TYPES: [] };
     if (id === "./schema.ts") return { validateExcelCleanerPipeline: () => ({ version: 1, rules: [] }) };
     if (id.includes("useOperationProgress")) return { useOperationProgress: () => ({ status: "idle", reset() {}, update() {} }) };
-    if (id === "../../components/ui") return { ...fallback, FileDropZone: (props: any) => { zones.set(props.label, props); return React.createElement("div", null, props.files.map((file: File) => file.name).join(",")); }, PageHeader: shell, PrimaryButton: shell, ResultCard: shell, SegmentedControl: shell, ToggleRow: shell, formatBytes: String };
+    if (id === "../../components/ui/button") return { Button: ({ children, ...props }: any) => React.createElement("button", props, children) };
+    if (id === "../../components/ui") return { ...fallback, FileDropZone: (props: any) => { zones.set(props.label, props); return React.createElement("div", null, props.files.map((file: File) => file.name).join(","), React.createElement("input", { type: "file", onClick: () => clicked.push(props.label) })); }, PageHeader: shell, PrimaryButton: shell, ResultCard: shell, SegmentedControl: shell, ToggleRow: shell, formatBytes: String };
     if (id in overrides) return overrides[id];
     return fallback;
   };
@@ -53,7 +55,7 @@ async function mountPage(tool: string, overrides: Record<string, unknown> = {}, 
   vm.runInNewContext(code, { require, exports, console, crypto, setTimeout, clearTimeout, queueMicrotask, window: dom.window, URL, File, AbortController }, { filename: file });
   const root = createRoot(dom.window.document.getElementById("root")!);
   await React.act(async () => root.render(React.createElement(React.StrictMode, null, React.createElement(exports[name]))));
-  return { zones, client, guards, text: () => dom.window.document.body.textContent!,
+  return { zones, client, guards, dom, clicked, text: () => dom.window.document.body.textContent!,
     adapter: () => adapter,
     start: async (files: File[], roles?: string[]) => {
       const controller = new AbortController(); let promise: Promise<any>;
@@ -133,3 +135,23 @@ for (const tool of ["excel-cleaner", "excel-merger", "document-generator"]) {
     } finally { finish(); await page.close(); }
   });
 }
+
+for (const partial of [false, true]) test(`P3b document reselect follows input role after DOM reordering (partial=${partial})`, async () => {
+  const page = await mountPage("document-generator");
+  try {
+    await page.receive([new File(["t"], partial ? "template.docx" : "invalid.pdf"), new File(["bad"], "bad.csv")], ["template", "data"]);
+    const doc = page.dom.window.document;
+    const data = doc.querySelector('[data-generator-input="data"]');
+    const template = doc.querySelector('[data-generator-input="template"]');
+    if (data && template) template.before(data);
+    const decoy = doc.createElement("input"); decoy.type = "file"; let decoyClicks = 0;
+    decoy.onclick = () => { decoyClicks++; };
+    doc.querySelector('[data-handoff-recovery]')!.prepend(decoy);
+    const button = [...doc.querySelectorAll("button")].find(button => button.textContent === "handoff.selectAgain")!;
+    assert.ok(button);
+    await React.act(async () => button.click());
+    assert.equal(decoyClicks, 0);
+    const labels = [...page.zones.keys()];
+    assert.deepEqual(page.clicked, [labels[partial ? 1 : 0]]);
+  } finally { await page.close(); }
+});

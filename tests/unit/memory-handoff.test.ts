@@ -539,3 +539,30 @@ test("error document navigation prevents the shell sentinel pop; normal cleanup 
   assert.equal(backs, 0); assert.equal(context.guardEntryRef.current, true);
   pending = false; (context as any).effect(); assert.equal(backs, 1); assert.equal(context.guardEntryRef.current, false);
 });
+
+for (const trigger of ["purge", "timer", "unmount"] as const) test(`P3b ${trigger} recovery transfers only its generated delivery and leaves the staged slot`, async context => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  let retained: handoff.Delivery | undefined, target: handoff.Delivery | undefined, detach: (() => void) | undefined;
+  try { await withTextReceiver(async () => {
+    const make = async (text: string, lifetime: number) => {
+      const token = stageHandoff(textInput(text));
+      const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+      entry.expiresAt = Date.now() + lifetime;
+      const record = deliverHandoff(entry, "/ko/tools/pdf-editor", text, textAdapter(false)); await record.promise;
+      return record;
+    };
+    retained = await make("unexpired", 120000); detach = retainDelivery(retained);
+    target = await make("target", 1000);
+    stageHandoff(textInput("staged"));
+    if (trigger === "purge") purgeExpiredHandoffs(target.entry.expiresAt);
+    else if (trigger === "timer") context.mock.timers.tick(1000);
+    else { const release = retainDelivery(target); release(); context.mock.timers.tick(0); }
+    assert.equal(target.closed, true); assert.equal(retained.closed, false); assert.equal(retained.text, "unexpired");
+    assert.equal(getRecovery()?.files.length, 1); assert.equal(await getRecovery()!.files[0].text(), "target");
+    clearRecovery(false); assert.equal(isAutoReloadHeld(), true, "the other delivery and staging slot still own their holds");
+    transferToRecovery();
+    assert.equal(retained.closed, true); assert.equal(getRecovery()?.files.length, 2);
+    assert.deepEqual((await Promise.all(getRecovery()!.files.map(file => file.text()))).sort(), ["staged", "unexpired"]);
+    clearRecovery(false); assert.equal(isAutoReloadHeld(), false);
+  }); } finally { detach?.(); if (target) closeDelivery(target); if (retained) closeDelivery(retained); clearRecovery(false); context.mock.timers.reset(); }
+});

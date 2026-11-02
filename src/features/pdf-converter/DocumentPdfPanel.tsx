@@ -66,7 +66,12 @@ export function DocumentPdfPanel() {
         try { if (await inspectDocumentInput(next, context.signal)) accepted.push(next); } catch { /* A failed container remains in the recovery chip. */ }
         if (generation !== intakeGeneration.current || context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };
       }
-      if (!crossOriginIsolated) accepted.length = 0;
+      if (!crossOriginIsolated) {
+        accepted.length = 0;
+        setError(L(
+          "이 브라우저에서는 문서를 안전하게 열기 위한 준비를 완료하지 못했습니다. 최신 데스크톱 브라우저에서 이 페이지를 다시 열어 주세요. 받은 원본 파일은 수신 안내에서 내려받을 수 있습니다.",
+          "This browser could not prepare to open documents safely. Reopen this page in a current desktop browser. Use the recovery notice to download the received originals."));
+      }
       if (accepted.length) {
         choose(accepted);
         setUnsavedWork("document-to-pdf", { hasWork: true, kind: "files", scopePath: "/tools/pdf-converter/document-to-pdf" });

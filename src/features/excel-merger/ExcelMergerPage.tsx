@@ -199,7 +199,17 @@ export function ExcelMergerPage() {
         })))).filter(({ requiresConversion }) => requiresConversion).map(({ entry }) => entry)
       : [];
     if (!currentIntake()) return [];
-    if (legacyAdditions.length) return await prepareLegacyInputs(additions, legacyAdditions, context, generation);
+    if (legacyAdditions.length) {
+      try {
+        const ready = await prepareLegacyInputs(additions, legacyAdditions, context, generation);
+        if (currentIntake() && context && ready.length) { clearResult(); setError(null); }
+        return ready;
+      } finally {
+        // Completed legacy inspection owns the inputs now; a late invalidate
+        // must not roll them back. Aborted inspections retain their rollback.
+        if (currentIntake() && handoffRollback.current?.generation === generation) handoffRollback.current = null;
+      }
+    }
 
     return await inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
       .then((inspectionResults) => {

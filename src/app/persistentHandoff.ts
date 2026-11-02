@@ -107,6 +107,11 @@ function payloadFits(receiverId: PersistentReceiverId, files: readonly File[]): 
     && (receiverId === "office-editor" || files.reduce((sum, file) => sum + file.size, 0) <= HANDOFF_RECORD_BYTES);
 }
 
+// Invalid expiry values cannot be consumed and must not occupy quota forever.
+function shouldPurge(record: PersistentHandoffRecord, now: number): boolean {
+  return !Number.isFinite(record.expiresAt) || record.expiresAt < now;
+}
+
 /** Stage only after the sender's leave confirmation. Storage failure must prevent navigation. */
 export function stagePersistentFiles(input: PersistentHandoffInput): Promise<PersistentHandoffToken> {
   const { receiverId, entryPath } = input;
@@ -120,9 +125,9 @@ export function stagePersistentFiles(input: PersistentHandoffInput): Promise<Per
     request.onsuccess = () => {
       const now = Date.now();
       const records = request.result as PersistentHandoffRecord[];
-      const expired = records.filter(record => record.expiresAt < now).sort((a, b) => a.expiresAt - b.expiresAt);
+      const expired = records.filter(record => shouldPurge(record, now));
       for (const record of expired) store.delete(record.id);
-      const live = records.filter(record => !(record.expiresAt < now));
+      const live = records.filter(record => !shouldPurge(record, now));
       // Unknown/corrupt payloads cannot make the global byte cap undercount.
       const storedBytes = live.reduce((sum, record) => {
         const payload = recordFiles(record);
@@ -222,11 +227,14 @@ export async function takePendingPersistentHandoff(receiverId: PersistentReceive
 
 export function purgeExpired(): Promise<void> {
   return inTransaction((store, result) => {
-    const request = store.index("expiresAt").openCursor(IDBKeyRange.upperBound(Date.now(), true));
+    // The expiry index omits missing keys and sorts non-numeric keys separately.
+    // The store is bounded to 20 normal records; scan it to retire corrupt ones too.
+    const now = Date.now();
+    const request = store.openCursor();
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) { result(undefined); return; }
-      cursor.delete();
+      if (shouldPurge(cursor.value, now)) cursor.delete();
       cursor.continue();
     };
   });

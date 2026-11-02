@@ -255,15 +255,15 @@ export function DocumentGeneratorPage() {
             for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
             setTimeout(() => handoff.dismiss(), 0);
           }}>{ht("handoff.downloadReceived")}</Button>}
-          <Button type="button" variant="outline" disabled={busy} onClick={() => intakeRoot.current?.querySelectorAll<HTMLInputElement>('input[type="file"]')[templateOnlyHandoff ? 1 : 0]?.click()}>{ht("handoff.selectAgain")}</Button>
+          <Button type="button" variant="outline" disabled={busy} onClick={() => intakeRoot.current?.querySelector<HTMLInputElement>(`[data-generator-input="${templateOnlyHandoff ? "data" : "template"}"] input[type="file"]`)?.click()}>{ht("handoff.selectAgain")}</Button>
           <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{ht("handoff.close")}</Button>
         </div>
       </UtilityNotice>}
 
     <PageHeader eyebrow={tr('features:documentGenerator.eyebrow')} title={tr('features:documentGenerator.title')} description={tr('features:documentGenerator.description')} />
     <UtilitySectionCard title={tr('features:documentGenerator.files.title')} description={tr('features:documentGenerator.files.description')}>
-      <FileDropZone label={tr('features:documentGenerator.files.template')} hint={tr('features:documentGenerator.files.templateHint')} accept={DOCX_ACCEPT} files={templateFile?[templateFile]:[]} onFiles={async files => { await replaceTemplate(files); }} disabled={busy}/>
-      <div className="mt-4"><FileDropZone label={tr('features:documentGenerator.files.data')} hint={tr('features:documentGenerator.files.dataHint')} accept={DATA_ACCEPT} multiple files={dataFiles} onFiles={async files => { await replaceData(files); }} disabled={busy}/></div>
+      <div data-generator-input="template"><FileDropZone label={tr('features:documentGenerator.files.template')} hint={tr('features:documentGenerator.files.templateHint')} accept={DOCX_ACCEPT} files={templateFile?[templateFile]:[]} onFiles={async files => { await replaceTemplate(files); }} disabled={busy}/></div>
+      <div className="mt-4" data-generator-input="data"><FileDropZone label={tr('features:documentGenerator.files.data')} hint={tr('features:documentGenerator.files.dataHint')} accept={DATA_ACCEPT} multiple files={dataFiles} onFiles={async files => { await replaceData(files); }} disabled={busy}/></div>
       <UtilityNotice className="mt-3">{tr('features:documentGenerator.files.limits')}</UtilityNotice>
       {sourceFailures.length>0&&<UtilityNotice className="mt-3" kind="error" role="alert"><ul>{sourceFailures.map(item=><li key={item.index}>{tr('features:documentGenerator.document', {number:item.index+1})}: {generatorMessage(item.code as never,language)}</li>)}</ul></UtilityNotice>}
       {templateVariables.length>0&&<p className="mt-3 text-sm"><strong>{tr('features:documentGenerator.variables')}:</strong> {templateVariables.join(', ')}</p>}
