@@ -3,7 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { intakeFiles, type FileIntake, type IntakeCandidate } from "../app/fileIntake";
-import { useMemoryHandoff } from "./AppShell";
+import { openInIsolatedTool } from "../app/openInIsolatedTool";
+import { isolatedFileAccepts, type IsolatedReceiverId } from "../app/fileAccepts";
+import { useGuardedNavigate, useMemoryHandoff } from "./AppShell";
 import { useAppLanguage } from "../i18n/routing";
 import { localizedPath } from "../i18n/languages";
 import { withSiteBasePath } from "../app/siteBasePath";
@@ -17,6 +19,7 @@ export function HomeDropzone() {
   const { t } = useTranslation("common");
   const language = useAppLanguage();
   const sender = useMemoryHandoff();
+  const request = useGuardedNavigate();
   const root = useRef<HTMLElement>(null);
   const selected = useRef<File[]>([]);
   const input = useRef<HTMLInputElement>(null);
@@ -38,11 +41,19 @@ export function HomeDropzone() {
   useClipboardImages(next => { if (!busy) void receive(next); });
   useFileDropTarget({ element: () => root.current, label: () => t("home.dropzone.title"), accept: "", disabled: busy, receive: next => receive(next) });
   const open = async (item: IntakeCandidate) => {
-    if (item.receiverId === "office") {
+    if (Object.hasOwn(isolatedFileAccepts, item.receiverId)) {
+      const receiverId = item.receiverId as IsolatedReceiverId;
+      const to = localizedPath(language, item.entryPath);
+      request(to, async () => {
+        setBusy(true); setFailed(false);
+        try { await openInIsolatedTool(receiverId, item.files, withSiteBasePath(to, import.meta.env.BASE_URL)); return true; }
+        catch { setFailed(true); setBusy(false); return false; }
+      });
+    } else if (item.receiverId === "office") {
       setBusy(true); setFailed(false);
       try { await openInOfficeEditor(item.files[0], withSiteBasePath(localizedPath(language, item.entryPath), import.meta.env.BASE_URL)); }
       catch { setFailed(true); setBusy(false); }
-    } else sender.send({ ...item, receiverId: item.receiverId, origin: "user-input", source: "home" });
+    } else sender.send({ ...item, receiverId: item.receiverId as import("../app/fileAccepts").ReceiverId, origin: "user-input", source: "home" });
   };
   return <section ref={root} className={`home-dropzone${dragging ? " is-dragging" : ""}`} aria-labelledby="home-drop-title" data-testid="home-dropzone"
     onDragOver={event => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)}

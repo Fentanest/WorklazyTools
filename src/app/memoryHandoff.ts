@@ -1,10 +1,10 @@
 import { holdAutoReload, release } from "./chunkRecovery.ts";
-import { acceptsFile, fileAccepts, type ReceiverId } from "./fileAccepts.ts";
+import { acceptsFile, fileAccepts, type ReceiverId, type HandoffReceiverDefinition } from "./fileAccepts.ts";
 import { clearUnsavedWork, setUnsavedWork } from "./toolState.ts";
 
 export interface HandoffInput {
   receiverId: ReceiverId; entryPath: string; files: File[];
-  roles?: ("template" | "data")[]; tab?: "edit" | "batch";
+  roles?: ("template" | "data" | "before" | "after")[]; text?: string; tab?: "edit" | "batch";
   origin: "user-input" | "generated"; source: string;
 }
 export interface HandoffEntry extends HandoffInput {
@@ -14,21 +14,28 @@ export interface HandoffToken { id: string; nonce: string }
 export interface DeliveryResult {
   status: "accepted" | "partial" | "rejected" | "cancelled";
   accepted: File[]; rejected: { file: File; reasonCode: string }[];
+  textAccepted?: boolean; textReason?: string;
 }
 // Inspection receivers must check signal/generation before every state write;
 // invalidate increments their generation before calling their existing reset.
 export interface IntakeContext { signal: AbortSignal }
 export type HandoffAdapter = {
+  payload?: "text";
   receive: (entry: HandoffEntry, context: IntakeContext) => DeliveryResult | Promise<DeliveryResult>;
 } & ({ kind: "selection"; invalidate?: () => void } | { kind: "inspection"; invalidate: () => void });
 export interface Delivery {
-  entry: HandoffEntry; path: string; locationKey: string; files: File[];
+  entry: HandoffEntry; path: string; locationKey: string; files: File[]; text?: string;
+  expiry?: ReturnType<typeof setTimeout>;
   promise: Promise<DeliveryResult>; result?: DeliveryResult; closed: boolean;
   owners: number; cleanup?: ReturnType<typeof setTimeout>; abort: AbortController;
   invalidate?: () => void; releaseHold?: () => void;
 }
 export interface Recovery { files: File[]; source: string; reason: string; path: string }
 const TTL = 60_000;
+// Bound UTF-8 transport bytes, not JS characters: at most ~2 MiB of UTF-16
+// content plus at most 3 MiB of temporary UTF-8 validation bytes. Accepted
+// UTF-8 content is at most 1 MiB, and there is only one staging slot.
+export const MAX_HANDOFF_TEXT_BYTES = 1024 * 1024;
 let slot: HandoffEntry | null = null;
 let slotRelease: (() => void) | undefined;
 let slotTimer: ReturnType<typeof setTimeout> | undefined;
@@ -56,6 +63,12 @@ const claimedHolds = new WeakMap<HandoffEntry, () => void>();
 let recovery: Recovery | null = null;
 let recoveryReleases: (() => void)[] = [];
 let deferredError: (() => void) | undefined;
+let errorDocumentNavigationPath: string | undefined;
+/** Keep same-document history cleanup from cancelling an explicit error assign. */
+export function isErrorDocumentNavigationPending(): boolean {
+  return errorDocumentNavigationPath !== undefined && typeof window !== "undefined"
+    && errorDocumentNavigationPath === `${window.location.pathname}${window.location.search}`;
+}
 const listeners = new Set<() => void>();
 export function subscribeHandoff(listener: () => void): () => void { listeners.add(listener); return () => { listeners.delete(listener); }; }
 function emit() { for (const listener of listeners) listener(); }
@@ -65,9 +78,19 @@ export function acquireGeneratedHold(): () => void {
   return () => { if (held) { held = false; release(); } };
 }
 export function validateHandoff(input: HandoffInput): string | null {
-  const definition = fileAccepts[input.receiverId];
+  const definition = fileAccepts[input.receiverId] as HandoffReceiverDefinition | undefined;
   if (!definition || !(definition.paths as readonly string[]).includes(input.entryPath)) return "destination";
+  if (definition.payload === "text") {
+    if (typeof input.text !== "string" || !input.text.length || input.files.length || input.roles !== undefined || input.tab !== undefined) return "text";
+    // The cheap UTF-16 bound rejects huge input before allocating UTF-8 bytes.
+    if (input.text.length > MAX_HANDOFF_TEXT_BYTES || new TextEncoder().encode(input.text).byteLength > MAX_HANDOFF_TEXT_BYTES) return "text-size";
+    return null;
+  }
+  if (input.text !== undefined) return "destination";
   if (!input.files.length || input.files.length > definition.max) return "count";
+  if (input.roles?.some(role => !["template", "data", "before", "after"].includes(role))) return "roles";
+  if (input.roles?.some(role => role === "before" || role === "after") &&
+    (input.files.length !== 2 || input.roles.length !== 2 || !input.roles.includes("before") || !input.roles.includes("after"))) return "roles";
   if (input.receiverId === "document-generator") {
     if (input.roles?.length !== input.files.length || input.roles.filter(role => role === "template").length !== 1
       || !input.roles.includes("data") || input.files.some((file, i) => !((input.roles![i] === "template" ? ["docx"] : ["xlsx", "csv"]).includes(file.name.split(".").pop()?.toLowerCase() ?? "")))) return "roles";
@@ -76,6 +99,7 @@ export function validateHandoff(input: HandoffInput): string | null {
   return null;
 }
 function clearSlot() {
+  if (slot) { slot.text = undefined; slot.files = []; slot.roles = undefined; }
   slot = null; clearTimeout(slotTimer); slotTimer = undefined;
   slotRelease?.(); slotRelease = undefined;
 }
@@ -108,9 +132,15 @@ export function claimHandoff(token: HandoffToken, receiverId: ReceiverId, entryP
   return entry;
 }
 function rejected(entry: HandoffEntry, reasonCode: string): DeliveryResult {
-  return { status: "rejected", accepted: [], rejected: entry.files.map(file => ({ file, reasonCode })) };
+  return { status: "rejected", accepted: [], rejected: entry.files.map(file => ({ file, reasonCode })),
+    ...(entry.text !== undefined ? { textAccepted: false, textReason: reasonCode } : {}) };
 }
 function normalizeResult(entry: HandoffEntry, result: DeliveryResult): DeliveryResult {
+  if (entry.text !== undefined) {
+    const success = result.status === "accepted" && result.textAccepted === true;
+    return { status: success ? "accepted" : result.status === "cancelled" ? "cancelled" : "rejected", accepted: [], rejected: [], textAccepted: success,
+      ...(!success ? { textReason: result.textReason ?? "rejected" } : {}) };
+  }
   const accepted = result.accepted.filter(file => entry.files.includes(file));
   const remaining = entry.files.filter(file => !accepted.includes(file));
   if (result.status === "cancelled") return { ...rejected(entry, "cancelled"), status: "cancelled" };
@@ -126,14 +156,23 @@ export function deliverHandoff(entry: HandoffEntry, path: string, locationKey: s
   if (existing) return existing;
   // The former chip remains owned by its mounted hook, not the active cache.
   deliveries.clear();
-  const record: Delivery = { entry, path, locationKey, files: entry.files, promise: null!, closed: false, owners: 0,
+  const record: Delivery = { entry, path, locationKey, files: entry.files, text: entry.text, promise: null!, closed: false, owners: 0,
     abort: new AbortController(), invalidate: adapter.invalidate, releaseHold: claimedHolds.get(entry) };
   claimedHolds.delete(entry);
   deliveries.set(entry.id, record);
+  if (entry.text !== undefined) {
+    record.expiry = setTimeout(() => {
+      if (record.closed) return;
+      if (entry.origin === "generated") transferToRecovery("expired", [record]);
+      else closeDelivery(record);
+    }, Math.max(0, entry.expiresAt - Date.now()));
+    record.expiry.unref?.();
+  }
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const receive = Promise.resolve().then(() => record.closed ? rejected({ ...entry, files: [] }, "closed") : adapter.receive(entry, { signal: record.abort.signal }));
+  const receive = Promise.resolve().then(() => record.closed ? rejected({ ...entry, files: [], text: undefined }, "closed")
+    : (entry.text !== undefined) !== (adapter.payload === "text") ? rejected(entry, "destination") : adapter.receive(entry, { signal: record.abort.signal }));
   const cancelled = new Promise<DeliveryResult>(resolve => {
-    record.abort.signal.addEventListener("abort", () => { if (record.closed) resolve(rejected({ ...entry, files: [] }, "closed")); }, { once: true });
+    record.abort.signal.addEventListener("abort", () => { if (record.closed) resolve(rejected({ ...entry, files: [], text: undefined }, "closed")); }, { once: true });
   });
   const timeout = adapter.kind === "inspection" ? new Promise<DeliveryResult>(resolve => {
     timer = setTimeout(() => {
@@ -142,24 +181,25 @@ export function deliverHandoff(entry: HandoffEntry, path: string, locationKey: s
   }) : null;
   record.promise = Promise.race(timeout ? [receive, timeout, cancelled] : [receive, cancelled]).catch(() => rejected(entry, "failed")).then(result => {
     clearTimeout(timer);
-    if (record.closed) return rejected({ ...entry, files: [] }, "closed");
+    if (record.closed) return rejected({ ...entry, files: [], text: undefined }, "closed");
     const normalized = normalizeResult(entry, result);
     if (normalized.status === "accepted" || normalized.status === "partial") rememberConsumedHandoff(record);
     // Do not retain accepted files in the delivery cache.
     record.result = { ...normalized, accepted: [] };
     record.files = normalized.rejected.map(item => item.file);
     // Successful input ownership is already with the receiver at this point.
-    entry.files = [];
-    if (!record.files.length) closeDelivery(record);
+    record.text = normalized.textAccepted ? undefined : entry.text;
+    entry.files = []; entry.text = undefined;
+    if (!record.files.length && record.text === undefined) closeDelivery(record);
     emit(); return normalized;
   });
   return record;
 }
 export function closeDelivery(record: Delivery): void {
   if (record.closed) return;
-  record.closed = true; clearTimeout(record.cleanup);
+  record.closed = true; clearTimeout(record.cleanup); clearTimeout(record.expiry);
   if (!record.result && !record.abort.signal.aborted) { record.abort.abort(); record.invalidate?.(); }
-  record.files = []; record.entry.files = []; record.result = undefined;
+  record.files = []; record.text = undefined; record.entry.files = []; record.entry.text = undefined; record.result = undefined;
   if (deliveries.get(record.entry.id) === record) deliveries.delete(record.entry.id);
   record.releaseHold?.(); record.releaseHold = undefined; emit();
 }
@@ -176,10 +216,15 @@ export function retainDelivery(record: Delivery): () => void {
     }, 0);
   };
 }
+// Generated text uses the existing downloadable File recovery host. Raw text
+// stays in memory; the generic filename never includes user content or source.
+function recoveryFiles(files: File[], text?: string): File[] {
+  return text === undefined ? files : [...files, new File([text], "handoff.txt", { type: "text/plain;charset=utf-8" })];
+}
 export function transferToRecovery(reason = "route-error", extra: Delivery[] = []): void {
   const candidates: { files: File[]; source: string; release?: () => void }[] = [];
   if (slot?.origin === "generated") {
-    candidates.push({ files: slot.files, source: slot.source, release: slotRelease });
+    candidates.push({ files: recoveryFiles(slot.files, slot.text), source: slot.source, release: slotRelease });
     slotRelease = undefined; clearSlot();
   }
   const records = new Set([...deliveries.values(), ...extra]);
@@ -189,7 +234,7 @@ export function transferToRecovery(reason = "route-error", extra: Delivery[] = [
   }
   for (const record of records) {
     if (record.entry.origin !== "generated" || record.closed) continue;
-    candidates.push({ files: record.files, source: record.entry.source, release: record.releaseHold });
+    candidates.push({ files: recoveryFiles(record.files, record.text), source: record.entry.source, release: record.releaseHold });
     record.releaseHold = undefined; closeDelivery(record);
   }
   if (!candidates.length) return;
@@ -205,24 +250,31 @@ export function deferErrorNavigation(action: () => void): boolean {
   deferredError = action; return true;
 }
 export function clearRecovery(runDeferred = true): void {
+  const action = runDeferred ? deferredError : undefined;
+  deferredError = undefined;
+  errorDocumentNavigationPath = action ? `${window.location.pathname}${window.location.search}` : undefined;
   recovery = null; clearUnsavedWork("handoff-recovery");
   for (const releaseHold of recoveryReleases) releaseHold();
-  recoveryReleases = []; const action = deferredError; deferredError = undefined; emit();
-  if (runDeferred) action?.();
+  recoveryReleases = []; emit();
+  try { action?.(); } catch (error) { errorDocumentNavigationPath = undefined; throw error; }
 }
 export function reconcileHandoffLocation(): void {
   const path = `${window.location.pathname}${window.location.search}`;
+  if (errorDocumentNavigationPath !== path) errorDocumentNavigationPath = undefined;
   // A confirmed route change replaces the failed screen with the chosen destination.
   if (recovery && recovery.path !== path) clearRecovery(false);
   for (const record of deliveries.values()) if (record.path !== path) closeDelivery(record);
 }
 export function purgeExpiredHandoffs(now = Date.now()): void {
   if (slot && now >= slot.expiresAt) clearSlot();
-  for (const record of deliveries.values()) if (now >= record.entry.expiresAt) closeDelivery(record);
+  for (const record of deliveries.values()) if (now >= record.entry.expiresAt) {
+    if (record.text !== undefined && record.entry.origin === "generated") transferToRecovery("expired", [record]);
+    else closeDelivery(record);
+  }
   emit();
 }
 // bfcache preserves the heap. Reconcile its real age when it returns.
-if (typeof window !== "undefined") window.addEventListener("pageshow", event => { if (event.persisted) purgeExpiredHandoffs(); });
+if (typeof window !== "undefined") window.addEventListener("pageshow", event => { if (event.persisted) { errorDocumentNavigationPath = undefined; purgeExpiredHandoffs(); } });
 /** Selection adapters use the same synchronous filter as the tool input. */
 export function selectHandoffFiles(receiverId: ReceiverId, files: File[], remaining = fileAccepts[receiverId].max): DeliveryResult {
   const accepted = files.filter(file => acceptsFile(receiverId, file)).slice(0, Math.max(0, remaining));

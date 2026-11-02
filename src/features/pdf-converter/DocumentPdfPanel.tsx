@@ -1,6 +1,9 @@
+import { usePersistentHandoffReceiver } from "../../app/useHandoffReceiver";
+import { PersistentHandoffNotice } from "../../components/PersistentHandoffNotice";
+import { inspectDocumentInput } from "./inspectDocumentInput";
 import { Download, FileText, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useUnsavedWorkGuard } from "../../app/toolState";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import { OperationProgress } from "../../components/OperationProgress";
 import { UtilityInput, UtilityNotice } from "../../components/UtilitySurface";
 import { FileDropZone, FileList, PrimaryButton, SectionCard } from "../../components/ui";
@@ -17,6 +20,8 @@ const supported = new Set(["hwp", "hwpx", "doc", "docx", "xls", "xlsx", "ppt", "
 const maxBytes = 50 * 1024 * 1024;
 export function DocumentPdfPanel() {
   const language = useAppLanguage();
+  const intakeGeneration = useRef(0);
+  const intakeRoot = useRef<HTMLDivElement>(null);
   const L = (ko: string, en: string) => language === "en" ? en : ko;
   const [batchFiles, setBatchFiles] = useState<File[]>();
   const [file, setFile] = useState<File>();
@@ -29,8 +34,8 @@ export function DocumentPdfPanel() {
   const [saved, setSaved] = useState(false);
   const controller = useRef<AbortController | undefined>(undefined);
   const operation = useOperationProgress();
-  useUnsavedWorkGuard("document-to-pdf", Boolean(file) && !saved, { kind: "files", scopePath: "/tools/pdf-converter/document-to-pdf" });
-  useEffect(() => () => controller.current?.abort(), []);
+  useUnsavedWorkGuard("document-to-pdf", (Boolean(file) || Boolean(batchFiles?.length)) && !saved, { kind: "files", scopePath: "/tools/pdf-converter/document-to-pdf" });
+  useEffect(() => () => { intakeGeneration.current++; controller.current?.abort(); }, []);
   useEffect(() => {
     if (!bytes) { setUrl(""); return; }
     const next = URL.createObjectURL(new Blob([bytes.slice().buffer], { type: "application/pdf" }));
@@ -39,6 +44,7 @@ export function DocumentPdfPanel() {
   }, [bytes]);
   const choose = (files: File[]) => {
     if (loading) return;
+    intakeGeneration.current++;
     if (files.length > 1) { controller.current?.abort(); setFile(undefined); setBytes(undefined); setBatchFiles(files); return; }
     const next = files.at(-1);
     setBytes(undefined); setFile(undefined); setError(""); setSaved(false); operation.reset();
@@ -50,6 +56,25 @@ export function DocumentPdfPanel() {
     }
     setFile(next); setName(next?.name.replace(/\.[^.]+$/, "") ?? "");
   };
+  const handoff = usePersistentHandoffReceiver("document-to-pdf", {
+    kind: "inspection",
+    invalidate: () => { intakeGeneration.current++; controller.current?.abort(); setFile(undefined); setBatchFiles(undefined); setBytes(undefined); setLoading(false); setError(""); operation.reset(); },
+    receive: async (files, context) => {
+      const generation = ++intakeGeneration.current;
+      const accepted: File[] = [];
+      for (const next of files) {
+        try { if (await inspectDocumentInput(next, context.signal)) accepted.push(next); } catch { /* A failed container remains in the recovery chip. */ }
+        if (generation !== intakeGeneration.current || context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };
+      }
+      if (!crossOriginIsolated) accepted.length = 0;
+      if (accepted.length) {
+        choose(accepted);
+        setUnsavedWork("document-to-pdf", { hasWork: true, kind: "files", scopePath: "/tools/pdf-converter/document-to-pdf" });
+      }
+      return { status: accepted.length === files.length ? "accepted" : accepted.length ? "partial" : "rejected", accepted, rejected: files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
+  });
+  const recovery = <PersistentHandoffNotice handoff={handoff} disabled={loading} onSelectAgain={() => intakeRoot.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()} />;
   const cancel = () => {
     controller.current?.abort(); controller.current = undefined;
     setLoading(false); operation.reset();
@@ -83,8 +108,9 @@ export function DocumentPdfPanel() {
       if (controller.current === active) { controller.current = undefined; setLoading(false); }
     }
   };
-  if (batchFiles) return <BatchConversionPanel mode="document-pdf" files={batchFiles} onClose={() => setBatchFiles(undefined)} />;
-  return <div data-document-pdf-ready={crossOriginIsolated}>
+  if (batchFiles) return <div ref={intakeRoot}>{recovery}<BatchConversionPanel mode="document-pdf" files={batchFiles} onClose={() => setBatchFiles(undefined)} /></div>;
+  return <div ref={intakeRoot} data-document-pdf-ready={crossOriginIsolated}>
+    {recovery}
     <SectionCard step={1} title={L("문서 선택", "Choose a document")} description="HWP · HWPX · DOC · DOCX · XLS · XLSX · PPT · PPTX">
       <FileDropZone disabled={!crossOriginIsolated || loading} multiple files={file ? [file] : []} accept=".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" onFiles={choose} accent="coral" hint={L("여러 파일 선택 가능 · 파일당 최대 50 MiB", "Choose one or more files · up to 50 MiB each")} />
       {file && <FileList files={[file]} accent="coral" onRemove={() => choose([])} />}

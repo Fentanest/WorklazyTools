@@ -142,7 +142,18 @@
         "image-edit": "Edit image",
         "image-batch": "Batch edit images",
         "image-privacy": "Remove image metadata",
-        "office": "Open in Office"
+        "office": "Open in Office",
+        "hwp-editor": "$t(tools:items.hwp-editor.title)",
+        "excel-compare": "$t(u5CompareHandoff.receivers.excel-compare)",
+        "pdf-compare": "$t(u5CompareHandoff.receivers.pdf-compare)",
+        "image-compare": "$t(u5CompareHandoff.receivers.image-compare)",
+        "document-compare": "$t(u5CompareHandoff.receivers.document-compare)",
+        "document-redactor": "Redact documents",
+        "document-to-pdf": "Convert documents to PDF",
+        "xls-preserve": "Preserve XLS formulas · formatting",
+        "image-to-pdf": "Images to PDF",
+        "pdf-to-image": "PDF to images",
+        "pdf-to-document": "PDF to documents"
       },
       "hints": {
         "excel": "Add another spreadsheet to merge files.",
@@ -246,5 +257,32 @@
     "count": "Check the number of files.",
     "destination": "Files cannot be sent to this screen.",
     "roles": "Select one template and at least one data file."
+  },
+  "u5CompareHandoff": {
+    "order": "Check the before and after order. Swap the files if needed, then start comparison.",
+    "swap": "Swap before and after",
+    "receivers": {
+      "excel-compare": "Compare spreadsheets",
+      "pdf-compare": "Compare PDFs",
+      "image-compare": "Compare images",
+      "document-compare": "Compare documents"
+    },
+    "before": "Before",
+    "after": "After"
+  },
+  "sendTo": {
+    "editImages": "Open in batch image editor",
+    "editImage": "Open in image editor",
+    "privacy": "Send to metadata remover",
+    "imagePdf": "Make a PDF from this image",
+    "pdfDocument": "Convert PDF to a document",
+    "pdfImages": "Convert PDF to images",
+    "failed": "Could not transfer the result. Download it or try again.",
+    "download": "Download the result being transferred",
+    "retry": "Try sending again",
+    "webp": "Choose PNG or JPG as the output format to send it to PDF.",
+    "selectPages": "Choose page images to edit",
+    "limit": "Choose 1–50 page images. The ZIP file is not transferred.",
+    "page": "Page {{page}}"
   }
 }

@@ -1,3 +1,8 @@
+import { acceptsFile } from "../../app/fileAccepts";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import { useTranslation } from "react-i18next";
+import { openComparisonPdf } from "./runtime";
 import {MappingEditor} from "./MappingEditor";
 import { createLocalId } from "../../lib/utils";
 import { ArrowLeftRight, Download, FilePlus2, Play, Square } from "lucide-react";
@@ -26,6 +31,7 @@ const copy = {
 } as const;
 
 export function PdfComparePage() {
+  const ht = useTranslation("common").t;
   const language = useAppLanguage(); const c:PdfCopy = {...copy[language],...candidateCopy[language]};
   const sessionRef = useRef<PdfCompareSession | null>(null);
   useEffect(() => {
@@ -58,8 +64,43 @@ export function PdfComparePage() {
   };
   useEffect(()=>()=>{ generation.current++; cancelExport(); void sessionRef.current?.dispose(); },[]);
   const invalidate=()=>{ generation.current++;previewGeneration.current++;suggestionGeneration.current++;setCandidateBusy(null); cancelExport(); sessionRef.current?.invalidate(); setResult(null); setSelected(null); setPreview(null); setPreviewStatus("idle"); setError(undefined); setBusy(false); };
-  const updatePair=(index:number,patch:Partial<DraftPair>)=>{ invalidate(); setPairs(current=>current.map((pair,i)=>i===index?{...pair,...patch}:pair)); };
-  const addPair=()=>{ invalidate(); setPairs(current=>[...current,{id:createLocalId(),before:null,after:null}]); };
+
+  const handoffGeneration = useRef(0), pendingHandoff = useRef<number | undefined>(undefined);
+  const handoff = useHandoffReceiver("pdf-compare", {
+    kind: "inspection",
+    invalidate: () => {
+      if (pendingHandoff.current !== handoffGeneration.current) return;
+      handoffGeneration.current++;
+      invalidate(); setPairs([{ id: createLocalId(), before: null, after: null }]);
+    },
+    receive: async (entry, context) => {
+      const epoch = ++handoffGeneration.current; pendingHandoff.current = epoch;
+      const current = () => !context.signal.aborted && epoch === handoffGeneration.current;
+      const accepted: File[] = [];
+      const validRoles = entry.files.length === 2 && entry.roles?.length === 2 && entry.roles.includes("before") && entry.roles.includes("after");
+      if (!validRoles) return { status: "rejected", accepted, rejected: entry.files.map(file => ({ file, reasonCode: "roles" })) };
+      const pair: DraftPair = { id: createLocalId(), before: null, after: null };
+      for (const [index, file] of entry.files.entries()) {
+        if (!current()) break;
+        if (!acceptsFile("pdf-compare", file)) continue;
+        try {
+          const owner = await openComparisonPdf(file, context.signal);
+          try { if (owner.document.numPages < 1) continue; } finally { await owner.close(); }
+          if (!current()) break;
+          pair[entry.roles![index] === "before" ? "before" : "after"] = file; accepted.push(file);
+        } catch { /* Parser failure is a rejected original, not a comparison. */ }
+      }
+      if (!current()) return { status: "cancelled", accepted: [], rejected: [] };
+      invalidate(); setPairs([pair]);
+      if (accepted.length) setUnsavedWork("pdf-compare", { hasWork: true, kind: "files", scopePath: "/tools/pdf-compare" });
+      return { status: accepted.length === 2 ? "accepted" : accepted.length ? "partial" : "rejected", accepted,
+        rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
+  });
+
+  useUnsavedWorkGuard("pdf-compare", pairs.some(pair => pair.before || pair.after), { kind: "files", scopePath: "/tools/pdf-compare" });
+  const updatePair=(index:number,patch:Partial<DraftPair>)=>{ handoffGeneration.current++; invalidate(); setPairs(current=>current.map((pair,i)=>i===index?{...pair,...patch}:pair)); };
+  const addPair=()=>{ handoffGeneration.current++; invalidate(); setPairs(current=>[...current,{id:createLocalId(),before:null,after:null}]); };
   const inputs=useMemo(()=>pairs.flatMap(pair=>pair.before&&pair.after?[{id:pair.id,before:pair.before,after:pair.after,mapping:pair.mapping}]:[]),[pairs]);
   const run=async()=>{
     if(inputs.length!==pairs.length){setError(c.needFiles);return;}
@@ -103,11 +144,27 @@ export function PdfComparePage() {
   const encodedBytes=pairs.reduce((sum,pair)=>sum+(pair.before?.size??0)+(pair.after?.size??0),0);
   const selectedPage=selected?result?.pairs[selected.pair]?.pages[selected.page]:undefined;
   return <UtilityPage toolId="pdf-compare">
+
+    {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
+      <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+      <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+      <div className="flex flex-wrap gap-2">
+        {!!handoff.recoveryFiles.length && <Button variant="outline" onClick={() => {
+          for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+          handoff.dismiss();
+        }}>{ht("handoff.downloadReceived")}</Button>}
+        <Button variant="ghost" onClick={handoff.dismiss}>{ht("handoff.close")}</Button>
+      </div>
+    </UtilityNotice>}
+    {pairs.some(pair => pair.before || pair.after) && <UtilityNotice kind="info" className="mb-3 flex-col items-start gap-2" data-handoff-order>
+      <p>{ht("u5CompareHandoff.order")}</p>
+      <ul className="max-w-full break-all">{pairs.map(pair => <li key={pair.id}>{ht("u5CompareHandoff.before")}: {pair.before?.name ?? "—"} · {ht("u5CompareHandoff.after")}: {pair.after?.name ?? "—"}</li>)}</ul>
+    </UtilityNotice>}
     <PageHeader eyebrow={c.eyebrow} title={c.title} description={c.description}/>
     <UtilityNotice className="mb-4" kind="warning">{c.limit}</UtilityNotice>
     <UtilitySectionCard title={c.files} description={c.filesDesc} step={1}>
       <div className="space-y-4">{pairs.map((pair,index)=><div className="rounded-3xl border border-border p-4" key={pair.id} data-testid="pdf-pair">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><strong>{c.page.replace("{{n}}",String(index+1))}</strong><div className="flex gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={()=>updatePair(index,{before:pair.after,after:pair.before,mapping:undefined})}><ArrowLeftRight size={16}/>{c.swap}</Button>{pairs.length>1?<Button type="button" variant="ghost" className="min-h-11" onClick={()=>{invalidate();setPairs(current=>current.filter((_,i)=>i!==index));}}>{c.remove}</Button>:null}</div></div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><strong>{c.page.replace("{{n}}",String(index+1))}</strong><div className="flex gap-2"><Button type="button" variant="outline" className="min-h-11" onClick={()=>updatePair(index,{before:pair.after,after:pair.before,mapping:undefined})}><ArrowLeftRight size={16}/>{c.swap}</Button>{pairs.length>1?<Button type="button" variant="ghost" className="min-h-11" onClick={()=>{handoffGeneration.current++;invalidate();setPairs(current=>current.filter((_,i)=>i!==index));}}>{c.remove}</Button>:null}</div></div>
         <div className="grid gap-4 min-[1000px]:grid-cols-2"><FileDropZone label={c.before} hint={c.hint} accept="application/pdf,.pdf" files={pair.before?[pair.before]:[]} onFiles={files=>updatePair(index,{before:files[0]??null,mapping:undefined})} accent="violet" disabled={busy}/><FileDropZone label={c.after} hint={c.hint} accept="application/pdf,.pdf" files={pair.after?[pair.after]:[]} onFiles={files=>updatePair(index,{after:files[0]??null,mapping:undefined})} accent="violet" disabled={busy}/></div>
         <PageCandidatesPanel before={pair.before} after={pair.after} language={language} revision={generation.current} busy={candidateBusy===pair.id} disabled={busy||!!(candidateBusy&&candidateBusy!==pair.id)} progress={candidateProgress} hasMapping={!!pair.mapping} onFind={()=>suggest(pair)} onCancel={()=>sessionRef.current?.cancel()} onReset={()=>updatePair(index,{mapping:undefined})} onApply={(snapshot,rows)=>{if(snapshot.revision!==generation.current||snapshot.before!==pair.before||snapshot.after!==pair.after)return false;updatePair(index,{mapping:rows.map(row=>({...row}))});return true;}}/>
       </div>)}</div>

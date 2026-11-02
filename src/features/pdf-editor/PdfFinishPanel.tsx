@@ -394,8 +394,8 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     });
   }, []);
   const finishHasWork =
-    (sources.length > 0 || inspecting) &&
-    (download.results.length === 0 || download.results.some((result) => !savedResultUrls.has(result.url)));
+    inspecting || (sources.length > 0 &&
+    (download.results.length === 0 || download.results.some((result) => !savedResultUrls.has(result.url))));
   useUnsavedWorkGuard("pdf-finish", finishHasWork, {
     kind: "files",
     scopePath: "/tools/pdf-editor/finish",
@@ -607,6 +607,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
   // render state, so an earlier attempt's error/inspecting cannot leak into a
   // newer attempt.
   const pendingIntakeRequestRef = useRef<number | null>(null);
+  const handoffRollback = useRef<{ requestId: number; signal: AbortSignal; controller: AbortController; files: File[] } | null>(null);
 
   const replaceFile = async (incoming: File[], intake?: { generation: number; attempt: number }, context?: IntakeContext): Promise<DeliveryResult | undefined> => {
     if (!incoming.length || context?.signal.aborted) return;
@@ -628,14 +629,14 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     const previous = fileRef.current;
     const retainPrimary = previous === incoming[0];
     const retainedSources = new Map(sources.map(source => [source.file, source]));
-    previewOwnerRef.current = undefined;
-    setPreviewing(false);
+    handoffRollback.current = context ? { requestId, signal: context.signal, controller, files: incoming.filter(next => !retainedSources.has(next)) } : null;
     setInspecting(true);
-    setError("");
-    setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
-    setRiskAccepted(false);
-    operation.reset();
-    download.clearResults();
+    const resetForInput = () => {
+      previewOwnerRef.current = undefined; setPreviewing(false); setError("");
+      setPreflight({ status: "idle", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: "" });
+      setRiskAccepted(false); operation.reset(); download.clearResults();
+    };
+    if (!context) resetForInput();
     try {
       const inspectedSources: FinishSource[] = [];
       const rejected: DeliveryResult["rejected"] = [];
@@ -663,6 +664,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
       // G4-1: re-check ownership right before committing: a discard, leave,
       // or newer request may have invalidated this run after its last await.
       if (!isCurrent()) return;
+      if (context) resetForInput();
       if (previous && !retainPrimary) void releasePdf(previous);
       fileRef.current = first.file;
       setFile(first.file);
@@ -702,12 +704,14 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
       for (const next of incoming) if (!retainedSources.has(next)) await releasePdf(next);
     } finally {
       context?.signal.removeEventListener("abort", abort);
+      if (handoffRollback.current?.requestId === requestId) handoffRollback.current = null;
       if (!isCurrent()) for (const next of incoming) if (!retainedSources.has(next)) void releasePdf(next);
       if (isCurrent()) setInspecting(false);
     }
   };
 
   const removeFile = (index?: number) => {
+    handoffRollback.current = null;
     if (index !== undefined && sources.length > 1) {
       void replaceFile(sources.filter((_, sourceIndex) => sourceIndex !== index).map(({ file: sourceFile }) => sourceFile));
       return;
@@ -739,9 +743,19 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     receive: async (entry, context) => await replaceFile(entry.files, undefined, context)
       ?? { status: "cancelled", accepted: [], rejected: [] },
     invalidate: () => {
-      // Generation changes before the existing reset/abort path.
-      fileRequestRef.current += 1;
-      removeFile();
+      const rollback = handoffRollback.current;
+      if (!rollback?.signal.aborted) return;
+      handoffRollback.current = null;
+      if (rollback.requestId !== fileRequestRef.current) return;
+      fileRequestRef.current++;
+      rollback.controller.abort();
+      rollback.files.forEach(file => { void releasePdf(file); });
+      if (fileLifecycleControllerRef.current === rollback.controller) {
+        fileLifecycleControllerRef.current = undefined; setInspecting(false); operation.reset();
+      }
+      // No removeFile(): the previously inspected document and its options,
+      // output/preflight state stay owned by the user until a successful swap.
+
     },
   });
   const downloadReceived = () => {

@@ -1,5 +1,5 @@
 import { acceptsFile } from "../../app/fileAccepts";
-import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { useHandoffReceiver, usePersistentHandoffReceiver } from "../../app/useHandoffReceiver";
 import { grantOneShotSafeTarget, setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
 import {
@@ -198,11 +198,8 @@ export function ExcelMergerPage() {
           requiresConversion: getExtension(entry.file.name) === "xls" && await requiresLegacySpreadsheetConversion(entry.file),
         })))).filter(({ requiresConversion }) => requiresConversion).map(({ entry }) => entry)
       : [];
-    if (legacyAdditions.length) {
-      void prepareLegacyInputs(additions, legacyAdditions);
-      return [];
-    }
     if (!currentIntake()) return [];
+    if (legacyAdditions.length) return await prepareLegacyInputs(additions, legacyAdditions, context, generation);
 
     return await inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
       .then((inspectionResults) => {
@@ -228,9 +225,14 @@ export function ExcelMergerPage() {
       });
   };
 
-  const prepareLegacyInputs = async (additions: ExcelFileEntry[], legacyAdditions: ExcelFileEntry[]) => {
+  const prepareLegacyInputs = async (additions: ExcelFileEntry[], legacyAdditions: ExcelFileEntry[], context?: IntakeContext, generation = intakeGeneration.current): Promise<File[]> => {
     const controller = new AbortController();
     precisionControllerRef.current = controller;
+    const ownsIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
+    const currentIntake = () => ownsIntake() && !controller.signal.aborted;
+    const checkIntake = () => { if (!ownsIntake()) return false; controller.signal.throwIfAborted(); return true; };
+    const cancel = () => controller.abort(); context?.signal.addEventListener("abort", cancel, { once: true });
+    if (!currentIntake()) { context?.signal.removeEventListener("abort", cancel); return []; }
     setPrecisionPreparing(true);
     assetUiRef.current = { fileNumber: 0, percent: -1 };
     operation.start(t("excel.xlsPreserve.status.checking"));
@@ -247,6 +249,7 @@ export function ExcelMergerPage() {
       let runtime = officeRuntimeRef.current;
       if (!runtime) {
         const assetBaseUrl = await prepareOfficeAssets(({ loaded, total, fileNumber, fileCount, cached }) => {
+          if (!currentIntake()) return;
           const percent = Math.max(2, Math.min(74, Math.round((loaded / Math.max(1, total)) * 74)));
           if (assetUiRef.current.fileNumber === fileNumber && assetUiRef.current.percent === percent) return;
           const message = cached
@@ -256,8 +259,10 @@ export function ExcelMergerPage() {
           else operation.update(percent, message);
           assetUiRef.current = { fileNumber, percent };
         }, controller.signal, "converter");
+        if (!checkIntake()) return [];
         operation.update(78, t("excel.xlsPreserve.status.preparing"));
         runtime = await launchOfficeRuntime(converterCanvasRef.current, assetBaseUrl);
+        if (!checkIntake()) return [];
         officeRuntimeRef.current = runtime;
       } else {
         operation.update(78, t("excel.xlsPreserve.status.reusing"));
@@ -272,6 +277,7 @@ export function ExcelMergerPage() {
         operation.update(progress, t("excel.xlsPreserve.status.converting", { current: index + 1, total: legacyAdditions.length, name: entry.file.name }));
         try {
           const converted = await runtime.convertLegacySpreadsheet(entry.file);
+          if (!checkIntake()) return [];
           convertedById.set(entry.id, new File([converted.bytes], converted.fileName, {
             type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             lastModified: entry.file.lastModified,
@@ -288,6 +294,7 @@ export function ExcelMergerPage() {
         if (degradedIds.has(entry.id)) return { ...entry, processingFile: undefined, preservedLegacy: false, degradedLegacy: true };
         return entry;
       });
+      if (!checkIntake()) return [];
       setEntries((current) => current.map((entry) => {
         return prepared.find((item) => item.id === entry.id) ?? entry;
       }));
@@ -300,6 +307,7 @@ export function ExcelMergerPage() {
         degradedLegacy: entry.degradedLegacy,
         csvEncoding,
       })), language);
+      if (!checkIntake()) return [];
       const byId = new Map(inspectionResults.map((item) => [item.id, item]));
       setEntries((current) => current.map((entry) => {
         const inspectionResult = byId.get(entry.id);
@@ -310,13 +318,17 @@ export function ExcelMergerPage() {
       if (firstError) operation.fail(firstError);
       else if (degradedIds.size) operation.succeed(t("excel.xlsPreserve.status.degraded", { count: degradedIds.size }));
       else operation.succeed(t("excel.xlsPreserve.status.ready", { count: legacyAdditions.length }));
+      return additions.filter(entry => inspectionResults.some(result => result.id === entry.id && !result.error && !result.encrypted && result.sheetNames.length)).map(entry => entry.file);
     } catch (reason) {
+      if (!ownsIntake()) return [];
       const message = xlsPreserveError(reason, language);
       failEntries(additionIds, message);
       setError(message);
       operation.fail(message);
+      return [];
     } finally {
-      setPrecisionPreparing(false);
+      context?.signal.removeEventListener("abort", cancel);
+      if (generation === intakeGeneration.current) setPrecisionPreparing(false);
       if (precisionControllerRef.current === controller) precisionControllerRef.current = undefined;
     }
   };
@@ -495,7 +507,7 @@ export function ExcelMergerPage() {
   };
 
   useUnsavedWorkGuard("excel-merger", entries.length > 0 || !!result, { kind: "files", scopePath: "/tools/excel-merger", safePaths: ["/tools/excel-merger", "/tools/excel-merger/xls-preserve"] });
-  const handoff = useHandoffReceiver("excel-merger", {
+  const memoryHandoff = useHandoffReceiver("excel-merger", {
     kind: "inspection",
     invalidate: () => {
       const rollback = handoffRollback.current;
@@ -512,6 +524,17 @@ export function ExcelMergerPage() {
       return { status: accepted.length === entry.files.length ? "accepted" : accepted.length ? "partial" : "rejected", accepted, rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
     },
   });
+  const persistentHandoff = usePersistentHandoffReceiver("xls-preserve", {
+    kind: "inspection",
+    invalidate: () => { intakeGeneration.current++; precisionControllerRef.current?.abort(); setPrecisionPreparing(false); setEntries([]); clearResult(); setError(null); operation.reset(); },
+    receive: async (files, context) => {
+      const accepted = await handleFiles(files.filter(file => acceptsFile("excel-merger", file)), context);
+      if (context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };
+      if (accepted.length) setUnsavedWork("excel-merger", { hasWork: true, kind: "files", scopePath: "/tools/excel-merger" });
+      return { status: accepted.length === files.length ? "accepted" : accepted.length ? "partial" : "rejected", accepted, rejected: files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
+  });
+  const handoff = preserveLegacyXls ? persistentHandoff : memoryHandoff;
   return (
     <UtilityPage toolId="excel-merger"><div ref={intakeRoot} className="contents">
       {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
