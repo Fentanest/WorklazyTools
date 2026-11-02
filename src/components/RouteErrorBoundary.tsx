@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation } from "react-router-dom";
 
 import { confirmToolReady, recoverChunkError } from "../app/chunkRecovery";
+import { deferErrorNavigation, getRecovery, transferToRecovery } from "../app/memoryHandoff";
 import { Button } from "./ui/button";
 import { setAdIneligible } from "../app/adEligibility";
 import { withSiteBasePath } from "../app/siteBasePath";
@@ -21,6 +22,7 @@ class RouteBoundary extends Component<{ children: ReactNode; resetKey: string; o
     return { failed: true, recovering: true };
   }
   componentDidCatch(error: unknown) {
+    transferToRecovery();
     const resetKey = this.props.resetKey;
     // An isolated document may still be waiting for its preparation owner.
     void Promise.resolve(recoverChunkError(error)).then((recovering) => {
@@ -48,7 +50,8 @@ export function RouteErrorBoundary({ children }: { children: ReactNode }) {
       // Second error in same session - show error in-place without navigation
       return;
     }
-    window.location.assign(withSiteBasePath(`/${lang}/error/`, import.meta.env.BASE_URL));
+    const assign = () => window.location.assign(withSiteBasePath(`/${lang}/error/`, import.meta.env.BASE_URL));
+    if (!deferErrorNavigation(assign)) assign();
   };
   return <RouteBoundary resetKey={`${location.pathname}${location.search}`} onError={handleError}>{children}</RouteBoundary>;
 }
@@ -70,7 +73,7 @@ function RouteFailure({ recovering }: { recovering: boolean }) {
     <div className="page tool-page tool-route-loading outline-none focus-visible:outline-solid focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring" role={recovering ? "status" : "alert"} tabIndex={-1} ref={notice} data-route-error={recovering ? undefined : true} data-route-recovering={recovering ? true : undefined}>
       <div className="grid max-w-lg gap-4 px-4 text-center text-foreground">
         <p>{t(recovering ? "recovery.reloading" : "recovery.toolFailed")}</p>
-        <Button type="button" onClick={goHome}>{t("recovery.goHome")}</Button>
+        {getRecovery() ? <a href={withSiteBasePath(`/${document.documentElement.lang || "en"}/`, import.meta.env.BASE_URL)}>{t("recovery.goHome")}</a> : <Button type="button" onClick={goHome}>{t("recovery.goHome")}</Button>}
       </div>
     </div>
   );
