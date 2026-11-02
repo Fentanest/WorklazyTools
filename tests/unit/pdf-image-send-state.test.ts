@@ -79,3 +79,22 @@ for (const language of ["ko", "en"] as const) test(`PDF image removal clears the
     assert.equal(document.querySelectorAll('[data-testid="pdf-image-result-grid"] input:checked').length, 2);
   } finally { await panel.close(); }
 });
+
+for (const language of ["ko", "en"] as const) test(`PDF image send label follows the selected count and preserves retry (${language})`, async () => {
+  const panel = await mountPanel(language);
+  const send = () => panel.query('[data-testid="pdf-images-send-to-studio"]') as HTMLButtonElement;
+  try {
+    await panel.convert();
+    assert.equal(send().textContent, panel.messages.sendTo.editImages);
+    assert.equal(send().disabled, false);
+    await panel.toggle(1);
+    assert.equal(send().textContent, panel.messages.sendTo.editImage);
+    assert.equal(send().disabled, false);
+    await panel.toggle(0);
+    assert.equal(send().disabled, true);
+    panel.sender.reason = "retryable failure";
+    await panel.toggle(0);
+    assert.equal(send().textContent, panel.messages.sendTo.retry);
+    assert.equal(send().disabled, false);
+  } finally { await panel.close(); }
+});
