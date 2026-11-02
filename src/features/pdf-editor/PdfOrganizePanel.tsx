@@ -1,3 +1,7 @@
+import { useTranslation } from "react-i18next";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { acceptsFile } from "../../app/fileAccepts";
+import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
 import { Download, FileArchive, FileCheck2, GripVertical, Info, Layers3, Plus, Scissors, Settings2, Trash2, X } from "lucide-react";
 import Sortable from "sortablejs";
 import { type FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -37,7 +41,7 @@ interface EvaluatedRangeRow extends RangeRow {
 import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
 import { pdfOrganizeDirty, type PdfOrganizePreset } from "./pdfOrganizeDirect";
 import { usePdfOrganize } from "./pdfOrganizeDirectLifecycle";
-import { useUnsavedWorkGuard } from "../../app/toolState";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import { PDF_ORGANIZE_SAFE_PATHS } from "./pdfUi";
 
 export type PdfOrganizeOutputMode = OutputMode;
@@ -65,6 +69,8 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   onInitialFilesConsumed?: () => void;
 }) {
   const language = useAppLanguage();
+  const { t } = useTranslation("common");
+  const intakeElementRef = useRef<HTMLDivElement>(null);
   const [sources, setSources] = useState<PdfSourceFile[]>([]);
   const [pages, setPages] = useState<PdfPageItem[]>([]);
   const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(new Set());
@@ -296,55 +302,104 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   const rangePageCount = groupMembership.size;
   const resultFileCount = outputMode === "merged" ? (selectedPages.length ? 1 : 0) : outputMode === "ranges" ? (rangesValid ? rangeRows.length : 0) : selectedPages.length;
 
-  const acquireInput = async (nextFiles: File[]) => {
+  const acquireInput = async (nextFiles: File[], context?: IntakeContext): Promise<DeliveryResult | undefined> => {
     const incoming = nextFiles.filter((file) => !sources.some((source) => source.file === file));
-    if (!incoming.length) return;
+    if (!incoming.length || context?.signal.aborted) return;
+    const generation = ++resumeGeneration.current;
     setError("");
     activeController.current?.abort();
-    pendingInputs.current = incoming;
+    pendingInputs.current = context ? [] : incoming;
     const controller = new AbortController();
     activeController.current = controller;
+    const isCurrent = () => !controller.signal.aborted && !context?.signal.aborted && generation === resumeGeneration.current;
+    const abort = () => controller.abort();
+    context?.signal.addEventListener("abort", abort, { once: true });
     setInspecting(true);
     invalidateResult();
     operation.start(featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingPagesInPdfs", { p0: incoming.length }));
     const addedSources: PdfSourceFile[] = [];
     const addedPages: PdfPageItem[] = [];
+    const rejected: DeliveryResult["rejected"] = [];
     try {
       for (let index = 0; index < incoming.length; index += 1) {
         const file = incoming[index];
-        if (!file.name.toLowerCase().endsWith(".pdf")) throw new Error(featureMessage(language, "pdf.messages.PdfOrganizePanel.onlyPdfFilesCanBeAdded", { p0: file.name }));
-        operation.update(8 + (index / incoming.length) * 82, featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingPagesIn", { p0: index + 1, p1: incoming.length, p2: file.name }));
-        const inspected = await inspectPdf(file, language, { requirePdfLibCompatibility: true, signal: controller.signal });
-        const sourceId = createLocalId("pdf");
-        addedSources.push({ id: sourceId, file, pageCount: inspected.pageCount });
-        for (let pageIndex = 0; pageIndex < inspected.pageCount; pageIndex += 1) {
-          addedPages.push({ id: createLocalId("page"), sourceId, sourceName: file.name, sourcePageIndex: pageIndex, rotation: 0 });
+        if (!isCurrent()) return;
+        try {
+          if (context ? !acceptsFile("pdf-organize", file) : !file.name.toLowerCase().endsWith(".pdf")) throw new Error(featureMessage(language, "pdf.messages.PdfOrganizePanel.onlyPdfFilesCanBeAdded", { p0: file.name }));
+          operation.update(8 + (index / incoming.length) * 82, featureMessage(language, "pdf.messages.PdfOrganizePanel.checkingPagesIn", { p0: index + 1, p1: incoming.length, p2: file.name }));
+          const inspected = await inspectPdf(file, language, { requirePdfLibCompatibility: true, signal: controller.signal });
+          if (!isCurrent()) { void releasePdf(file); return; }
+          const sourceId = createLocalId("pdf");
+          addedSources.push({ id: sourceId, file, pageCount: inspected.pageCount });
+          for (let pageIndex = 0; pageIndex < inspected.pageCount; pageIndex += 1) {
+            addedPages.push({ id: createLocalId("page"), sourceId, sourceName: file.name, sourcePageIndex: pageIndex, rotation: 0 });
+          }
+        } catch (reason) {
+          void releasePdf(file);
+          if (!isCurrent()) return;
+          if (!context) throw reason;
+          rejected.push({ file, reasonCode: "unreadable-document" });
         }
       }
-      if (controller.signal.aborted) return;
+      if (!isCurrent()) return;
       focusAfterLoad.current = direct.acceptedPreset?.postLoadFocus;
       setSources((current) => [...current, ...addedSources]);
       setPages((current) => [...current, ...addedPages]);
       if (direct.acceptedPreset?.purpose === "split") setRangeRows(current => current.some(row => row.range.trim()) ? current : [{ ...current[0], range: compactPdfPageRange([...pages, ...addedPages].map((_, index) => index)), pageIds: [...pages, ...addedPages].map(page => page.id), orderIds: undefined }]);
       setSelectedPageIds((current) => new Set([...current, ...addedPages.map((page) => page.id)]));
       operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.addedAndSelectedAllPages", { p0: addedPages.length }));
+      if (context) {
+        if (addedSources.length) setUnsavedWork("pdf-organize", {
+          hasWork: true, kind: "files", scopePath: "/tools/pdf-editor",
+          safePaths: [...PDF_ORGANIZE_SAFE_PATHS], messageKey: "pdf.messages.PdfEditorPage.unsavedOrganize",
+        });
+        return { status: rejected.length ? (addedSources.length ? "partial" : "rejected") : "accepted", accepted: addedSources.map(source => source.file), rejected };
+      }
     } catch (reason) {
       addedSources.forEach((source) => { void releasePdf(source.file); });
-      if (controller.signal.aborted) return;
+      if (!isCurrent()) return;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfOrganizePanel.unableToReadThePdfFiles");
       setError(message);
       operation.fail(message);
     } finally {
-      if (activeController.current === controller) { setInspecting(false); pendingInputs.current = []; }
+      context?.signal.removeEventListener("abort", abort);
+      if (!isCurrent()) addedSources.forEach(source => { void releasePdf(source.file); });
+      if (isCurrent() && activeController.current === controller) { setInspecting(false); pendingInputs.current = []; }
     }
   };
 
   const handleFiles = (files: File[]) => {
-    const task = acquireInput(files);
+    const task = acquireInput(files).then(() => {});
     inputTask.current = task;
     return task;
   };
   inputHandler.current = handleFiles;
+
+  const handoff = useHandoffReceiver("pdf-organize", {
+    kind: "inspection",
+    receive: async (entry, context) => await acquireInput(entry.files, context)
+      ?? { status: "cancelled", accepted: [], rejected: [] },
+    invalidate: () => {
+      // Invalidate before resetting; a parser may finish after abort/timeout.
+      resumeGeneration.current += 1;
+      activeController.current?.abort();
+      pendingInputs.current = [];
+      sourcesRef.current.forEach(source => { void releasePdf(source.file); });
+      sourcesRef.current = [];
+      setSources([]); setPages([]); setSelectedPageIds(new Set()); setMovePageIds(new Set());
+      setSplitAfterPageIds(new Set()); setSelectionRange(""); setSelectionError("");
+      setInspecting(false); setError(""); operation.reset(); invalidateResult();
+    },
+  });
+  const downloadReceived = () => {
+    for (const file of handoff.recoveryFiles) {
+      const url = URL.createObjectURL(file);
+      const anchor = document.createElement("a"); anchor.href = url; anchor.download = file.name;
+      document.body.append(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    }
+    setTimeout(() => handoff.dismiss(), 0);
+  };
 
   // W1 [① 정리로 돌아가기]: files handed back from finish are acquired once
   // through the normal input path.
@@ -616,12 +671,21 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
 
   return (
     <>
+      {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" className="mb-4 flex-col items-start gap-2" role="status" data-pdf-handoff-recovery>
+        <p>{handoff.recoveryFiles.length ? t("handoff.partial", { count: handoff.recoveryFiles.length }) : t("handoff.notReceived")}</p>
+        {handoff.recoveryFiles.length > 0 && <ul className="max-w-full break-all text-sm">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>}
+        <div className="flex flex-wrap gap-2">
+          {handoff.recoveryFiles.length > 0 && <Button type="button" variant="outline" onClick={downloadReceived}>{t("handoff.downloadReceived")}</Button>}
+          <Button type="button" variant="outline" disabled={locked} onClick={() => intakeElementRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>{t("handoff.selectAgain")}</Button>
+          {handoff.recoveryFiles.length > 0 && <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{t("handoff.close")}</Button>}
+        </div>
+      </UtilityNotice>}
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
       {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? ({ merge: "PDF 합치기", split: "PDF 나누기", delete: "PDF 페이지 삭제", rotate: "PDF 페이지 회전" })[direct.acceptedPreset.purpose] : ({ merge: "Merge PDFs", split: "Split a PDF", delete: "Delete PDF pages", rotate: "Rotate PDF pages" })[direct.acceptedPreset.purpose]} description={language === "ko" ? ({ merge: "출력 설정에서 선택한 페이지를 하나의 PDF로 저장하세요.", split: "페이지 사이의 나누기 위치를 선택하세요. 선택 전에는 모든 페이지가 하나의 범위로 유지됩니다.", delete: "PDF를 넣고 첫 페이지의 삭제 버튼에서 지울 페이지를 선택하세요. 자동으로 삭제하지 않습니다.", rotate: "PDF를 넣고 첫 페이지의 회전 버튼에서 방향을 조정하세요. 자동으로 회전하지 않습니다." })[direct.acceptedPreset.purpose] : ({ merge: "Save the selected pages as one PDF using the output settings.", split: "Choose boundaries between pages. All pages stay in one range until you choose a boundary.", delete: "Add a PDF, then use the first page’s delete button. No pages are deleted automatically.", rotate: "Add a PDF, then use the first page’s rotate button. No pages are rotated automatically." })[direct.acceptedPreset.purpose]} />}
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
         <div>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPdfs")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.loadEveryPageFromMultiplePdfsIntoOne")} className="">
-            <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} disabled={locked} accent="violet" hint={featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseMultiplePdfsAtOnceOrAddMore")} />
+            <div ref={intakeElementRef}><FileDropZone accept=".pdf,application/pdf" multiple files={sources.map((source) => source.file)} onFiles={handleFiles} disabled={locked} accent="violet" hint={featureMessage(language, "pdf.messages.PdfOrganizePanel.chooseMultiplePdfsAtOnceOrAddMore")} /></div>
             <FileList files={sources.map((source) => source.file)} onRemove={removeSource} accent="violet" />
           </SectionCard>
 

@@ -1,3 +1,7 @@
+import { useTranslation } from "react-i18next";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { acceptsFile } from "../../app/fileAccepts";
+import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, FileCheck2, Hash, Image as ImageIcon, Minus, PanelTop, PenLine, Plus, Redo2, SquareDashed, Stamp, Type, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
@@ -310,6 +314,8 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
   onBackToOrganize?: (files: File[]) => string | null;
 }) {
   const language = useAppLanguage();
+  const { t } = useTranslation("common");
+  const intakeElementRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const requestGuardedNavigate = useGuardedNavigate();
   const copy = featureResource<FinishCopy>(language, "pdf.finish");
@@ -602,9 +608,9 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
   // newer attempt.
   const pendingIntakeRequestRef = useRef<number | null>(null);
 
-  const replaceFile = async (incoming: File[], intake?: { generation: number; attempt: number }) => {
-    if (!incoming.length) return;
-    if (incoming.some((next) => !/\.pdf$/iu.test(next.name) && next.type !== "application/pdf")) {
+  const replaceFile = async (incoming: File[], intake?: { generation: number; attempt: number }, context?: IntakeContext): Promise<DeliveryResult | undefined> => {
+    if (!incoming.length || context?.signal.aborted) return;
+    if (!context && incoming.some((next) => !/\.pdf$/iu.test(next.name) && next.type !== "application/pdf")) {
       setError(copy.invalidFile);
       return;
     }
@@ -616,6 +622,9 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     controllerRef.current?.abort();
     const controller = new AbortController();
     fileLifecycleControllerRef.current = controller;
+    const isCurrent = () => !controller.signal.aborted && !context?.signal.aborted && fileRequestRef.current === requestId;
+    const abort = () => controller.abort();
+    context?.signal.addEventListener("abort", abort, { once: true });
     const previous = fileRef.current;
     const retainPrimary = previous === incoming[0];
     const retainedSources = new Map(sources.map(source => [source.file, source]));
@@ -629,18 +638,31 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     download.clearResults();
     try {
       const inspectedSources: FinishSource[] = [];
-      for (const [index, next] of incoming.entries()) {
+      const rejected: DeliveryResult["rejected"] = [];
+      for (const next of incoming) {
+        if (!isCurrent()) return;
         const retained = retainedSources.get(next);
         if (retained) { inspectedSources.push(retained); continue; }
-        const inspected = await inspectPdf(next, language, { requirePdfLibCompatibility: true, signal: controller.signal });
-        if (index > 0) await releasePdf(next);
-        if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
-        inspectedSources.push({ key: createLocalId("finish-source"), file: next, pageCount: inspected.pageCount });
+        try {
+          if (context && !acceptsFile("pdf-finish", next)) throw new Error(copy.invalidFile);
+          const inspected = await inspectPdf(next, language, { requirePdfLibCompatibility: true, signal: controller.signal });
+          if (inspectedSources.length > 0) await releasePdf(next);
+          if (!isCurrent()) { void releasePdf(next); return; }
+          inspectedSources.push({ key: createLocalId("finish-source"), file: next, pageCount: inspected.pageCount });
+        } catch (reason) {
+          if (!context) throw reason;
+          void releasePdf(next);
+          if (!isCurrent()) return;
+          rejected.push({ file: next, reasonCode: "unreadable-document" });
+        }
       }
+      if (!isCurrent()) return;
+      const result: DeliveryResult = { status: rejected.length ? (inspectedSources.length ? "partial" : "rejected") : "accepted", accepted: inspectedSources.map(source => source.file), rejected };
+      if (!inspectedSources.length) return result;
       const first = inspectedSources[0];
       // G4-1: re-check ownership right before committing: a discard, leave,
       // or newer request may have invalidated this run after its last await.
-      if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
+      if (!isCurrent()) return;
       if (previous && !retainPrimary) void releasePdf(previous);
       fileRef.current = first.file;
       setFile(first.file);
@@ -648,7 +670,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
       setFileKey(first.key);
       setPageCount(first.pageCount);
       if (!retainPrimary) { setRangeText(`1-${first.pageCount}`); setParity("all"); }
-      if (intake) {
+      if (intake || context) {
         // Ack only after this exact intake request inspected successfully.
         // Order (plan §4.1): finish protection first (direct registry write),
         // then the ack, which lets the parent release the result guard.
@@ -660,10 +682,11 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
           safePaths: [...PDF_FINISH_SAFE_PATHS],
           messageKey: "pdf.messages.PdfEditorPage.unsavedFinish",
         });
-        onHandoffAccepted?.(intake.generation, intake.attempt);
+        if (intake) onHandoffAccepted?.(intake.generation, intake.attempt);
       }
+      return result;
     } catch (reason) {
-      if (controller.signal.aborted || fileRequestRef.current !== requestId) return;
+      if (!isCurrent()) return;
       if (intake) {
         // G4-2: the failure of this completed intake request, bound to its
         // own (generation, attempt). Every completed intake inspection
@@ -677,7 +700,9 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
       setError(inspectionErrorMessage(reason, language, copy));
       for (const next of incoming) if (!retainedSources.has(next)) await releasePdf(next);
     } finally {
-      if (fileRequestRef.current === requestId) setInspecting(false);
+      context?.signal.removeEventListener("abort", abort);
+      if (!isCurrent()) for (const next of incoming) if (!retainedSources.has(next)) void releasePdf(next);
+      if (isCurrent()) setInspecting(false);
     }
   };
 
@@ -706,6 +731,26 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     setRiskAccepted(false);
     operation.reset();
     download.clearResults();
+  };
+
+  const handoff = useHandoffReceiver("pdf-finish", {
+    kind: "inspection",
+    receive: async (entry, context) => await replaceFile(entry.files, undefined, context)
+      ?? { status: "cancelled", accepted: [], rejected: [] },
+    invalidate: () => {
+      // Generation changes before the existing reset/abort path.
+      fileRequestRef.current += 1;
+      removeFile();
+    },
+  });
+  const downloadReceived = () => {
+    for (const file of handoff.recoveryFiles) {
+      const url = URL.createObjectURL(file);
+      const anchor = document.createElement("a"); anchor.href = url; anchor.download = file.name;
+      document.body.append(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    }
+    setTimeout(() => handoff.dismiss(), 0);
   };
 
   // W1 prepared handoff intake (plan §4.1 D4-1, F3): insert through the normal
@@ -963,6 +1008,15 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
 
   return (
     <section className="pdf-finish-panel" data-testid="pdf-finish-ready" data-pdf-finish-tab={activeTab} data-preflight-status={preflight.status}>
+      {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" className="mb-4 flex-col items-start gap-2" role="status" data-pdf-handoff-recovery>
+        <p>{handoff.recoveryFiles.length ? t("handoff.partial", { count: handoff.recoveryFiles.length }) : t("handoff.notReceived")}</p>
+        {handoff.recoveryFiles.length > 0 && <ul className="max-w-full break-all text-sm">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>}
+        <div className="flex flex-wrap gap-2">
+          {handoff.recoveryFiles.length > 0 && <Button type="button" variant="outline" onClick={downloadReceived}>{t("handoff.downloadReceived")}</Button>}
+          <Button type="button" variant="outline" disabled={locked} onClick={() => intakeElementRef.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>{t("handoff.selectAgain")}</Button>
+          {handoff.recoveryFiles.length > 0 && <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{t("handoff.close")}</Button>}
+        </div>
+      </UtilityNotice>}
       <div className="mb-4 grid grid-cols-4 gap-1 rounded-2xl bg-muted p-1" role="tablist" aria-label={copy.tabsLabel}>
         {(["page-numbers", "header-footer", "watermark", "stamp"] as const).map((tab) => {
           const selected = activeTab === tab;
@@ -982,7 +1036,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
       <div id={tabPanelId} role="tabpanel" aria-labelledby={`${tabPanelId}-${activeTab}`}>
         {stampActive && <UtilityNotice className="mb-4 flex-col" kind="warning" data-testid="pdf-stamp-notice" data-pdf-stamp-owned><strong className="block text-foreground" data-testid="pdf-stamp-notice-title">{copy.stamp.noticeTitle}</strong><span data-testid="pdf-stamp-notice-description">{copy.stamp.noticeDescription}</span></UtilityNotice>}
         <SectionCard step={1} title={copy.uploadTitle} description={copy.uploadDescription} className="">
-          <FileDropZone accept=".pdf,application/pdf" multiple files={sources.map(({ file: sourceFile }) => sourceFile)} onFiles={replaceFile} disabled={locked} accent="violet" hint={inspecting ? copy.inspecting : copy.uploadHint} />
+          <div ref={intakeElementRef}><FileDropZone accept=".pdf,application/pdf" multiple files={sources.map(({ file: sourceFile }) => sourceFile)} onFiles={(files) => { void replaceFile(files); }} disabled={locked} accent="violet" hint={inspecting ? copy.inspecting : copy.uploadHint} /></div>
           <FileList files={sources.map(({ file: sourceFile }) => sourceFile)} onRemove={removeFile} accent="violet" />
           <Button type="button" variant="ghost" className="mt-2 min-h-10 w-fit rounded-xl px-3 text-xs font-bold text-primary" data-testid="pdf-finish-back-to-organize" onClick={backToOrganize} disabled={locked}>
             {copy.backToOrganize}
