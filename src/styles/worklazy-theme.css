@@ -773,6 +773,7 @@ input:focus-visible {
 .tool-view-switch button[aria-pressed="true"] { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand-on-bg); }
 .tool-list { display: grid; gap: 8px; margin-top: 14px; }
 .tool-list-row { display: grid; grid-template-columns: 44px minmax(0,1fr) 18px; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--separator); border-radius: 14px; background: var(--bg-elevated); color: var(--foreground); }
+.tool-list-row-with-favorite { padding-right: 64px; }
 .tool-list-row:hover { border-color: var(--brand-border); background: var(--brand-soft); }
 .tool-list-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; }
 .tool-list-row h3 { margin: 0; font-size: 15px; font-weight: 750; overflow-wrap: anywhere; }

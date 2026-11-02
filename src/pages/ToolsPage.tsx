@@ -134,7 +134,7 @@ export function ToolsPage() {
               <div className={view === "list" ? "tool-list" : "tool-grid all-tools-grid"} data-testid="tool-results" data-view={view}>
                 {categoryTools.map((tool) => {
                   const Icon = tool.icon;
-                  return view === "grid" ? <ToolCard key={tool.id} tool={tool} /> : <div key={tool.id} className="relative"><Link to={tool.path} className="tool-list-row" style={{ paddingRight: 64 }} data-ui-component="tool-card" onClick={() => trackToolOpen(tool.id, "tools_card", language)}><span className="tool-list-icon tone-icon-badge" data-icon-tone={getToolIconTone(tool.id)}><Icon size={22} aria-hidden="true" /></span><span><h3>{tool.title}</h3><p data-testid="tool-tagline">{tool.tagline}</p></span><ArrowRight size={18} aria-hidden="true" /></Link><FavoriteToolButton tool={tool} list /></div>;
+                  return view === "grid" ? <ToolCard key={tool.id} tool={tool} /> : <div key={tool.id} className="relative"><Link to={tool.path} className="tool-list-row tool-list-row-with-favorite" data-ui-component="tool-card" onClick={() => trackToolOpen(tool.id, "tools_card", language)}><span className="tool-list-icon tone-icon-badge" data-icon-tone={getToolIconTone(tool.id)}><Icon size={22} aria-hidden="true" /></span><span><h3>{tool.title}</h3><p data-testid="tool-tagline">{tool.tagline}</p></span><ArrowRight size={18} aria-hidden="true" /></Link><FavoriteToolButton tool={tool} list /></div>;
                 })}
               </div>
             </section>

@@ -34,12 +34,15 @@ export function createPersonalizationStore(storage: StorageAccess) {
   }
   function getSnapshot() { if (!initialized) load(); return snapshot; }
   function publish() { listeners.forEach(listener => listener()); }
-  function save(kind: Kind, ids: readonly string[], clear = false) {
+  function save(kind: Kind, update: (latest: readonly string[]) => readonly string[], clear = false) {
     const before = getSnapshot();
     if (!before[`${kind}Enabled`]) return false;
     try {
-      // Re-read before writing: another tab may have replaced valid data with corrupt bytes.
-      if (!read(kind).enabled) throw new Error("Storage unavailable");
+      // Apply this action to the latest valid storage value: storage events from
+      // another tab may still be queued when this tab handles a click or visit.
+      const latest = read(kind);
+      if (!latest.enabled) throw new Error("Storage unavailable");
+      const ids = update(latest.ids);
       if (clear) storage().removeItem(PERSONALIZATION_KEYS[kind]);
       else storage().setItem(PERSONALIZATION_KEYS[kind], JSON.stringify(ids));
       snapshot = { ...before, [kind]: ids };
@@ -57,15 +60,13 @@ export function createPersonalizationStore(storage: StorageAccess) {
     refresh() { load(); publish(); },
     record(id: string) {
       if (!toolIds.has(id)) return;
-      const { recent } = getSnapshot();
-      if (recent[0] !== id) save("recent", [id, ...recent.filter(item => item !== id)].slice(0, 6));
+      save("recent", recent => [id, ...recent.filter(item => item !== id)].slice(0, 6));
     },
     toggle(id: string) {
       if (!toolIds.has(id)) return;
-      const { favorites } = getSnapshot();
-      save("favorites", favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]);
+      save("favorites", favorites => favorites.includes(id) ? favorites.filter(item => item !== id) : [...favorites, id]);
     },
-    clear(kind: Kind) { return save(kind, [], true); },
+    clear(kind: Kind) { return save(kind, () => [], true); },
   };
 }
 
