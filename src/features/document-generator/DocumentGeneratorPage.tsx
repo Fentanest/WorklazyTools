@@ -1,3 +1,7 @@
+import { acceptsFile } from "../../app/fileAccepts";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
 import { Download, FileText, Package, Play, RotateCcw, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +22,11 @@ type SelectionDraft = { sheetName: string; headerRow: number; aliases: Record<nu
 type LooseT = (key: string, options?: Record<string, unknown>) => string;
 
 export function DocumentGeneratorPage() {
+  const { t: ht } = useTranslation("common");
+  const intakeRoot = useRef<HTMLDivElement>(null);
+  const intakeGeneration = useRef(0);
+  const intakeMount = useRef(0);
+  useEffect(() => { const mount = ++intakeMount.current; return () => { queueMicrotask(() => { if (mount === intakeMount.current) intakeGeneration.current++; }); }; }, []);
   const { t, i18n } = useTranslation(['features', 'common']);
   const tr = t as unknown as LooseT;
   const language = i18n.language.startsWith('en') ? 'en' : 'ko';
@@ -83,27 +92,42 @@ export function DocumentGeneratorPage() {
     return {...base, aliases: Object.fromEntries(columns.map(({column, display}) => [column, display && counts.get(display) === 1 ? display : '']))};
   }, [columnsFor]);
 
-  const replaceData = async (files: File[]) => {
-    if (busy) return; setPending(true); setMessage(''); clearPrepared(); releaseDownload(zip); setZip(undefined); setZipAttemptId(undefined);
+  const replaceData = async (files: File[], context?: IntakeContext): Promise<File[]> => {
+    const generation = ++intakeGeneration.current;
+    const currentIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
+    if (busy) return []; setPending(true); setMessage(''); clearPrepared(); releaseDownload(zip); setZip(undefined); setZipAttemptId(undefined);
     try {
       await client.reset();
+      if (!currentIntake()) return [];
       const retained = new Map(dataFiles.map((file, index) => [file, sources[index]]));
       const accepted: File[] = []; const loaded: GeneratorSource[] = []; const failures: Array<{index:number;code:string}> = [];
       for (let index = 0; index < files.length; index++) {
+        if (!currentIntake()) return [];
         try { const source = retained.get(files[index]) ?? (await client.loadSources([files[index]]))[0]; accepted.push(files[index]); loaded.push(source); }
         catch (error) { failures.push({index, code: error instanceof GeneratorError ? error.code : 'DAMAGED_DATA'}); }
       }
+      if (!currentIntake()) return [];
       setDataFiles(accepted); setSources(loaded); setSourceFailures(failures);
       setDrafts(old => Object.fromEntries(loaded.map(source => [source.id, old[source.id] ?? makeDraft(source)])));
-    } catch (error) { setMessage(errorText(error)); }
-    finally { setPending(false); }
+      if (accepted.length && !context && handoff.notReceived) handoff.dismiss();
+      return accepted;
+    } catch (error) { if (currentIntake()) setMessage(errorText(error)); return []; }
+    finally { if (currentIntake()) setPending(false); }
   };
 
-  const replaceTemplate = async (files: File[]) => {
-    const file = files.at(-1); if (!file || busy) return; setPending(true); setMessage(''); clearPrepared(); releaseDownload(zip); setZip(undefined); setZipAttemptId(undefined);
-    try { await client.reset(); const inspected = await client.inspectTemplate(file); setTemplateFile(file); setTemplateVariables(inspected.variables); }
-    catch (error) { setTemplateFile(undefined); setTemplateVariables([]); setMessage(errorText(error)); }
-    finally { setPending(false); }
+  const replaceTemplate = async (files: File[], context?: IntakeContext): Promise<boolean> => {
+    const file = files.at(-1); if (!file || busy) return false;
+    const generation = ++intakeGeneration.current;
+    const currentIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
+    setPending(true); setMessage(''); clearPrepared(); releaseDownload(zip); setZip(undefined); setZipAttemptId(undefined);
+    try {
+      await client.reset(); if (!currentIntake()) return false;
+      const inspected = await client.inspectTemplate(file); if (!currentIntake()) return false;
+      setTemplateFile(file); setTemplateVariables(inspected.variables);
+      if (!context && handoff.notReceived) handoff.dismiss();
+      return true;
+    } catch (error) { if (currentIntake()) { setTemplateFile(undefined); setTemplateVariables([]); setMessage(errorText(error)); } return false; }
+    finally { if (currentIntake()) setPending(false); }
   };
 
   const updateDraft = (source: GeneratorSource, next: Partial<SelectionDraft>) => {
@@ -148,17 +172,47 @@ export function DocumentGeneratorPage() {
   };
   const resetAll = async () => { if (busy) return; setPending(true); try { await client.reset(); setDataFiles([]); setSources([]); setDrafts({}); setTemplateFile(undefined); setTemplateVariables([]); setSourceFailures([]); clearPrepared(); releaseDownload(zip); setZip(undefined); setZipAttemptId(undefined); setMessage(''); operation.reset(); } finally { setPending(false); } };
 
+  useUnsavedWorkGuard("document-generator", dataFiles.length > 0 || !!templateFile || snapshot.results.length > 0, { kind: "files", scopePath: "/tools/document-generator" });
+  const handoff = useHandoffReceiver("document-generator", {
+    kind: "inspection",
+    invalidate: () => { intakeGeneration.current++; client.cancel(); void client.reset().catch(() => {}); setPending(false); setDataFiles([]); setSources([]); setDrafts({}); setSourceFailures([]); setTemplateFile(undefined); setTemplateVariables([]); clearPrepared(); },
+    receive: async (entry, context) => {
+      const template = entry.files.filter((file, index) => entry.roles?.[index] === "template" && /\.docx$/i.test(file.name));
+      const data = entry.files.filter((file, index) => entry.roles?.[index] === "data" && /\.(xlsx|csv)$/i.test(file.name));
+      const rejected = (): DeliveryResult => ({ status: "rejected", accepted: [], rejected: entry.files.map(file => ({ file, reasonCode: "inspection" })) });
+      if (entry.roles?.length !== entry.files.length || template.length !== 1 || !data.length || data.length > 49 || data.length + 1 !== entry.files.length || !entry.files.every(file => acceptsFile("document-generator", file))) return rejected();
+      if (!await replaceTemplate(template, context) || context.signal.aborted) return rejected();
+      const loaded = await replaceData(data, context);
+      if (context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };
+      const accepted = [template[0], ...loaded];
+      setUnsavedWork("document-generator", { hasWork: true, kind: "files", scopePath: "/tools/document-generator" });
+      return { status: accepted.length === entry.files.length ? "accepted" : "partial", accepted, rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
+  });
   const successfulRows = snapshot.results.length;
   const attemptIsPublished = snapshot.attempt?.id === snapshot.resultAttemptId;
   const progressRows = snapshot.attempt?.rows ?? [];
   const selectedRow = plan?.rows.find(row=>row.id===sampleRow);
   const guide = tr('features:documentGenerator.guide', {returnObjects:true}) as any;
 
-  return <UtilityPage toolId="document-generator">
+  return <UtilityPage toolId="document-generator"><div ref={intakeRoot} className="contents">
+      {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
+        <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+        <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+        <div className="flex flex-wrap gap-2">
+          {!!handoff.recoveryFiles.length && <Button type="button" variant="outline" onClick={() => {
+            for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+            setTimeout(() => handoff.dismiss(), 0);
+          }}>{ht("handoff.downloadReceived")}</Button>}
+          <Button type="button" variant="outline" disabled={busy} onClick={() => intakeRoot.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()}>{ht("handoff.selectAgain")}</Button>
+          <Button type="button" variant="ghost" onClick={() => handoff.dismiss()}>{ht("handoff.close")}</Button>
+        </div>
+      </UtilityNotice>}
+
     <PageHeader eyebrow={tr('features:documentGenerator.eyebrow')} title={tr('features:documentGenerator.title')} description={tr('features:documentGenerator.description')} />
     <UtilitySectionCard title={tr('features:documentGenerator.files.title')} description={tr('features:documentGenerator.files.description')}>
-      <FileDropZone label={tr('features:documentGenerator.files.template')} hint={tr('features:documentGenerator.files.templateHint')} accept={DOCX_ACCEPT} files={templateFile?[templateFile]:[]} onFiles={replaceTemplate} disabled={busy}/>
-      <div className="mt-4"><FileDropZone label={tr('features:documentGenerator.files.data')} hint={tr('features:documentGenerator.files.dataHint')} accept={DATA_ACCEPT} multiple files={dataFiles} onFiles={replaceData} disabled={busy}/></div>
+      <FileDropZone label={tr('features:documentGenerator.files.template')} hint={tr('features:documentGenerator.files.templateHint')} accept={DOCX_ACCEPT} files={templateFile?[templateFile]:[]} onFiles={async files => { await replaceTemplate(files); }} disabled={busy}/>
+      <div className="mt-4"><FileDropZone label={tr('features:documentGenerator.files.data')} hint={tr('features:documentGenerator.files.dataHint')} accept={DATA_ACCEPT} multiple files={dataFiles} onFiles={async files => { await replaceData(files); }} disabled={busy}/></div>
       <UtilityNotice className="mt-3">{tr('features:documentGenerator.files.limits')}</UtilityNotice>
       {sourceFailures.length>0&&<UtilityNotice className="mt-3" kind="error" role="alert"><ul>{sourceFailures.map(item=><li key={item.index}>{tr('features:documentGenerator.document', {number:item.index+1})}: {generatorMessage(item.code as never,language)}</li>)}</ul></UtilityNotice>}
       {templateVariables.length>0&&<p className="mt-3 text-sm"><strong>{tr('features:documentGenerator.variables')}:</strong> {templateVariables.join(', ')}</p>}
@@ -191,7 +245,7 @@ export function DocumentGeneratorPage() {
     </UtilitySectionCard>}
     {message&&<UtilityNotice kind="error" role="alert">{message}</UtilityNotice>}
     <ToolGuideWrapper slug="documentGenerator" />
-  </UtilityPage>;
+  </div></UtilityPage>;
 }
 
 function activateDownload(value: GeneratorDownload, name?: string) {

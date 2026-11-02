@@ -734,3 +734,24 @@ input:focus-visible {
   background: var(--tone-bg) !important;
   transition: all 0.2s;
 }
+
+/* H1: the existing hero illustration slot becomes a local file intake. */
+.home-page .wl-hero { overflow: clip; }
+.home-dropzone { width: 100%; min-width: 0; padding: 24px; border: 2px dashed var(--border); border-radius: 24px; background: var(--card); color: var(--foreground); text-align: center; }
+.home-dropzone.is-dragging { border-color: var(--brand-on-bg); background: var(--brand-soft); }
+.home-dropzone > svg { margin: 0 auto 12px; color: var(--brand-on-bg); }
+.home-dropzone h2 { margin: 0 0 8px; font-size: 22px; letter-spacing: -.035em; }
+.home-dropzone p { margin: 8px 0 14px; font-size: 13px; line-height: 1.6; color: var(--muted-foreground); }
+.home-dropzone > small { display: block; margin-top: 12px; font-size: 12px; color: var(--muted-foreground); }
+.home-drop-results { text-align: left; }
+.home-drop-summary, .home-drop-files li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.home-drop-summary { margin-top: 16px; }
+.home-drop-files { list-style: none; padding: 0; margin: 8px 0; max-height: 112px; overflow: auto; font-size: 12px; }
+.home-drop-files span { min-width: 0; overflow-wrap: anywhere; }
+.home-drop-files small { flex-shrink: 0; color: var(--muted-foreground); }
+.home-drop-group { padding-top: 12px; margin-top: 12px; border-top: 1px solid var(--border); font-size: 13px; }
+.home-drop-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.home-drop-actions button { white-space: normal; height: auto; min-height: 40px; }
+.home-drop-actions a { color: var(--brand-on-bg); text-decoration: underline; }
+.home-dropzone .home-drop-bundle-note { margin-bottom: 0; }
+@media (max-width: 620px) { .home-dropzone { padding: 18px; } .home-drop-actions button { min-height: 44px; } }

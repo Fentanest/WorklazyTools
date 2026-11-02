@@ -110,6 +110,48 @@
       "processDescription": "See progress and logs while your files remain on your device.",
       "saveTitle": "3. Save the result",
       "saveDescription": "Review the result created by your browser and download it to your device."
+    },
+    "dropzone": {
+      "title": "Drop files to get started",
+      "description": "Find tools for your files. You can paste images too.",
+      "choose": "Choose files",
+      "checking": "Checking files…",
+      "local": "Checked only in your browser · Up to 50 files at once",
+      "limit": "You selected {{count}} files. Choose up to 50 at once. No files were added.",
+      "count": "Selected files: {{count}}",
+      "failed": "Could not open the files. Please choose them again.",
+      "video": "Video tools are currently unavailable.",
+      "allTools": "View all tools",
+      "bundle": "Only the chosen group will open. Return home and add the remaining files again to open another group.",
+      "groups": {
+        "spreadsheet": "Excel · CSV",
+        "pdf": "PDF",
+        "image": "Images",
+        "office": "Documents · Slides",
+        "video": "Video",
+        "other": "Other files",
+        "mailmerge": "Template + data"
+      },
+      "receivers": {
+        "excel-cleaner": "Clean data",
+        "excel-merger": "Merge spreadsheets",
+        "document-generator": "Generate documents",
+        "pdf-organize": "Organize · merge PDFs",
+        "pdf-finish": "Watermark PDFs",
+        "image-edit": "Edit image",
+        "image-batch": "Batch edit images",
+        "image-privacy": "Remove image metadata",
+        "office": "Open in Office"
+      },
+      "hints": {
+        "excel": "Add another spreadsheet to merge files.",
+        "data": "Add spreadsheets or CSVs to merge, or a DOCX template to generate documents.",
+        "pdf": "Add another PDF to merge files.",
+        "image": "Add more images to batch edit.",
+        "template": "Add XLSX or CSV data to generate documents."
+      },
+      "add": "Add files",
+      "remove": "Remove {{name}}"
     }
   },
   "files": {

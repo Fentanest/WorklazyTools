@@ -2,6 +2,9 @@ import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { acceptsFile } from "../../app/fileAccepts";
+import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -53,13 +56,27 @@ const EDITOR_WORK_MAX_DIMENSION = 4096;
 const EDITOR_EXPORT_MAX_DIMENSION = 8192;
 const EDITOR_PANEL_STORAGE_KEY = "worklazy:image-editor-panel-collapsed";
 
-import { useUnsavedWorkGuard } from "../../app/toolState";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
 import { imageDirectDirty, type ImageDirectPreset } from "./imageDirect";
 import { useImageDirect } from "./imageDirectLifecycle";
-interface ImageEditorDirectHandle { apply: (preset?: ImageDirectPreset) => void; cancel: () => void }
+interface ImageEditorDirectHandle {
+  apply: (preset?: ImageDirectPreset) => void;
+  cancel: () => void;
+  receive: (file: File, context: IntakeContext) => Promise<boolean>;
+  invalidate: () => void;
+}
+function imageIntakeResult(files: File[], accepted: File[]): DeliveryResult {
+  const rejected = files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "rejected" }));
+  return { status: rejected.length ? (accepted.length ? "partial" : "rejected") : "accepted", accepted, rejected };
+}
+function protectImageInput() {
+  setUnsavedWork("image-studio", { hasWork: true, kind: "files", scopePath: "/tools/image-studio" });
+}
 export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
   const { t, i18n } = useTranslation("features");
+  const { t: commonT } = useTranslation("common");
+  const pageElement = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<StudioTab>("editor");
   const progress = useOperationProgress();
   const activeController = useRef<AbortController | undefined>(undefined);
@@ -82,7 +99,9 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
     const available = 50 - current.inputFiles.length - current.handoffFiles.length;
     const accepted = filterRasterImages(incoming);
     setBatchNotice(accepted.length > available ? "limit" : undefined);
-    updateBatchQueue({ ...current, inputFiles: [...current.inputFiles, ...accepted.slice(0, available)] });
+    const added = accepted.slice(0, Math.max(0, available));
+    updateBatchQueue({ ...current, inputFiles: [...current.inputFiles, ...added] });
+    return added;
   };
   const onEditedResult = (file: File) => {
     const current = batchQueueRef.current;
@@ -100,9 +119,44 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       : { ...current, handoffFiles: current.handoffFiles.filter((_, i) => i !== index - current.inputFiles.length) });
     setBatchNotice(undefined);
   };
-  const pageDirty = editorDirty || batchCount > 0 || Object.values(otherDirty).some(Boolean) || progress.status === "running";
-  useUnsavedWorkGuard("image-studio", pageDirty, { kind: "files", scopePath: "/tools/image-studio" });
   const editorHandle = useRef<ImageEditorDirectHandle | undefined>(undefined);
+  const editHandoff = useHandoffReceiver("image-edit", {
+    kind: "inspection",
+    invalidate: () => editorHandle.current?.invalidate(),
+    receive: async (entry, context) => {
+      setTab("editor");
+      const file = entry.files[0];
+      const accepted = file && acceptsFile("image-edit", file) && filterRasterImages([file]).length
+        && await editorHandle.current?.receive(file, context) ? [file] : [];
+      return imageIntakeResult(entry.files, accepted);
+    },
+  });
+  const batchHandoff = useHandoffReceiver("image-batch", {
+    kind: "selection",
+    receive: (entry, { signal }) => {
+      if (signal.aborted) return imageIntakeResult(entry.files, []);
+      setVisited(current => new Set([...current, "batch"]));
+      setTab("batch");
+      const accepted = appendBatchFiles(entry.files.filter(file => acceptsFile("image-batch", file)));
+      if (accepted.length) protectImageInput();
+      return imageIntakeResult(entry.files, accepted);
+    },
+  });
+  // Both receivers share a route. A token rejected by one can belong to the other.
+  const notReceived = editHandoff.notReceived && batchHandoff.notReceived;
+  const recoveryFiles = [editHandoff, batchHandoff].flatMap(receiver => receiver.result ? receiver.recoveryFiles : []);
+  const dismissHandoff = () => { editHandoff.dismiss(); batchHandoff.dismiss(); };
+  const downloadReceived = () => {
+    for (const file of recoveryFiles) {
+      const url = URL.createObjectURL(file);
+      const anchor = document.createElement("a"); anchor.href = url; anchor.download = file.name;
+      document.body.append(anchor); anchor.click(); anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30_000);
+    }
+    setTimeout(dismissHandoff, 0);
+  };
+  const pageDirty = editorDirty || batchCount > 0 || recoveryFiles.length > 0 || Object.values(otherDirty).some(Boolean) || progress.status === "running";
+  useUnsavedWorkGuard("image-studio", pageDirty, { kind: "files", scopePath: "/tools/image-studio" });
   const reportOtherDirty = useCallback((tab: string, value: boolean) => setOtherDirty(current => current[tab] === value ? current : { ...current, [tab]: value }), []);
   const direct = useImageDirect(preset, pageDirty, next => {
     activeController.current?.abort();
@@ -130,11 +184,22 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       <UtilityNotice className="image-format-notice mb-2">{t("image.heic")}</UtilityNotice>
       {(tab === "batch" || tab === "collage" || tab === "gif") && <UtilityNotice className="image-worker-notice mb-2">{t("image.offscreen")}</UtilityNotice>}
 
+      {(notReceived || recoveryFiles.length > 0) && <UtilityNotice role="status" className="mb-3" data-testid="image-handoff-recovery">
+        <p>{recoveryFiles.length ? commonT("handoff.partial", { count: recoveryFiles.length }) : commonT("handoff.notReceived")}</p>
+        {recoveryFiles.map((file, index) => <p className="break-all" key={index}>{file.name}</p>)}
+        <div className="mt-2 flex flex-wrap gap-2">
+          {recoveryFiles.length > 0 && <Button type="button" variant="outline" onClick={downloadReceived}>{commonT("handoff.downloadReceived")}</Button>}
+          <Button type="button" variant="outline" onClick={() => pageElement.current?.querySelector<HTMLInputElement>(`[data-image-owner="${tab === "batch" ? "batch" : "editor"}"] input[type="file"]`)?.click()}>{commonT("handoff.selectAgain")}</Button>
+          <Button type="button" variant="outline" onClick={dismissHandoff}>{commonT("handoff.close")}</Button>
+        </div>
+      </UtilityNotice>}
+      <div ref={pageElement}>
       <div hidden={tab !== "editor"} data-image-owner="editor"><ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} /></div>
       {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel inputFiles={batchQueue.inputFiles} handoffFiles={batchQueue.handoffFiles} onFiles={appendBatchFiles} onRemove={removeBatchFile} limitReached={batchNotice === "limit"} progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("collage") && <div hidden={tab !== "collage"} data-image-owner="collage"><CollagePanel progress={progress} controllerRef={activeController} active={tab === "collage"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("gif") && <div hidden={tab !== "gif"} data-image-owner="gif"><GifPanel progress={progress} controllerRef={activeController} active={tab === "gif"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
 
+      </div>
       <OperationProgress {...progress} accent="sky" title={t("image.log")} />
       {progress.status === "running" && <div className="mt-2 flex justify-end"><Button className="rounded-xl" variant="secondary" type="button" onClick={() => activeController.current?.abort()}>{t("image.cancel")}</Button></div>}
 
@@ -206,8 +271,9 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   acceptedPresetRef.current = preset;
   const editController = useRef<AbortController | undefined>(undefined);
   const pendingImageFile = useRef<File | undefined>(undefined);
-  const loadImageTask = useRef<Promise<void>>(Promise.resolve());
-  const loadImageHandler = useRef<((file?: File) => Promise<void>) | undefined>(undefined);
+  const loadImageTask = useRef<Promise<boolean>>(Promise.resolve(false));
+  const intakeGeneration = useRef(0);
+  const loadImageHandler = useRef<((file?: File) => Promise<boolean>) | undefined>(undefined);
   const resumeImageGeneration = useRef(0);
   const [loadingImage, setLoadingImage] = useState(false);
   const emptyReadyHistoryLength = useRef<number | undefined>(undefined);
@@ -300,10 +366,9 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (next?.purpose === "mosaic") setRegionEffect(next.regionEffect);
     if (next?.purpose === "watermark") setText(next.text);
   };
-  handleRef.current = { apply: applyDirectPreset, cancel: () => { editController.current?.abort(); setLoadingImage(false); setRegionEffectBusy(false); regionEffectBusyRef.current = false; setStickerBusy(false); } };
   useLayoutEffect(() => { applyDirectPreset(preset); }, [preset]);
   useLayoutEffect(() => { onDirty(imageDirectDirty({ file, historyLength: historyState.length, emptyReadyHistoryLength: emptyReadyHistoryLength.current ?? historyState.length, regionEffectBusy, stickerBusy, status: loadingImage ? "running" : "idle", result: false, otherTabHasInput: batchCount > 0, otherTabHasResult: false, otherTabRunning: false })); }, [file, historyState.length, regionEffectBusy, stickerBusy, loadingImage, batchCount, onDirty]);
-  useEffect(() => () => { resumeImageGeneration.current += 1; editController.current?.abort(); }, []);
+  useEffect(() => () => { ++intakeGeneration.current; resumeImageGeneration.current += 1; editController.current?.abort(); }, []);
   const updateOutputMultiplier = useCallback((value: number) => {
     const normalized = Math.max(Number.EPSILON, Number.isFinite(value) ? value : 1);
     outputMultiplierRef.current = normalized;
@@ -892,17 +957,21 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (interactionMode !== "effect") clearEffectSelection();
   }, [clearCropSelection, clearEffectSelection, interactionMode]);
 
-  const acquireImage = async (next?: File) => {
-    if (!next || !canvas.current) return;
+  const acquireImage = async (next?: File, context?: IntakeContext) => {
+    if (!next || !canvas.current || context?.signal.aborted) return false;
+    const generation = ++intakeGeneration.current;
     editController.current?.abort();
     const controller = new AbortController();
     editController.current = controller;
+    const abort = () => controller.abort();
+    context?.signal.addEventListener("abort", abort, { once: true });
+    const current = () => generation === intakeGeneration.current && !controller.signal.aborted && !context?.signal.aborted;
     pendingImageFile.current = next;
     setLoadingImage(true);
     const url = URL.createObjectURL(next);
     try {
       const image = await FabricImage.fromURL(url, { signal: controller.signal });
-      if (controller.signal.aborted) { image.dispose(); URL.revokeObjectURL(url); return; }
+      if (!current() || !canvas.current) { image.dispose(); URL.revokeObjectURL(url); return false; }
       const instance = canvas.current;
       restoringRef.current = true;
       clearRegionSelection();
@@ -940,21 +1009,26 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
       syncSelectedObject();
       restoringRef.current = false;
       pushSnapshot(true, true);
-      window.requestAnimationFrame(syncCanvasDisplay);
+      window.requestAnimationFrame(() => { if (current()) syncCanvasDisplay(); });
+      if (context) { onDirty(true); protectImageInput(); }
+      return true;
     } catch {
-      restoringRef.current = false;
       URL.revokeObjectURL(url);
-      if (!controller.signal.aborted) setEditorError(t("image.common.failed"));
-    } finally { if (editController.current === controller) { setLoadingImage(false); pendingImageFile.current = undefined; } }
+      if (current()) { restoringRef.current = false; setEditorError(t("image.common.failed")); }
+      return false;
+    } finally {
+      context?.signal.removeEventListener("abort", abort);
+      if (current() && editController.current === controller) { setLoadingImage(false); pendingImageFile.current = undefined; }
+    }
   };
 
   const loadFile = (file?: File) => { const task = acquireImage(file); loadImageTask.current = task; return task; };
   loadImageHandler.current = loadFile;
 
-  const newBlankCanvas = () => {
+  const newBlankCanvas = (confirm = true) => {
     const instance = canvas.current;
     if (!instance) return;
-    if (instance.getObjects().length && !window.confirm(t("image.editor.confirm"))) return;
+    if (confirm && instance.getObjects().length && !window.confirm(t("image.editor.confirm"))) return;
     restoringRef.current = true;
     clearRegionSelection();
     instance.clear();
@@ -976,6 +1050,22 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     restoringRef.current = false;
     pushSnapshot(true, true);
     window.requestAnimationFrame(syncCanvasDisplay);
+  };
+
+  handleRef.current = {
+    apply: applyDirectPreset,
+    cancel: () => { editController.current?.abort(); setLoadingImage(false); setRegionEffectBusy(false); regionEffectBusyRef.current = false; setStickerBusy(false); },
+    receive: (file, context) => { const task = acquireImage(file, context); loadImageTask.current = task; return task; },
+    invalidate: () => {
+      ++intakeGeneration.current;
+      ++resumeImageGeneration.current;
+      pendingImageFile.current = undefined;
+      editController.current?.abort();
+      editController.current = undefined;
+      if (!canvas.current) return;
+      setLoadingImage(false);
+      newBlankCanvas(false);
+    },
   };
 
   useClipboardImages((images) => {
@@ -1680,7 +1770,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
       <FileDropZone disabled={loadingImage || regionEffectBusy || stickerBusy} files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
       {editorError && <UtilityNotice kind="error" role="alert" className="mt-3">{editorError}</UtilityNotice>}
       <ClipboardHint mode="replace" />
-      <div className="editor-source-actions mt-2 flex items-center justify-between gap-2.5"><Button type="button" className="rounded-xl" variant="secondary" onClick={newBlankCanvas}><ImageIcon size={16} /> {t("image.editor.blank")}</Button>{file && <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground">{t("image.editor.editing", { name: file.name })}</span>}</div>
+      <div className="editor-source-actions mt-2 flex items-center justify-between gap-2.5"><Button type="button" className="rounded-xl" variant="secondary" onClick={() => newBlankCanvas()}><ImageIcon size={16} /> {t("image.editor.blank")}</Button>{file && <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground">{t("image.editor.editing", { name: file.name })}</span>}</div>
       <ImageEditorToolbar
         activePanel={activePanel}
         hasFile={Boolean(file)}
