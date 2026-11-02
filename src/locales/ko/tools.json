@@ -57,7 +57,8 @@
         "5종 디자인",
         "Excel·CSV 입력",
         "HTML·iframe 코드"
-      ]
+      ],
+      "synonyms": ["알리익스프레스", "알리", "광고 배너", "배너 만들기", "배너 생성기", "제휴 마케팅", "제휴 링크", "엑셀", "aliexpress", "affiliate", "ad", "banner", "builder", "excel", "csv", "html", "iframe"]
     },
     "document-markdown": {
       "title": "문서 → Markdown",
@@ -68,7 +69,8 @@
         "워드·엑셀·PPTX",
         "텍스트 PDF",
         "Markdown 저장"
-      ]
+      ],
+      "synonyms": ["워드 마크다운", "엑셀 마크다운", "프레젠테이션", "마크다운", "Word to Markdown", "Excel to Markdown", "PowerPoint to Markdown", "PDF to Markdown", "DOCX", "XLSX", "XLS", "PPTX", "MarkItDown", "markdown"]
     },
     "pdf-converter": {
       "title": "PDF 변환",
@@ -80,7 +82,8 @@
         "PDF → DOCX·XLSX·PPTX·HWPX",
         "이미지 ↔ PDF",
         "페이지 선택·OCR"
-      ]
+      ],
+      "synonyms": ["피디에프 변환", "PDF 워드 변환", "PDF 엑셀 변환", "PDF PPT 변환", "PDF 한글 변환", "스캔 PDF OCR", "검색 가능한 PDF", "HWP", "HWPX", "워드", "Word", "오피스", "Office", "엑셀", "Excel", "프레젠테이션", "PPT", "PPTX", "PowerPoint", "JPG", "PNG", "image to pdf", "pdf to image", "convert word to pdf", "pdf to word", "pdf to powerpoint", "word to pdf", "pdf to docx", "pdf to xlsx", "pdf to pptx", "pdf to hwpx", "searchable pdf", "scanned pdf ocr", "hwp to pdf"]
     },
     "foliotrace": {
       "title": "FolioTrace",
@@ -91,7 +94,8 @@
         "DART 공시 근거",
         "추적 종목",
         "접수일 구분"
-      ]
+      ],
+      "synonyms": ["foliotrace"]
     },
     "document-redactor": {
       "title": "PDF·이미지 개인정보 가리기",
@@ -103,7 +107,8 @@
         "모든 PDF 페이지 재생성",
         "이미지 PNG 저장",
         "결과 다시 확인"
-      ]
+      ],
+      "synonyms": ["개인정보 마스킹", "검정 박스", "PDF 가리기", "문서 가리기"]
     },
     "excel-merger": {
       "title": "엑셀 파일·시트 합치기",
@@ -115,7 +120,8 @@
         "세로 병합",
         "가로 병합",
         "빈 영역·암호"
-      ]
+      ],
+      "synonyms": ["엑셀", "xls", "xlsx"]
     },
     "excel-compare": {
       "title": "엑셀 파일·데이터 비교",
@@ -128,7 +134,8 @@
         "중복 키 좌우 묶음",
         "회계 대사",
         "쌍별 Excel 보고서"
-      ]
+      ],
+      "synonyms": ["엑셀", "xls", "xlsx", "엑셀 대사", "대사", "diff", "diff checker", "spreadsheet reconciliation"]
     },
     "excel-cleaner": {
       "title": "엑셀 데이터 일괄 정리",
@@ -140,7 +147,8 @@
         "텍스트 규칙 7종",
         "필터·값 변환 8종",
         "다중 파일·보고서"
-      ]
+      ],
+      "synonyms": ["엑셀", "xls", "xlsx", "엑셀 중복 제거", "공백 제거", "중복 제거", "빈 행 삭제", "remove duplicates", "trim spaces"]
     },
     "pdf-editor": {
       "title": "PDF 페이지 편집",
@@ -152,7 +160,8 @@
         "번호·워터마크",
         "회전·순서 변경",
         "머리글·스탬프"
-      ]
+      ],
+      "synonyms": ["피디에프", "pdf", "PDF 나누기", "PDF 자르기", "PDF 직인", "쪽번호", "stamp", "watermark"]
     },
     "document-compare": {
       "title": "워드·한글 문서 비교",
@@ -164,7 +173,8 @@
         "이동·분할 판정",
         "Excel 보고서",
         "다중 동시 비교"
-      ]
+      ],
+      "synonyms": ["문서", "워드", "한글", "docx", "hwp", "diff", "diff checker"]
     },
     "pdf-compare": {
       "title": "PDF 파일 차이 비교",
@@ -176,7 +186,8 @@
         "페이지별 화면 비교",
         "추출 텍스트 비교",
         "쌍별 보고서"
-      ]
+      ],
+      "synonyms": ["pdf 비교", "diff", "diff checker"]
     },
     "hwp-editor": {
       "title": "온라인 한글 문서 편집",
@@ -188,7 +199,8 @@
         "전체 문서 편집",
         "서식·표·개체",
         "암호 문서"
-      ]
+      ],
+      "synonyms": ["한글", "hwp", "hwpx", "한글 편집", "한글 뷰어", "hwp 뷰어", "hwp viewer", "Hangul viewer"]
     },
     "office-editor": {
       "title": "온라인 오피스 문서 편집",
@@ -200,7 +212,8 @@
         "전체 화면 편집",
         "한글 대체 글꼴",
         "브라우저 내 처리"
-      ]
+      ],
+      "synonyms": ["워드 온라인", "엑셀 온라인", "word", "excel", "powerpoint", "office", "word online", "excel online"]
     },
     "video-studio": {
       "title": "온라인 동영상 편집",
@@ -213,7 +226,8 @@
         "그룹 간 구간 일괄 적용",
         "개별 저장·선택 ZIP",
         "영상 속 음성 제어"
-      ]
+      ],
+      "synonyms": ["video studio"]
     },
     "audio-studio": {
       "title": "온라인 오디오 편집",
@@ -225,7 +239,8 @@
         "구간 편집",
         "피치·로봇 효과",
         "WAV·MP3"
-      ]
+      ],
+      "synonyms": ["음악 자르기", "mp3 cutter", "오디오", "mp3", "음악", "녹음", "music cutter"]
     },
     "image-studio": {
       "title": "온라인 사진 편집",
@@ -239,7 +254,8 @@
         "출력 크기 지정",
         "도형·스티커 레이어",
         "콜라주·GIF"
-      ]
+      ],
+      "synonyms": ["사진", "이미지", "png", "jpg", "리사이즈", "image resizer", "블러", "얼굴 모자이크", "pixelate", "mosaic", "resize", "blur", "face mosaic"]
     },
     "text-merger": {
       "title": "텍스트 파일 일괄 합치기",
@@ -251,7 +267,8 @@
         "TXT 불러오기",
         "통합 순서 변경",
         "복사·다운로드"
-      ]
+      ],
+      "synonyms": ["text merger"]
     },
     "text-tools": {
       "title": "텍스트 줄바꿈·공백 제거",
@@ -263,7 +280,8 @@
         "중복 줄 제거",
         "Case 변환",
         "한국어 가이드"
-      ]
+      ],
+      "synonyms": ["text tools"]
     },
     "text-formatter": {
       "title": "JSON·SQL·XML 포맷터",
@@ -275,7 +293,8 @@
         "SQL",
         "XML",
         "오류 탐지"
-      ]
+      ],
+      "synonyms": ["text formatter"]
     },
     "work-calculator": {
       "title": "영업일 및 연차 계산기",
@@ -287,7 +306,8 @@
         "대체공휴일",
         "입사일 기준",
         "회계연도 기준"
-      ]
+      ],
+      "synonyms": ["work calculator"]
     },
     "timezone-calculator": {
       "title": "세계지도 시차 계산기",
@@ -299,7 +319,8 @@
         "서머타임",
         "근무시간 중첩",
         "44개 주요 도시"
-      ]
+      ],
+      "synonyms": ["timezone calculator"]
     },
     "payroll-calculator": {
       "title": "실수령액·퇴직금 계산기",
@@ -311,7 +332,8 @@
         "실수령액",
         "4대 보험",
         "퇴직금"
-      ]
+      ],
+      "synonyms": ["4대보험", "급여", "실수령액", "퇴직금", "payroll", "salary", "social insurance"]
     },
     "image-privacy": {
       "title": "사진 메타데이터·위치정보 삭제",
@@ -323,7 +345,8 @@
         "GPS 제거",
         "JPG·PNG·WebP",
         "브라우저 처리"
-      ]
+      ],
+      "synonyms": ["사진 메타데이터", "exif", "gps", "위치정보", "metadata", "photo metadata"]
     },
     "security-tools": {
       "title": "안전한 비밀번호 생성기",
@@ -335,7 +358,8 @@
         "강도 분석",
         "해독 시간 추정",
         "최대 64자"
-      ]
+      ],
+      "synonyms": ["랜덤 비밀번호", "비밀번호", "password", "random", "random password"]
     },
     "qr-studio": {
       "title": "QR 코드 만들기 및 스캔",
@@ -347,7 +371,8 @@
         "표 파일 일괄 생성",
         "카메라·사진 스캔",
         "PNG·ZIP·라벨 PDF"
-      ]
+      ],
+      "synonyms": ["QR 스튜디오", "QR 만들기", "QR 스캔", "QR코드", "qr", "qrcode", "qr code"]
     },
     "data-converter": {
       "title": "CSV·JSON·HTML 데이터 변환기",
@@ -359,7 +384,8 @@
         "JSON",
         "HTML 표",
         "브라우저 변환"
-      ]
+      ],
+      "synonyms": ["데이터 변환", "csv", "json", "html", "table"]
     },
     "document-generator": {
       "title": "워드 문서 일괄 생성",
@@ -371,7 +397,8 @@
         "여러 엑셀·CSV 파일",
         "한 번에 다수의 DOCX 생성",
         "미리보기 및 결과 보고서"
-      ]
+      ],
+      "synonyms": ["워드 메일머지", "메일머지", "mail merge", "문서 일괄 생성", "양식 자동 채우기", "DOCX", "Word", "워드 온라인", "엑셀 온라인"]
     },
     "market-calendar": {
       "title": "주식시장 거래 달력",
@@ -382,7 +409,8 @@
         "휴장일",
         "개장·마감 시간",
         "미국 시장 한국 시간"
-      ]
+      ],
+      "synonyms": ["증시", "휴장일", "krx", "nxt", "nyse", "nasdaq", "stock", "market", "calendar", "market holidays", "stock exchange calendar"]
     },
     "text-compare": {
       "title": "텍스트 비교",
@@ -393,7 +421,8 @@
         "줄·단어·글자 비교",
         "무시 규칙",
         "선택 변경 적용"
-      ]
+      ],
+      "synonyms": ["텍스트", "비교", "diff", "diff checker"]
     },
     "image-compare": {
       "title": "이미지 비교",
@@ -404,7 +433,8 @@
         "아홉 가지 보기",
         "정렬 후보 검토",
         "인식 글자 비교"
-      ]
+      ],
+      "synonyms": ["이미지 비교", "diff", "diff checker"]
     },
     "folder-compare": {
       "title": "폴더·ZIP 비교",
@@ -415,7 +445,8 @@
         "파일 내용 확인",
         "이름 변경 후보",
         "문서·표·그림 상세 비교"
-      ]
+      ],
+      "synonyms": ["폴더 비교", "diff", "diff checker"]
     }
   }
 }

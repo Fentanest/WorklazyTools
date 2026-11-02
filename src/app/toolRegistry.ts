@@ -1,4 +1,5 @@
-import { isToolPublished } from "./publicService";
+import type { ReceiverId } from "./fileAccepts";
+import { isToolPublished } from "./publicService.ts";
 import {
   AlignLeft,
   AudioWaveform,
@@ -47,7 +48,14 @@ export interface ToolCategoryDefinition {
   icon: LucideIcon;
 }
 
+export type ToolAction = "cut" | "merge" | "convert" | "clean" | "compare" | "protect" | "create";
+
 export interface ToolDefinition {
+  // Receiver IDs only: fileAccepts owns accepted formats and intake limits.
+  receiverIds: ReceiverId[];
+  scenarios: ToolCategoryId[];
+  actions: ToolAction[];
+  entryPoints: string[];
   id: string;
   category: ToolCategoryId;
   path: string;
@@ -495,6 +503,48 @@ const allTools = [
     ],
     status: "available",
   },
-] satisfies ToolDefinition[];
+] satisfies Omit<ToolDefinition, "receiverIds" | "scenarios" | "actions" | "entryPoints">[];
 
-export const tools: ToolDefinition[] = allTools.filter((tool) => isToolPublished(tool.id));
+// Scenario IDs reuse the existing categories until U1 supplies dedicated copy.
+// Entry points are existing routes, not new handoff receivers.
+const toolMetadata: Record<string, { actions: ToolAction[]; receiverIds?: ReceiverId[] }> = {
+  "market-calendar": { actions: [] },
+  "foliotrace": { actions: [] },
+  "excel-merger": { actions: ["merge"], receiverIds: ["excel-merger"] },
+  "excel-cleaner": { actions: ["clean"], receiverIds: ["excel-cleaner"] },
+  "excel-compare": { actions: ["compare"] },
+  "document-generator": { actions: ["create"], receiverIds: ["document-generator"] },
+  "pdf-editor": { actions: ["cut", "merge", "protect"], receiverIds: ["pdf-organize", "pdf-finish"] },
+  "pdf-converter": { actions: ["convert"] },
+  "document-compare": { actions: ["compare"] },
+  "pdf-compare": { actions: ["compare"] },
+  "text-compare": { actions: ["compare"] },
+  "image-compare": { actions: ["compare"] },
+  "folder-compare": { actions: ["compare"] },
+  "document-markdown": { actions: ["convert"] },
+  "document-redactor": { actions: ["protect"] },
+  "product-banner": { actions: ["create"] },
+  "hwp-editor": { actions: ["create"] },
+  "office-editor": { actions: ["create"] },
+  "video-studio": { actions: ["cut", "merge", "convert"] },
+  "audio-studio": { actions: ["cut", "merge", "convert"] },
+  "image-studio": { actions: ["cut", "convert", "protect"], receiverIds: ["image-edit", "image-batch"] },
+  "image-privacy": { actions: ["protect"], receiverIds: ["image-privacy"] },
+  "text-merger": { actions: ["merge"] },
+  "text-tools": { actions: ["clean"] },
+  "text-formatter": { actions: ["clean"] },
+  "data-converter": { actions: ["convert"] },
+  "work-calculator": { actions: [] },
+  "timezone-calculator": { actions: [] },
+  "payroll-calculator": { actions: [] },
+  "security-tools": { actions: ["create", "protect"] },
+  "qr-studio": { actions: ["create"] },
+};
+
+export const tools: ToolDefinition[] = allTools.filter((tool) => isToolPublished(tool.id)).map((tool) => ({
+  ...tool,
+  receiverIds: toolMetadata[tool.id].receiverIds ?? [],
+  scenarios: [tool.category],
+  actions: toolMetadata[tool.id].actions,
+  entryPoints: [tool.path],
+}));

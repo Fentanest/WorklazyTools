@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { type ToolAccent, type ToolCategoryId } from "../app/toolRegistry";
-import { toolAliasesFor } from "../app/toolSearch";
+import { matchTools, normalizeSearchText } from "../app/toolSearch";
 import { PrivacyBanner } from "../components/PrivacyBanner";
 import { ToolCard } from "../components/ToolCard";
 import { getToolIconTone } from "../components/toolAccentStyles";
@@ -24,7 +24,7 @@ export function ToolsPage() {
   const [query, setQuery] = useState<string>(() => stateQuery ?? searchParams.get("q") ?? "");
   const requestedCategory = searchParams.get("category");
   const activeCategory: CategoryFilter = isToolCategory(requestedCategory) ? requestedCategory : "all";
-  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedQuery = normalizeSearchText(query);
 
   // Migrate old ?q= links into route state before this page becomes eligible
   // for third-party SDKs. New searches never put free text in the URL.
@@ -44,23 +44,13 @@ export function ToolsPage() {
     .filter((category) => activeCategory === "all" || category.id === activeCategory)
     .map((category) => ({
       category,
-      tools: tools.filter((tool) => {
-        if (tool.category !== category.id) return false;
-        if (!normalizedQuery) return true;
-        const searchText = [
-          tool.title,
-          tool.shortTitle,
-          tool.description,
-          tool.eyebrow,
-          category.label,
-          category.shortLabel,
-          ...tool.highlights.map((highlight) => highlight.label),
-          ...(tool.id === "product-banner" ? toolAliasesFor(tool.id) : []),
-        ].join(" ").toLowerCase();
-        return searchText.includes(normalizedQuery);
-      }),
+      tools: matchTools(tools.filter((tool) => tool.category === category.id).map((tool) => ({
+        ...tool,
+        categoryLabel: category.label,
+        categoryShortLabel: category.shortLabel,
+      })), query),
     }))
-    .filter((group) => group.tools.length > 0), [activeCategory, normalizedQuery, toolCategories, tools]);
+    .filter((group) => group.tools.length > 0), [activeCategory, query, toolCategories, tools]);
 
   const visibleToolCount = groupedTools.reduce((count, group) => count + group.tools.length, 0);
   const selectCategory = (category: CategoryFilter) => {

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { matchTools } from "../../src/app/toolSearch.ts";
 import { INPUT_ERROR_CODES } from "../../src/features/product-banner/inputTypes.ts";
 import { inputErrorMessages } from "../../src/features/product-banner/inputErrorMessages.ts";
 import { uiMessages } from "../../src/features/product-banner/uiMessages.ts";
@@ -37,7 +38,6 @@ test("AliExpress names, descriptions, search aliases and OG source agree in both
   const { default: ko } = await import("../../src/locales/ko/tools.json", { with: { type: "json" } });
   const { default: en } = await import("../../src/locales/en/tools.json", { with: { type: "json" } });
   const source = fs.readFileSync("scripts/generate-social-images.mjs", "utf8");
-  const search = fs.readFileSync("src/app/toolSearch.ts", "utf8").split('"product-banner":')[1].split("\n")[0];
   for (const [language, dictionary, title] of [["ko", ko, "알리익스프레스 광고 배너 만들기"], ["en", en, "AliExpress Ad Banner Builder"]] as const) {
     const tool = dictionary.items["product-banner"], seo = getSeoDefinition(language, "/tools/product-banner");
     assert.equal(tool.title, title); assert.equal(tool.shortTitle, title); assert.equal(uiMessages[language].title, title);
@@ -45,6 +45,11 @@ test("AliExpress names, descriptions, search aliases and OG source agree in both
     assert.ok(getGuideData(language, "productBanner").title.startsWith(title)); assert.ok(source.includes(title));
     assert.match(tool.description, /HTML.*iframe/u); assert.match(seo.description, /HTML.*iframe/u);
     assert.match(seo.faq![0].question, language === "ko" ? /알리익스프레스/u : /AliExpress/u);
+    const searchable = { ...tool, id: "product-banner", path: "/tools/product-banner", categoryLabel: "", categoryShortLabel: "", highlights: tool.highlights.map((label) => ({ label })) };
+    for (const keyword of ["알리익스프레스", "알리", "제휴 마케팅", "엑셀", "aliexpress", "affiliate", "ad", "banner", "builder", "excel", "html", "iframe"]) {
+      if (language === "en" && /[가-힣]/.test(keyword)) continue;
+      assert.ok(tool.synonyms.includes(keyword), `${language}: ${keyword}`);
+      assert.equal(matchTools([searchable], keyword)[0], searchable);
+    }
   }
-  for (const keyword of ["알리익스프레스", "알리", "제휴 마케팅", "엑셀", "aliexpress", "affiliate", "ad", "banner", "builder", "excel", "html", "iframe"]) assert.ok(search.includes(`"${keyword}"`));
 });
