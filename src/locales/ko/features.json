@@ -857,7 +857,12 @@
     "result": {
       "title": "Excel 파일을 만들었습니다.",
       "message": "{{fileCount}}개 파일의 {{sheetCount}}개 시트를 {{outputCount}}개 시트로 정리했습니다.{{encrypted}}",
-      "encrypted": " 출력 파일 암호도 적용했습니다."
+      "encrypted": " 출력 파일 암호도 적용했습니다.",
+      "sendToCleaner": "정리 도구로 넘기기",
+      "cleanerRetry": "다시 시도",
+      "cleanerInputNotice": "이동하면 병합 도구의 입력 목록은 사라집니다.",
+      "cleanerFailed": "정리 도구를 열지 못했습니다. 결과를 다운로드하거나 다시 시도해 주세요.",
+      "cleanerIsolated": "결과를 다운로드한 뒤 정리 도구에 올려 주세요."
     }
   },
   "audio": {

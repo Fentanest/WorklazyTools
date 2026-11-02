@@ -864,7 +864,12 @@
     "result": {
       "title": "Your Excel file is ready.",
       "message": "Organized {{sheetCount}} sheets from {{fileCount}} files into {{outputCount}} output sheets.{{encrypted}}",
-      "encrypted": " The output password was applied."
+      "encrypted": " The output password was applied.",
+      "sendToCleaner": "Send to cleaner",
+      "cleanerRetry": "Try again",
+      "cleanerInputNotice": "The merger input list will be cleared when you leave.",
+      "cleanerFailed": "Could not open the cleaner. Download your result or try again.",
+      "cleanerIsolated": "Download the result, then upload it to the cleaner."
     }
   },
   "audio": {
