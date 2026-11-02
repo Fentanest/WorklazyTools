@@ -1,0 +1,7 @@
+.library-image-editor { min-width: 0; }
+.library-image-editor .asp-editor { max-width: 100%; }
+.library-image-editor .asp-editor button:focus-visible,
+.library-image-editor .asp-editor label:focus-within { outline: 2px solid var(--color-sky-600); outline-offset: 2px; }
+@media (max-width: 639px) {
+  .library-image-editor .asp-editor { height: min(720px, 85svh) !important; min-height: 480px; }
+}

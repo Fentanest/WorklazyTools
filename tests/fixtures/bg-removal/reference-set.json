@@ -1,0 +1,868 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    "frontal_person",
+    "hair_person",
+    "plain_product",
+    "complex_product",
+    "document_photo",
+    "animal"
+  ],
+  "criteria": {
+    "maeMax": 0.02,
+    "iouMin": 0.95,
+    "minimumBothPass": 28,
+    "minimumIoUAllowed": 0.9,
+    "foreground": "alpha>=0.5",
+    "emptyUnionIoU": 1.0
+  },
+  "preprocessing": {
+    "mode": "RGB",
+    "size": [
+      512,
+      512
+    ],
+    "resize": "bilinear, no aspect preservation",
+    "rescale": 0.00392156862745098,
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ],
+    "layout": "NCHW float32",
+    "comparison": "external sigmoid on final logits, 512x512 before output resizing/compositing"
+  },
+  "reference": {
+    "repo": "ZhengPeng7/BiRefNet_lite",
+    "revision": "aa62cd87eafb9cc43056d08ef3615a14628b831d",
+    "file": "model.safetensors",
+    "bytes": 177634392,
+    "sha256": "4417d89795250e698c3cb0ae8df15743810065f646f48a694fdfa7ca052d0815"
+  },
+  "candidate": {
+    "repo": "studioludens/birefnet-lite-512",
+    "revision": "962e67969ec6acec9c19fab76acee4f5e22e990c",
+    "file": "onnx/model_fp16.onnx",
+    "bytes": 98484532,
+    "sha256": "eff9216bb2f9d3f023d9c2b7196845a7485739ab1f231593633e4d2344ffc516"
+  },
+  "fixturePreparation": "Source CC0 photograph or scan, EXIF transpose, composite existing alpha onto white, longest edge at most1280 via LANCZOS, lossless PNG. Full inputs and download bytes are separately hashed. Recommended1280px Wikimedia thumbnails used after honoring Retry-After; already-cached original images retained.",
+  "selectionNotes": [
+    "Selected categories visually before inference; no prediction-based filtering.",
+    "Excluded Winter Woman portrait because hair was mostly covered, and Ellen Terry because visible hair was limited; added the CC0 Paderewski photograph.",
+    "frontal_person includes one distant front-facing seated person; document_photo includes scans and a record-book cover."
+  ],
+  "images": [
+    {
+      "id": "frontal_person-01",
+      "category": "frontal_person",
+      "sourceTitle": "Portrait Christian Bolt.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Portrait_Christian_Bolt.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b9/Portrait_Christian_Bolt.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Patheus",
+      "sourceDeclaredBytes": 259466,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/b/b9/Portrait_Christian_Bolt.jpg",
+      "downloadSHA256": "3595004f2ff9db940d5e64cfcfd1c04a4d94c895b96a9a93f164264e92521358",
+      "downloadBytes": 259466,
+      "downloadDimensions": [
+        607,
+        754
+      ],
+      "file": "images/frontal_person-01.png",
+      "sha256": "7362c383406c91151adfe4b74e1db9c5c6d0708295421a39a11c879da83f7637",
+      "bytes": 427093,
+      "dimensions": [
+        607,
+        754
+      ],
+      "metadataFile": "source-metadata/frontal_person-01.json",
+      "metadataSHA256": "1009d0065dec049653fa3e27be5fbc59551d31fc302c0c4e1fcac68de9a5e1d7"
+    },
+    {
+      "id": "frontal_person-02",
+      "category": "frontal_person",
+      "sourceTitle": "Portrait of Prof Mikhail Lemeshko.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Portrait_of_Prof_Mikhail_Lemeshko.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Portrait_of_Prof_Mikhail_Lemeshko.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "",
+      "sourceDeclaredBytes": 742583,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Portrait_of_Prof_Mikhail_Lemeshko.jpg",
+      "downloadSHA256": "c44e85f688ead6f083dc98c6345e7bc83057073018b18019c054ae3481b9fab5",
+      "downloadBytes": 742583,
+      "downloadDimensions": [
+        2034,
+        2717
+      ],
+      "file": "images/frontal_person-02.png",
+      "sha256": "98e192383cffa6b32a3817876847e0977311eccb98ea63c0f8fc3728074a45cb",
+      "bytes": 1526237,
+      "dimensions": [
+        958,
+        1280
+      ],
+      "metadataFile": "source-metadata/frontal_person-02.json",
+      "metadataSHA256": "5257c2e9d087c0dbdd829e0a5f1ac4f0d45c5c5ad16934fda762ebafccef581c"
+    },
+    {
+      "id": "frontal_person-03",
+      "category": "frontal_person",
+      "sourceTitle": "Masha Priven's Portrait.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Masha_Priven%27s_Portrait.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Masha_Priven%27s_Portrait.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Jamyswiki",
+      "sourceDeclaredBytes": 1812856,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Masha_Priven%27s_Portrait.jpg",
+      "downloadSHA256": "219b758f847eb48884f96222cd5b353b9d345730eb5bdf7402b69970c00db34f",
+      "downloadBytes": 1812856,
+      "downloadDimensions": [
+        1259,
+        1258
+      ],
+      "file": "images/frontal_person-03.png",
+      "sha256": "8a0d6b8488f2dff379588bdda6c5553786fbccea772b33e49b121dd4adae7a94",
+      "bytes": 2890465,
+      "dimensions": [
+        1259,
+        1258
+      ],
+      "metadataFile": "source-metadata/frontal_person-03.json",
+      "metadataSHA256": "b4fcc4a3c6777fcf8a895f04130b494e99d65bec19d7222deae43324224cfe85"
+    },
+    {
+      "id": "frontal_person-04",
+      "category": "frontal_person",
+      "sourceTitle": "Devin R. Berg portrait.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Devin_R._Berg_portrait.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/17/Devin_R._Berg_portrait.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Devinberg",
+      "sourceDeclaredBytes": 599581,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/1/17/Devin_R._Berg_portrait.jpg",
+      "downloadSHA256": "5ed6ae5fa6735f6ed87cc40c214d4ffd54b5a754c5340912c415fa0549e49428",
+      "downloadBytes": 599581,
+      "downloadDimensions": [
+        1200,
+        1800
+      ],
+      "file": "images/frontal_person-04.png",
+      "sha256": "2a34e36491a4493b9ab5c6cb3a6b5876b0f5fd8013a4e9b5f0bf5b0a1fd8a65f",
+      "bytes": 1543557,
+      "dimensions": [
+        853,
+        1280
+      ],
+      "metadataFile": "source-metadata/frontal_person-04.json",
+      "metadataSHA256": "a6bb5f0062773f7dd150f30a61cf618fda1b2fdb76b2e3faa70f1ba4452fab6a"
+    },
+    {
+      "id": "frontal_person-05",
+      "category": "frontal_person",
+      "sourceTitle": "Abdullkadir KAPLAN DUDAYEV.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Abdullkadir_KAPLAN_DUDAYEV.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/8/85/Abdullkadir_KAPLAN_DUDAYEV.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "BerzanOner",
+      "sourceDeclaredBytes": 833966,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/8/85/Abdullkadir_KAPLAN_DUDAYEV.jpg",
+      "downloadSHA256": "1cedf5eb146f190cc26d384487fed3cf6fe120b2480b25c327536ce4b1c2ae9a",
+      "downloadBytes": 833966,
+      "downloadDimensions": [
+        5120,
+        3413
+      ],
+      "file": "images/frontal_person-05.png",
+      "sha256": "34b1b3102283a57005e00fe99b358bc2bf8a6db56f28dcf350266364bf894662",
+      "bytes": 960524,
+      "dimensions": [
+        1280,
+        853
+      ],
+      "metadataFile": "source-metadata/frontal_person-05.json",
+      "metadataSHA256": "c8acf45b17226dbb6de2e44d0af6868eb688fa0f76005c4bbcc5b836ef3e8c24"
+    },
+    {
+      "id": "hair_person-01",
+      "category": "hair_person",
+      "sourceTitle": "Woman with chestnut hair and blue eyes.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Woman_with_chestnut_hair_and_blue_eyes.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Woman_with_chestnut_hair_and_blue_eyes.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Christine Castro",
+      "sourceDeclaredBytes": 245937,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/2/2f/Woman_with_chestnut_hair_and_blue_eyes.jpg",
+      "downloadSHA256": "860d16c833cb56c144892823e9922a1d60864d008bccab625768a75b04c816c1",
+      "downloadBytes": 245937,
+      "downloadDimensions": [
+        1271,
+        1920
+      ],
+      "file": "images/hair_person-01.png",
+      "sha256": "6383e3469b441a2ce83b41fa8cf850ebc9f3b327e394ed7dce536a10a7dc4b1c",
+      "bytes": 851562,
+      "dimensions": [
+        847,
+        1280
+      ],
+      "metadataFile": "source-metadata/hair_person-01.json",
+      "metadataSHA256": "9c0a683d95bac13ef8fe7eab278ec9a12f248f2bbd22026a679f4fecb658f2b6"
+    },
+    {
+      "id": "hair_person-02",
+      "category": "hair_person",
+      "sourceTitle": "Woman with hair straightener.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Woman_with_hair_straightener.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/5/59/Woman_with_hair_straightener.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Petr Kratochvil",
+      "sourceDeclaredBytes": 111790,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/5/59/Woman_with_hair_straightener.jpg",
+      "downloadSHA256": "9b1ad10b285dc52a5511040240a2f38e7a8082fb4014c68ccc200f5ab558acb8",
+      "downloadBytes": 111790,
+      "downloadDimensions": [
+        1280,
+        853
+      ],
+      "file": "images/hair_person-02.png",
+      "sha256": "a8ddf4c84cad28c98c154186e4b862bff630d5f0af0b6d8b4b8c89f811231e58",
+      "bytes": 613496,
+      "dimensions": [
+        1280,
+        853
+      ],
+      "metadataFile": "source-metadata/hair_person-02.json",
+      "metadataSHA256": "6af09917477862c3977bd28da5cf9fe567b479b1eb5633ebfbc5d4228840d838"
+    },
+    {
+      "id": "hair_person-03",
+      "category": "hair_person",
+      "sourceTitle": "Fashion-woman-model-portrait (24300464886).jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Fashion-woman-model-portrait_(24300464886).jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Fashion-woman-model-portrait_%2824300464886%29.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "www.Pixel.la Free Stock Photos",
+      "sourceDeclaredBytes": 5024125,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Fashion-woman-model-portrait_%2824300464886%29.jpg/1280px-Fashion-woman-model-portrait_%2824300464886%29.jpg",
+      "downloadSHA256": "9ade16f6cf61141f2244023f9b686cdde156631cd5c4936bcfa4849071858365",
+      "downloadBytes": 262573,
+      "downloadDimensions": [
+        1280,
+        854
+      ],
+      "file": "images/hair_person-03.png",
+      "sha256": "512bd4c46bd5604c2c76aae64bae75690ccbebc0cd409795b1f857db947024b4",
+      "bytes": 1609011,
+      "dimensions": [
+        1280,
+        854
+      ],
+      "metadataFile": "source-metadata/hair_person-03.json",
+      "metadataSHA256": "25a55771ec6d441817ba6c66b6532e832156002a31e59c170c0302744ee712f2"
+    },
+    {
+      "id": "hair_person-06",
+      "category": "hair_person",
+      "sourceTitle": "Portrait photograph of Isadora Duncan.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Portrait_photograph_of_Isadora_Duncan.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/9/98/Portrait_photograph_of_Isadora_Duncan.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Genthe, Arnold, 1869-1942, photographer",
+      "sourceDeclaredBytes": 48890,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/9/98/Portrait_photograph_of_Isadora_Duncan.jpg",
+      "downloadSHA256": "0745c1b23f0ed85b03d471b68c5871210440d5ea4ab609a38762172b581fba8c",
+      "downloadBytes": 48890,
+      "downloadDimensions": [
+        277,
+        335
+      ],
+      "file": "images/hair_person-06.png",
+      "sha256": "eba9ca3cd5825bc69f54d808b31ed051cc189f84bccba7ac91cbd9c7d06e772c",
+      "bytes": 75897,
+      "dimensions": [
+        277,
+        335
+      ],
+      "metadataFile": "source-metadata/hair_person-06.json",
+      "metadataSHA256": "8ce41566fcccc28f406cea98a2b85f737b8887f690e25a8df719e8bf62ea6fcf"
+    },
+    {
+      "id": "hair_person-07",
+      "category": "hair_person",
+      "sourceTitle": "Portrait photograph of Ignace Paderewski.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Portrait_photograph_of_Ignace_Paderewski.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/8/86/Portrait_photograph_of_Ignace_Paderewski.jpg",
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/8/86/Portrait_photograph_of_Ignace_Paderewski.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Genthe, Arnold, 1869-1942, photographer",
+      "sourceDeclaredBytes": 102356,
+      "downloadSHA256": "08e9719eebcdb36bcb0271e5a524deb763683b689cbb36d66ee84fecfa2c43af",
+      "downloadBytes": 102356,
+      "file": "images/hair_person-07.png",
+      "sha256": "e21d6c86935bfc12e3310a1bb27c77eddea5af33a37a8d4614dd69f00701e025",
+      "bytes": 303876,
+      "dimensions": [
+        723,
+        882
+      ],
+      "metadataFile": "source-metadata/hair_person-07.json",
+      "metadataSHA256": "c678b8b793480e78091f34fc24755d834b9e0485e198767ef9c7a6df8e9fb138"
+    },
+    {
+      "id": "plain_product-01",
+      "category": "plain_product",
+      "sourceTitle": "Cup of tea isolated on white background - Petr Kratochvil.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Cup_of_tea_isolated_on_white_background_-_Petr_Kratochvil.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/9/92/Cup_of_tea_isolated_on_white_background_-_Petr_Kratochvil.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Petr Kratochvil",
+      "sourceDeclaredBytes": 35999,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/9/92/Cup_of_tea_isolated_on_white_background_-_Petr_Kratochvil.jpg",
+      "downloadSHA256": "2afac62a3f6f27e69c9697af8b05fa78f19268c1ac04c0de38b57db3418a80fa",
+      "downloadBytes": 35999,
+      "downloadDimensions": [
+        1280,
+        853
+      ],
+      "file": "images/plain_product-01.png",
+      "sha256": "1e61e58c174c2895c7094ffa927e49055b7f3bc4fc23a0f00ad3065e655fd8e5",
+      "bytes": 174860,
+      "dimensions": [
+        1280,
+        853
+      ],
+      "metadataFile": "source-metadata/plain_product-01.json",
+      "metadataSHA256": "121b2d38b375037674e499c4b190a0f10a385741434c4d6e24f2a0973a68e53f"
+    },
+    {
+      "id": "plain_product-02",
+      "category": "plain_product",
+      "sourceTitle": "Red Christmas present on white background.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Red_Christmas_present_on_white_background.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Red_Christmas_present_on_white_background.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Petr Kratochvil",
+      "sourceDeclaredBytes": 158903,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Red_Christmas_present_on_white_background.jpg",
+      "downloadSHA256": "9e160bd22e22eef876e1927112890ae148d1cd046840507f91a9e5920567da4f",
+      "downloadBytes": 158903,
+      "downloadDimensions": [
+        1280,
+        889
+      ],
+      "file": "images/plain_product-02.png",
+      "sha256": "2408fda17e8b7fa090b22ba0bfc2c82fab0bfadc91646fdfb2d0045f556bd937",
+      "bytes": 804211,
+      "dimensions": [
+        1280,
+        889
+      ],
+      "metadataFile": "source-metadata/plain_product-02.json",
+      "metadataSHA256": "d7166fca0e58b62237a8dc6883c986ae62505a1cba693d9394a173166cb18361"
+    },
+    {
+      "id": "plain_product-03",
+      "category": "plain_product",
+      "sourceTitle": "Ebivol.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Ebivol.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/a/a2/Ebivol.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Anton0987654321",
+      "sourceDeclaredBytes": 1044689,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Ebivol.jpg/1280px-Ebivol.jpg",
+      "downloadSHA256": "d6ad7500a8de2266c7f6ba17bde909c2337652a43caf52ffb48543b7410bb51c",
+      "downloadBytes": 124323,
+      "downloadDimensions": [
+        1280,
+        960
+      ],
+      "file": "images/plain_product-03.png",
+      "sha256": "7f629af21625570c7cd3fe7cd753b15d1c5032905084ffd351b828e9b95abcbf",
+      "bytes": 692271,
+      "dimensions": [
+        1280,
+        960
+      ],
+      "metadataFile": "source-metadata/plain_product-03.json",
+      "metadataSHA256": "27149e7b41f3961cd25e4c06b6a5a4e4157dc3bf1d5fad5f9b4b38ad11bf86b0"
+    },
+    {
+      "id": "plain_product-04",
+      "category": "plain_product",
+      "sourceTitle": "Rupafin.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Rupafin.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/1/13/Rupafin.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Anton0987654321",
+      "sourceDeclaredBytes": 1407092,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/1/13/Rupafin.jpg/1280px-Rupafin.jpg",
+      "downloadSHA256": "368b800db045fe23535d9904f3e5df82161e548924775bee94262e1786396d2d",
+      "downloadBytes": 134378,
+      "downloadDimensions": [
+        1280,
+        960
+      ],
+      "file": "images/plain_product-04.png",
+      "sha256": "ce9f8e5bd066f62327a9f6970a80effb908c8d90f945902a43febb6956525fea",
+      "bytes": 738555,
+      "dimensions": [
+        1280,
+        960
+      ],
+      "metadataFile": "source-metadata/plain_product-04.json",
+      "metadataSHA256": "37c998eaf9dade2e4361515daa338227216d9c6441229c5ad4b6798588e3e2b8"
+    },
+    {
+      "id": "plain_product-05",
+      "category": "plain_product",
+      "sourceTitle": "Plasticware - isolated.png",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Plasticware_-_isolated.png",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/73/Plasticware_-_isolated.png",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Alanthebox",
+      "sourceDeclaredBytes": 1375367,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Plasticware_-_isolated.png/1280px-Plasticware_-_isolated.png",
+      "downloadSHA256": "1ce38299b51841b023062e338677b212b941f353e69a15b84efb592cc1a06e59",
+      "downloadBytes": 743548,
+      "downloadDimensions": [
+        1280,
+        1185
+      ],
+      "file": "images/plain_product-05.png",
+      "sha256": "2716a936443f8b89880976be6047204bcc5b715a61b091c0a63da0ca33720fbb",
+      "bytes": 646688,
+      "dimensions": [
+        1280,
+        1185
+      ],
+      "metadataFile": "source-metadata/plain_product-05.json",
+      "metadataSHA256": "63b37f51d661bd4d489b7deea5ed4d0e601a056ff8ff86b53299c0b4ecd35625"
+    },
+    {
+      "id": "complex_product-01",
+      "category": "complex_product",
+      "sourceTitle": "20180502 Apollo 14 camera Cosmosphere.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:20180502_Apollo_14_camera_Cosmosphere.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/22/20180502_Apollo_14_camera_Cosmosphere.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Balon Greyjoy",
+      "sourceDeclaredBytes": 11956014,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/22/20180502_Apollo_14_camera_Cosmosphere.jpg/1280px-20180502_Apollo_14_camera_Cosmosphere.jpg",
+      "downloadSHA256": "684590c3af6930ceaf1f494482908335cbda155aea084c74a3816db56e04fbf6",
+      "downloadBytes": 237546,
+      "downloadDimensions": [
+        1280,
+        879
+      ],
+      "file": "images/complex_product-01.png",
+      "sha256": "0eddac0c3d444a03cf5307c73e5982319a27cf203dd3c0d6630c6e61e9a101cf",
+      "bytes": 1469656,
+      "dimensions": [
+        1280,
+        879
+      ],
+      "metadataFile": "source-metadata/complex_product-01.json",
+      "metadataSHA256": "740c62b72ee89498e3a9163ae5f4b1cc673c5e19d12f59149c043814456a98f1"
+    },
+    {
+      "id": "complex_product-02",
+      "category": "complex_product",
+      "sourceTitle": "Adapted Lens on Mirrorless Camera (side view).jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Adapted_Lens_on_Mirrorless_Camera_(side_view).jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e7/Adapted_Lens_on_Mirrorless_Camera_%28side_view%29.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Hallo3800",
+      "sourceDeclaredBytes": 8395642,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e7/Adapted_Lens_on_Mirrorless_Camera_%28side_view%29.jpg/1280px-Adapted_Lens_on_Mirrorless_Camera_%28side_view%29.jpg",
+      "downloadSHA256": "5dbc7970edf4200ebddb4db5a722a93ff651d209da29acf0abf3f6d3908a35b4",
+      "downloadBytes": 135632,
+      "downloadDimensions": [
+        1280,
+        947
+      ],
+      "file": "images/complex_product-02.png",
+      "sha256": "9f4004fe80831b4dbec8d9a249f33035585923661a0505aead70c04c2a3758a3",
+      "bytes": 952490,
+      "dimensions": [
+        1280,
+        947
+      ],
+      "metadataFile": "source-metadata/complex_product-02.json",
+      "metadataSHA256": "0eef84d57400e4e7273ee6c7d2780553aeae057f76e9eff2dac8b20e5f82d7b0"
+    },
+    {
+      "id": "complex_product-03",
+      "category": "complex_product",
+      "sourceTitle": "Bicycle 02.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Bicycle_02.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/2/21/Bicycle_02.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Shams948",
+      "sourceDeclaredBytes": 4984993,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/21/Bicycle_02.jpg/1280px-Bicycle_02.jpg",
+      "downloadSHA256": "938a96e9736e9cda0d331f6752dd084add8932c53e1446cf984a659bb0b5cc72",
+      "downloadBytes": 469791,
+      "downloadDimensions": [
+        1280,
+        960
+      ],
+      "file": "images/complex_product-03.png",
+      "sha256": "609046e4446864473de11cd1789cf26267f7dfb70eebc1e05440e58af8a12216",
+      "bytes": 2525212,
+      "dimensions": [
+        1280,
+        960
+      ],
+      "metadataFile": "source-metadata/complex_product-03.json",
+      "metadataSHA256": "cce6b59fcfa7000bc7b94cbeb09592d4d2e79d4eea75372909979e6ea806de15"
+    },
+    {
+      "id": "complex_product-04",
+      "category": "complex_product",
+      "sourceTitle": "Bike on a snowy street in Quebec City at night.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Bike_on_a_snowy_street_in_Quebec_City_at_night.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/3/30/Bike_on_a_snowy_street_in_Quebec_City_at_night.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Wilfredor",
+      "sourceDeclaredBytes": 17375849,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/Bike_on_a_snowy_street_in_Quebec_City_at_night.jpg/1280px-Bike_on_a_snowy_street_in_Quebec_City_at_night.jpg",
+      "downloadSHA256": "16e6f0c053beb8050158bb6aacfa71a2654d1b4461dbf403c74629bf96a97f1e",
+      "downloadBytes": 245585,
+      "downloadDimensions": [
+        1280,
+        855
+      ],
+      "file": "images/complex_product-04.png",
+      "sha256": "d659a7b21dca1f227ad4241c8095321f27675b896f58d034e111cec53172f01d",
+      "bytes": 1183470,
+      "dimensions": [
+        1280,
+        855
+      ],
+      "metadataFile": "source-metadata/complex_product-04.json",
+      "metadataSHA256": "defc3b7c183ebb611e375306c998b9b55d1c09db4dd81708aa727fa8e9a51598"
+    },
+    {
+      "id": "complex_product-05",
+      "category": "complex_product",
+      "sourceTitle": "Backlit Laptop Keyboard.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Backlit_Laptop_Keyboard.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d9/Backlit_Laptop_Keyboard.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Gre123gr",
+      "sourceDeclaredBytes": 69751890,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d9/Backlit_Laptop_Keyboard.jpg/1280px-Backlit_Laptop_Keyboard.jpg",
+      "downloadSHA256": "0dbff8f2d9b0bf3daf73b91de75ec0c4ec0fb37b7ee9772824ac8726ff87c28b",
+      "downloadBytes": 254362,
+      "downloadDimensions": [
+        1280,
+        960
+      ],
+      "file": "images/complex_product-05.png",
+      "sha256": "5183237f8071d1d7c5d0a1da35a60c18f9e8c3a9e83ae1551ef93cde165bb955",
+      "bytes": 1575151,
+      "dimensions": [
+        1280,
+        960
+      ],
+      "metadataFile": "source-metadata/complex_product-05.json",
+      "metadataSHA256": "71fcd321d8e5dc7da60ca4db4a4838862abe561a3a213ed7d8c3b768f2d3a3c8"
+    },
+    {
+      "id": "document_photo-01",
+      "category": "document_photo",
+      "sourceTitle": "1982-06-25 Document on the Closure of Gymnasium in Sečovce.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/4/45/1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Lišiak",
+      "sourceDeclaredBytes": 752862,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg/1280px-1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg",
+      "downloadSHA256": "968a1678635e5df1572397390d0137f69e9f4859c30860d97ccad9741c809cef",
+      "downloadBytes": 400609,
+      "downloadDimensions": [
+        1280,
+        1826
+      ],
+      "file": "images/document_photo-01.png",
+      "sha256": "a477b30d11f5742c56cb9ef581e4f61a265e0fc76984e6df0a3777d0fcbdf6e6",
+      "bytes": 1220686,
+      "dimensions": [
+        897,
+        1280
+      ],
+      "metadataFile": "source-metadata/document_photo-01.json",
+      "metadataSHA256": "f0219ba5f947a0b554f5e8eb3401f9893e299a58265f73bc08e1c9dd702a5d20"
+    },
+    {
+      "id": "document_photo-02",
+      "category": "document_photo",
+      "sourceTitle": "Seamans-record-book.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Seamans-record-book.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/76/Seamans-record-book.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Sebastian Nizan",
+      "sourceDeclaredBytes": 4421082,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/7/76/Seamans-record-book.jpg/1280px-Seamans-record-book.jpg",
+      "downloadSHA256": "1e7e93442a2ee5e42b2051d6457fd64028dccab716c4df5a28d80465d72bbeef",
+      "downloadBytes": 1103399,
+      "downloadDimensions": [
+        1280,
+        1819
+      ],
+      "file": "images/document_photo-02.png",
+      "sha256": "0e3622b7d0569756fbd7b881eacbf3fe76ddfaf8bcfc3745e112b83555079886",
+      "bytes": 2667141,
+      "dimensions": [
+        901,
+        1280
+      ],
+      "metadataFile": "source-metadata/document_photo-02.json",
+      "metadataSHA256": "7ed3862a7215ec980e55565802d45e8c8c1bfab74dc10fea3563de9ec53e5d9c"
+    },
+    {
+      "id": "document_photo-03",
+      "category": "document_photo",
+      "sourceTitle": "Circuit City Receipt - December 17, 1987.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Circuit_City_Receipt_-_December_17,_1987.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/c/ca/Circuit_City_Receipt_-_December_17%2C_1987.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Mopenstein",
+      "sourceDeclaredBytes": 1762789,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/c/ca/Circuit_City_Receipt_-_December_17%2C_1987.jpg/1280px-Circuit_City_Receipt_-_December_17%2C_1987.jpg",
+      "downloadSHA256": "82fd2e2e5033001593602abd56329c34d4975d271a61876cd212d0964e6a72ee",
+      "downloadBytes": 553168,
+      "downloadDimensions": [
+        1280,
+        1203
+      ],
+      "file": "images/document_photo-03.png",
+      "sha256": "6aa99d71db775a39fca2f4e15e3e22cb952ab8da74b8027fbf6801d5fb375d52",
+      "bytes": 2889123,
+      "dimensions": [
+        1280,
+        1203
+      ],
+      "metadataFile": "source-metadata/document_photo-03.json",
+      "metadataSHA256": "846935cd9a0465ae9e86e9e92f4560b1aebfa74c2319453957c481db9a1da9d2"
+    },
+    {
+      "id": "document_photo-04",
+      "category": "document_photo",
+      "sourceTitle": "Ticket de caisse sans BPA.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Ticket_de_caisse_sans_BPA.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/8/80/Ticket_de_caisse_sans_BPA.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Cjp24",
+      "sourceDeclaredBytes": 240318,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/80/Ticket_de_caisse_sans_BPA.jpg/1280px-Ticket_de_caisse_sans_BPA.jpg",
+      "downloadSHA256": "53a7d15d810238a264e252df5a326c156a3df618def63c8f843529dc2c1939c7",
+      "downloadBytes": 108107,
+      "downloadDimensions": [
+        1280,
+        454
+      ],
+      "file": "images/document_photo-04.png",
+      "sha256": "199c2625767b9f7bf467f9556546e95397f6f80c1ee220e417401a594ec86aa5",
+      "bytes": 682848,
+      "dimensions": [
+        1280,
+        454
+      ],
+      "metadataFile": "source-metadata/document_photo-04.json",
+      "metadataSHA256": "906987a019e9b33ecd1426d2ff4dd9483eaab1d637ea751eb3b171c15c859c3f"
+    },
+    {
+      "id": "document_photo-05",
+      "category": "document_photo",
+      "sourceTitle": "Wikipedia Receipt For Food.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Wikipedia_Receipt_For_Food.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/5/56/Wikipedia_Receipt_For_Food.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Wilhelmmarvel",
+      "sourceDeclaredBytes": 42754,
+      "downloadUrl": "https://upload.wikimedia.org/wikipedia/commons/5/56/Wikipedia_Receipt_For_Food.jpg",
+      "downloadSHA256": "c68b17698473fb92ba5364537b823bab672184a70f90c3b280a4fb7be0e136c3",
+      "downloadBytes": 42754,
+      "downloadDimensions": [
+        656,
+        1007
+      ],
+      "file": "images/document_photo-05.png",
+      "sha256": "a8a953d137b76482bb311dc686d91da1f4b54c7e1b9c30e252fa4ca1204be59e",
+      "bytes": 230922,
+      "dimensions": [
+        656,
+        1007
+      ],
+      "metadataFile": "source-metadata/document_photo-05.json",
+      "metadataSHA256": "8cb47cbd66787b216d645c62803c231c8774834db9dbd84f173627d1c34ef6f3"
+    },
+    {
+      "id": "animal-01",
+      "category": "animal",
+      "sourceTitle": "A photograph of a cat lying down 0002.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:A_photograph_of_a_cat_lying_down_0002.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/9/96/A_photograph_of_a_cat_lying_down_0002.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Asabae2752",
+      "sourceDeclaredBytes": 6428124,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/96/A_photograph_of_a_cat_lying_down_0002.jpg/1280px-A_photograph_of_a_cat_lying_down_0002.jpg",
+      "downloadSHA256": "a785887489885a4a50f913c10a5be38c7f44f2a6feb3a6774d9e34201552623e",
+      "downloadBytes": 563293,
+      "downloadDimensions": [
+        1280,
+        960
+      ],
+      "file": "images/animal-01.png",
+      "sha256": "f85e6872f0b78b7e85a45084ccf8080dfe0178cd274ba9703277f1ee23a66a34",
+      "bytes": 2908589,
+      "dimensions": [
+        1280,
+        960
+      ],
+      "metadataFile": "source-metadata/animal-01.json",
+      "metadataSHA256": "d302a51d4e378b9e2353259ab2bbcec854191496d2d2890d50b45764c8c3733d"
+    },
+    {
+      "id": "animal-02",
+      "category": "animal",
+      "sourceTitle": "Cat among the rocks.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Cat_among_the_rocks.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/a/a7/Cat_among_the_rocks.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Joselodos",
+      "sourceDeclaredBytes": 29557725,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a7/Cat_among_the_rocks.jpg/1280px-Cat_among_the_rocks.jpg",
+      "downloadSHA256": "93b9fc5a8c5c9da7572013aa8e663644e7ffefab88a4d9267021761b1eb6a59b",
+      "downloadBytes": 289328,
+      "downloadDimensions": [
+        1280,
+        853
+      ],
+      "file": "images/animal-02.png",
+      "sha256": "f51f2aa94837298e359a9554ba0f901a541a427105dbe745bd62e49be7190c6d",
+      "bytes": 1734177,
+      "dimensions": [
+        1280,
+        853
+      ],
+      "metadataFile": "source-metadata/animal-02.json",
+      "metadataSHA256": "06911976e27a61ef316156e2abdc45d97644d47c5fc74409bba381b707b74b98"
+    },
+    {
+      "id": "animal-03",
+      "category": "animal",
+      "sourceTitle": "Boxer dog posing on the grass.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Boxer_dog_posing_on_the_grass.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/0/07/Boxer_dog_posing_on_the_grass.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Joselodos",
+      "sourceDeclaredBytes": 50394949,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Boxer_dog_posing_on_the_grass.jpg/1280px-Boxer_dog_posing_on_the_grass.jpg",
+      "downloadSHA256": "c02535f12bf8ceb441ccf58099e503b52f6e8b1bcb47a6760da973cc39b565b6",
+      "downloadBytes": 454666,
+      "downloadDimensions": [
+        1280,
+        853
+      ],
+      "file": "images/animal-03.png",
+      "sha256": "fd10bc1cb2db0f40b21e3dcfed8b2bcd2d257e5b46982772691c922521edbb08",
+      "bytes": 2467572,
+      "dimensions": [
+        1280,
+        853
+      ],
+      "metadataFile": "source-metadata/animal-03.json",
+      "metadataSHA256": "b720d74f44f3d3436c370311a362fcc4a01852b0d034b9ccbb6a3ff62196be9f"
+    },
+    {
+      "id": "animal-04",
+      "category": "animal",
+      "sourceTitle": "Dog resting on the grass.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Dog_resting_on_the_grass.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/5/5c/Dog_resting_on_the_grass.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Joselodos",
+      "sourceDeclaredBytes": 52476885,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/5/5c/Dog_resting_on_the_grass.jpg/1280px-Dog_resting_on_the_grass.jpg",
+      "downloadSHA256": "df64a1118dc65cf6cac5d0e28c13a1a201c7a876397a1d2fe3090fdb4fac3725",
+      "downloadBytes": 412679,
+      "downloadDimensions": [
+        1280,
+        853
+      ],
+      "file": "images/animal-04.png",
+      "sha256": "35c55a2cdda70ba83edec726829dce27b3ddab18d9e5ec74587115637181364c",
+      "bytes": 2341049,
+      "dimensions": [
+        1280,
+        853
+      ],
+      "metadataFile": "source-metadata/animal-04.json",
+      "metadataSHA256": "b803d7bba3e5f47d3c364c51f8c02726637776ec6098b4f015f9744244d31540"
+    },
+    {
+      "id": "animal-05",
+      "category": "animal",
+      "sourceTitle": "Mountain dog looking at you.jpg",
+      "sourcePage": "https://commons.wikimedia.org/wiki/File:Mountain_dog_looking_at_you.jpg",
+      "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/4/47/Mountain_dog_looking_at_you.jpg",
+      "license": "CC0-1.0",
+      "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "author": "Hamoma30",
+      "sourceDeclaredBytes": 901608,
+      "downloadUrl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/47/Mountain_dog_looking_at_you.jpg/1280px-Mountain_dog_looking_at_you.jpg",
+      "downloadSHA256": "56ee4da50379f21952f7b4ea5ccc645ca61aca9881edda22c5635b7c71c88eeb",
+      "downloadBytes": 191160,
+      "downloadDimensions": [
+        1280,
+        857
+      ],
+      "file": "images/animal-05.png",
+      "sha256": "c85f9482f3839aeb6362d7a7864c48cf45a9e9f3d5ffe6cfca34ac6199235035",
+      "bytes": 1300324,
+      "dimensions": [
+        1280,
+        857
+      ],
+      "metadataFile": "source-metadata/animal-05.json",
+      "metadataSHA256": "15ea87542f8975a60e732458866f6084bc742e7bf12b498e16f183b8314df350"
+    }
+  ]
+}

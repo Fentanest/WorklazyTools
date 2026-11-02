@@ -1,0 +1,9 @@
+{
+  "repo": "Xenova/modnet",
+  "revision": "fa2fa546052fba4c08921230a26cc69a333fca12",
+  "sourcePath": "onnx/model_uint8.onnx",
+  "sourceUrl": "https://huggingface.co/Xenova/modnet/resolve/fa2fa546052fba4c08921230a26cc69a333fca12/onnx/model_uint8.onnx",
+  "bytes": 6627048,
+  "sha256": "7bad6522b3cde60246e69e234b7786337ef9c88abc790ee5c1aaa6e535b0c61d",
+  "status": "observation only; not adopted in production manifest"
+}

@@ -1,6 +1,6 @@
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
 import { acceptsFile } from "../../app/fileAccepts";
@@ -46,6 +46,9 @@ import {
 } from "./regionEffectTransform";
 import type { ImageOutputFormat } from "./types";
 
+import { IMAGE_EDITOR_ENGINE } from "../../app/publicServiceConfig.mjs";
+const LibraryImageEditor = lazy(() => import("./editor/LibraryImageEditor"));
+
 type StudioTab = "editor" | "batch" | "collage" | "gif";
 
 const EDITOR_MIN_ZOOM = 0.25;
@@ -60,7 +63,7 @@ import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
 import { imageDirectDirty, type ImageDirectPreset } from "./imageDirect";
 import { useImageDirect } from "./imageDirectLifecycle";
-interface ImageEditorDirectHandle {
+export interface ImageEditorDirectHandle {
   apply: (preset?: ImageDirectPreset) => void;
   cancel: () => void;
   receive: (file: File, context: IntakeContext) => Promise<boolean>;
@@ -126,8 +129,12 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
     receive: async (entry, context) => {
       setTab("editor");
       const file = entry.files[0];
+      // The library chunk can still be loading when H1 first delivers its token.
+      while (!editorHandle.current && !context.signal.aborted) {
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      }
       const accepted = file && acceptsFile("image-edit", file) && filterRasterImages([file]).length
-        && await editorHandle.current?.receive(file, context) ? [file] : [];
+        && !context.signal.aborted && await editorHandle.current?.receive(file, context) ? [file] : [];
       return imageIntakeResult(entry.files, accepted);
     },
   });
@@ -194,7 +201,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
         </div>
       </UtilityNotice>}
       <div ref={pageElement}>
-      <div hidden={tab !== "editor"} data-image-owner="editor"><ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} /></div>
+      <div hidden={tab !== "editor"} data-image-owner="editor">{IMAGE_EDITOR_ENGINE === "library" ? <Suspense fallback={<p role="status">{t("image.library.loading")}</p>}><LibraryImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} /></Suspense> : <ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} />}</div>
       {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel inputFiles={batchQueue.inputFiles} handoffFiles={batchQueue.handoffFiles} onFiles={appendBatchFiles} onRemove={removeBatchFile} limitReached={batchNotice === "limit"} progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("collage") && <div hidden={tab !== "collage"} data-image-owner="collage"><CollagePanel progress={progress} controllerRef={activeController} active={tab === "collage"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("gif") && <div hidden={tab !== "gif"} data-image-owner="gif"><GifPanel progress={progress} controllerRef={activeController} active={tab === "gif"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}

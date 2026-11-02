@@ -1,0 +1,245 @@
+import { ImageEditor, ERROR_MESSAGES, type BeforeExportContext, type ExportDecision } from '@ascentsparksoftware/react-image-editor';
+import '@ascentsparksoftware/react-image-editor/styles.css';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { FileDropZone } from '../../../components/ui';
+import { Button } from '../../../components/ui/button';
+import { UtilityNotice, UtilitySectionCard } from '../../../components/UtilitySurface';
+import { useFileDropTarget } from '../../../components/FileDropProvider';
+import type { IntakeContext } from '../../../app/memoryHandoff';
+import { setUnsavedWork } from '../../../app/toolState';
+import type { ImageEditorDirectHandle } from '../ImageStudioPage';
+import type { ImageDirectPreset } from '../imageDirect';
+import { ClipboardHint, filterRasterImages, RASTER_IMAGE_ACCEPT } from '../imageStudioShared';
+import { BackgroundRemovalController, BgRemovalError, messages, type BgMode, type ConsentInfo } from '../bgRemoval';
+import { actualShrinkNotice, classifyD6, draftD6Props } from './d6Policy';
+import { prepareImage, type PreparedImage } from './prepareImage';
+import './libraryImageEditor.css';
+
+interface Props {
+  active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>;
+  onDirty: (dirty: boolean) => void; onEditedResult: (file: File) => void;
+  batchCount: number; batchNotice?: 'added' | 'limit';
+}
+type PendingDecision<T> = { resolve: (value: T) => void };
+const FORMATS = ['png', 'jpeg', 'webp', 'pdf', 'svg', 'json'] as const;
+const localFonts = new Set(['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Verdana', 'Courier New', 'Noto Sans']);
+const fontResolver = (family: string) => localFonts.has(family) || family.includes('system-ui') ? 'local' as const : 'google' as const;
+const initialTool = (preset?: ImageDirectPreset) => preset?.purpose === 'mosaic' ? 'redact' : preset?.purpose === 'watermark' ? 'text' : preset?.purpose === 'resize' ? 'resize' : 'select';
+
+export default function LibraryImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: Props) {
+  const { t, i18n } = useTranslation('features');
+  const language = i18n.language === 'en' ? 'en' : 'ko';
+  const root = useRef<HTMLDivElement>(null);
+  const [source, setSource] = useState<PreparedImage>();
+  const [generation, setGeneration] = useState(0);
+  const [selectedPreset, setSelectedPreset] = useState(preset);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [mode, setMode] = useState<BgMode>('person');
+  const [bgBusy, setBgBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [result, setResult] = useState<File>();
+  const [resultUrl, setResultUrl] = useState<string>();
+  const [adding, setAdding] = useState(false);
+  const [exportPrompt, setExportPrompt] = useState<PendingDecision<ExportDecision>>();
+  const [consent, setConsent] = useState<ConsentInfo & PendingDecision<boolean>>();
+  const exportPending = useRef<PendingDecision<ExportDecision> | undefined>(undefined);
+  const consentPending = useRef<PendingDecision<boolean> | undefined>(undefined);
+  const bg = useRef<BackgroundRemovalController | undefined>(undefined);
+  const version = useRef(0);
+  const sourceRef = useRef(source); sourceRef.current = source;
+  const activeRef = useRef(active); activeRef.current = active;
+  const onDirtyRef = useRef(onDirty); onDirtyRef.current = onDirty;
+  const loadedAck = useRef<{ resolve: (ok: boolean) => void; version: number } | undefined>(undefined);
+  const destination = useRef<'result' | 'batch'>('result');
+  const batchLock = useRef(false);
+  const batchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saving = useRef(false);
+  const [policy] = useState(() => draftD6Props(classifyD6({
+    primaryPointerCoarse: matchMedia('(pointer: coarse)').matches ? true : matchMedia('(pointer: fine)').matches ? false : null,
+    maxTouchPoints: navigator.maxTouchPoints, screenShortEdgeCssPx: Math.min(screen.width, screen.height),
+  })));
+  const labels = t('image.library.labels', { returnObjects: true }) as Record<string, string>;
+
+  const dismissPending = useCallback(() => {
+    exportPending.current?.resolve('cancel'); exportPending.current = undefined; setExportPrompt(undefined);
+    consentPending.current?.resolve(false); consentPending.current = undefined; setConsent(undefined);
+  }, []);
+  const cancel = useCallback(() => {
+    version.current++; bg.current?.cancel(); dismissPending();
+    loadedAck.current?.resolve(false); loadedAck.current = undefined;
+    saving.current = false; destination.current = 'result';
+    setBgBusy(false); setLoading(false);
+  }, [dismissPending]);
+  useEffect(() => {
+    const controller = new BackgroundRemovalController({ language,
+      confirm: info => new Promise<boolean>(resolve => {
+        consentPending.current = { resolve }; setConsent({ ...info, resolve });
+      }), notice: setNotice,
+    });
+    bg.current = controller;
+    void controller.defaultMode().then(value => { if (bg.current === controller) setMode(value); });
+    return () => { controller.dispose(); dismissPending(); if (bg.current === controller) bg.current = undefined; };
+  }, [language, dismissPending]);
+  useEffect(() => { if (!active) cancel(); }, [active, cancel]);
+  useEffect(() => {
+    onDirtyRef.current(!!source || dirty || loading || bgBusy || !!result);
+  }, [source, dirty, loading, bgBusy, result]);
+  useEffect(() => () => { version.current++; loadedAck.current?.resolve(false); clearTimeout(batchTimer.current); onDirtyRef.current(false); }, []);
+  useEffect(() => {
+    if (!result) { setResultUrl(undefined); return; }
+    const url = URL.createObjectURL(result); setResultUrl(url); return () => URL.revokeObjectURL(url);
+  }, [result]);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+  useEffect(() => {
+    const observer = new MutationObserver(() => setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light'));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] }); return () => observer.disconnect();
+  }, []);
+
+  const receive = async (file: File, context?: IntakeContext) => {
+    if (!filterRasterImages([file]).length || context?.signal.aborted) return false;
+    cancel(); const request = version.current;
+    setLoading(true); setError(''); setNotice(''); setResult(undefined);
+    const abort = () => { if (request === version.current) cancel(); };
+    context?.signal.addEventListener('abort', abort, { once: true });
+    try {
+      const prepared = await prepareImage(file, policy.resolutionLimits.inputMaxDimension);
+      if (request !== version.current || context?.signal.aborted) return false;
+      setUnsavedWork('image-studio', { hasWork: true, kind: 'files', scopePath: '/tools/image-studio' });
+      setLoaded(false); setSource(prepared); setGeneration(value => value + 1);
+      return await new Promise<boolean>(resolve => { loadedAck.current = { resolve, version: request }; });
+    } catch {
+      if (request === version.current) setError(t('image.library.loadFailed'));
+      return false;
+    } finally {
+      context?.signal.removeEventListener('abort', abort);
+      if (request === version.current) setLoading(false);
+    }
+  };
+  const receiveRef = useRef(receive); receiveRef.current = receive;
+  useEffect(() => {
+    const handle: ImageEditorDirectHandle = {
+      receive: (file, context) => receiveRef.current(file, context), cancel,
+      invalidate: cancel,
+      apply: next => { cancel(); setSelectedPreset(next); setResult(undefined); setLoaded(false); setGeneration(value => value + 1); },
+    };
+    handleRef.current = handle;
+    return () => { if (handleRef.current === handle) handleRef.current = undefined; };
+  }, [handleRef, cancel]);
+  const editorArea = useRef<HTMLDivElement>(null);
+  useFileDropTarget({ element: () => editorArea.current, label: () => t('image.editor.title'), accept: RASTER_IMAGE_ACCEPT,
+    disabled: !active || loading || bgBusy, receive: files => receiveRef.current(files.at(-1)!).then(() => {}),
+  }, active);
+
+  const beforeExport = async ({ format, hasConcealment }: BeforeExportContext): Promise<ExportDecision> => {
+    if (!hasConcealment || !['svg', 'json'].includes(format)) return 'proceed';
+    if (exportPending.current) return 'cancel';
+    return new Promise(resolve => { const pending = { resolve }; exportPending.current = pending; setExportPrompt(pending); });
+  };
+  const finishExport = (value: ExportDecision) => { exportPending.current?.resolve(value); exportPending.current = undefined; setExportPrompt(undefined); };
+  const finishConsent = (value: boolean) => { consentPending.current?.resolve(value); consentPending.current = undefined; setConsent(undefined); };
+  const backgroundRemovalLoader = async () => ({ removeBackground: async (input: Blob | string) => {
+    const request = version.current; setBgBusy(true); setProgress(0); setError('');
+    try {
+      const controller = bg.current;
+      if (!controller || !activeRef.current) throw new BgRemovalError('ai-cancelled');
+      return await controller.removeBackground(input, { mode, progress: (_key, current, total) => {
+        if (request === version.current) setProgress(total > 0 ? Math.round(current / total * 100) : 0);
+      } });
+    } catch (cause) {
+      if (request === version.current && cause instanceof BgRemovalError && cause.code !== 'ai-cancelled') setError(messages[language][cause.code]);
+      throw cause;
+    } finally { if (request === version.current) setBgBusy(false); }
+  } });
+  const saved = (blob: Blob) => {
+    if (!activeRef.current) return;
+    const file = new File([blob], `${(sourceRef.current?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited.png`, { type: 'image/png' });
+    if (destination.current === 'batch') onEditedResult(file);
+    else setResult(file);
+    destination.current = 'result'; saving.current = false;
+  };
+  const commit = (target: 'result' | 'batch') => {
+    if (target === 'batch') {
+      clearTimeout(batchTimer.current);
+      batchTimer.current = setTimeout(() => { batchLock.current = false; setAdding(false); }, 600);
+      if (batchLock.current) return;
+      batchLock.current = true; setAdding(true);
+      if (batchCount >= 50) { setNotice(t('image.handoff.limit')); return; }
+    }
+    if (saving.current || !loaded || loading || bgBusy) return;
+    destination.current = target; saving.current = true;
+    // The fork's public commit action owns export hooks and forced PNG encoding.
+    const button = editorArea.current?.querySelector<HTMLButtonElement>('.asp-commit');
+    if (button) button.click(); else { saving.current = false; setError(t('image.library.exportFailed')); }
+  };
+  const shrink = source && actualShrinkNotice(source.original, source.decoded, language);
+  return <UtilitySectionCard title={t('image.editor.title')} description={t('image.library.description')}>
+    <div ref={root} data-testid="library-image-editor">
+      <FileDropZone files={source ? [source.file] : []} disabled={loading || bgBusy} accept={RASTER_IMAGE_ACCEPT} hint={t('image.editor.hint')} onFiles={files => { const next = filterRasterImages(files).at(-1); if (next) void receiveRef.current(next); }} accent="sky" />
+      <ClipboardHint mode="replace" />
+      {shrink && <UtilityNotice role="status" className="mt-2" data-testid="image-editor-shrink">{shrink}</UtilityNotice>}
+      {error && <UtilityNotice kind="error" role="alert" className="mt-2">{error}</UtilityNotice>}
+      {notice && <UtilityNotice role="status" className="mt-2">{notice}</UtilityNotice>}
+      <UtilityNotice className="mt-2">{t('image.library.redactionHint')}</UtilityNotice>
+      <div className="my-3 flex flex-wrap items-center gap-2" data-testid="image-background-controls">
+        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => setMode(event.target.value as BgMode)}>
+          <option value="person">{t('image.library.person')}</option><option value="product">{t('image.library.product')}</option>
+        </select></label>
+        <Button type="button" variant="outline" onClick={() => { cancel(); void bg.current?.clearStoredModels().then(() => setNotice(t('image.library.modelsCleared'))); }}>{t('image.library.clearModels')}</Button>
+        {bgBusy && <><span role="status">{t('image.library.processing', { progress })}</span><Button type="button" variant="secondary" onClick={cancel}>{t('image.cancel')}</Button></>}
+      </div>
+      <p className="mb-3 text-sm text-muted-foreground">{t('image.library.magicWandHint')}</p>
+      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onChangeCapture={event => {
+        const input = event.target;
+        // Route source replacement through the host's measured File-only import.
+        if (input instanceof HTMLInputElement && input.type === 'file' && input.accept === 'image/*' && !input.closest('label')?.classList.contains('asp-mt-sm')) {
+          event.stopPropagation(); const file = input.files?.[0]; input.value = ''; if (file) void receiveRef.current(file);
+        }
+      }}>
+        <ImageEditor key={generation} src={source?.file ?? null} mode="full" height={640} themeMode={theme} baseColor={theme === 'dark' ? '#18181b' : '#ffffff'} accentColor="#0284c7"
+          exportFormats={FORMATS} exportQuality={92} jpegExportQuality={95} commitFormat="png" showCommit commitLabel={t('image.library.makeResult')}
+          resolutionLimits={policy.resolutionLimits} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
+          labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
+          onImageLoaded={() => { bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false); loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false); }}
+          onDirtyChange={value => { setDirty(value); if (value) setResult(undefined); }}
+          onHistoryChange={() => { setResult(undefined); }}
+          onSaved={saved} suppressHandledErrorToast onError={failure => {
+            saving.current = false; destination.current = 'result'; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);
+            if (!failure.code.endsWith('cancelled')) setError(messages[language][failure.code as keyof typeof messages.ko] || labels[ERROR_MESSAGES[failure.code]] || t('image.library.failed'));
+            return true;
+          }} />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="image-editor-result-actions">
+        <Button variant="outline" type="button" disabled={!loaded || loading || bgBusy} onClick={() => commit('result')}>{t('image.library.makeResult')}</Button>
+        <Button variant="outline" type="button" data-testid="image-editor-add-to-batch" aria-disabled={adding} className={adding ? 'opacity-60' : ''} disabled={!loaded || loading || bgBusy} onClick={() => commit('batch')}>{t('image.handoff.add', { count: batchCount })}</Button>
+        {batchNotice && <span role="status">{t(`image.handoff.${batchNotice}`)}</span>}
+      </div>
+      {result && resultUrl && <div className="mt-3 rounded-xl border border-border p-3" data-testid="image-editor-result">
+        <img src={resultUrl} alt={t('image.library.resultAlt')} className="max-h-64 max-w-full object-contain" />
+        <a className="mt-2 inline-flex min-h-11 items-center text-primary underline" href={resultUrl} download={result.name}>{t('image.editor.download')}</a>
+      </div>}
+      {exportPrompt && <DecisionDialog title={t('image.library.exportWarningTitle')} onCancel={() => finishExport('cancel')}>
+        <p>{t('image.library.exportWarning')}</p><div className="mt-4 flex flex-wrap gap-2">
+          <Button autoFocus onClick={() => finishExport('flatten')}>{t('image.library.flatten')}</Button><Button variant="outline" onClick={() => finishExport('proceed')}>{t('image.library.proceed')}</Button><Button variant="ghost" onClick={() => finishExport('cancel')}>{t('image.cancel')}</Button>
+        </div>
+      </DecisionDialog>}
+      {consent && <DecisionDialog title={t('image.library.downloadTitle')} onCancel={() => finishConsent(false)}>
+        <p>{t('image.library.downloadDescription', { mode: consent.label, bytes: consent.downloadBytes.toLocaleString(language === 'ko' ? 'ko-KR' : 'en-US') })}</p>
+        <p className="mt-2">{consent.programFilesNote}</p><p className="mt-2">{t('image.library.downloadPrivacy')}</p>
+        <div className="mt-4 flex gap-2"><Button autoFocus onClick={() => finishConsent(true)}>{t('image.library.download')}</Button><Button variant="ghost" onClick={() => finishConsent(false)}>{t('image.cancel')}</Button></div>
+      </DecisionDialog>}
+    </div>
+  </UtilitySectionCard>;
+}
+
+function DecisionDialog({ title, onCancel, children }: { title: string; onCancel: () => void; children: React.ReactNode }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => { const node = ref.current; node?.showModal(); return () => { node?.close(); }; }, []);
+  return <dialog ref={ref} aria-label={title} onCancel={event => { event.preventDefault(); onCancel(); }} className="m-auto max-h-[85vh] w-[min(92vw,560px)] overflow-auto rounded-2xl border border-border bg-background p-5 text-foreground shadow-xl backdrop:bg-black/50">
+    <h2 className="mb-3 text-lg font-bold">{title}</h2>{children}
+  </dialog>;
+}

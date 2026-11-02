@@ -1,0 +1,102 @@
+{
+  "pageid": 142805567,
+  "ns": 6,
+  "title": "File:Portrait of Prof Mikhail Lemeshko.jpg",
+  "index": 10,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 742583,
+      "width": 2034,
+      "height": 2717,
+      "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/Portrait_of_Prof_Mikhail_Lemeshko.jpg/1280px-Portrait_of_Prof_Mikhail_Lemeshko.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "thumbwidth": 1024,
+      "thumbheight": 1368,
+      "responsiveUrls": {
+        "2": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Portrait_of_Prof_Mikhail_Lemeshko.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+      },
+      "thumbattribs": {
+        "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6d/Portrait_of_Prof_Mikhail_Lemeshko.jpg/1280px-Portrait_of_Prof_Mikhail_Lemeshko.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 1368,
+        "srcset": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Portrait_of_Prof_Mikhail_Lemeshko.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled 2x"
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/6/6d/Portrait_of_Prof_Mikhail_Lemeshko.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Portrait_of_Prof_Mikhail_Lemeshko.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=142805567",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2023-12-24 01:41:25",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Portrait of Prof Mikhail Lemeshko",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Physicists from Russia|Files with no machine-readable author|Physicists from Austria|Physicists from the Soviet Union|Media lacking author information|Template Unknown (author)",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Portrait of Prof Mikhail Lemeshko around 2023",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2023-12-23 16:39:32",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "Personal exchange with Prof Lemeshko",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

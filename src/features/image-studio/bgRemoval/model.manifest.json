@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "cacheName": "worklazy-models-v1",
+  "ortVersion": "1.31.1",
+  "models": [
+    {
+      "id": "person",
+      "name": {
+        "ko": "인물 배경 제거",
+        "en": "Portrait background removal"
+      },
+      "repo": "Xenova/modnet",
+      "revision": "fa2fa546052fba4c08921230a26cc69a333fca12",
+      "sourcePath": "onnx/model.onnx",
+      "sourceUrl": "https://huggingface.co/Xenova/modnet/resolve/fa2fa546052fba4c08921230a26cc69a333fca12/onnx/model.onnx",
+      "bytes": 25888640,
+      "sha256": "07c308cf0fc7e6e8b2065a12ed7fc07e1de8febb7dc7839d7b7f15dd66584df9",
+      "url": "vendor/bg-removal/person/fa2fa546052fba4c08921230a26cc69a333fca12/model.onnx",
+      "runtime": "wasm",
+      "processor": "modnet",
+      "license": {
+        "identifier": "Apache-2.0",
+        "file": "licenses/MODNet.txt",
+        "bytes": 11357,
+        "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+        "sourceUrl": "https://raw.githubusercontent.com/ZHKKKe/MODNet/28165a451e4610c9d77cfdf925a94610bb2810fb/LICENSE",
+        "copyright": [],
+        "upstream": "ZHKKKe/MODNet",
+        "conversion": "Xenova ONNX conversion"
+      }
+    },
+    {
+      "id": "product",
+      "name": {
+        "ko": "사물·제품 배경 제거",
+        "en": "Object and product background removal"
+      },
+      "repo": "studioludens/birefnet-lite-512",
+      "revision": "962e67969ec6acec9c19fab76acee4f5e22e990c",
+      "sourcePath": "onnx/model_fp16.onnx",
+      "sourceUrl": "https://huggingface.co/studioludens/birefnet-lite-512/resolve/962e67969ec6acec9c19fab76acee4f5e22e990c/onnx/model_fp16.onnx",
+      "bytes": 98484532,
+      "sha256": "eff9216bb2f9d3f023d9c2b7196845a7485739ab1f231593633e4d2344ffc516",
+      "url": "vendor/bg-removal/product/962e67969ec6acec9c19fab76acee4f5e22e990c/model_fp16.onnx",
+      "runtime": "webgpu",
+      "processor": "birefnet",
+      "license": {
+        "identifier": "MIT",
+        "file": "licenses/BiRefNet.txt",
+        "bytes": 1106,
+        "sha256": "b5cd5faac84a0acb8a6bdb8aeef0919e528891be27216df84eab398d7c8bd2aa",
+        "sourceUrl": "https://huggingface.co/studioludens/birefnet-lite-512/raw/962e67969ec6acec9c19fab76acee4f5e22e990c/LICENSE",
+        "copyright": [
+          "Copyright (c) 2024 ZhengPeng",
+          "Copyright (c) 2026 Studio Ludens V.O.F."
+        ],
+        "upstream": "ZhengPeng7/BiRefNet (MIT)",
+        "conversion": "Studio Ludens 512 fp16 ONNX conversion"
+      }
+    }
+  ],
+  "runtimes": [
+    {
+      "id": "wasm",
+      "file": "ort-wasm-simd-threaded.wasm",
+      "bytes": 14848852,
+      "sha256": "4b884c203b0fa48d057be3332c65513ff85aa3c5bddd6946acc0fab7ecda001d",
+      "url": "vendor/onnxruntime-web/1.31.1/ort-wasm-simd-threaded.wasm",
+      "package": "onnxruntime-web",
+      "version": "1.31.1",
+      "packageIntegrity": "sha512-5GeH+bWQ+HxM10z7erGlsWqryrwMbSvm/1tkIsKTT48g0fI19VXVVC435t4t7VsPdSQeS7NmuZPXrQ73k82URw=="
+    },
+    {
+      "id": "webgpu",
+      "file": "ort-wasm-simd-threaded.asyncify.wasm",
+      "bytes": 28747738,
+      "sha256": "ca319e9539cd0f1e291cf56074760121eaf39650f5dbf84b6e52c07f4b2944ec",
+      "url": "vendor/onnxruntime-web/1.31.1/ort-wasm-simd-threaded.asyncify.wasm",
+      "package": "onnxruntime-web",
+      "version": "1.31.1",
+      "packageIntegrity": "sha512-5GeH+bWQ+HxM10z7erGlsWqryrwMbSvm/1tkIsKTT48g0fI19VXVVC435t4t7VsPdSQeS7NmuZPXrQ73k82URw=="
+    }
+  ],
+  "internalNotice": "확인한 코드·가중치 라이선스 기준으로 채택했으며, 원 학습 데이터 일부 조건은 조사 범위 밖",
+  "modnetNoticeSearch": {
+    "revision": "28165a451e4610c9d77cfdf925a94610bb2810fb",
+    "rootNoticeFound": false
+  },
+  "referenceComparison": "IE0b only; BiRefNet candidate not yet adopted by reference validation",
+  "programFilesNotice": {
+    "ko": "프로그램 파일(약 0.21MB)은 별도로 불러옵니다.",
+    "en": "Program files (about 0.21 MB) are loaded separately."
+  }
+}

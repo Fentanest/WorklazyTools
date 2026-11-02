@@ -1,0 +1,103 @@
+{
+  "pageid": 17766345,
+  "ns": 6,
+  "title": "File:Red Christmas present on white background.jpg",
+  "index": 3,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 158903,
+      "width": 1280,
+      "height": 889,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Red_Christmas_present_on_white_background.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "thumbwidth": 1024,
+      "thumbheight": 711,
+      "thumbattribs": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Red_Christmas_present_on_white_background.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 711
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Red_Christmas_present_on_white_background.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Red_Christmas_present_on_white_background.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=17766345",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2011-12-22 17:58:47",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Red Christmas present on white background",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Files from external sources with reviewed licenses|Gift-wrapping|Red containers|Objects with white background|Christmas gifts in art",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Red Christmas present on white background",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external free\" href=\"http://www.publicdomainpictures.net/view-image.php?image=1470&amp;picture=christmas-present\">http://www.publicdomainpictures.net/view-image.php?image=1470&amp;picture=christmas-present</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"http://www.publicdomainpictures.net/browse-author.php?a=1\">Petr Kratochvil</a>",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "This image is public domain. You may use this picture for any purpose, including commercial. If you do use it, please consider linking back to publicdomainpictures.net. If you are going to redistribute this image online, a hyperlink to the original sourcee is mandatory. <b>Note:</b> If you intend to use an image you find here for commercial use, please be aware that some photos do require a model or property release. Pictures featuring products should be used with care.",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

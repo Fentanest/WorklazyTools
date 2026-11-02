@@ -1,0 +1,103 @@
+{
+  "pageid": 19674422,
+  "ns": 6,
+  "title": "File:Cup of tea isolated on white background - Petr Kratochvil.jpg",
+  "index": 1,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 35999,
+      "width": 1280,
+      "height": 853,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/9/92/Cup_of_tea_isolated_on_white_background_-_Petr_Kratochvil.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "thumbwidth": 1024,
+      "thumbheight": 682,
+      "thumbattribs": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/9/92/Cup_of_tea_isolated_on_white_background_-_Petr_Kratochvil.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 682
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/92/Cup_of_tea_isolated_on_white_background_-_Petr_Kratochvil.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Cup_of_tea_isolated_on_white_background_-_Petr_Kratochvil.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=19674422",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2012-05-31 03:09:51",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Cup of tea isolated on white background - Petr Kratochvil",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Files from external sources with reviewed licenses|Images with extracted images|White tea cups|Cups of mint tea",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Mint tea on white background.",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"http://www.publicdomainpictures.net/view-image.php?image=4291&amp;picture=cup-of-tea-isolated\">cup-of-tea-isolated</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"http://www.publicdomainpictures.net/browse-author.php?a=1\">Petr Kratochvil</a>",
+          "source": "commons-desc-page"
+        },
+        "Permission": {
+          "value": "This image is public domain. You may use this picture for any purpose, including commercial. If you do use it, please consider linking back to publicdomainpictures.net. If you are going to redistribute this image online, a hyperlink to the original sourcee is mandatory. <b>Note:</b> If you intend to use an image you find here for commercial use, please be aware that some photos do require a model or property release. Pictures featuring products should be used with care.",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

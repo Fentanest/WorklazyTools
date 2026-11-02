@@ -23,7 +23,7 @@
     "vendor:qr-font": "node scripts/vendor-qr-label-font.mjs",
     "vendor:rhwp:prune": "node scripts/prune-rhwp-vendor.mjs 0.8.4",
     "vendor:image-studio": "node scripts/vendor-image-studio-assets.mjs",
-    "prebuild": "npm run test:guides && node scripts/apply-dependency-patches.mjs && node scripts/validate-rhwp-vendor.mjs && node scripts/vendor-browser-runtimes.mjs && node scripts/vendor-comparison-assets.mjs && node scripts/vendor-libreoffice-converter.mjs && node scripts/vendor-image-studio-assets.mjs && node scripts/vendor-qr-label-font.mjs && node scripts/generate-third-party-licenses.mjs",
+    "prebuild": "npm run test:guides && node scripts/apply-dependency-patches.mjs && node scripts/validate-rhwp-vendor.mjs && node scripts/vendor-browser-runtimes.mjs && node scripts/vendor-comparison-assets.mjs && node scripts/vendor-libreoffice-converter.mjs && node scripts/vendor-image-studio-assets.mjs && node scripts/vendor-qr-label-font.mjs && node scripts/vendor-bg-removal-model.mjs && node scripts/verify-image-editor-vendor.mjs && node scripts/generate-third-party-licenses.mjs",
     "build": "tsc -b && vite build && node --experimental-strip-types scripts/generate-static-pages.mjs",
     "preview": "vite preview",
     "test:recovery": "node tests/blank-page-recovery-smoke.mjs",
@@ -37,7 +37,7 @@
     "test:qr-bulk": "node tests/qr-bulk-smoke.mjs",
     "test:qr-font-render": "node --experimental-strip-types tests/qr-font-render-regression.mjs",
     "test:pdf-font-embed": "node --experimental-strip-types tests/pdf-font-embed-regression.mjs",
-    "test:unit": "node scripts/run-public-unit-tests.mjs",
+    "test:unit": "node scripts/run-public-unit-tests.mjs && npm run test:bg-removal",
     "test:new-tools": "node tests/new-tools-smoke.mjs",
     "test:video-hybrid": "node tests/video-hybrid-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",
@@ -66,7 +66,8 @@
     "build:product-banner-tests": "node --experimental-strip-types scripts/build-product-banner-tests.mjs",
     "test:product-banner": "node scripts/test-product-banner.mjs",
     "test:product-banner:real": "node tests/product-banner/real-xls.mjs",
-    "test:product-banner:images": "node tests/product-banner/real-xls.mjs --images"
+    "test:product-banner:images": "node tests/product-banner/real-xls.mjs --images",
+    "test:bg-removal": "node --test --experimental-strip-types src/features/image-studio/bgRemoval/tests/unit.test.ts"
   },
   "dependencies": {
     "@bentopdf/pymupdf-wasm": "0.11.16",
@@ -134,7 +135,9 @@
     "wavesurfer.js": "^7.12.11",
     "world-atlas": "^2.0.2",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zetajs": "1.2.0"
+    "zetajs": "1.2.0",
+    "onnxruntime-web": "1.31.1",
+    "@ascentsparksoftware/react-image-editor": "file:vendor/react-image-editor/ascentsparksoftware-react-image-editor-1.3.0.tgz"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",

@@ -1,3 +1,4 @@
+import { verifiedRuntimeWasmPlugin } from "./src/features/image-studio/bgRemoval/verified-runtime-vite.mjs";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -5,7 +6,7 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { moduleAttributionPlugin } from "./scripts/bundle-output-metadata.mjs";
-import { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC } from "./src/app/publicServiceConfig.mjs";
+import { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, IMAGE_EDITOR_ENGINE } from "./src/app/publicServiceConfig.mjs";
 import { productBannerRuntimePlugin } from "./scripts/product-banner-runtime.mjs";
 
 const configuredBase = process.env.VITE_BASE_PATH || "/";
@@ -26,7 +27,7 @@ const browserNodePolyfills = () => nodePolyfills({
 
 export default defineConfig({
   base,
-  define: { __VIDEO_STUDIO_PUBLIC__: JSON.stringify(VIDEO_STUDIO_PUBLIC), __COMPARISON_PORT_PUBLIC__: JSON.stringify(COMPARISON_PORT_PUBLIC) },
+  define: { __IMAGE_EDITOR_ENGINE__: JSON.stringify(IMAGE_EDITOR_ENGINE), __VIDEO_STUDIO_PUBLIC__: JSON.stringify(VIDEO_STUDIO_PUBLIC), __COMPARISON_PORT_PUBLIC__: JSON.stringify(COMPARISON_PORT_PUBLIC) },
   plugins: [
     productBannerRuntimePlugin(),
     react(),
@@ -40,7 +41,7 @@ export default defineConfig({
     },
   },
   worker: {
-    plugins: () => [browserNodePolyfills()],
+    plugins: () => [browserNodePolyfills(), verifiedRuntimeWasmPlugin()],
     rollupOptions: {
       output: {
         // PptxGenJS has optional Node-only dynamic imports. Keep browser workers

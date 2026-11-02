@@ -1,0 +1,106 @@
+{
+  "pageid": 26597123,
+  "ns": 6,
+  "title": "File:Ticket de caisse sans BPA.jpg",
+  "index": 6,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 240318,
+      "width": 1482,
+      "height": 526,
+      "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/80/Ticket_de_caisse_sans_BPA.jpg/1280px-Ticket_de_caisse_sans_BPA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "thumbwidth": 1024,
+      "thumbheight": 363,
+      "responsiveUrls": {
+        "2": "https://upload.wikimedia.org/wikipedia/commons/8/80/Ticket_de_caisse_sans_BPA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+      },
+      "thumbattribs": {
+        "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/80/Ticket_de_caisse_sans_BPA.jpg/1280px-Ticket_de_caisse_sans_BPA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 363,
+        "srcset": "https://upload.wikimedia.org/wikipedia/commons/8/80/Ticket_de_caisse_sans_BPA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled 2x"
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/80/Ticket_de_caisse_sans_BPA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Ticket_de_caisse_sans_BPA.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=26597123",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2013-06-11 15:29:09",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Ticket de caisse sans BPA",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Taken with Pentax Optio 50|CC-Zero|Bisphenol A|Receipts|Self-published work|French inscriptions in France",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Cash receipt back side from a french hypermarket. <a href=\"https://en.wikipedia.org/wiki/Bisphenol_A\" class=\"extiw\" title=\"w:Bisphenol A\">BPA</a>-free paper.",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2013-06-11",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Cjp24\" title=\"User:Cjp24\">Cjp24</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

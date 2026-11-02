@@ -5,6 +5,8 @@ import { PageHeader } from "../components/ui";
 import { useAppLanguage } from "../i18n/routing";
 
 const libraries = [
+  { name: "MODNet · Xenova ONNX conversion", license: "Apache-2.0", url: "https://github.com/ZHKKKe/MODNet/tree/28165a451e4610c9d77cfdf925a94610bb2810fb", purpose: "인물 배경 제거 · Xenova 고정 변환 가중치" },
+  { name: "BiRefNet-512 · Studio Ludens ONNX conversion", license: "MIT · Copyright (c) 2024 ZhengPeng / Copyright (c) 2026 Studio Ludens V.O.F.", url: "https://huggingface.co/studioludens/birefnet-lite-512/tree/962e67969ec6acec9c19fab76acee4f5e22e990c", purpose: "사물·제품 배경 제거 · 고정 커뮤니티 변환 후보" },
   { name: "Microsoft MarkItDown 0.1.8 document converters", license: "MIT", url: "https://github.com/microsoft/markitdown", purpose: "공식 Python 변환기로 Markdown 추출 · 브라우저용 지연 로딩 진입점 적용" },
   { name: "PptxGenJS 4.0.1", license: "MIT", url: "https://github.com/gitbrent/PptxGenJS", purpose: "PDF 추출 텍스트와 이미지로 편집 가능한 PPTX 생성" },
   { name: "rhwp / @rhwp/core·@rhwp/editor 0.8.7", license: "MIT", url: "https://github.com/edwardkim/rhwp", purpose: "HWP·HWPX·HML 문서 해석, 편집기 UI와 파일 저장" },

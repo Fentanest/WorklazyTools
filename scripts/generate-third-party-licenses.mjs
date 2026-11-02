@@ -5,6 +5,8 @@ import path from "node:path";
 const projectRoot = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const lock = JSON.parse(await fs.readFile(path.join(projectRoot, "package-lock.json"), "utf8"));
 const stickerManifest = JSON.parse(await fs.readFile(path.join(projectRoot, "src", "features", "image-studio", "stickers.manifest.json"), "utf8"));
+const bgManifestPath = path.join(projectRoot, "src/features/image-studio/bgRemoval/model.manifest.json");
+const bgManifest = JSON.parse(await fs.readFile(bgManifestPath, "utf8"));
 const productionPackages = Object.entries(lock.packages || {})
   .filter(([packagePath, metadata]) => packagePath.startsWith("node_modules/") && metadata?.dev !== true)
   .sort(([left], [right]) => left.localeCompare(right));
@@ -31,6 +33,13 @@ const sections = [
   "JSDoc legacy Word reader snapshot 821695a — 0BSD — https://github.com/Alpaq92/JSDoc",
   `Twemoji graphics ${stickerManifest.version} — CC BY 4.0 — https://github.com/jdecked/twemoji/tree/${stickerManifest.commit}/assets/svg`,
 ];
+
+for (const model of bgManifest.models) {
+  const license = await fs.readFile(path.join(path.dirname(bgManifestPath), model.license.file));
+  const { createHash } = await import('node:crypto');
+  if (license.length !== model.license.bytes || createHash('sha256').update(license).digest('hex') !== model.license.sha256) throw new Error('Background model license integrity mismatch');
+  sections.push('', '='.repeat(78), `${model.repo} @ ${model.revision}`, `Declared license: ${model.license.identifier}`, `Conversion: ${model.license.conversion}`, `Upstream: ${model.license.upstream}`, `Source: ${model.license.sourceUrl}`, '', license.toString('utf8').trim());
+}
 
 const markdownNotices = await fs.readFile(path.join(projectRoot, "public/vendor/markitdown/0.1.8/THIRD_PARTY_LICENSES.txt"), "utf8");
 sections.push("", "=".repeat(78), markdownNotices.trim().replace(/[ \t]+$/gm, ""));
@@ -134,6 +143,7 @@ function buildRootNotices() {
     "repeated in this summary.",
     "",
     "## Runtime resources loaded on demand",
+    ...bgManifest.models.map(model => `- ${model.repo} @ ${model.revision} — ${model.license.identifier}; ${model.license.sourceUrl}`),
     "",
     `- Pyodide ${versionOf("pyodide")} is copied into the Worklazy Tools GitHub Pages deployment and`,
     "  loaded from the same origin for Word comparison and Markdown extraction. It is distributed under",

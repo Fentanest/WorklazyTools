@@ -1,0 +1,106 @@
+{
+  "pageid": 108208428,
+  "ns": 6,
+  "title": "File:1982-06-25 Document on the Closure of Gymnasium in Sečovce.jpg",
+  "index": 7,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 752862,
+      "width": 1886,
+      "height": 2691,
+      "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg/1280px-1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "thumbwidth": 1024,
+      "thumbheight": 1461,
+      "responsiveUrls": {
+        "2": "https://upload.wikimedia.org/wikipedia/commons/4/45/1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled"
+      },
+      "thumbattribs": {
+        "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/4/45/1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg/1280px-1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 1461,
+        "srcset": "https://upload.wikimedia.org/wikipedia/commons/4/45/1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled 2x"
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/4/45/1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:1982-06-25_Document_on_the_Closure_of_Gymnasium_in_Se%C4%8Dovce.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=108208428",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2021-08-06 19:39:17",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "1982-06-25 Document on the Closure of Gymnasium in Sečovce",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Sečovce|Self-published work",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Zrušovacia listina Gymnázia v Sečovciach z 25. júna 1982 s účinnosťou k 30. augustu 1982",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2021-08-06 21:33:18",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/wiki/User:Li%C5%A1iak\" class=\"mw-redirect\" title=\"User:Lišiak\">Lišiak</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}
