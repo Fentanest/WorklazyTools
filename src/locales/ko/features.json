@@ -1,4 +1,8 @@
 {
+  "documentPdf": {
+    "timeout": "이 문서의 PDF 변환을 완료하지 못했습니다. Word 또는 LibreOffice에서 파일을 열어 ‘PDF로 내보내기’를 이용해 주세요. 다른 파일을 시도하려면 페이지를 새로 열어 주세요.",
+    "reload": "페이지 새로 열기"
+  },
   "documentCompare": {
     "side": {
       "before": "수정 전",
@@ -3197,6 +3201,7 @@
     "fallbackNotice": "현재 실행 환경에서는 파일 처리 기능을 준비하지 못했습니다. 파일 선택은 잠겨 있지만 아래에서 사용 방법과 주의사항을 확인할 수 있습니다."
   },
   "documentGenerator": {
+    "handoffTemplateOnly": "양식은 열었지만 데이터 파일을 열지 못했습니다. 데이터 파일을 다시 선택해 주세요.",
     "eyebrow": "워드 일괄 생성",
     "title": "워드 일괄 생성",
     "description": "워드 템플릿의 변수를 엑셀 데이터로 치환하여 한 번에 여러 문서를 자동으로 완성합니다.",

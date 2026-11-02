@@ -1,10 +1,18 @@
+import JSZip from "jszip";
+import { useTranslation } from "react-i18next";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { acceptsFile } from "../../app/fileAccepts";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import type { DeliveryResult, IntakeContext } from "../../app/memoryHandoff";
+import { useMemoryHandoff } from "../../components/AppShell";
+import { UtilityNotice } from "../../components/UtilitySurface";
 import { useImageInputs, type ImageEntry } from "./useImageInputs";
 import { imageFailureMessage } from "./imageMessages";
 import type { ImageStage } from "./imageInput.ts";
 import { BatchConversionPanel } from "../conversion-batch/BatchConversionPanel";
 import { FileImage, GripVertical, Images, Trash2 } from "lucide-react";
 import Sortable from "sortablejs";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { OperationProgress } from "../../components/OperationProgress";
 import { UtilityField, UtilityInput, UtilitySelect } from "../../components/UtilitySurface";
@@ -20,26 +28,72 @@ import { imagesToPdf } from "./pdfWorkerClient";
 import { type PdfPageItem } from "./types";
 import { featureMessage } from "../../i18n/featureMessages";
 
+export function PdfHandoffRecovery({ handoff, onSelect }: { handoff: ReturnType<typeof useHandoffReceiver>; onSelect: () => void }) {
+  const { t } = useTranslation("common");
+  return handoff.notReceived || (handoff.result && handoff.recoveryFiles.length) ? <UtilityNotice kind="warning" role="status" className="my-3 flex-col items-start gap-2" data-pdf-send-recovery>
+    <p>{t(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p><ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+    <div className="flex flex-wrap gap-2">{!!handoff.recoveryFiles.length && <Button type="button" variant="outline" onClick={() => { for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); } setTimeout(handoff.dismiss, 0); }}>{t("handoff.downloadReceived")}</Button>}<Button type="button" variant="outline" onClick={onSelect}>{t("handoff.selectAgain")}</Button><Button type="button" variant="ghost" onClick={handoff.dismiss}>{t("handoff.close")}</Button></div>
+  </UtilityNotice> : null;
+}
+const receivedResult = (files: File[], accepted: File[]): DeliveryResult => ({ status: accepted.length === files.length ? "accepted" : accepted.length ? "partial" : "rejected", accepted, rejected: files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) });
+
 export function PdfImagePanel({ direction }: { direction: "image-to-pdf" | "pdf-to-image" }) {
   return direction === "image-to-pdf" ? <ImagesToPdf /> : <PdfToImages />;
 }
 
 function ImagesToPdf() {
   const language = useAppLanguage();
+  const intakeRoot = useRef<HTMLDivElement>(null);
+  const generation = useRef(0);
   const active = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => active.current?.abort(), []);
   const inputs = useImageInputs();
+  const [cancelledAcquisition, setCancelledAcquisition] = useState(false);
+  const acquiring = inputs.acquiring && !cancelledAcquisition;
   const files = inputs.entries.flatMap(e => e.file ? [e.file] : []);
   const [busy, setBusy] = useState(false);
   const [canceling, setCanceling] = useState(false);
   const preparing = inputs.entries.some(e => e.status === 'reading' || e.status === 'preview');
-  const canConvert = inputs.entries.length > 0 && inputs.entries.every(e => e.file && e.stage !== "decode") && !preparing && !inputs.acquiring;
+  const canConvert = inputs.entries.length > 0 && inputs.entries.every(e => e.file && e.stage !== "decode") && !preparing && !acquiring;
   const [pageMode, setPageMode] = useState<"a4" | "image">("a4");
   const [outputName, setOutputName] = useState(featureMessage(language, "pdf.messages.PdfImagePanel.worklazyImagePdf"));
   const [error, setError] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   const operation = useOperationProgress();
   const download = useDownloadResult();
+
+  const latestInputs = useRef(inputs); latestInputs.current = inputs;
+  const pending = useRef<{ signal: AbortSignal; before: Set<string>; files: File[]; ids?: string[]; done: boolean; resolve: (accepted: File[]) => void } | undefined>(undefined);
+  const settle = () => {
+    const job = pending.current;
+    if (!job) return;
+    const rows = latestInputs.current.entries.filter(entry => !job.before.has(entry.id));
+    if (!job.ids && rows.length === job.files.length) job.ids = rows.map(row => row.id);
+    if (!job.done) return;
+    if (rows.length < job.files.length || rows.some(row => row.status === "reading" || row.status === "preview")) return;
+    pending.current = undefined; job.resolve(job.files.filter((_, index) => rows.find(row => row.id === job.ids?.[index])?.status === "ready"));
+  };
+  useLayoutEffect(settle, [inputs.entries, inputs.acquiring]);
+  const invalidateIntake = () => {
+    const job = pending.current;
+    if (!job?.signal.aborted) return;
+    setCancelledAcquisition(true); generation.current++; job.resolve([]); pending.current = undefined;
+    latestInputs.current.entries.filter(entry => !job.before.has(entry.id)).forEach(entry => latestInputs.current.remove(entry.id));
+  };
+  const handoff = useHandoffReceiver("image-to-pdf", { kind: "inspection", invalidate: invalidateIntake, receive: async (entry, context) => {
+    setCancelledAcquisition(false);
+    const version = ++generation.current;
+    const eligible = entry.files.filter(file => acceptsFile("image-to-pdf", file)).slice(0, Math.max(0, 50 - latestInputs.current.entries.length));
+    if (!eligible.length) return receivedResult(entry.files, []);
+    const accepted = await new Promise<File[]>(resolve => {
+      pending.current = { signal: context.signal, before: new Set(latestInputs.current.entries.map(row => row.id)), files: eligible, done: false, resolve };
+      void latestInputs.current.add(eligible).then(() => { if (generation.current === version && !context.signal.aborted && pending.current) { pending.current.done = true; settle(); } });
+    });
+    if (generation.current !== version || context.signal.aborted) return receivedResult(entry.files, []);
+    if (accepted.length) { download.clearResult(); setUnsavedWork("image-to-pdf", { hasWork: true, kind: "files", scopePath: "/tools/pdf-converter/image-to-pdf" }); }
+    return receivedResult(entry.files, accepted);
+  } });
+  useUnsavedWorkGuard("image-to-pdf", inputs.entries.length > 0 || !!download.result || handoff.recoveryFiles.length > 0, { kind: "files", scopePath: "/tools/pdf-converter/image-to-pdf" });
 
   useEffect(() => {
     const list = listRef.current;
@@ -65,6 +119,8 @@ function ImagesToPdf() {
   const addFiles = async (next: File[]) => {
     if (active.current) return;
     setError(""); download.clearResult();
+    if (handoff.notReceived) handoff.dismiss();
+    setCancelledAcquisition(false);
     await inputs.add(next);
   };
 
@@ -96,12 +152,13 @@ function ImagesToPdf() {
 
   return (
     <>
+      <PdfHandoffRecovery handoff={handoff} onSelect={() => intakeRoot.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()} />
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
-        <div>
+        <div ref={intakeRoot}>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfImagePanel.addImages")} description={featureMessage(language, "pdf.messages.PdfImagePanel.addJpgAndPngImagesAndArrangeThem")} className="">
-            <FileDropZone accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple files={files} onFiles={addFiles} onNewFiles={addFiles} disabled={busy || preparing || inputs.acquiring} accent="violet" hint={featureMessage(language, "pdf.messages.PdfImagePanel.chooseJpgPngImagesAtOnceOrAdd")} />
+            <FileDropZone accept=".jpg,.jpeg,.png,image/jpeg,image/png" multiple files={files} onFiles={addFiles} onNewFiles={addFiles} disabled={busy || preparing || acquiring} accent="violet" hint={featureMessage(language, "pdf.messages.PdfImagePanel.chooseJpgPngImagesAtOnceOrAdd")} />
           </SectionCard>
-          {(preparing || inputs.acquiring) && <div role="status" className="my-3 text-sm">
+          {(preparing || acquiring) && <div role="status" className="my-3 text-sm">
             {!preparing ? featureMessage(language, "pdf.imageInput.canceling") : featureMessage(language, "pdf.imageInput.preparing", { done: inputs.entries.filter(e => e.status === 'ready' || e.status === 'failed').length, total: inputs.entries.length })}
             <Button variant="outline" onClick={() => { inputs.cancelPreparation(); download.clearResult(); setError(""); }}>{featureMessage(language, "pdf.imageInput.cancelPreparation")}</Button>
           </div>}
@@ -141,6 +198,16 @@ function ImagesToPdf() {
 function PdfToImages() {
   const language = useAppLanguage();
   const [batchFiles, setBatchFiles] = useState<File[]>();
+  const { t } = useTranslation("common");
+  const sender = useMemoryHandoff();
+  const intakeRoot = useRef<HTMLDivElement>(null);
+  const intakeGeneration = useRef(0);
+  const handoffInspection = useRef<{ generation: number; signal: AbortSignal; controller: AbortController; file: File } | undefined>(undefined);
+  const [pageImages, setPageImages] = useState<{ archive: JSZip; names: string[]; pages: number[]; mime: string }>();
+  const [chosen, setChosen] = useState<Set<number>>(new Set());
+  const [sending, setSending] = useState(false);
+  const sendGeneration = useRef(0);
+  useEffect(() => () => { sendGeneration.current++; }, []);
   const active = useRef<AbortController | undefined>(undefined);
   useEffect(() => () => active.current?.abort(), []);
     const [file, setFile] = useState<File | null>(null);
@@ -155,29 +222,62 @@ function PdfToImages() {
 
   useEffect(() => () => { if (file) void releasePdf(file); }, [file]);
 
-  const setInput = async (files: File[]) => {
+  const setInput = async (files: File[], context?: IntakeContext): Promise<boolean> => {
+    if (context?.signal.aborted) return false;
+    sendGeneration.current++; setSending(false);
+    const generation = ++intakeGeneration.current;
+    handoffInspection.current = undefined;
     active.current?.abort();
-    if (files.length > 1) { setFile(null); download.clearResult(); setBatchFiles(files); return; }
+    if (!context) { setPageImages(undefined); setChosen(new Set()); }
+    if (files.length > 1) { setFile(null); download.clearResult(); setBatchFiles(files); return false; }
     const controller = new AbortController(); active.current = controller;
     const next = files.at(-1);
-    if (!next || next === file) return;
+    if (!next) return false;
+    if (next === file) return true;
+    handoffInspection.current = context ? { generation, signal: context.signal, controller, file: next } : undefined;
     setLoading(true);
-    setError("");
-    download.clearResult();
+    if (!context) { setError(""); download.clearResult(); }
     operation.start(featureMessage(language, "pdf.messages.PdfImagePanel.checkingPagesIn", { p0: next.name }));
     try {
       const inspected = await inspectPdf(next, language, { signal: controller.signal });
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || context?.signal.aborted || generation !== intakeGeneration.current) return false;
+      if (context) { setError(""); download.clearResult(); setPageImages(undefined); setChosen(new Set()); }
       setFile(next);
       setPageCount(inspected.pageCount);
       setPageRange("");
       operation.succeed(featureMessage(language, "pdf.messages.PdfImagePanel.loadedPages", { p0: inspected.pageCount }));
+      setUnsavedWork("pdf-to-image", { hasWork: true, kind: "files", scopePath: "/tools/pdf-converter/pdf-to-image" });
+      return true;
     } catch (reason) {
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || context?.signal.aborted || generation !== intakeGeneration.current) return false;
       const message = reason instanceof Error ? reason.message : featureMessage(language, "pdf.messages.PdfImagePanel.unableToReadThePdf");
       setError(message);
-      operation.fail(message);
-    } finally { if (active.current === controller) setLoading(false); }
+      operation.fail(message); return false;
+    } finally {
+      if (handoffInspection.current?.generation === generation) handoffInspection.current = undefined;
+      if (active.current === controller && generation === intakeGeneration.current && !context?.signal.aborted) setLoading(false);
+    }
+  };
+
+  const handoff = useHandoffReceiver("pdf-to-image", { kind: "inspection", invalidate: () => {
+    const job = handoffInspection.current;
+    if (!job?.signal.aborted || job.generation !== intakeGeneration.current) return;
+    handoffInspection.current = undefined; intakeGeneration.current++; job.controller.abort();
+    void releasePdf(job.file); setLoading(false); operation.reset();
+  }, receive: async (entry, context) => {
+    const next = entry.files[0]; const ok = !!next && acceptsFile("pdf-to-image", next) && await setInput([next], context);
+    return receivedResult(entry.files, ok ? [next] : []);
+  } });
+  useUnsavedWorkGuard("pdf-to-image", !!file || loading || !!batchFiles || !!download.result || handoff.recoveryFiles.length > 0, { kind: "files", scopePath: "/tools/pdf-converter/pdf-to-image" });
+  const sendImages = async () => {
+    if (!pageImages || !chosen.size || chosen.size > 50 || sending) return;
+    const generation = ++sendGeneration.current;
+    setSending(true);
+    try {
+      const files = await Promise.all([...chosen].sort((a,b) => a-b).map(async index => new File([await pageImages.archive.files[pageImages.names[index]].async("uint8array")], pageImages.names[index], { type: pageImages.mime })));
+      if (generation !== sendGeneration.current) return;
+      sender.send({ receiverId: files.length === 1 ? "image-edit" : "image-batch", entryPath: "/tools/image-studio", tab: files.length === 1 ? "edit" : "batch", files, origin: "generated", source: "pdf-to-image" });
+    } catch { if (generation === sendGeneration.current) setError(t("sendTo.failed")); } finally { if (generation === sendGeneration.current) setSending(false); }
   };
 
   const convert = async () => {
@@ -185,12 +285,17 @@ function PdfToImages() {
     active.current?.abort();
     const controller = new AbortController(); active.current = controller;
     setError("");
-    download.clearResult();
+    download.clearResult(); setPageImages(undefined); setChosen(new Set());
     operation.start(featureMessage(language, "pdf.messages.PdfImagePanel.startingPdfPageImageConversion"));
     try {
       const selectedPages = pageRange.trim() ? parsePageRange(pageRange, pageCount, language) : undefined;
       const output = await pdfToImageArchive(file, format, dpi, 0.9, (value, message) => { if (!controller.signal.aborted) operation.update(value, message); }, language, selectedPages, controller.signal);
       if (controller.signal.aborted) return;
+      const archive = await JSZip.loadAsync(await output.blob.arrayBuffer());
+      if (controller.signal.aborted) return;
+      const names = Object.keys(archive.files).filter(name => !archive.files[name].dir);
+      setPageImages({ archive, names, pages: selectedPages ?? Array.from({ length: pageCount }, (_, index) => index), mime: format === "png" ? "image/png" : "image/jpeg" });
+      setChosen(new Set(names.slice(0, 50).map((_, index) => index)));
       download.makeBlobResult(output.blob, output.fileName, [featureMessage(language, "pdf.messages.PdfImagePanel.morePagesAndHigherResolutionIncreaseConversionTime")]);
       const convertedCount = selectedPages?.length ?? pageCount;
       operation.succeed(featureMessage(language, "pdf.messages.PdfImagePanel.createdAZipContainingPageImages", { p0: convertedCount }));
@@ -207,11 +312,12 @@ function PdfToImages() {
   if (batchFiles) return <BatchConversionPanel mode="pdf-images" files={batchFiles} initialOptions={{ imageFormat: format, dpi, pageRange }} onClose={() => setBatchFiles(undefined)} />;
   return (
     <>
+      <PdfHandoffRecovery handoff={handoff} onSelect={() => intakeRoot.current?.querySelector<HTMLInputElement>('input[type="file"]')?.click()} />
       <div className="pdf-workflow-grid grid grid-cols-[minmax(0,1fr)_290px] items-start gap-4 max-[820px]:grid-cols-1">
-        <div>
+        <div ref={intakeRoot}>
           <SectionCard step={1} title={featureMessage(language, "pdf.messages.PdfImagePanel.chooseAPdf")} description={featureMessage(language, "pdf.messages.PdfImagePanel.convertEveryPageToAHighResolutionPng")} className="">
-            <FileDropZone accept=".pdf,application/pdf" multiple files={file ? [file] : []} disabled={loading || operation.status === "running"} onFiles={setInput} accent="violet" hint={language === "ko" ? "여러 PDF를 한 번에 선택할 수 있습니다." : "Choose one or more PDFs."} />
-            {file && <FileList files={[file]} accent="violet" onRemove={() => { active.current?.abort(); operation.reset(); void releasePdf(file); setFile(null); setPageCount(0); download.clearResult(); }} />}
+            <FileDropZone accept=".pdf,application/pdf" multiple files={file ? [file] : []} disabled={loading || operation.status === "running"} onFiles={files => { if (handoff.notReceived) handoff.dismiss(); void setInput(files); }} accent="violet" hint={language === "ko" ? "여러 PDF를 한 번에 선택할 수 있습니다." : "Choose one or more PDFs."} />
+            {file && <FileList files={[file]} accent="violet" onRemove={() => { active.current?.abort(); operation.reset(); void releasePdf(file); setFile(null); setPageCount(0); setPageImages(undefined); setChosen(new Set()); download.clearResult(); }} />}
           </SectionCard>
           {!!file && <SectionCard step={2} title={featureMessage(language, "pdf.messages.PdfImagePanel.pagePreview")} description={featureMessage(language, "pdf.messages.PdfImagePanel.everyPageIsConvertedWithTheSameFormat")} className="overflow-visible "><div className="pdf-page-grid grid max-h-[610px] grid-cols-[repeat(auto-fill,minmax(145px,1fr))] gap-3 overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable] max-[620px]:max-h-[520px] max-[620px]:grid-cols-2" data-density="compact">{previewItems.map((item, index) => <PdfThumbnail key={`${file.name}-${file.size}-${file.lastModified}-${item.id}`} item={item} file={file} outputIndex={index} totalItems={previewItems.length} draggable={false} />)}</div></SectionCard>}
         </div>
@@ -230,6 +336,10 @@ function PdfToImages() {
       </div>
       <PdfError message={error} />
       {download.result && <PdfDownloadCard result={download.result} />}
+      {pageImages && <SectionCard title={t("sendTo.selectPages")}>
+        <p>{t("sendTo.limit")}</p><div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="pdf-image-result-grid">{pageImages.names.map((name, index) => <div key={name} className="min-w-0 rounded-xl border border-border p-2"><label className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={chosen.has(index)} onChange={event => setChosen(current => { const next = new Set(current); if (event.target.checked) next.add(index); else next.delete(index); return next; })} /> {t("sendTo.page", { page: pageImages.pages[index] + 1 })}</label>{file && <PdfThumbnail item={{ id: `generated-${index}`, sourceId: "generated", sourceName: file.name, sourcePageIndex: pageImages.pages[index], rotation: 0 }} file={file} outputIndex={index} totalItems={pageImages.names.length} draggable={false} />}<span className="block truncate text-xs">{name}</span></div>)}</div>
+        <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="pdf-images-send-to-studio" disabled={!chosen.size || chosen.size > 50 || sending} onClick={() => void sendImages()}>{t(sender.reason ? "sendTo.retry" : chosen.size > 1 ? "sendTo.editImages" : "sendTo.editImage")}</Button>{sender.reason && <p role="alert">{t("sendTo.failed")}</p>}
+      </SectionCard>}
     </>
   );
 }

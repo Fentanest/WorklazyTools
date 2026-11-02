@@ -9,23 +9,13 @@ import { normalizeToolsSearch, toolFilterValues } from "../app/publicService";
 import { useAppLanguage } from "../i18n/routing";
 import { trackToolOpen } from "../components/AnalyticsLoader";
 import { PrivacyBanner } from "../components/PrivacyBanner";
-import { ToolCard } from "../components/ToolCard";
+import { FavoriteToolButton, ToolCard } from "../components/ToolCard";
 import { getToolIconTone } from "../components/toolAccentStyles";
 import { PageHeader } from "../components/ui";
 import { useToolCatalog } from "../i18n/useToolCatalog";
 import { cn } from "../lib/utils";
 
 type CategoryFilter = "all" | ToolCategoryId;
-// These are topic filters, not another accepted-file contract or receiver list.
-const fromToolIds: Record<string, readonly string[]> = {
-  pdf: ["pdf-editor", "pdf-converter", "pdf-compare", "document-redactor", "document-markdown"],
-  image: ["image-studio", "image-privacy", "image-compare", "document-redactor", "pdf-converter", "qr-studio"],
-  spreadsheet: ["excel-merger", "excel-cleaner", "excel-compare", "data-converter", "document-generator", "document-markdown", "office-editor", "product-banner", "qr-studio"],
-  document: ["document-compare", "document-generator", "document-markdown", "office-editor", "pdf-converter", "hwp-editor"],
-  hwp: ["hwp-editor", "document-compare", "pdf-converter"],
-  text: ["text-compare", "text-merger", "text-tools", "text-formatter", "data-converter", "qr-studio"],
-  audio: ["audio-studio"],
-};
 
 export function ToolsPage() {
   const { t } = useTranslation(["tools", "common"]);
@@ -69,7 +59,7 @@ export function ToolsPage() {
     .filter((category) => activeCategory === "all" || category.id === activeCategory)
     .map((category) => ({
       category,
-      tools: matchTools(tools.filter((tool) => tool.category === category.id && (!from || fromToolIds[from]?.includes(tool.id)) && (!action || tool.actions.includes(action as typeof tool.actions[number]))).map((tool) => ({
+      tools: matchTools(tools.filter((tool) => tool.category === category.id && (!from || tool.inputTopics.some(topic => topic === from)) && (!action || tool.actions.includes(action as typeof tool.actions[number]))).map((tool) => ({
         ...tool,
         categoryLabel: category.label,
         categoryShortLabel: category.shortLabel,
@@ -144,7 +134,7 @@ export function ToolsPage() {
               <div className={view === "list" ? "tool-list" : "tool-grid all-tools-grid"} data-testid="tool-results" data-view={view}>
                 {categoryTools.map((tool) => {
                   const Icon = tool.icon;
-                  return view === "grid" ? <ToolCard key={tool.id} tool={tool} /> : <Link key={tool.id} to={tool.path} className="tool-list-row" data-ui-component="tool-card" onClick={() => trackToolOpen(tool.id, "tools_card", language)}><span className="tool-list-icon tone-icon-badge" data-icon-tone={getToolIconTone(tool.id)}><Icon size={22} aria-hidden="true" /></span><span><h3>{tool.title}</h3><p data-testid="tool-tagline">{tool.tagline}</p></span><ArrowRight size={18} aria-hidden="true" /></Link>;
+                  return view === "grid" ? <ToolCard key={tool.id} tool={tool} headingLevel={3} /> : <div key={tool.id} className="relative"><Link to={tool.path} className="tool-list-row tool-list-row-with-favorite" data-ui-component="tool-card" onClick={() => trackToolOpen(tool.id, "tools_card", language)}><span className="tool-list-icon tone-icon-badge" data-icon-tone={getToolIconTone(tool.id)}><Icon size={22} aria-hidden="true" /></span><span><h3>{tool.title}</h3><p data-testid="tool-tagline">{tool.tagline}</p></span><ArrowRight size={18} aria-hidden="true" /></Link><FavoriteToolButton tool={tool} list /></div>;
                 })}
               </div>
             </section>

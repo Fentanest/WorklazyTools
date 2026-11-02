@@ -1,3 +1,4 @@
+import { personalization, usePersonalization } from "../app/personalization";
 import { FileLock2, Globe2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { clearRecipes } from "../features/excel-cleaner/recipeStore";
@@ -11,6 +12,7 @@ interface PolicySection { title: string; paragraphs: string[]; items?: string[] 
 export function PrivacyPage() {
   const { t } = useTranslation("pages");
   const [clearStatus, setClearStatus] = useState<"ok" | "storage">();
+  const personal = usePersonalization();
   const sections = t("privacy.sections", { returnObjects: true }) as PolicySection[];
   return (
     <div className="page standard-page page-enter content-page">
@@ -19,6 +21,11 @@ export function PrivacyPage() {
       <article className="prose-card">
         <p className="policy-date">{t("privacy.date")}</p>
         {sections.map((section) => <section key={section.title}><h2>{section.title}</h2>{section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}{section.items && <ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul>}</section>)}
+        <section data-testid="privacy-personalization">
+          <h2>{t("privacy.personalizationControls")}</h2>
+          <div className="flex flex-wrap gap-2">{(["recent", "favorites"] as const).map(kind => <Button key={kind} type="button" variant="outline" disabled={!personal[`${kind}Enabled`] || !personal[kind].length} onClick={() => personalization.clear(kind)}>{t(`privacy.clear${kind === "recent" ? "Recent" : "Favorites"}`)}</Button>)}</div>
+          {(!personal.recentEnabled || !personal.favoritesEnabled) && <p role="status">{t("privacy.personalizationUnavailable")}</p>}
+        </section>
         <section data-testid="privacy-cleaner-recipes">
           <h2>{t("privacy.cleanerRecipes.title")}</h2>
           <p>{t("privacy.cleanerRecipes.description")}</p>

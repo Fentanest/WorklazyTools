@@ -1,7 +1,8 @@
+import { downloadRetainedPdf } from "./retainedPdfDownload";
 import type { PdfOrganizePreset } from "./pdfOrganizeDirect";
 import type { PdfConvertPreset } from "./pdfConvertDirect";
 import { BadgeCheck, Layers3 } from "lucide-react";
-import { Component, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Component, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 import { PrivacyBanner } from "../../components/PrivacyBanner";
@@ -333,10 +334,6 @@ function OrganizeHandoffHost({ organizePreset }: { organizePreset?: PdfOrganizeP
     });
   }, [language, navigate, requestGuardedNavigate]);
 
-  const retainedUrl = useMemo(() => (retained ? URL.createObjectURL(retained.blob) : null), [retained]);
-  useEffect(() => () => {
-    if (retainedUrl) URL.revokeObjectURL(retainedUrl);
-  }, [retainedUrl]);
 
   return (
     <>
@@ -349,20 +346,19 @@ function OrganizeHandoffHost({ organizePreset }: { organizePreset?: PdfOrganizeP
         onResultSaved={handleSaved}
         onHandoffRequest={requestHandoff}
       />
-      {retained && retainedUrl && (
+      {retained && (
         <section className="mt-4 rounded-2xl border border-border bg-card p-4" data-testid="pdf-retained-result" aria-live="polite">
           <strong className="text-sm text-foreground">{featureMessage(language, "pdf.messages.PdfEditorPage.retainedResultTitle")}</strong>
           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{retained.name}</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <a
+            <button
               className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground"
-              href={retainedUrl}
-              download={retained.name}
+              type="button"
               data-testid="pdf-retained-download"
-              onClick={handleSaved}
+              onClick={() => { downloadRetainedPdf(retained.blob, retained.name); handleSaved(); }}
             >
               {featureMessage(language, "pdf.messages.PdfEditorPage.retainedDownload")}
-            </a>
+            </button>
             {retained.outputMode === "merged" ? (
               <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs font-bold" data-testid="pdf-retained-send-to-finish" onClick={requestHandoff}>
                 {featureMessage(language, "pdf.messages.PdfEditorPage.sendToFinish")}
@@ -683,13 +679,6 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
   }, [language]);
 
   const slot = handoffSlot;
-  // F2: key the object URL on the blob itself so guard-only re-renders
-  // (e.g. marking saved) never revoke the in-flight download URL.
-  const slotBlob = slot ? slot.blob : null;
-  const slotUrl = useMemo(() => (slotBlob ? URL.createObjectURL(slotBlob) : null), [slotBlob]);
-  useEffect(() => () => {
-    if (slotUrl) URL.revokeObjectURL(slotUrl);
-  }, [slotUrl]);
   const isSuggestion = adoptKind === "suggest" && !!slot && !intake && failedAttempt === null && !timedOut;
   const showChip = !!slot && (failedAttempt !== null || timedOut || isSuggestion || reloadRequired);
   const chipFailed = failedAttempt !== null || timedOut;
@@ -722,16 +711,15 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
                 </Button>
               )
             )}
-            {slotUrl && (
-              <a
+            {slot && (
+              <button
                 className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground"
-                href={slotUrl}
-                download={slot.name}
+                type="button"
                 data-testid="pdf-handoff-download"
-                onClick={markHandoffSaved}
+                onClick={() => { downloadRetainedPdf(slot.blob, slot.name); markHandoffSaved(); }}
               >
                 {featureMessage(language, "pdf.messages.PdfEditorPage.retainedDownload")}
-              </a>
+              </button>
             )}
             <Button type="button" variant="ghost" className="min-h-10 rounded-xl text-xs font-bold text-destructive" data-testid="pdf-handoff-discard" onClick={discardSlot}>
               {featureMessage(language, "pdf.messages.PdfEditorPage.discardResult")}
@@ -742,7 +730,7 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
       <FinishLoadBoundary
         key={boundaryKey}
         language={language}
-        downloadHref={slotUrl}
+        downloadBlob={slot?.blob}
         downloadName={slot?.name}
         onDownloaded={handleBoundaryDownloaded}
         onRetry={retryFinishLoad}
@@ -770,7 +758,7 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
  */
 class FinishLoadBoundary extends Component<{
   language: ReturnType<typeof useAppLanguage>;
-  downloadHref?: string | null;
+  downloadBlob?: Blob;
   downloadName?: string;
   onDownloaded?: () => void;
   onRetry: () => void;
@@ -789,16 +777,18 @@ class FinishLoadBoundary extends Component<{
       <section className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4" data-testid="pdf-finish-load-failure" role="alert">
         <strong className="text-sm text-foreground">{featureMessage(language, "pdf.messages.PdfEditorPage.finishLoadFailed")}</strong>
         <div className="mt-3 flex flex-wrap gap-2">
-          {this.props.downloadHref && (
-            <a
+          {this.props.downloadBlob && (
+            <button
               className="inline-flex min-h-10 items-center justify-center rounded-xl bg-primary px-3 text-xs font-bold text-primary-foreground"
-              href={this.props.downloadHref}
-              download={this.props.downloadName}
+              type="button"
               data-testid="pdf-finish-load-download"
-              onClick={() => this.props.onDownloaded?.()}
+              onClick={() => {
+                downloadRetainedPdf(this.props.downloadBlob!, this.props.downloadName ?? "result.pdf");
+                this.props.onDownloaded?.();
+              }}
             >
               {featureMessage(language, "pdf.messages.PdfEditorPage.retainedDownload")}
-            </a>
+            </button>
           )}
           <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs font-bold" data-testid="pdf-finish-load-retry" onClick={() => {
             this.setState({ failed: false });

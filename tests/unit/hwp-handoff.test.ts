@@ -13,7 +13,7 @@ const deferred = <T,>() => { let resolve!: (value:T)=>void; const promise=new Pr
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
 const file=()=>new File(["synthetic"],"input.HWP");
 const entry=(input:File):HandoffEntry=>({files:[input],receiverId:"hwp-editor",entryPath:"/tools/hwp-editor",origin:"user-input",source:"unit",schema:1,id:"id",nonce:"nonce",createdAt:0,expiresAt:60000});
-async function fixture(run:(f:{adapter:()=>HandoffAdapter; select:(files:File[])=>void; editors:any[]; dom:JSDOM; protected:()=>boolean; unmount:()=>Promise<void>; ready:ReturnType<typeof deferred<void>>; load:ReturnType<typeof deferred<void>>; hml:ReturnType<typeof deferred<void>>})=>Promise<void>,block:"ready"|"load"|"hml"|"fail") {
+async function fixture(run:(f:{adapter:()=>HandoffAdapter; select:(files:File[])=>void; editors:any[]; dom:JSDOM; protected:()=>boolean; unmount:()=>Promise<void>; ready:ReturnType<typeof deferred<void>>; load:ReturnType<typeof deferred<void>>; hml:ReturnType<typeof deferred<void>>})=>Promise<void>,block:"ready"|"load"|"hml"|"fail"|"none") {
  const dom=new JSDOM("<div id='root'></div>",{url:"https://example.test/en/tools/hwp-editor"});
  const saved=new Map(["window","document","IS_REACT_ACT_ENVIRONMENT"].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  for(const [key,value] of Object.entries({window:dom.window,document:dom.window.document,IS_REACT_ACT_ENVIRONMENT:true}))Object.defineProperty(globalThis,key,{configurable:true,value});
@@ -91,3 +91,29 @@ test('HWP unmount invalidates pending initialization before load/protection',asy
  await f.unmount();f.ready.resolve();const result=await receiving;
  assert.equal(result.accepted.length,0);assert.equal(f.editors[0].calls,0);assert.equal(f.editors[0].destroyed,true);assert.equal(f.protected(),false);
 },'ready'));
+
+test('P3b HWP incoming handoff preserves a manually opened document',async()=>fixture(async f=>{
+ await React.act(async()=>{f.select([new File(['manual'],'manual.hwpx')]);await tick();});
+ assert.match(f.dom.window.document.body.textContent!,/manual.hwpx/);
+ const before=f.editors[0].calls;let result!:DeliveryResult;
+ await React.act(async()=>{result=await f.adapter().receive(entry(file()),{signal:new AbortController().signal});});
+ assert.equal(result.status,'rejected');assert.equal(result.rejected[0].reasonCode,'busy');
+ assert.equal(f.editors[0].calls,before);assert.equal(f.editors[0].destroyed,false);
+ assert.match(f.dom.window.document.body.textContent!,/manual.hwpx/);
+},'none'));
+test('P3b HWP successful handoff cannot be closed by a late same-generation invalidate',async()=>fixture(async f=>{
+ let result!:DeliveryResult;const input=file();const old=f.adapter();
+ await React.act(async()=>{result=await old.receive(entry(input),{signal:new AbortController().signal});});
+ assert.equal(result.status,'accepted');
+ await React.act(async()=>{old.invalidate!();await tick();});
+ assert.equal(f.editors[0].destroyed,false);assert.equal(f.editors.length,1);
+ assert.ok(f.dom.window.document.querySelector('[data-testid=hwp-focus-document]'));
+},'none'));
+test('P3b HWP second handoff cannot cancel an already pending manual open',async()=>fixture(async f=>{
+ await React.act(async()=>{f.select([new File(['manual'],'manual.hwpx')]);await tick();});
+ const old=f.adapter();let result!:DeliveryResult;
+ await React.act(async()=>{result=await old.receive(entry(file()),{signal:new AbortController().signal});await tick();});
+ assert.equal(result.status,'rejected');assert.equal(result.rejected[0].reasonCode,'busy');assert.equal(f.editors[0].destroyed,false);
+ await React.act(async()=>{f.load.resolve();await tick();});
+ assert.match(f.dom.window.document.body.textContent!,/manual.hwpx/);
+},'load'));

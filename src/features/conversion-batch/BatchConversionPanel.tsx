@@ -6,6 +6,7 @@ import { useUnsavedWorkGuard } from "../../app/toolState";
 import { UtilityInput, UtilityNotice, UtilitySelect } from "../../components/UtilitySurface";
 import { FileDropZone, PrimaryButton, SectionCard, formatBytes } from "../../components/ui";
 import { Button } from "../../components/ui/button";
+import { featureMessage } from "../../i18n/featureMessages";
 import { useAppLanguage } from "../../i18n/routing";
 import { createZipArchiveBlob } from "../../utils/zipArchive";
 import { HwpPdfPanel } from "../pdf-converter/HwpPdfPanel";
@@ -18,7 +19,7 @@ import { releaseStirlingDocumentSession } from "../pdf-editor/stirlingDocumentCl
 
 function releasePdfDocumentSessions() { releaseBentoPdfSession(); void releasePdfOcrSession(); releaseStirlingDocumentSession(); }
 
-export function BatchConversionPanel({ mode, files, initialOptions, onFilesChange, onClose }: { mode: BatchMode; files: File[]; initialOptions?: Partial<BatchOptions>; onFilesChange?: (files: File[]) => void; onClose: () => void }) {
+export function BatchConversionPanel({ mode, files, initialOptions, onFilesChange, onClose, needsReload = false, onNeedsReload }: { mode: BatchMode; files: File[]; initialOptions?: Partial<BatchOptions>; onFilesChange?: (files: File[]) => void; onClose: () => void; needsReload?: boolean; onNeedsReload?: () => void }) {
   const language = useAppLanguage();
   const location = useLocation();
   const L = (ko: string, en: string) => language === "en" ? en : ko;
@@ -45,6 +46,7 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
   useEffect(() => () => { if (zipUrl) URL.revokeObjectURL(zipUrl); }, [zipUrl]);
   useUnsavedWorkGuard(`conversion-batch-${mode}`, items.some(item => !item.saved), { kind: "files", scopePath: stripLanguagePrefix(location.pathname).replace(/\/$/, "") });
   const busy = Boolean(queue?.running || zipBusy || printing !== undefined);
+  const reloadRequired = mode === "document-pdf" && (needsReload || items.some(item => item.error === "reload-required"));
   const selectedPrint = items.find(item => item.id === printing);
   const status: Record<BatchStatus, string> = {
     pending: L("대기", "Queued"), running: L("변환 중", "Converting"), success: L("변환 완료", "Converted"), failed: L("실패", "Failed"), cancelled: L("취소됨", "Cancelled"),
@@ -63,10 +65,27 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
     "scan-table-unavailable": L("OCR로 글자를 인식했지만 표 셀은 찾지 못했습니다. DOCX·TXT로 인식 결과를 확인해 주세요.", "OCR recognized text but found no reliable table cells. Review the result as DOCX or TXT."),
     "image-decode": L("PDF의 그림을 읽지 못해 이 파일 변환을 중단했습니다. 원본 파일을 확인해 주세요.", "An image in this PDF could not be decoded. Check the source file and retry."),
     unavailable: L("변환 준비를 완료하지 못했습니다. 연결 상태와 데스크톱 브라우저를 확인해 주세요.", "Conversion could not be prepared. Check your connection and use a current desktop browser."),
+    "reload-required": featureMessage(language, "documentPdf.timeout"),
     timeout: L("변환 시간이 초과됐습니다. 더 작은 파일로 다시 시도해 주세요.", "Conversion timed out. Retry with a smaller file."),
     conversion: L("변환하지 못했습니다. 파일 형식·손상·암호 여부를 확인한 뒤 다시 시도해 주세요.", "Conversion failed. Check the file format, damage or password protection, then retry."),
   };
   const update = <K extends keyof BatchOptions>(key: K, value: BatchOptions[K]) => setOptions(current => ({ ...current, [key]: value }));
+  const run = async () => {
+    if (busy || reloadRequired) return;
+    const process = batchProcessor(mode, { ...options }, language);
+    try {
+      await queue?.run(async (file, signal, progress) => {
+        try { return await process(file, signal, progress); }
+        catch (error) {
+          if (!signal.aborted && error instanceof Error && "code" in error && error.code === "reload-required") onNeedsReload?.();
+          throw error;
+        }
+      });
+    } finally {
+      if (mode === "document-pdf") releaseOfficePdfSession();
+      if (mode === "pdf-document") releasePdfDocumentSessions();
+    }
+  };
   const buildZip = async () => {
     if (busy || !outputs.length) return;
     const controller = new AbortController(); zipTask.current = controller;
@@ -79,8 +98,8 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
   };
   return <div data-testid="conversion-batch" className="space-y-4">
     <SectionCard step={1} title={L("여러 파일 변환", "Convert multiple files")} description={L("파일별로 순서대로 처리합니다. 한 파일이 실패해도 다음 파일은 계속합니다.", "Files are processed one at a time. A failed file does not stop the next file.")}>
-      <FileDropZone multiple files={[]} disabled={busy} accent="coral" accept={mode === "document-pdf" ? ".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" : mode === "markdown" ? ".docx,.xlsx,.xls,.pptx,.pdf" : ".pdf"}
-        onFiles={added => setAdmissionError(!(queue?.add(added) ?? false))} hint={L("최대 20개 · 파일당 50 MiB · 입력 합계 200 MiB", "Up to 20 files · 50 MiB each · 200 MiB total input")} />
+      <FileDropZone multiple files={[]} disabled={busy || reloadRequired} accent="coral" accept={mode === "document-pdf" ? ".hwp,.hwpx,.doc,.docx,.xls,.xlsx,.ppt,.pptx" : mode === "markdown" ? ".docx,.xlsx,.xls,.pptx,.pdf" : ".pdf"}
+        onFiles={added => { if (!reloadRequired) setAdmissionError(!(queue?.add(added) ?? false)); }} hint={L("최대 20개 · 파일당 50 MiB · 입력 합계 200 MiB", "Up to 20 files · 50 MiB each · 200 MiB total input")} />
       {admissionError && <UtilityNotice kind="error" role="alert" className="mt-3">{L("선택한 묶음이 파일 수 또는 합계 용량 제한을 넘어서 추가되지 않았습니다. 더 작은 묶음을 선택하세요.", "The selected group was not added because it exceeds the file count or total size limit. Choose a smaller group.")}</UtilityNotice>}
     </SectionCard>
     <UtilityNotice kind="info">{L("변환 결과는 합계 128 MiB까지 보관하고, 전체 ZIP은 결과 합계 64 MiB까지 만듭니다. 변환 중 메모리는 파일 용량보다 커질 수 있습니다. 큰 문서는 작은 묶음으로 처리하세요.", "Up to 128 MiB of results are retained. A combined ZIP is available for results totaling up to 64 MiB. Conversion may use much more memory than the input size. Process large documents in smaller groups.")}</UtilityNotice>
@@ -104,24 +123,27 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
       </fieldset>
     </SectionCard>}
     <div className="flex flex-wrap gap-2">
-      <PrimaryButton accent="coral" disabled={busy || !items.some(item => item.status === "pending")} onClick={() => { void (async () => { try { await queue?.run(batchProcessor(mode, { ...options }, language)); } finally { if (mode === "document-pdf") releaseOfficePdfSession(); if (mode === "pdf-document") releasePdfDocumentSessions(); } })(); }}>{L("대기 파일 변환", "Convert queued files")}</PrimaryButton>
+      {reloadRequired
+        ? <PrimaryButton accent="coral" onClick={() => window.location.reload()}>{featureMessage(language, "documentPdf.reload")}</PrimaryButton>
+        : <PrimaryButton accent="coral" disabled={busy || !items.some(item => item.status === "pending")} onClick={() => void run()}>{L("대기 파일 변환", "Convert queued files")}</PrimaryButton>}
       {queue?.running && <Button variant="outline" onClick={() => queue.cancelAll()}><X size={16} />{L("남은 변환 모두 취소", "Cancel all remaining")}</Button>}
       {!items.length && <Button variant="outline" onClick={onClose}>{L("단일 파일 화면", "Single-file view")}</Button>}
     </div>
+    {reloadRequired && <UtilityNotice kind="error" role="alert">{featureMessage(language, "documentPdf.timeout")}</UtilityNotice>}
     <ul className="space-y-3" aria-label={L("변환 목록", "Conversion queue")}>
       {items.map(item => <li key={item.id} data-testid="batch-row" data-state={item.status} className="rounded-2xl border border-border bg-card p-4">
         <div className="flex flex-wrap items-center justify-between gap-2"><strong className="min-w-0 break-all text-sm">{item.file.name}</strong><span className="text-sm text-muted-foreground">{formatBytes(item.file.size)}</span></div>
         <p role="status" className="my-2 text-sm">{status[item.status]}{item.status === "running" ? ` · ${item.progress}%` : ""}</p>
         {item.status === "running" && <progress aria-label={L("파일 변환 진행률", "File conversion progress")} className="w-full accent-primary" max={100} value={item.progress} />}
-        {item.error && <UtilityNotice kind="error" role="alert" className="my-2">{errors[item.error]}</UtilityNotice>}
+        {item.error && item.error !== "reload-required" && <UtilityNotice kind="error" role="alert" className="my-2">{errors[item.error]}</UtilityNotice>}
         {Boolean(item.output?.warningCount) && <div className="my-2 text-sm">{item.output?.warningLanguage === language && item.output.warnings?.length
           ? <ul className="list-disc space-y-1 pl-5">{item.output.warnings.slice(0, 8).map((warning, index) => <li key={`${index}-${warning}`}>{warning}</li>)}</ul>
           : <p>{L("추출·OCR 결과에 주의 사항이 있습니다. 원본과 텍스트·이미지·표를 대조하세요.", "Extraction or OCR requires review. Compare text, images and tables with the original.")}</p>}</div>}
         <div className="flex flex-wrap gap-2">
           {item.output && <Button render={<a data-testid="batch-download" href={item.output.url} download={item.output.fileName} onClick={() => queue?.saved(item.id)} />}><Download size={16} /><span className="break-all whitespace-normal">{item.output.fileName}</span></Button>}
           {["pending", "running"].includes(item.status) && <Button variant="outline" onClick={() => queue?.cancel(item.id)}><X size={16} />{L("취소", "Cancel")}</Button>}
-          {["failed", "cancelled", "print-reviewed"].includes(item.status) && <Button variant="outline" disabled={busy} onClick={() => queue?.retry(item.id)}><RotateCcw size={16} />{L("다시 대기", "Queue again")}</Button>}
-          {item.status === "print-needed" && <Button variant="outline" disabled={busy} onClick={() => setPrinting(item.id)}><Printer size={16} />{L("이 문서 인쇄", "Print this document")}</Button>}
+          {["failed", "cancelled", "print-reviewed"].includes(item.status) && <Button variant="outline" disabled={busy || reloadRequired} onClick={() => { if (!reloadRequired) queue?.retry(item.id); }}><RotateCcw size={16} />{L("다시 대기", "Queue again")}</Button>}
+          {item.status === "print-needed" && <Button variant="outline" disabled={busy || reloadRequired} onClick={() => setPrinting(item.id)}><Printer size={16} />{L("이 문서 인쇄", "Print this document")}</Button>}
           <Button variant="outline" disabled={busy} onClick={() => queue?.remove(item.id)} aria-label={L(`${item.file.name} 제거`, `Remove ${item.file.name}`)}><Trash2 size={16} />{L("제거", "Remove")}</Button>
         </div>
       </li>)}

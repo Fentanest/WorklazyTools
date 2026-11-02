@@ -26,6 +26,7 @@ export function DocumentRedactorPage() {
   const language=useAppLanguage(); const c=(resources[language].features.documentRedactor as Copy);
   const [ready,setReady]=useState(false); const [fatal,setFatal]=useState(false); const [imageEnabled,setImageEnabled]=useState(false); const client=useRef<RedactorClient|undefined>(undefined);
   const intakeGeneration=useRef(0); const preparingTask=useRef<Promise<RedactorClient> | undefined>(undefined);
+  const activeSelections=useRef(0);
   const mounted=useRef(true); const urls=useRef(new Set<string>()); const lease=useRef<PreviewLease|undefined>(undefined); const previewToken=useRef(0); const previewSettled=useRef<Promise<void>>(Promise.resolve());
   const [files,setFiles]=useState<File[]>([]); const [inputs,setInputs]=useState<InputInfo[]>([]); const [failures,setFailures]=useState<Failure[]>([]);
   const [histories,setHistories]=useState<Record<string,MaskHistory>>({}); const [fileId,setFileId]=useState(''); const [pageIndex,setPageIndex]=useState(0);
@@ -65,19 +66,24 @@ export function DocumentRedactorPage() {
 
   const releaseAllResults=useCallback(()=>{const value=client.current; Object.values(resultsRef.current).forEach(result=>{revoke(result.url);try{value?.releaseResult(result.info.id)}catch{}}); resultsRef.current={};setResults({});revokeZip();},[revoke,revokeZip]);
   const replaceInputs=useCallback(async(next:File[], context?: IntakeContext): Promise<File[]> => {
+    if(running||selecting)return [];
     const generation=++intakeGeneration.current;
+    let ownsSelection=false;
     const active=()=>mounted.current && generation===intakeGeneration.current && !context?.signal.aborted;
     try {
       const value=context ? await preparingTask.current : client.current;
-      if(!value||!active()||running||selecting)return [];
-      setSelecting(true);setNotice('');setJobFailures([]);
+      if(!value||!active())return [];
+      ownsSelection=true;activeSelections.current++;setSelecting(true);setNotice('');setJobFailures([]);
       const selection=await value.setInputs(next);
       if(!active())return [];
       releaseAllResults(); const accepted=selection.inputs.map(info=>next[info.index]); setFiles(accepted);setInputs(selection.inputs);setFailures(selection.failures);
       setHistories(old=>Object.fromEntries(selection.inputs.map(info=>[info.id,old[info.id]??emptyMaskHistory()])));setFileId(old=>selection.inputs.some(info=>info.id===old)?old:selection.inputs[0]?.id??'');
       if(!selection.inputs.some(info=>info.id===fileId)){setPageIndex(0);setSelectedMask(-1);}setConfirmed(false);setResultMode(false);
       return accepted;
-    }catch(error){if(active())setNotice(c.errors[safeError(error).code]);return [];}finally{if(active())setSelecting(false);}
+    }catch(error){if(active())setNotice(c.errors[safeError(error).code]);return [];}finally{
+      // Selection lifetime outlasts intake generations, including a newer intake's abort.
+      if(ownsSelection&&--activeSelections.current===0&&mounted.current)setSelecting(false);
+    }
   },[c,releaseAllResults,running,selecting,fileId]);
   const handoff=usePersistentHandoffReceiver("document-redactor", {
     kind:"inspection",

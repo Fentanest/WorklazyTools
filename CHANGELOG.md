@@ -1,5 +1,7 @@
 # CHANGELOG
 
+- 무헤더 정적 호스트의 XLS 보존 페이지에서 XLSX 검사·병합 worker가 차단되던 문제를 수정했다. 격리 문서에서는 동일 출처 모듈을 Blob worker에서 시작하고, 종료·오류·취소 때 자원을 해제한다(미배포·정식 검수 대기). — Codx
+
 - 거래 달력의 사이트 반영이 FolioTrace 수집 중단에 묶이지 않도록 매일 07:30 KST 독립 배포 예약을 추가했다. 소유자 결정으로 정상일(10/19–10/28) 데이터 반영 06:20–06:41 뒤 약 50분 여유를 두고 08:31 FolioTrace 실행과 간격을 확보한다. 기존 변수 게이트·최신 main 검사·Pages 동시성·명시 dispatch 모드를 유지한다(미배포). — Codx
 
 - FolioTrace 옛 서버 수집 파이프라인 삭제(P4): `pipeline/foliotrace/`, `scripts/foliotrace/`, `tests/foliotrace/` 41개 파일과 `npm run test:foliotrace`를 제거했다. 수집·판독·평가·게시는 `foliotrace-pipeline` 저장소가 맡고 사이트는 공개 JSON만 읽는다. 저장소 소유자가 `foliotrace-data` 브랜치와 Actions 시크릿 `DART_API_KEY`를 삭제해야 한다(미배포). — Claude(Sonnet)

@@ -9,7 +9,7 @@ import { JSDOM } from "jsdom";
 import * as handoff from "../../src/app/memoryHandoff.ts";
 import { isAutoReloadHeld } from "../../src/app/chunkRecovery.ts";
 import { acceptsFile, fileAccepts, type HandoffReceiverDefinition } from "../../src/app/fileAccepts.ts";
-import { clearUnsavedWork, hasUnsavedWork } from "../../src/app/toolState.ts";
+import { clearUnsavedWork, hasUnsavedWork, subscribeUnsavedWork } from "../../src/app/toolState.ts";
 import { claimHandoff, stageHandoff, deliverHandoff, closeDelivery, retainDelivery, cancelStagedHandoff,
   clearRecovery, getRecovery, transferToRecovery, deferErrorNavigation, purgeExpiredHandoffs, reconcileHandoffLocation,
   selectHandoffFiles, validateHandoff, MAX_HANDOFF_TEXT_BYTES, type HandoffInput, type DeliveryResult } from "../../src/app/memoryHandoff.ts";
@@ -454,8 +454,8 @@ test("U5a rejected text hook retains raw text locally until dismiss; route clean
   });
 });
 
-test("U5a all thirteen file receiver definitions remain file-only and their file paths/tabs validate", () => {
-  assert.equal(Object.keys(fileAccepts).length, 13);
+test("registered file receiver definitions remain file-only and their file paths/tabs validate", () => {
+  assert.equal(Object.keys(fileAccepts).length, 16);
   for (const [id, definition] of Object.entries(fileAccepts)) {
     assert.equal((definition as HandoffReceiverDefinition).payload, undefined);
     const files = id === "document-generator" ? [new File([], "template.docx"), new File([], "data.csv")] : [new File([], `input.${definition.extensions[0]}`)];
@@ -504,4 +504,65 @@ test("U5a bfcache age purge preserves claimed generated text through the same re
     assert.equal(await getRecovery()!.files[0].text(), "bfcache-private");
     assert.equal(isAutoReloadHeld(), true); clearRecovery(); assert.equal(isAutoReloadHeld(), false);
   });
+});
+
+test("error document navigation is pending before unsaved listeners and survives deferred assign", () => {
+  clearRecovery(false);
+  stageHandoff(input()); transferToRecovery();
+  const pending = () => (handoff as any).isErrorDocumentNavigationPending?.() ?? false;
+  let duringAssign = false, observedCleanup = false;
+  const unsubscribe = subscribeUnsavedWork(() => { if (!hasUnsavedWork()) observedCleanup = pending(); });
+  deferErrorNavigation(() => { duringAssign = pending(); }); clearRecovery(); unsubscribe();
+  assert.equal(duringAssign, true); assert.equal(observedCleanup, true); assert.equal(pending(), true);
+  window.location.pathname = "/ko/"; reconcileHandoffLocation(); assert.equal(pending(), false);
+  window.location.pathname = "/ko/tools/pdf-editor";
+});
+test("error document navigation is not pending after route dismissal or a throwing assign", () => {
+  const pending = () => (handoff as any).isErrorDocumentNavigationPending?.() ?? false;
+  stageHandoff(input()); transferToRecovery(); let assigned = false;
+  deferErrorNavigation(() => { assigned = true; }); clearRecovery(false);
+  assert.equal(assigned, false); assert.equal(pending(), false);
+  stageHandoff(input()); transferToRecovery(); deferErrorNavigation(() => { throw new Error("assign blocked"); });
+  assert.throws(() => clearRecovery(), /assign blocked/); assert.equal(pending(), false);
+});
+test("error document navigation prevents the shell sentinel pop; normal cleanup still pops", () => {
+  const source = ts.createSourceFile("AppShell.tsx", readFileSync("src/components/AppShell.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let effect = "";
+  const visit = (node: ts.Node) => {
+    if (ts.isCallExpression(node) && node.expression.getText(source) === "useEffect" && node.arguments[0]?.getText(source).includes("else if (!unsavedActive && guardEntryRef.current)")) effect = node.arguments[0].getText(source);
+    ts.forEachChild(node, visit);
+  }; visit(source); assert.ok(effect);
+  let pending = true, backs = 0;
+  const context = { leavingRef: { current: false }, unsavedActive: false, guardOpen: false, guardEntryRef: { current: true }, guardKeyRef: { current: "old" }, skipPopRef: { current: false }, location: { key: "old" }, window: { history: { back() { backs++; } } }, isErrorDocumentNavigationPending: () => pending };
+  const js = ts.transpileModule(`globalThis.effect=(${effect});`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+  vm.runInNewContext(js, context); (context as any).effect();
+  assert.equal(backs, 0); assert.equal(context.guardEntryRef.current, true);
+  pending = false; (context as any).effect(); assert.equal(backs, 1); assert.equal(context.guardEntryRef.current, false);
+});
+
+for (const trigger of ["purge", "timer", "unmount"] as const) test(`P3b ${trigger} recovery transfers only its generated delivery and leaves the staged slot`, async context => {
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  let retained: handoff.Delivery | undefined, target: handoff.Delivery | undefined, detach: (() => void) | undefined;
+  try { await withTextReceiver(async () => {
+    const make = async (text: string, lifetime: number) => {
+      const token = stageHandoff(textInput(text));
+      const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+      entry.expiresAt = Date.now() + lifetime;
+      const record = deliverHandoff(entry, "/ko/tools/pdf-editor", text, textAdapter(false)); await record.promise;
+      return record;
+    };
+    retained = await make("unexpired", 120000); detach = retainDelivery(retained);
+    target = await make("target", 1000);
+    stageHandoff(textInput("staged"));
+    if (trigger === "purge") purgeExpiredHandoffs(target.entry.expiresAt);
+    else if (trigger === "timer") context.mock.timers.tick(1000);
+    else { const release = retainDelivery(target); release(); context.mock.timers.tick(0); }
+    assert.equal(target.closed, true); assert.equal(retained.closed, false); assert.equal(retained.text, "unexpired");
+    assert.equal(getRecovery()?.files.length, 1); assert.equal(await getRecovery()!.files[0].text(), "target");
+    clearRecovery(false); assert.equal(isAutoReloadHeld(), true, "the other delivery and staging slot still own their holds");
+    transferToRecovery();
+    assert.equal(retained.closed, true); assert.equal(getRecovery()?.files.length, 2);
+    assert.deepEqual((await Promise.all(getRecovery()!.files.map(file => file.text()))).sort(), ["staged", "unexpired"]);
+    clearRecovery(false); assert.equal(isAutoReloadHeld(), false);
+  }); } finally { detach?.(); if (target) closeDelivery(target); if (retained) closeDelivery(retained); clearRecovery(false); context.mock.timers.reset(); }
 });

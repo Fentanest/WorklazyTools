@@ -53,7 +53,7 @@ export async function startRecoveryServer({ root = "dist", port = 0, fault = "",
 }
 
 function contentType(file) {
-  return ({ ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".wasm": "application/wasm", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2" })[path.extname(file)] || "application/octet-stream";
+  return ({ ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".wasm": "application/wasm", ".svg": "image/svg+xml", ".png": "image/png", ".woff2": "font/woff2" })[path.extname(file)] || "application/octet-stream";
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

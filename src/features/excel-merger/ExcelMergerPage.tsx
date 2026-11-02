@@ -95,6 +95,7 @@ export function ExcelMergerPage() {
   const standardPath = useLocalizedPath("/tools/excel-merger/");
   const preservePath = useLocalizedPath("/tools/excel-merger/xls-preserve/");
   const [entries, setEntries] = useState<ExcelFileEntry[]>([]);
+  const handoffRollback = useRef<{ generation: number; signal: AbortSignal; ids: Set<string> } | null>(null);
   const [mergeMode, setMergeMode] = useState<MergeMode>("sheets");
   const [xlsxFormulas, setXlsxFormulas] = useState(true);
   const [xlsxFormatting, setXlsxFormatting] = useState(true);
@@ -156,9 +157,9 @@ export function ExcelMergerPage() {
   const visibleFiles = useMemo(() => entries.map((entry) => entry.file), [entries]);
 
   const handleFiles = async (nextFiles: File[], context?: IntakeContext): Promise<File[]> => {
+    if (precisionPreparing) return [];
     const generation = ++intakeGeneration.current;
     const currentIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
-    if (precisionPreparing) return [];
     const accepted: File[] = [];
     const rejected: string[] = [];
     const existingKeys = new Set(entries.map((entry) => fileKey(entry.file)));
@@ -187,9 +188,9 @@ export function ExcelMergerPage() {
       sheetNames: [],
       selectedSheetNames: [],
     }));
+    if (context) handoffRollback.current = { generation, signal: context.signal, ids: new Set(additions.map(item => item.id)) };
     setEntries((current) => [...current, ...additions]);
-    clearResult();
-    setError(null);
+    if (!context) { clearResult(); setError(null); }
 
     const legacyAdditions = preserveLegacyXls
       ? (await Promise.all(additions.map(async (entry) => ({
@@ -198,11 +199,31 @@ export function ExcelMergerPage() {
         })))).filter(({ requiresConversion }) => requiresConversion).map(({ entry }) => entry)
       : [];
     if (!currentIntake()) return [];
-    if (legacyAdditions.length) return await prepareLegacyInputs(additions, legacyAdditions, context, generation);
+    if (legacyAdditions.length) {
+      const preparation = prepareLegacyInputs(additions, legacyAdditions, context, generation);
+      // Handoff must acknowledge inspected files; manual selection releases the
+      // drop zone while the cancellable preparation owns its separate UI lock.
+      if (context) {
+        try {
+          const ready = await preparation;
+          // Unlike ordinary inspection, legacy preparation can set a page-level error.
+          // With no accepted files, retain that error and the previous downloadable result.
+          if (currentIntake() && ready.length) { clearResult(); setError(null); }
+          return ready;
+        } finally {
+          // Completed legacy inspection owns the inputs now; a late invalidate
+          // must not roll them back. Aborted inspections retain their rollback.
+          if (currentIntake() && handoffRollback.current?.generation === generation) handoffRollback.current = null;
+        }
+      }
+      void preparation;
+      return [];
+    }
 
     return await inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
       .then((inspectionResults) => {
         if (!currentIntake()) return [];
+        if (context) { handoffRollback.current = null; clearResult(); setError(null); }
         const byId = new Map(inspectionResults.map((item) => [item.id, item]));
         setEntries((current) => current.map((entry) => {
           const inspectionResult = byId.get(entry.id);
@@ -215,6 +236,7 @@ export function ExcelMergerPage() {
       })
       .catch((inspectionError: Error) => {
         if (!currentIntake()) return [];
+        if (context) handoffRollback.current = null;
         setEntries((current) => current.map((entry) => additions.some((item) => item.id === entry.id)
           ? { ...entry, inspection: "error", error: inspectionError.message }
           : entry));
@@ -503,10 +525,25 @@ export function ExcelMergerPage() {
     });
   };
 
+  const invalidateHandoff = () => {
+    const rollback = handoffRollback.current;
+    if (!rollback?.signal.aborted) return;
+    handoffRollback.current = null;
+    if (rollback.generation === intakeGeneration.current) {
+      intakeGeneration.current++;
+      if (precisionControllerRef.current) {
+        precisionControllerRef.current.abort();
+        setPrecisionPreparing(false);
+        operation.reset();
+      }
+    }
+    setEntries(current => current.filter(item => !rollback.ids.has(item.id)));
+  };
+
   useUnsavedWorkGuard("excel-merger", entries.length > 0 || !!result, { kind: "files", scopePath: "/tools/excel-merger", safePaths: ["/tools/excel-merger", "/tools/excel-merger/xls-preserve"] });
   const memoryHandoff = useHandoffReceiver("excel-merger", {
     kind: "inspection",
-    invalidate: () => { intakeGeneration.current++; setEntries([]); clearResult(); setError(null); },
+    invalidate: invalidateHandoff,
     receive: async (entry, context) => {
       const eligible = entry.files.filter(file => acceptsFile("excel-merger", file)).slice(0, Math.max(0, 50 - entries.length));
       const accepted = await handleFiles(eligible, context);
@@ -517,7 +554,7 @@ export function ExcelMergerPage() {
   });
   const persistentHandoff = usePersistentHandoffReceiver("xls-preserve", {
     kind: "inspection",
-    invalidate: () => { intakeGeneration.current++; precisionControllerRef.current?.abort(); setPrecisionPreparing(false); setEntries([]); clearResult(); setError(null); operation.reset(); },
+    invalidate: invalidateHandoff,
     receive: async (files, context) => {
       const accepted = await handleFiles(files.filter(file => acceptsFile("excel-merger", file)), context);
       if (context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };

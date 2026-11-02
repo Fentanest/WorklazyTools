@@ -1,3 +1,5 @@
+import { useMemoryHandoff } from "../../components/AppShell";
+import type { HandoffInput } from "../../app/memoryHandoff";
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
@@ -268,6 +270,12 @@ interface EditorHistorySnapshot {
 }
 
 function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: { onEditedResult: (file: File) => void; batchCount: number; batchNotice?: "added" | "limit"; active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>; onDirty: (dirty: boolean) => void }) {
+  const sender = useMemoryHandoff();
+  const { t: sendT } = useTranslation("common");
+  const [preparedSend, setPreparedSend] = useState<HandoffInput>();
+  const downloadPrepared = () => {
+    for (const file of preparedSend?.files ?? []) { const url = URL.createObjectURL(file); const anchor = document.createElement("a"); anchor.href = url; anchor.download = file.name; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+  };
   const batchAddLock = useRef(false);
   const batchAddTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [addingToBatch, setAddingToBatch] = useState(false);
@@ -374,7 +382,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (next?.purpose === "watermark") setText(next.text);
   };
   useLayoutEffect(() => { applyDirectPreset(preset); }, [preset]);
-  useLayoutEffect(() => { onDirty(imageDirectDirty({ file, historyLength: historyState.length, emptyReadyHistoryLength: emptyReadyHistoryLength.current ?? historyState.length, regionEffectBusy, stickerBusy, status: loadingImage ? "running" : "idle", result: false, otherTabHasInput: batchCount > 0, otherTabHasResult: false, otherTabRunning: false })); }, [file, historyState.length, regionEffectBusy, stickerBusy, loadingImage, batchCount, onDirty]);
+  useLayoutEffect(() => { onDirty(imageDirectDirty({ file, historyLength: historyState.length, emptyReadyHistoryLength: emptyReadyHistoryLength.current ?? historyState.length, regionEffectBusy, stickerBusy, status: loadingImage ? "running" : "idle", result: !!preparedSend, otherTabHasInput: batchCount > 0, otherTabHasResult: false, otherTabRunning: false })); }, [file, historyState.length, regionEffectBusy, stickerBusy, loadingImage, batchCount, onDirty, preparedSend]);
   useEffect(() => () => { ++intakeGeneration.current; resumeImageGeneration.current += 1; editController.current?.abort(); }, []);
   const updateOutputMultiplier = useCallback((value: number) => {
     const normalized = Math.max(Number.EPSILON, Number.isFinite(value) ? value : 1);
@@ -1711,7 +1719,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const originalExportPlan = getOriginalQualityExportPlan(canvasDimensions, outputMultiplier, EDITOR_EXPORT_MAX_DIMENSION);
   const exportResultDimensions = exportMode === "original" ? originalExportPlan.dimensions : normalizeEditorDimensions(exportDimensions, EDITOR_EXPORT_MAX_DIMENSION);
 
-  const exportImage = (destination: "download" | "batch" = "download") => {
+  const exportImage = (destination: "download" | "batch" | "privacy" | "pdf" = "download") => {
     const instance = canvas.current;
     if (!instance) return;
     if (destination === "batch") {
@@ -1747,9 +1755,15 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
       source.height = 1;
       const actualFormat = dataUrl.startsWith("data:image/png") ? "png" : dataUrl.startsWith("data:image/webp") ? "webp" : "jpeg";
       const fileName = `${file ? stripExtension(file.name) : "worklazy-image"}-${t("image.editor.suffix")}.${actualFormat === "jpeg" ? "jpg" : actualFormat}`;
-      if (destination === "batch") {
+      if (destination !== "download") {
         const bytes = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(",") + 1)), char => char.charCodeAt(0));
-        onEditedResult(new File([bytes], fileName, { type: `image/${actualFormat}` }));
+        const output = new File([bytes], fileName, { type: `image/${actualFormat}` });
+        if (destination === "batch") onEditedResult(output);
+        else {
+          if (destination === "pdf" && actualFormat === "webp") return;
+          const input: HandoffInput = { receiverId: destination === "pdf" ? "image-to-pdf" : "image-privacy", entryPath: destination === "pdf" ? "/tools/pdf-converter/image-to-pdf" : "/tools/image-privacy", files: [output], origin: "generated", source: "image-studio" };
+          setPreparedSend(input); protectImageInput(); sender.send(input);
+        }
       } else {
         const anchor = document.createElement("a");
         anchor.href = dataUrl;
@@ -1929,6 +1943,12 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button type="button" variant="outline" className={cn("min-h-11 rounded-xl", addingToBatch && "opacity-60")} data-testid="image-editor-add-to-batch" aria-disabled={addingToBatch} disabled={loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("batch")}>{t("image.handoff.add", { count: batchCount })}</Button>
         <span role="status" data-testid="image-batch-notice" className="text-sm text-muted-foreground">{batchNotice ? t(`image.handoff.${batchNotice}`, { max: 50 }) : ""}</span>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2" data-testid="image-editor-send-actions">
+        <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-privacy" disabled={loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("privacy")}>{sendT("sendTo.privacy")}</Button>
+        <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-pdf" disabled={format === "webp" || loadingImage || regionEffectBusy || stickerBusy} aria-describedby={format === "webp" ? "image-send-webp-reason" : undefined} onClick={() => exportImage("pdf")}>{sendT("sendTo.imagePdf")}</Button>
+        {format === "webp" && <p id="image-send-webp-reason" className="w-full text-sm text-muted-foreground">{sendT("sendTo.webp")}</p>}
+        {sender.reason && preparedSend && <div role="alert" className="w-full"><p>{sendT("sendTo.failed")}</p><Button type="button" variant="outline" onClick={downloadPrepared}>{sendT("sendTo.download")}</Button><Button type="button" variant="outline" onClick={() => sender.send(preparedSend)}>{sendT("sendTo.retry")}</Button></div>}
       </div>
       <div className="export-row image-editor-export-row mt-3.5 grid grid-cols-[minmax(260px,1fr)_minmax(230px,310px)] items-end gap-3 max-[620px]:grid-cols-1">
         <div className="image-editor-export-settings grid min-w-0 gap-3">

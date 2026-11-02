@@ -3,7 +3,7 @@ import type { PdfPageConversionResult } from "../pdf-editor/pdfConversionCore";
 
 export const BATCH_LIMITS = { files: 20, fileBytes: 50 * 1024 ** 2, inputBytes: 200 * 1024 ** 2, resultBytes: 128 * 1024 ** 2, zipBytes: 64 * 1024 ** 2 };
 export type BatchStatus = "pending" | "running" | "success" | "failed" | "cancelled" | "print-needed" | "print-reviewed";
-export type BatchError = "unsupported" | "input-limit" | "output-limit" | "page-limit" | "range" | "encrypted" | "no-text" | "no-tables" | "ocr-required-for-tables" | "scan-table-unavailable" | "image-decode" | "unavailable" | "timeout" | "conversion";
+export type BatchError = "unsupported" | "input-limit" | "output-limit" | "page-limit" | "range" | "encrypted" | "no-text" | "no-tables" | "ocr-required-for-tables" | "scan-table-unavailable" | "image-decode" | "unavailable" | "timeout" | "reload-required" | "conversion";
 export interface BatchOutput { blob: Blob; fileName: string; warningCount?: number; warnings?: string[]; warningLanguage?: "ko" | "en"; pageResults?: PdfPageConversionResult[] }
 export interface BatchItem {
   id: number; file: File; status: BatchStatus; progress: number; error?: BatchError;
@@ -14,7 +14,7 @@ export class BatchFailure extends Error {
   readonly code: BatchError;
   constructor(code: BatchError) { super(code); this.code = code; }
 }
-const batchErrors = new Set<BatchError>(["unsupported", "input-limit", "output-limit", "page-limit", "range", "encrypted", "no-text", "no-tables", "ocr-required-for-tables", "scan-table-unavailable", "image-decode", "unavailable", "timeout", "conversion"]);
+const batchErrors = new Set<BatchError>(["unsupported", "input-limit", "output-limit", "page-limit", "range", "encrypted", "no-text", "no-tables", "ocr-required-for-tables", "scan-table-unavailable", "image-decode", "unavailable", "timeout", "reload-required", "conversion"]);
 function batchErrorCode(error: unknown): BatchError | undefined {
   const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
   return typeof code === "string" && batchErrors.has(code as BatchError) ? code as BatchError : undefined;
@@ -67,7 +67,7 @@ export class BatchQueue {
         } catch (error) {
           if (!controller.signal.aborted && !this.disposed) {
             item.status = "failed"; item.error = batchErrorCode(error) ?? "conversion";
-            if (item.error === "output-limit") break; // Keep remaining inputs pending until results are removed.
+            if (item.error === "output-limit" || item.error === "reload-required") break; // Preserve remaining inputs and completed results.
           }
         } finally { this.active = undefined; this.publish(); }
       }

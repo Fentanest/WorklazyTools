@@ -18,16 +18,17 @@ function transactionHarness(globals = {}) {
   const requests: any[] = [];
   const deleted: string[] = [];
   const inserted: any[] = [];
+  const added: any[] = [];
   const store = {
     getAll: () => request(), get: (_id: string) => request(),
-    index: () => ({ openCursor: () => request() }), openCursor: () => request(), delete: (id: string) => deleted.push(id), add: (value: any) => inserted.push(value),
+    index: () => ({ openCursor: () => request() }), openCursor: () => request(), delete: (id: string) => deleted.push(id), add: (value: any) => { inserted.push(value); const result = {}; added.push(result); return result; },
   };
   const transaction: any = { objectStore: () => store, abort: () => queueMicrotask(() => transaction.onabort()) };
   const database: any = { transaction: () => transaction, close: () => { database.closed = true; } };
   const open: any = { result: database };
   function request() { const r = {}; requests.push(r); return r; }
   const core = load(corePath, { indexedDB: { open: () => { queueMicrotask(() => open.onsuccess()); return open; } }, ...globals });
-  return { core, open, database, transaction, requests, deleted, inserted };
+  return { core, open, database, transaction, requests, deleted, inserted, added };
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
 
@@ -252,5 +253,107 @@ test("P3 aborted pending cancellation preserves the old token; malformed/missing
     const core = load(corePath, { indexedDB: { open: () => assert.fail("no identifiable old record") },
       sessionStorage: { getItem: () => value, removeItem: () => { cleared = true; } } });
     await core.cancelPendingPersistentHandoff("document-redactor"); assert.equal(cleared, value !== null);
+  }
+});
+
+const corruptExpiries = [undefined, null, "9999999999999", "invalid", NaN, Infinity, -Infinity, {}, []];
+test("P3b purge scans missing/non-numeric/non-finite expiry keys and preserves the strict boundary", async () => {
+  const now = 1000000;
+  const h = transactionHarness({ Date: class extends Date { static now() { return now; } } });
+  const pending = h.core.purgeExpired(); await tick();
+  const values = [...corruptExpiries, now - 1, now, now + 1];
+  const removed: number[] = [];
+  for (const [index, expiresAt] of values.entries()) {
+    h.requests[0].result = { value: { id: index, ...(expiresAt === undefined ? {} : { expiresAt }) },
+      delete: () => removed.push(index), continue: () => {} };
+    h.requests[0].onsuccess();
+  }
+  h.requests[0].result = null; h.requests[0].onsuccess();
+  let settled = false; void pending.then(() => { settled = true; }); await tick(); assert.equal(settled, false);
+  h.transaction.oncomplete(); await pending;
+  assert.deepEqual(removed, values.slice(0, -2).map((_, index) => index));
+});
+test("P3b stage retires corrupt expiries before quota accounting and preserves live records", async () => {
+  const now = 1000000;
+  const h = transactionHarness({ Date: class extends Date { static now() { return now; } } });
+  const pending = h.core.stagePersistentHandoff(file); await tick();
+  const records = corruptExpiries.map((expiresAt, id) => ({ id, expiresAt }));
+  h.requests[0].result = [...records, { id: "boundary", receiverId: "office-editor", file, expiresAt: now },
+    { id: "live", receiverId: "office-editor", file, expiresAt: now + 1 }];
+  h.requests[0].onsuccess(); h.transaction.oncomplete(); await pending;
+  assert.deepEqual(h.deleted, records.map(record => record.id)); assert.equal(h.inserted.length, 1);
+});
+
+
+function replacementHarness(storageFailure = false) {
+  const key = "worklazy-handoff-token:document-to-pdf";
+  const old = { id: "owned", nonce: "old-nonce", receiverId: "document-to-pdf", entryPath: "/tools/pdf-converter/document-to-pdf",
+    files: [file], schema: 1, createdAt: Date.now(), expiresAt: Date.now() + 900000 };
+  const raw = JSON.stringify({ id: old.id, nonce: old.nonce });
+  const values = new Map([[key, raw], ["worklazy-handoff-token:document-redactor", "unrelated-token"]]);
+  const h = transactionHarness({ sessionStorage: {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { if (storageFailure) throw Error("denied"); values.set(key, value); },
+    removeItem: (key: string) => values.delete(key),
+  } });
+  const input = { receiverId: old.receiverId, entryPath: old.entryPath, files: [new File(["new"], "new.docx")] };
+  return { ...h, key, old, raw, values, input };
+}
+test("P3E atomic replacement credits the owned slot at 20 records and waits for commit", async () => {
+  const h = replacementHarness();
+  const promise = h.core.replacePendingPersistentHandoff(h.input);
+  let settled = false; void promise.then(() => { settled = true; }); await tick();
+  h.requests[0].result = [h.old, ...Array.from({ length: 19 }, (_, i) => ({ ...h.old, id: `other-${i}`, nonce: `other-${i}` }))];
+  h.requests[0].onsuccess();
+  assert.equal(h.inserted.length, 1); assert.deepEqual(h.deleted, [h.old.id]);
+  assert.equal(h.values.get(h.key), h.raw);
+  h.added[0].onsuccess(); await tick(); assert.equal(settled, false);
+  assert.deepEqual(JSON.parse(h.values.get(h.key)!), { id: h.inserted[0].id, nonce: h.inserted[0].nonce });
+  h.transaction.oncomplete(); await promise;
+  assert.equal(h.values.get("worklazy-handoff-token:document-redactor"), "unrelated-token");
+});
+test("P3E byte cap credits only the owned payload and rejects over-cap without changing token", async () => {
+  for (const extra of [0, 1]) {
+    const h = replacementHarness();
+    Object.defineProperty(h.input.files[0], "size", { value: h.core.HANDOFF_RECORD_BYTES });
+    const other = new File([], "other.docx"); Object.defineProperty(other, "size", { value: h.core.HANDOFF_TOTAL_BYTES - h.core.HANDOFF_RECORD_BYTES + extra });
+    const promise = h.core.replacePendingPersistentHandoff(h.input);
+    const checked = extra ? assert.rejects(promise, { code: "full" }) : promise;
+    await tick(); h.requests[0].result = [h.old, { ...h.old, id: "other", receiverId: "office-editor", file: other }];
+    h.requests[0].onsuccess();
+    if (!extra) h.added[0].onsuccess();
+    h.transaction.oncomplete(); await checked;
+    assert.deepEqual(h.deleted, extra ? [] : [h.old.id]);
+    assert.equal(h.inserted.length, extra ? 0 : 1);
+    if (extra) assert.equal(h.values.get(h.key), h.raw);
+  }
+});
+test("P3E replacement abort restores old token after publish; denied session write aborts DB", async () => {
+  for (const storageFailure of [false, true]) {
+    const h = replacementHarness(storageFailure);
+    const rejected = assert.rejects(h.core.replacePendingPersistentHandoff(h.input), { code: "unavailable" });
+    await tick(); h.requests[0].result = [h.old]; h.requests[0].onsuccess();
+    h.added[0].onsuccess();
+    if (!storageFailure) h.transaction.onabort();
+    await rejected; assert.equal(h.values.get(h.key), h.raw);
+  }
+});
+test("P3E mismatched ownership never earns a quota slot or deletes another record", async () => {
+  for (const patch of [{ nonce: "wrong" }, { receiverId: "xls-preserve" }, { entryPath: "/wrong" }, { id: "other" }]) {
+    const h = replacementHarness();
+    const rejected = assert.rejects(h.core.replacePendingPersistentHandoff(h.input), { code: "full" });
+    await tick(); h.requests[0].result = [{ ...h.old, ...patch }, ...Array.from({ length: 19 }, (_, i) => ({ ...h.old, id: `other-${i}` }))];
+    h.requests[0].onsuccess(); h.transaction.oncomplete(); await rejected;
+    assert.deepEqual(h.deleted, []); assert.equal(h.inserted.length, 0); assert.equal(h.values.get(h.key), h.raw);
+  }
+});
+test("P3E transaction failure before publish preserves token; changed token aborts instead of overwriting", async () => {
+  for (const changed of [false, true]) {
+    const h = replacementHarness();
+    const rejected = assert.rejects(h.core.replacePendingPersistentHandoff(h.input), { code: "unavailable" });
+    await tick(); h.requests[0].result = [h.old]; h.requests[0].onsuccess();
+    if (changed) { h.values.set(h.key, "newer-token"); h.added[0].onsuccess(); }
+    else h.transaction.onabort();
+    await rejected; assert.equal(h.values.get(h.key), changed ? "newer-token" : h.raw);
   }
 });

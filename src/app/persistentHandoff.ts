@@ -78,7 +78,7 @@ function openDatabase(): Promise<IDBDatabase> {
   });
 }
 
-async function inTransaction<T>(action: (store: IDBObjectStore, result: (value: T) => void) => void): Promise<T> {
+async function inTransaction<T>(action: (store: IDBObjectStore, result: (value: T) => void, fail: (error: unknown) => void) => void): Promise<T> {
   const database = await openDatabase();
   try {
     return await new Promise<T>((resolve, reject) => {
@@ -87,9 +87,10 @@ async function inTransaction<T>(action: (store: IDBObjectStore, result: (value: 
       let failure: unknown;
       transaction.oncomplete = () => resolve(value);
       transaction.onabort = () => reject(failure ?? new PersistentHandoffError("unavailable"));
+      const fail = (error: unknown) => { failure = error; transaction.abort(); };
       // Request errors abort by default; only the committed transaction can succeed.
-      try { action(transaction.objectStore(STORE_NAME), (next) => { value = next; }); }
-      catch (error) { failure = error; transaction.abort(); }
+      try { action(transaction.objectStore(STORE_NAME), (next) => { value = next; }, fail); }
+      catch (error) { fail(error); }
     });
   } finally { database.close(); }
 }
@@ -107,35 +108,60 @@ function payloadFits(receiverId: PersistentReceiverId, files: readonly File[]): 
     && (receiverId === "office-editor" || files.reduce((sum, file) => sum + file.size, 0) <= HANDOFF_RECORD_BYTES);
 }
 
+// Invalid expiry values cannot be consumed and must not occupy quota forever.
+function shouldPurge(record: PersistentHandoffRecord, now: number): boolean {
+  return !Number.isFinite(record.expiresAt) || record.expiresAt < now;
+}
+
 /** Stage only after the sender's leave confirmation. Storage failure must prevent navigation. */
 export function stagePersistentFiles(input: PersistentHandoffInput): Promise<PersistentHandoffToken> {
+  return stageFiles(input);
+}
+
+function stageFiles(input: PersistentHandoffInput, replacement?: {
+  token?: PersistentHandoffToken;
+  publish: (token: PersistentHandoffToken) => void;
+}): Promise<PersistentHandoffToken> {
   const { receiverId, entryPath } = input;
   const files = [...input.files];
   if (!destinationMatches(receiverId, entryPath) || !payloadFits(receiverId, files))
     return Promise.reject(new PersistentHandoffError("invalid"));
   const bytes = files.reduce((sum, file) => sum + file.size, 0);
   const token = { id: crypto.randomUUID(), nonce: crypto.randomUUID() };
-  return inTransaction<PersistentHandoffToken | undefined>((store, result) => {
+  return inTransaction<PersistentHandoffToken | undefined>((store, result, fail) => {
     const request = store.getAll();
     request.onsuccess = () => {
-      const now = Date.now();
-      const records = request.result as PersistentHandoffRecord[];
-      const expired = records.filter(record => record.expiresAt < now).sort((a, b) => a.expiresAt - b.expiresAt);
-      for (const record of expired) store.delete(record.id);
-      const live = records.filter(record => !(record.expiresAt < now));
-      // Unknown/corrupt payloads cannot make the global byte cap undercount.
-      const storedBytes = live.reduce((sum, record) => {
-        const payload = recordFiles(record);
-        return sum + (payload ? payload.reduce((size, file) => size + file.size, 0) : HANDOFF_TOTAL_BYTES);
-      }, 0);
-      if (live.length >= HANDOFF_LIMIT || storedBytes + bytes > HANDOFF_TOTAL_BYTES) {
-        result(undefined); // Commit expired cleanup, preserving every live record.
-        return;
-      }
-      store.add({ ...token, receiverId, entryPath, schema: 1,
-        ...(receiverId === "office-editor" ? { file: files[0] } : { files }),
-        createdAt: now, expiresAt: now + HANDOFF_TTL_MS } satisfies PersistentHandoffRecord);
-      result(token);
+      try {
+        const now = Date.now();
+        const records = request.result as PersistentHandoffRecord[];
+        const expired = records.filter(record => shouldPurge(record, now));
+        for (const record of expired) store.delete(record.id);
+        // Credit only the exact owned record. Delete+add commit together, so a
+        // replacement can use its slot/bytes without evicting another tab's input.
+        const previous = replacement?.token && records.find(record => record.id === replacement.token!.id
+          && record.nonce === replacement.token!.nonce && record.receiverId === receiverId && record.entryPath === entryPath);
+        const live = records.filter(record => !shouldPurge(record, now) && record !== previous);
+        // Unknown/corrupt payloads cannot make the global byte cap undercount.
+        const storedBytes = live.reduce((sum, record) => {
+          const payload = recordFiles(record);
+          return sum + (payload ? payload.reduce((size, file) => size + file.size, 0) : HANDOFF_TOTAL_BYTES);
+        }, 0);
+        if (live.length >= HANDOFF_LIMIT || storedBytes + bytes > HANDOFF_TOTAL_BYTES) {
+          result(undefined); // Commit expired cleanup, preserving every live record.
+          return;
+        }
+        if (previous) store.delete(previous.id);
+        const added = store.add({ ...token, receiverId, entryPath, schema: 1,
+          ...(receiverId === "office-editor" ? { file: files[0] } : { files }),
+          createdAt: now, expiresAt: now + HANDOFF_TTL_MS } satisfies PersistentHandoffRecord);
+        if (replacement) added.onsuccess = () => {
+          // Publish before commit so a denied token write can abort both DB
+          // mutations. The caller restores the old token if commit later aborts.
+          try { replacement.publish(token); }
+          catch { fail(new PersistentHandoffError("unavailable")); }
+        };
+        result(token);
+      } catch (error) { fail(error); }
     };
   }).then(staged => {
     if (!staged) throw new PersistentHandoffError("full");
@@ -175,9 +201,7 @@ export async function consumePersistentHandoff(token: PersistentHandoffToken, re
 }
 
 const tokenKey = (receiverId: PersistentReceiverId) => `worklazy-handoff-token:${receiverId}`;
-/** H2 serializes send attempts. Retire the previous case before reserving quota
- * for its replacement; a failed cancellation keeps the original token usable.
- */
+/** Explicit cancellation keeps the original token usable if the DB aborts. */
 export async function cancelPendingPersistentHandoff(receiverId: PersistentReceiverId): Promise<void> {
   const key = tokenKey(receiverId);
   let raw: string | null;
@@ -193,6 +217,38 @@ export async function cancelPendingPersistentHandoff(receiverId: PersistentRecei
   try { if (sessionStorage.getItem(key) === raw) sessionStorage.removeItem(key); }
   catch { throw new PersistentHandoffError("unavailable"); }
 }
+/** Atomically replace this tab's pending case, crediting only its own quota.
+ * Storage/token failure preserves the old record and restores its token.
+ */
+export async function replacePendingPersistentHandoff(input: PersistentHandoffInput): Promise<void> {
+  const key = tokenKey(input.receiverId);
+  let raw: string | null;
+  try { raw = sessionStorage.getItem(key); }
+  catch { throw new PersistentHandoffError("unavailable"); }
+  let previous: PersistentHandoffToken | undefined;
+  try {
+    const value = JSON.parse(raw ?? "null");
+    if (value && typeof value.id === "string" && typeof value.nonce === "string") previous = value;
+  } catch { /* A malformed token never authorizes deleting a record. */ }
+  let published: string | undefined;
+  try {
+    await stageFiles(input, { token: previous, publish: token => {
+      if (sessionStorage.getItem(key) !== raw) throw new PersistentHandoffError("unavailable");
+      const next = JSON.stringify(token);
+      sessionStorage.setItem(key, next);
+      published = next;
+    } });
+  } catch (error) {
+    try {
+      if (published !== undefined && sessionStorage.getItem(key) === published) {
+        if (raw === null) sessionStorage.removeItem(key);
+        else sessionStorage.setItem(key, raw);
+      }
+    } catch { throw new PersistentHandoffError("unavailable"); }
+    throw error;
+  }
+}
+
 export async function stagePendingPersistentHandoff(input: PersistentHandoffInput): Promise<void> {
   const receiverId = input.receiverId;
   const token = await stagePersistentFiles(input);
@@ -222,11 +278,14 @@ export async function takePendingPersistentHandoff(receiverId: PersistentReceive
 
 export function purgeExpired(): Promise<void> {
   return inTransaction((store, result) => {
-    const request = store.index("expiresAt").openCursor(IDBKeyRange.upperBound(Date.now(), true));
+    // The expiry index omits missing keys and sorts non-numeric keys separately.
+    // The store is bounded to 20 normal records; scan it to retire corrupt ones too.
+    const now = Date.now();
+    const request = store.openCursor();
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) { result(undefined); return; }
-      cursor.delete();
+      if (shouldPurge(cursor.value, now)) cursor.delete();
       cursor.continue();
     };
   });

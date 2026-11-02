@@ -42,7 +42,7 @@
     "description": "How local file processing differs from network requests used to operate this site.",
     "principleTitle": "Core principle",
     "principle": "Documents, file passwords and generated results are not uploaded to or stored on a Worklazy Tools server.",
-    "date": "Effective September 30, 2026",
+    "date": "Effective November 2, 2026",
     "providerLinksTitle": "Provider information and your choice",
     "providerLinksDescription": "The providers' official pages explain their data practices and available choices. You can also use browser cookie and content-blocking settings.",
     "googlePolicyLink": "Google Privacy Policy",
@@ -106,6 +106,13 @@
         "paragraphs": [
           "The service targets general work users and does not offer accounts or forms intended to collect information from children under 14. This policy and its effective date may be updated when features, providers or applicable law change. Never attach real work documents or passwords to a privacy inquiry."
         ]
+      },
+      {
+        "title": "8. Recent tools and favorites stored in your browser",
+        "paragraphs": [
+          "This browser stores up to six recent tool IDs in worklazy:recent-tools and favorite tool IDs in worklazy:favorite-tools using localStorage. These lists do not store file names, search queries, file contents or generated results. Lists are not sent to a server, advertising or analytics services.",
+          "Lists remain until cleared using the home or policy buttons below, or browser site-data settings. Corrupt values are ignored and left untouched. A blocked store or failed write disables only the affected saved list. Corrupt values can be removed in browser site-data settings."
+        ]
       }
     ],
     "localTitle": "Documents & passwords",
@@ -118,7 +125,11 @@
       "clear": "Clear all saved Excel cleaning rules",
       "ok": "All saved Excel cleaning rules have been cleared.",
       "storage": "Could not clear rules because browser storage is blocked."
-    }
+    },
+    "personalizationControls": "Clear recent tools and favorites",
+    "clearRecent": "Clear all recent tools",
+    "clearFavorites": "Clear all favorites",
+    "personalizationUnavailable": "This saved list is disabled because browser storage is unavailable."
   },
   "terms": {
     "title": "Terms of Use",

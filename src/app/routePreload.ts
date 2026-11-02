@@ -10,6 +10,9 @@ export async function preloadReceiver(receiverId: ReceiverId): Promise<void> {
     case "image-privacy": await import("../features/image-privacy/ImagePrivacyPage"); break;
     case "pdf-organize": await import("../features/pdf-editor/PdfEditorPage"); break;
     case "pdf-finish": await Promise.all([import("../features/pdf-editor/PdfEditorPage"), import("../features/pdf-editor/PdfFinishPanel")]); break;
+    case "image-to-pdf":
+    case "pdf-to-image":
+    case "pdf-to-document": await import("../features/pdf-converter/PdfConverterPage"); break;
     case "image-edit":
     case "image-batch": await import("../features/image-studio/ImageStudioPage"); break;
   }

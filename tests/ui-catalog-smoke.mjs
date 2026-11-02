@@ -26,7 +26,7 @@ try {
         assert.equal(await page.locator(".wl-hero-copy > p").innerText(), common.home.description);
         assert.equal(await page.getByTestId("home-dropzone").count(), 1);
         assert.equal(await page.locator(".home-how-grid > div").count(), 3);
-        assert.equal(await page.locator(".tool-grid > a").count(), language === "ko" ? 12 : 13);
+        assert.equal(await page.locator(".tool-grid a.ui-tool-card").count(), language === "ko" ? 12 : 13);
         const links = nav.locator("a"); assert.equal(await links.count(), 7);
         for (const link of await links.all()) {
           const id = await link.getAttribute("data-scenario-id");
@@ -64,6 +64,10 @@ try {
         await page.goto(`${base}/${language}/tools/`, { waitUntil: "networkidle" });
         const rows = page.locator(".tool-list-row"); await rows.first().waitFor();
         const hrefs = await rows.evaluateAll((items) => items.map((item) => item.getAttribute("href")));
+        assert.equal(await page.locator(".tool-category-heading h2").count(), await page.locator(".tool-category-section").count());
+        assert.equal(await rows.locator("h3").count(), hrefs.length);
+        assert.equal(await rows.first().evaluate(node => node.style.paddingRight), "");
+        assert.equal(await rows.first().evaluate(node => getComputedStyle(node).paddingRight), "64px");
         assert.ok(hrefs.length >= 20); assert.equal(await page.getByTestId("tools-view-list").getAttribute("aria-pressed"), "true");
         assert.ok((await rows.first().boundingBox()).height <= 110, "default rows remain compact");
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -71,6 +75,12 @@ try {
         await page.screenshot({ path: path.join(output, `tools-${language}-${width}-${theme}.png`) });
         await page.getByTestId("tools-view-grid").focus(); await page.keyboard.press("Enter");
         assert.deepEqual(await page.locator(".tool-category-groups [data-ui-component='tool-card']").evaluateAll((items) => items.map((item) => item.getAttribute("href"))), hrefs);
+        const cards = page.locator(".tool-category-groups [data-ui-component='tool-card']");
+        assert.equal(await cards.locator("h3").count(), hrefs.length);
+        assert.equal(await cards.locator("h2").count(), 0);
+        assert.equal(await cards.first().locator("h3").evaluate(node => getComputedStyle(node).fontSize), "17px");
+        assert.equal(await cards.first().locator("h3").evaluate(node => getComputedStyle(node).fontWeight), "800");
+        await page.screenshot({ path: path.join(output, `cards-${language}-${width}-${theme}.png`) });
         await page.reload({ waitUntil: "networkidle" });
         await page.locator("[data-view='grid']").first().waitFor();
         assert.equal(await page.evaluate(() => localStorage.getItem("worklazy:tools-view")), "grid");

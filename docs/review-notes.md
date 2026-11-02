@@ -1,5 +1,15 @@
 # 검토 기록 (Review Notes)
 
+## 2026-11-03 — XLS 보존 문서의 무헤더 호스트 worker 시작 수리 (정식 검수 대기·미배포)
+
+`d9a9c0d`의 신선한 브라우저에서 문서 전용 SW 설치·자동 재로드 후에도 `/assets/excel.worker-7X4-lhP1.js`가 `ERR_BLOCKED_BY_RESPONSE`로 차단됐다. worker 진입 요청은 자신의 URL로 SW scope를 매칭하므로 문서를 제어하는 nested SW만으로는 `/assets/` 응답에 COEP를 넣지 못한다. 루트 SW만 등록한 대조군과 루트+nested 대조군은 성공했다. 캐시와 navigation preload는 필수 원인이 아니었다.
+
+격리 문서의 Excel client만 동일 출처 모듈을 정적 import하는 Blob worker로 시작한다. 정적 import는 모듈 평가 전에 들어오는 파일 메시지를 보존하며, 성공·오류·취소·생성/dispatch 실패 때 worker와 소유 URL을 정리한다. 비격리 문서는 직접 worker를 사용한다. SW·scope·캐시·벤더·worker 본문 해시(`6b13310b…`)는 유지했다. 새 회귀는 실제 SW 미제어 첫 문서, 자동 재로드 1회, nested 재방문, root 제어, 일반 병합에서 입력과 수식 출력까지 대조한다.
+
+검증은 build, 단위 1,218건(실패·skip 0), static, i18n, tsc, 무헤더 worker 4시나리오의 검사·병합·수식 보존, 첫 로드 4파일, H2 21건, Office의 13 native 인계 계약 표본·실제 DOCX 저장·한글 Calc 편집, DOCX→PDF의 한글 텍스트를 통과했다. 시험 서버의 `.mjs` MIME 누락, 첫 로드 시험의 미처리 beforeunload, data 프레임에 대한 관측 초기화 오류를 보정했고 실패 원본을 보존했다. H2는 redactor의 CSP 격리와 Office/XLS의 COEP 격리를 구분하며 기존 CSP 단언을 유지한다.
+
+상세 원문·입력 해시·실행 영수증·보정 전 실패는 지정 `SOL-XLSWORKER-REPORT.md`와 `/tmp/sol-xlsworker/`에 보존한다. 구현자 검사와 Reviewer(sonnet)의 정식 검수·Claude 감사는 구분한다. — Codx
+
 ## 2026-10-28 — 거래 달력 독립 일일 배포 예약 (구현·국소 검사, 미커밋·미배포)
 
 FolioTrace collection 중단 시 calendar의 검증된 data branch 갱신도 사이트에 반영되지 않던 경로를 `deploy-site.yml`의 07:30 KST 예약으로 분리했다. 소유자 결정으로 정상일(10/19–10/28) calendar 데이터 반영 06:20–06:41 뒤 약 50분 여유를 두고 08:31 FolioTrace 실행과 간격을 확보하도록 시각을 변경했다. 승인 지시서는 `solmc-market-calendar.md` Task 2이며 기준은 `ff1b772`, 작업 브랜치는 `deploy-trigger-20261028`다. data-branch push는 체크아웃 ref·main 검사 변경이 필요하고 publisher dispatch는 토큰 권한·재시도 연결이 늘어 기존 기본 main 배포 경로를 재사용하는 예약을 선택했다. 기존 변수 게이트는 자동 예약에도 적용하고, 명시 dispatch의 validate/deploy·Pages 동시성·최신 main 검사를 유지했다. 전체 사이트 재배포이며 데이터 전용 브랜치 코드를 실행하지 않는다.

@@ -1,3 +1,4 @@
+import { PERSONALIZATION_KEYS, personalization, toolIdForPersonalization } from "../app/personalization";
 import { purgeExpired } from "../app/persistentHandoff";
 import { FileDropProvider } from "./FileDropProvider";
 import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
@@ -85,7 +86,7 @@ import { AppInstallControl } from "./AppInstallControl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { RouteSeo } from "./RouteSeo";
 import { HandoffRecoveryHost } from "./HandoffRecoveryHost";
-import { acquireGeneratedHold, cancelStagedHandoff, stageHandoff, validateHandoff, type HandoffInput } from "../app/memoryHandoff";
+import { acquireGeneratedHold, cancelStagedHandoff, isErrorDocumentNavigationPending, stageHandoff, validateHandoff, type HandoffInput } from "../app/memoryHandoff";
 import { preloadReceiver } from "../app/routePreload";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { getUnsavedWorkKind, getUnsavedWorkMessageKey, hasUnsavedWork, isGuardedTarget, restoreLastOneShotSafeTarget, subscribeUnsavedWork } from "../app/toolState";
@@ -273,7 +274,7 @@ export function AppShell() {
   }, [location.pathname, location.key]);
 
   useEffect(() => {
-    if (leavingRef.current) return;
+    if (leavingRef.current || isErrorDocumentNavigationPending()) return;
     if (unsavedActive && !guardOpen) {
       // Keep a guard entry at the top of the stack (also after exempt
       // same-scope navigations, which push real entries above it) so Back is
@@ -316,6 +317,15 @@ export function AppShell() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
   const normalizedPath = stripLanguagePrefix(location.pathname).replace(/\/+$/, "") || "/";
+  const recentToolId = toolIdForPersonalization(normalizedPath);
+  useEffect(() => { if (recentToolId) personalization.record(recentToolId); }, [recentToolId]);
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || (event.key === PERSONALIZATION_KEYS.recent || event.key === PERSONALIZATION_KEYS.favorites)) personalization.refresh();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
   const redactorActive = isRedactorPath(location.pathname);
   const redactorDocument = isRedactorDocument();
   useEffect(() => { if (import.meta.env.PROD && redactorActive !== redactorDocument) window.location.replace(window.location.href); }, [redactorActive, redactorDocument]);
