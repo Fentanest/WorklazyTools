@@ -55,6 +55,7 @@ export function ExcelCleanerPage() {
   const dragRuleIndex = useRef<number | undefined>(undefined);
   const urls = useRef<Set<string>>(new Set());
   const [items, setItems] = useState<FileItem[]>([]);
+  const handoffRollback = useRef<{ generation: number; signal: AbortSignal; items: FileItem[] } | null>(null);
   const [drafts, setDrafts] = useState<RuleDraft[]>([]);
   const [addType, setAddType] = useState<ExcelCleanerRuleType>("trim-whitespace");
   const [output, setOutput] = useState<"xlsx" | "csv" | "both">("xlsx");
@@ -103,6 +104,7 @@ export function ExcelCleanerPage() {
     const currentIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
     const current = new Map(items.map((item) => [item.file, item]));
     const next = files.map((file) => current.get(file) ?? { id: crypto.randomUUID(), file, inspecting: true, selectedSheets: [], headerRows: {} });
+    handoffRollback.current = context ? { generation, signal: context.signal, items } : null;
     setItems(next);
     const ready: File[] = [];
     for (const item of next) {
@@ -111,6 +113,7 @@ export function ExcelCleanerPage() {
       else if (!item.error && await inspectItem(item, [1], currentIntake)) ready.push(item.file);
     }
     if (!currentIntake()) return [];
+    handoffRollback.current = null;
     markPreviewStale();
     if (ready.length && handoff.notReceived && !context) handoff.dismiss();
     return ready;
@@ -248,7 +251,14 @@ export function ExcelCleanerPage() {
   useUnsavedWorkGuard("excel-cleaner", items.length > 0 || downloads.length > 0, { kind: "files", scopePath: "/tools/excel-cleaner" });
   const handoff = useHandoffReceiver("excel-cleaner", {
     kind: "inspection",
-    invalidate: () => { intakeGeneration.current++; setItems([]); markPreviewStale(); },
+    invalidate: () => {
+      const rollback = handoffRollback.current;
+      if (!rollback?.signal.aborted) return;
+      handoffRollback.current = null;
+      if (rollback.generation !== intakeGeneration.current) return;
+      intakeGeneration.current++;
+      setItems(rollback.items);
+    },
     receive: async (entry, context) => {
       const eligible = entry.files.filter(file => acceptsFile("excel-cleaner", file)).slice(0, 50);
       const accepted = await replaceFiles(eligible, context);

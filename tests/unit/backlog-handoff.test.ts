@@ -29,25 +29,37 @@ async function mountPage(tool: string, overrides: Record<string, unknown> = {}, 
   const require = (id: string): any => {
     if (id === "react") return React;
     if (id === "react/jsx-runtime") return jsx;
-    if (id === "react-i18next") return { useTranslation: () => ({ t, i18n: { language } }) };
+    if (id === "react-i18next") return { useTranslation: () => ({ t, i18n: { language, resolvedLanguage: language } }) };
     if (id.includes("useHandoffReceiver")) return { useHandoffReceiver: (_id: string, value: any) => { adapter = value; const [result, setResult] = React.useState<any>(); publish = setResult; return { result, notReceived: false, recoveryFiles: result?.rejected.map((item: any) => item.file) ?? [], dismiss() {} }; } };
     if (id.includes("toolState")) return { setUnsavedWork: (id: string, value: any) => guards.set(id, value.hasWork), useUnsavedWorkGuard: (id: string, work: boolean) => { guards.set(id, work); } };
     if (id.includes("fileAccepts")) return { acceptsFile: () => true };
-    if (id === "./client") return { createDocumentGeneratorClient: () => client };
+    if (id === "./client") return { createDocumentGeneratorClient: () => typeof overrides.clientFactory === "function" ? (overrides.clientFactory as Function)() : client };
     if (id === "./errors") return { GeneratorError: Error, generatorMessage: () => "Could not open file" };
+    if (id === "react-router-dom") return { useLocation: () => ({ pathname: dom.window.location.pathname, search: "" }) };
+    if (id.includes("i18n/languages")) return { stripLanguagePrefix: (value: string) => value.replace(/^\/(en|ko)/, "") };
+    if (id.includes("i18n/routing")) return { useLocalizedPath: (value: string) => value };
+    if (id.includes("AppShell")) return { useMemoryHandoff: () => ({ send() {} }) };
+    if (id === "./recipeStore.ts") return { readRecipes: () => ({ recipes: [] }) };
+    if (id === "./types.ts") return { EXCEL_CLEANER_RULE_TYPES: [] };
+    if (id === "./schema.ts") return { validateExcelCleanerPipeline: () => ({ version: 1, rules: [] }) };
     if (id.includes("useOperationProgress")) return { useOperationProgress: () => ({ status: "idle", reset() {}, update() {} }) };
-    if (id === "../../components/ui") return { ...fallback, FileDropZone: (props: any) => { zones.set(props.label, props); return React.createElement("div", null, props.files.map((file: File) => file.name).join(",")); }, PageHeader: shell, formatBytes: String };
+    if (id === "../../components/ui") return { ...fallback, FileDropZone: (props: any) => { zones.set(props.label, props); return React.createElement("div", null, props.files.map((file: File) => file.name).join(",")); }, PageHeader: shell, PrimaryButton: shell, ResultCard: shell, SegmentedControl: shell, ToggleRow: shell, formatBytes: String };
     if (id in overrides) return overrides[id];
     return fallback;
   };
   const name = tool === "document-generator" ? "DocumentGeneratorPage" : tool === "excel-cleaner" ? "ExcelCleanerPage" : "ExcelMergerPage";
   const file = path.resolve(process.env.BACKLOG_SOURCE_ROOT ?? ".", `src/features/${tool}/${name}.tsx`);
-  const code = ts.transpileModule(fs.readFileSync(file, "utf8"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const code = ts.transpileModule(fs.readFileSync(file, "utf8").replaceAll("import.meta.env", "({ DEV: true })"), { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, target: ts.ScriptTarget.ES2022 } }).outputText;
   vm.runInNewContext(code, { require, exports, console, crypto, setTimeout, clearTimeout, queueMicrotask, window: dom.window, URL, File, AbortController }, { filename: file });
   const root = createRoot(dom.window.document.getElementById("root")!);
   await React.act(async () => root.render(React.createElement(React.StrictMode, null, React.createElement(exports[name]))));
   return { zones, client, guards, text: () => dom.window.document.body.textContent!,
     adapter: () => adapter,
+    start: async (files: File[], roles?: string[]) => {
+      const controller = new AbortController(); let promise: Promise<any>;
+      await React.act(async () => { promise = adapter.receive({ files, roles }, { signal: controller.signal }); });
+      return { promise: promise!, abort: async () => { await React.act(async () => { controller.abort(); adapter.invalidate(); }); } };
+    },
     receive: async (files: File[], roles?: string[]) => { let result: any; await React.act(async () => { result = await adapter.receive({ files, roles }, { signal: new AbortController().signal }); publish({ ...result, accepted: [] }); }); return result; },
     close: async () => { await React.act(async () => root.unmount()); dom.window.close(); for (const [key, original] of originals) { if (original) Object.defineProperty(globalThis, key, original); else Reflect.deleteProperty(globalThis, key); } },
   };
@@ -66,3 +78,39 @@ for (const language of ["ko", "en"]) test(`template-only partial explains that d
     assert.match(page.text(), /template.docx/);
   } finally { await page.close(); }
 });
+
+const source = (file: File) => ({ id: file.name, fileName: file.name, book: { sheets: [{ name: "Sheet1", rowCount: 2, columnCount: 1, cells: [{ row: 1, column: 1, value: "name" }] }] } });
+for (const tool of ["excel-cleaner", "excel-merger", "document-generator"]) {
+  for (const lateFailure of [false, true]) test(`${tool}: abort preserves existing input and ignores late ${lateFailure ? "failure" : "success"}`, async () => {
+    let finish!: () => void;
+    const delayed = new Promise<void>(resolve => { finish = resolve; });
+    const inspect = async (file: File) => {
+      if (file.name === "incoming.csv") { await delayed; if (lateFailure) throw new Error("delayed failure"); }
+      return { format: "csv", sheets: [{ name: "Sheet1", headerRows: [], rowCount: 2, columnCount: 1 }], hardLimitExceeded: false };
+    };
+    const overrides = {
+      "./excelCleanerClient.ts": { inspectExcelCleanerFile: inspect },
+      "./excelWorkerClient": { inspectExcelFiles: async (files: any[]) => { await inspect(files[0].file); return files.map(item => ({ id: item.id, sheetNames: ["Sheet1"], encrypted: false })); } },
+      client: { loadSources: async ([file]: File[]) => { await inspect(file); return [source(file)]; } },
+    };
+    const page = await mountPage(tool, overrides);
+    try {
+      const existing = new File(["old"], "existing.csv"), incoming = new File(["new"], "incoming.csv");
+      const template = new File(["template"], "existing.docx");
+      if (tool === "document-generator") {
+        await React.act(async () => { await [...page.zones.values()][0].onFiles([template]); });
+        await React.act(async () => { await [...page.zones.values()][1].onFiles([existing]); });
+      } else await React.act(async () => { await [...page.zones.values()][0].onFiles([existing]); });
+      assert.match(page.text(), /existing.csv/);
+      const job = await page.start(tool === "document-generator" ? [new File(["new"], "incoming.docx"), incoming] : [incoming], tool === "document-generator" ? ["template", "data"] : undefined);
+      await job.abort();
+      assert.match(page.text(), /existing.csv/);
+      assert.doesNotMatch(page.text(), /incoming.csv/);
+      if (tool === "document-generator") assert.match(page.text(), /existing.docx/);
+      await React.act(async () => { finish(); await job.promise; });
+      assert.match(page.text(), /existing.csv/);
+      assert.doesNotMatch(page.text(), /incoming.csv/);
+      assert.equal(page.guards.get(tool), true);
+    } finally { finish(); await page.close(); }
+  });
+}

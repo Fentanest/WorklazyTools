@@ -33,6 +33,7 @@ export function DocumentGeneratorPage() {
   const clientRef = useRef<ReturnType<typeof createDocumentGeneratorClient> | null>(null);
   if (!clientRef.current) clientRef.current = createDocumentGeneratorClient();
   const client = clientRef.current;
+  const pendingHandoff = useRef<{ client: typeof client; signal: AbortSignal } | null>(null);
   const clientMount = useRef(0);
   const [snapshot, setSnapshot] = useState<GeneratorSnapshot>(() => client.snapshot());
   const [dataFiles, setDataFiles] = useState<File[]>([]);
@@ -175,18 +176,63 @@ export function DocumentGeneratorPage() {
   useUnsavedWorkGuard("document-generator", dataFiles.length > 0 || !!templateFile || snapshot.results.length > 0, { kind: "files", scopePath: "/tools/document-generator" });
   const handoff = useHandoffReceiver("document-generator", {
     kind: "inspection",
-    invalidate: () => { intakeGeneration.current++; client.cancel(); void client.reset().catch(() => {}); setPending(false); setDataFiles([]); setSources([]); setDrafts({}); setSourceFailures([]); setTemplateFile(undefined); setTemplateVariables([]); clearPrepared(); },
+    invalidate: () => {
+      const intake = pendingHandoff.current;
+      if (!intake?.signal.aborted) return;
+      pendingHandoff.current = null;
+      intakeGeneration.current++;
+      intake.client.cancel();
+      void intake.client.dispose().catch(() => {});
+      setPending(false);
+    },
     receive: async (entry, context) => {
       const template = entry.files.filter((file, index) => entry.roles?.[index] === "template" && /\.docx$/i.test(file.name));
       const data = entry.files.filter((file, index) => entry.roles?.[index] === "data" && /\.(xlsx|csv)$/i.test(file.name));
       const rejected = (): DeliveryResult => ({ status: "rejected", accepted: [], rejected: entry.files.map(file => ({ file, reasonCode: "inspection" })) });
       if (entry.roles?.length !== entry.files.length || template.length !== 1 || !data.length || data.length > 49 || data.length + 1 !== entry.files.length || !entry.files.every(file => acceptsFile("document-generator", file))) return rejected();
-      if (!await replaceTemplate(template, context) || context.signal.aborted) return rejected();
-      const loaded = await replaceData(data, context);
-      if (context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };
-      const accepted = [template[0], ...loaded];
-      setUnsavedWork("document-generator", { hasWork: true, kind: "files", scopePath: "/tools/document-generator" });
-      return { status: accepted.length === entry.files.length ? "accepted" : "partial", accepted, rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+      if (busy || context.signal.aborted) return rejected();
+      // Inspect in an isolated client. Until commit, the existing input,
+      // prepared plan and downloadable results retain their original owner.
+      const incoming = createDocumentGeneratorClient();
+      const intake = { client: incoming, signal: context.signal };
+      pendingHandoff.current = intake;
+      const generation = ++intakeGeneration.current;
+      const currentIntake = () => generation === intakeGeneration.current && !context.signal.aborted;
+      setPending(true);
+      let adopted = false;
+      try {
+        const inspected = await incoming.inspectTemplate(template[0]);
+        if (!currentIntake()) return rejected();
+        const loaded: GeneratorSource[] = [], acceptedData: File[] = [];
+        const failures: Array<{ index: number; code: string }> = [];
+        for (let index = 0; index < data.length; index++) {
+          try {
+            const source = (await incoming.loadSources([data[index]]))[0];
+            if (!currentIntake()) return rejected();
+            loaded.push(source); acceptedData.push(data[index]);
+          } catch (error) {
+            if (!currentIntake()) return rejected();
+            failures.push({ index, code: error instanceof GeneratorError ? error.code : "DAMAGED_DATA" });
+          }
+        }
+        clearPrepared(); releaseDownload(zip); setZip(undefined); setZipAttemptId(undefined);
+        clientRef.current = incoming; adopted = true;
+        setSnapshot(incoming.snapshot());
+        void client.dispose().catch(() => {});
+        setTemplateFile(template[0]); setTemplateVariables(inspected.variables);
+        setDataFiles(acceptedData); setSources(loaded); setSourceFailures(failures);
+        setDrafts(Object.fromEntries(loaded.map(source => [source.id, makeDraft(source)])));
+        setMessage("");
+        const accepted = [template[0], ...acceptedData];
+        setUnsavedWork("document-generator", { hasWork: true, kind: "files", scopePath: "/tools/document-generator" });
+        return { status: accepted.length === entry.files.length ? "accepted" : "partial", accepted, rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+      } catch (error) {
+        if (currentIntake()) setMessage(errorText(error));
+        return rejected();
+      } finally {
+        if (!adopted) void incoming.dispose().catch(() => {});
+        if (pendingHandoff.current === intake) { pendingHandoff.current = null; setPending(false); }
+      }
     },
   });
   const successfulRows = snapshot.results.length;
