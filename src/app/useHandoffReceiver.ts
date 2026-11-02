@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import type { ReceiverId } from "./fileAccepts";
-import { claimHandoff, closeDelivery, deliverHandoff, findDelivery, getDelivery, retainDelivery, subscribeHandoff, type Delivery, type DeliveryResult, type HandoffAdapter, type HandoffToken } from "./memoryHandoff";
+import { claimHandoff, closeDelivery, deliverHandoff, findDelivery, getDelivery, retainDelivery, subscribeHandoff, wasHandoffConsumed, type Delivery, type DeliveryResult, type HandoffAdapter, type HandoffToken } from "./memoryHandoff";
 import { stripLanguagePrefix } from "../i18n/languages";
 
 /** Attach this hook to the tool's existing intake; it never runs its main job. */
@@ -31,7 +31,10 @@ export function useHandoffReceiver(receiverId: ReceiverId, adapter: HandoffAdapt
         const userState = { ...state?.usr }; delete userState.wlHandoff;
         window.history.replaceState({ ...state, usr: userState }, "");
         if (entry) record.current = deliverHandoff(entry, path, location.key, adapterRef.current);
-        else { record.current = null; setNotReceived(true); }
+        else {
+          record.current = null;
+          setNotReceived(!wasHandoffConsumed(token, receiverId, entryPath, location.key, path));
+        }
       }
     }
     if (!token) record.current = findDelivery(receiverId, path, location.key) ?? null;

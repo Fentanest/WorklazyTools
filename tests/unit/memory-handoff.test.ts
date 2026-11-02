@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
+import ts from "typescript";
+import * as React from "react";
+import { createRoot } from "react-dom/client";
+import { JSDOM } from "jsdom";
+import * as handoff from "../../src/app/memoryHandoff.ts";
 import { isAutoReloadHeld } from "../../src/app/chunkRecovery.ts";
 import { acceptsFile } from "../../src/app/fileAccepts.ts";
 import { clearUnsavedWork, hasUnsavedWork } from "../../src/app/toolState.ts";
@@ -161,4 +167,127 @@ test("recovery: explicit download or discard executes deferred assign exactly on
     clearRecovery(); clearRecovery();
     assert.equal(assigns, 1, action); assert.equal(hasUnsavedWork(), false);
   }
+});
+
+// Run the real hook with React effects and stale Router location.state. Only
+// useLocation is stubbed; the browser probe additionally uses BrowserRouter.
+async function receiverFixture(run: (fixture: {
+  mount: (token: { id: string; nonce: string }, receiverId?: "pdf-organize" | "pdf-finish") => Promise<ReturnType<typeof import("../../src/app/useHandoffReceiver").useHandoffReceiver>>;
+  unmount: () => Promise<void>; calls: () => number;
+}) => Promise<void>, receive: (entry: handoff.HandoffEntry) => DeliveryResult = entry => accepted(entry.files)) {
+  const dom = new JSDOM("<div id='root'></div>", { url: "https://example.test/ko/tools/pdf-editor" });
+  const saved = new Map(["window", "document", "IS_REACT_ACT_ENVIRONMENT"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  Object.defineProperty(globalThis, "window", { configurable: true, value: dom.window });
+  Object.defineProperty(globalThis, "document", { configurable: true, value: dom.window.document });
+  Object.defineProperty(globalThis, "IS_REACT_ACT_ENVIRONMENT", { configurable: true, value: true });
+  let location: { pathname: string; search: string; key: string; state: unknown };
+  const source = readFileSync(new URL("../../src/app/useHandoffReceiver.ts", import.meta.url), "utf8");
+  const context = vm.createContext({ exports: {}, window: dom.window, require: (id: string) => {
+    if (id === "react") return React;
+    if (id === "react-router-dom") return { useLocation: () => location };
+    if (id === "./memoryHandoff") return handoff;
+    if (id === "../i18n/languages") return { stripLanguagePrefix: (path: string) => path.replace(/^\/(ko|en)(?=\/|$)/, "") };
+    throw new Error(`unexpected hook dependency ${id}`);
+  } });
+  vm.runInContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText, context);
+  let root: ReturnType<typeof createRoot> | undefined;
+  let state: ReturnType<typeof import("../../src/app/useHandoffReceiver").useHandoffReceiver>;
+  let calls = 0;
+  const unmount = async () => { if (root) { const current = root; root = undefined; await React.act(async () => current.unmount()); await wait(); } };
+  try {
+    await run({ calls: () => calls, unmount, mount: async (token, receiverId = "pdf-organize") => {
+      const pathname = receiverId === "pdf-organize" ? "/ko/tools/pdf-editor" : "/ko/tools/pdf-editor/watermark";
+      dom.window.history.replaceState({ key: "remount-key", idx: 2, usr: { wlHandoff: token, other: "preserved" } }, "", pathname);
+      location = { pathname, search: "", key: "remount-key", state: { wlHandoff: token } };
+      function Probe() {
+        state = context.exports.useHandoffReceiver(receiverId, { kind: "selection", receive: (entry: handoff.HandoffEntry) => { calls++; return receive(entry); } });
+        return null;
+      }
+      root = createRoot(dom.window.document.getElementById("root")!);
+      await React.act(async () => { root!.render(React.createElement(React.StrictMode, null, React.createElement(Probe))); await wait(); });
+      assert.equal(dom.window.history.state.usr.wlHandoff, undefined);
+      assert.equal(dom.window.history.state.usr.other, "preserved");
+      assert.equal(dom.window.history.state.key, "remount-key");
+      return state!;
+    } });
+  } finally {
+    await unmount(); dom.window.close();
+    for (const [key, descriptor] of saved) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else Reflect.deleteProperty(globalThis, key);
+    }
+  }
+}
+
+test("receiver hook: accepted and dismissed partial remount silently without redelivery", async () => {
+  const bad = new File(["bad"], "rejected.pdf");
+  for (const receiverId of ["pdf-organize", "pdf-finish"] as const) {
+    for (const partial of [false, true]) {
+      await receiverFixture(async fixture => {
+        const entryPath = receiverId === "pdf-organize" ? "/tools/pdf-editor" : "/tools/pdf-editor/watermark";
+        const token = stageHandoff(input({ receiverId, entryPath, files: partial ? [file, bad] : [file] }));
+        const first = await fixture.mount(token, receiverId);
+        assert.equal(first.result?.status, partial ? "partial" : "accepted");
+        assert.equal(fixture.calls(), 1, "StrictMode must apply input once");
+        if (partial) {
+          assert.equal(first.recoveryFiles.length, 1);
+          assert.equal(first.recoveryFiles[0], bad);
+          await React.act(async () => first.dismiss());
+        }
+        await fixture.unmount();
+        const remount = await fixture.mount(token, receiverId);
+        assert.equal(remount.notReceived, false, `${receiverId} consumed token must be silent`);
+        assert.equal(remount.result, undefined);
+        assert.equal(remount.recoveryFiles.length, 0);
+        assert.equal(fixture.calls(), 1, "closed accepted/partial token must not rerun adapter");
+        assert.equal(isAutoReloadHeld(), false);
+      }, entry => ({ status: partial ? "partial" : "accepted", accepted: [entry.files[0]], rejected: partial ? [{ file: bad, reasonCode: "bad" }] : [] }));
+    }
+  }
+});
+
+test("receiver hook: absent, expired, wrong nonce and another tab tokens still show notReceived", async () => {
+  for (const reason of ["absent", "expired", "nonce", "another-tab"]) {
+    await receiverFixture(async fixture => {
+      const staged = reason === "expired" || reason === "nonce" ? stageHandoff(input({ origin: "user-input" }), reason === "expired" ? 100 : Date.now()) : undefined;
+      const token = staged ? { ...staged, ...(reason === "nonce" ? { nonce: "wrong-nonce" } : {}) } : { id: crypto.randomUUID(), nonce: crypto.randomUUID() };
+      const state = await fixture.mount(token);
+      assert.equal(state.notReceived, true, reason);
+      assert.equal(state.result, undefined);
+      assert.equal(fixture.calls(), 0);
+      if (staged) await React.act(async () => cancelStagedHandoff(staged));
+    });
+  }
+});
+
+test("consumed token identity includes nonce, receiver, route and location key; failures are not remembered", async () => {
+  const path = "/ko/tools/pdf-editor";
+  for (const status of ["accepted", "partial", "rejected", "cancelled"] as const) {
+    const extra = new File([], "extra.pdf");
+    const token = stageHandoff(input({ files: [file, extra], origin: "user-input" }));
+    const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+    const record = deliverHandoff(entry, path, "identity-key", { kind: "selection", receive: () => ({ status, accepted: status === "accepted" ? [file, extra] : status === "partial" ? [file] : [], rejected: [] }) });
+    await record.promise; closeDelivery(record);
+    const wasConsumed = (candidate = token, receiverId: "pdf-organize" | "pdf-finish" = "pdf-organize", entryPath = "/tools/pdf-editor", locationKey = "identity-key", actualPath = path) => handoff.wasHandoffConsumed(candidate, receiverId, entryPath, locationKey, actualPath);
+    assert.equal(wasConsumed(), status === "accepted" || status === "partial");
+    assert.equal(wasConsumed({ ...token, nonce: "wrong" }), false);
+    assert.equal(wasConsumed(token, "pdf-finish"), false);
+    assert.equal(wasConsumed(token, "pdf-organize", "/tools/pdf-editor/merge"), false);
+    assert.equal(wasConsumed(token, "pdf-organize", undefined, "another-key"), false);
+    assert.equal(wasConsumed(token, "pdf-organize", undefined, undefined, `${path}?changed=1`), false);
+    assert.deepEqual(entry.files, []); assert.deepEqual(record.files, []);
+  }
+});
+
+test("consumed token memory evicts old identities at its 256 entry bound", async () => {
+  const tokens = [];
+  for (let index = 0; index < 257; index++) {
+    const token = stageHandoff(input({ origin: "user-input" })); tokens.push(token);
+    const entry = claimHandoff(token, "pdf-organize", "/tools/pdf-editor")!;
+    await deliverHandoff(entry, "/ko/tools/pdf-editor", "bounded", { kind: "selection", receive: entry => accepted(entry.files) }).promise;
+  }
+  const seen = (index: number) => handoff.wasHandoffConsumed(tokens[index], "pdf-organize", "/tools/pdf-editor", "bounded", "/ko/tools/pdf-editor");
+  assert.equal(seen(0), false);
+  assert.equal(seen(1), true);
+  assert.equal(seen(256), true);
 });

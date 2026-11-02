@@ -33,6 +33,23 @@ let slot: HandoffEntry | null = null;
 let slotRelease: (() => void) | undefined;
 let slotTimer: ReturnType<typeof setTimeout> | undefined;
 const deliveries = new Map<string, Delivery>();
+// Completed inputs need no File references, but a stale Router location.state
+// can replay its token on a same-location remount. Keep only bounded identity
+// metadata in this document; unknown tokens must still report notReceived.
+const consumedHandoffs = new Map<string, {
+  nonce: string; receiverId: ReceiverId; entryPath: string; locationKey: string; path: string;
+}>();
+const MAX_CONSUMED_HANDOFFS = 256;
+export function wasHandoffConsumed(token: HandoffToken, receiverId: ReceiverId, entryPath: string, locationKey: string, path: string): boolean {
+  const consumed = consumedHandoffs.get(token.id);
+  return !!consumed && consumed.nonce === token.nonce && consumed.receiverId === receiverId
+    && consumed.entryPath === entryPath && consumed.locationKey === locationKey && consumed.path === path;
+}
+function rememberConsumedHandoff(record: Delivery): void {
+  const { id, nonce, receiverId, entryPath } = record.entry;
+  consumedHandoffs.set(id, { nonce, receiverId, entryPath, locationKey: record.locationKey, path: record.path });
+  if (consumedHandoffs.size > MAX_CONSUMED_HANDOFFS) consumedHandoffs.delete(consumedHandoffs.keys().next().value!);
+}
 // Superseded chips are owned by their mounted receiver, not this cache.
 const mountedChips = new Set<WeakRef<Delivery>>();
 const claimedHolds = new WeakMap<HandoffEntry, () => void>();
@@ -127,6 +144,7 @@ export function deliverHandoff(entry: HandoffEntry, path: string, locationKey: s
     clearTimeout(timer);
     if (record.closed) return rejected({ ...entry, files: [] }, "closed");
     const normalized = normalizeResult(entry, result);
+    if (normalized.status === "accepted" || normalized.status === "partial") rememberConsumedHandoff(record);
     // Do not retain accepted files in the delivery cache.
     record.result = { ...normalized, accepted: [] };
     record.files = normalized.rejected.map(item => item.file);
