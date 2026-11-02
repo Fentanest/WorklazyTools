@@ -6,6 +6,7 @@ import type {
   WordCompareResult,
 } from "./types";
 import type { ExcelThemePalette } from "./excelThemeColors";
+import excelWorkerUrl from "./excel.worker.ts?worker&url";
 
 type WorkerProgress = (progress: number, message: string) => void;
 type AppLanguage = "ko" | "en";
@@ -17,7 +18,21 @@ interface WorkerErrorPayload {
 }
 
 function createExcelWorker() {
-  return new Worker(new URL("./excel.worker.ts", import.meta.url), { type: "module" });
+  const scriptUrl = new URL(excelWorkerUrl, import.meta.url);
+  // A worker's entry request matches SW scope by its own URL. /assets/ is
+  // outside the document-scoped isolation SW on headerless static hosts.
+  // A Blob entry inherits document isolation; static import finishes loading
+  // the bundled module before queued file-processing messages are dispatched.
+  const objectUrl = globalThis.crossOriginIsolated
+    ? URL.createObjectURL(new Blob([`import ${JSON.stringify(scriptUrl.href)};`], { type: "text/javascript" }))
+    : undefined;
+  try {
+    const worker = new Worker(objectUrl ?? scriptUrl, { type: "module" });
+    return { worker, dispose: () => { worker.terminate(); if (objectUrl) URL.revokeObjectURL(objectUrl); } };
+  } catch (error) {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    throw error;
+  }
 }
 
 function runWorker<T>(
@@ -27,11 +42,11 @@ function runWorker<T>(
   language: AppLanguage = "ko",
   signal?: AbortSignal,
 ): Promise<T> {
-  const worker = createExcelWorker();
+  const { worker, dispose } = createExcelWorker();
 
   return new Promise<T>((resolve, reject) => {
     let settled = false;
-    const finish = () => { if (settled) return false; settled = true; signal?.removeEventListener("abort", abort); worker.terminate(); return true; };
+    const finish = () => { if (settled) return false; settled = true; signal?.removeEventListener("abort", abort); dispose(); return true; };
     const abort = () => { if (finish()) reject(new DOMException(language === "en" ? "The spreadsheet merge was cancelled." : "스프레드시트 병합을 취소했습니다.", "AbortError")); };
     signal?.addEventListener("abort", abort, { once: true });
     if (signal?.aborted) { abort(); return; }
@@ -67,7 +82,8 @@ function runWorker<T>(
       reject(new Error(language === "en" ? "Could not start file processing. Reload the page and try again." : "파일 처리를 시작하지 못했습니다. 페이지를 새로고침한 뒤 다시 시도해 주세요."));
     };
 
-    worker.postMessage(message, transfer);
+    try { worker.postMessage(message, transfer); }
+    catch (error) { if (finish()) reject(error); }
   });
 }
 
