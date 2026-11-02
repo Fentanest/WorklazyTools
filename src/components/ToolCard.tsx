@@ -9,7 +9,7 @@ import { getToolIconTone } from "./toolAccentStyles";
 import { Card } from "./ui/card";
 
 interface ToolCardProps {
-  tool: ToolDefinition;
+  tool: ToolDefinition & { tagline?: string };
   featured?: boolean;
 }
 
@@ -32,7 +32,7 @@ export function ToolCard({ tool, featured = false }: ToolCardProps) {
       <div className="ui-tool-card-copy">
         {!featured && <p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{tool.eyebrow}</p>}
         <h2>{tool.title}</h2>
-        <p>{tool.description}</p>
+        <p data-testid="tool-tagline">{tool.tagline ?? tool.description}</p>
       </div>
       <div className="ui-tool-highlights">
         {tool.highlights.slice(0, 3).map((item) => {

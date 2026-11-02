@@ -50,7 +50,33 @@ export function documentReadiness(
 
 const ordinaryPages = new Set(["/", "/tools", "/about", "/privacy", "/terms", "/contact", "/licenses", "/error"]);
 const workspacePages = new Set(["/tools/office-editor/app", "/tools/excel-merger/xls-preserve"]);
-const publicToolCategories = new Set(["spreadsheets", "documents", "media", "text-data", "work", "security-share", "investment-research"]);
+export const toolFilterValues = {
+  category: ["spreadsheets", "documents", "media", "text-data", "work", "security-share", "investment-research"],
+  from: ["pdf", "image", "spreadsheet", "document", "hwp", "text", "audio"],
+  do: ["cut", "merge", "convert", "clean", "compare", "protect", "create"],
+} as const;
+
+/** Strict decoding, duplicate rejection and fixed ordering before SDK eligibility. */
+export function normalizeToolsSearch(search: string): string {
+  const entries = new Map<string, string[]>();
+  for (const part of search.replace(/^\?/, "").split("&")) {
+    const equal = part.indexOf("=");
+    try {
+      const key = decodeURIComponent((equal < 0 ? part : part.slice(0, equal)).replace(/\+/g, " "));
+      entries.set(key, [...(entries.get(key) ?? []), equal < 0 ? "" : part.slice(equal + 1)]);
+    } catch { /* Malformed keys are discarded, never repaired by URLSearchParams. */ }
+  }
+  const result = new URLSearchParams();
+  for (const key of ["category", "from", "do"] as const) {
+    const values = entries.get(key);
+    if (values?.length !== 1) continue;
+    try {
+      const value = decodeURIComponent(values[0].replace(/\+/g, " "));
+      if ((toolFilterValues[key] as readonly string[]).includes(value)) result.set(key, value);
+    } catch { /* Malformed values are discarded too. */ }
+  }
+  return result.size ? `?${result}` : "";
+}
 
 export function isKnownPublicPath(path: string) {
   if (isVideoUnavailablePath(path) || !isComparisonPathPublished(path)) return false;
@@ -67,7 +93,7 @@ export function safeAnalyticsPage(pathname: string, search = "", hash = "") {
   let path = stripLanguagePrefix(pathname).replace(/\/+$/, "") || "/";
   if (!isKnownPublicPath(path)) return null;
   const parameters = new URLSearchParams(search);
-  const allowed = path === "/tools" && parameters.size === 1 && publicToolCategories.has(parameters.get("category") ?? "")
+  const allowed = path === "/tools" && search === normalizeToolsSearch(search)
     || path === "/tools/market-calendar" && parseCalendarSelection(parameters) !== null
     || path === "/tools/office-editor" && parameters.size === 1 && parameters.get("guide") === "1"
     || path === "/tools/excel-merger/xls-preserve" && [...parameters].every(([key, value]) => (key === "formula" || key === "format") && (value === "0" || value === "1")) && parameters.size <= 2;

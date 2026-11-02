@@ -86,6 +86,7 @@
     "removed": "서버 전송 없음"
   },
   "home": {
+    "scenariosLabel": "어떤 작업이 필요하세요?",
     "kicker": "작지만 유용한 업무 도구",
     "titleBefore": "귀찮은 파일 작업은",
     "titleAccent": "도구에게",

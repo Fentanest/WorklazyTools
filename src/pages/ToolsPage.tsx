@@ -1,10 +1,13 @@
-import { LayoutGrid, Search } from "lucide-react";
+import { ArrowRight, LayoutGrid, List, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
 import { type ToolAccent, type ToolCategoryId } from "../app/toolRegistry";
-import { toolAliasesFor } from "../app/toolSearch";
+import { matchTools, normalizeSearchText } from "../app/toolSearch";
+import { normalizeToolsSearch, toolFilterValues } from "../app/publicService";
+import { useAppLanguage } from "../i18n/routing";
+import { trackToolOpen } from "../components/AnalyticsLoader";
 import { PrivacyBanner } from "../components/PrivacyBanner";
 import { ToolCard } from "../components/ToolCard";
 import { getToolIconTone } from "../components/toolAccentStyles";
@@ -13,18 +16,36 @@ import { useToolCatalog } from "../i18n/useToolCatalog";
 import { cn } from "../lib/utils";
 
 type CategoryFilter = "all" | ToolCategoryId;
+// These are topic filters, not another accepted-file contract or receiver list.
+const fromToolIds: Record<string, readonly string[]> = {
+  pdf: ["pdf-editor", "pdf-converter", "pdf-compare", "document-redactor", "document-markdown"],
+  image: ["image-studio", "image-privacy", "image-compare", "document-redactor", "pdf-converter", "qr-studio"],
+  spreadsheet: ["excel-merger", "excel-cleaner", "excel-compare", "data-converter", "document-generator", "document-markdown", "office-editor", "product-banner", "qr-studio"],
+  document: ["document-compare", "document-generator", "document-markdown", "office-editor", "pdf-converter", "hwp-editor"],
+  hwp: ["hwp-editor", "document-compare", "pdf-converter"],
+  text: ["text-compare", "text-merger", "text-tools", "text-formatter", "data-converter", "qr-studio"],
+  audio: ["audio-studio"],
+};
 
 export function ToolsPage() {
   const { t } = useTranslation(["tools", "common"]);
   const { toolCategories, tools } = useToolCatalog();
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const language = useAppLanguage();
+  const [view, setView] = useState<"list" | "grid">(() => {
+    try { return localStorage.getItem("worklazy:tools-view") === "grid" ? "grid" : "list"; } catch { return "list"; }
+  });
+  const canonicalSearch = normalizeToolsSearch(location.search);
+  const filters = new URLSearchParams(canonicalSearch);
+  const from = filters.get("from") ?? "";
+  const action = filters.get("do") ?? "";
   const stateQuery = typeof location.state?.worklazySearchQuery === "string" ? location.state.worklazySearchQuery : null;
   const [query, setQuery] = useState<string>(() => stateQuery ?? searchParams.get("q") ?? "");
-  const requestedCategory = searchParams.get("category");
+  const requestedCategory = filters.get("category");
   const activeCategory: CategoryFilter = isToolCategory(requestedCategory) ? requestedCategory : "all";
-  const normalizedQuery = query.trim().toLowerCase();
+  const normalizedQuery = normalizeSearchText(query);
 
   // Migrate old ?q= links into route state before this page becomes eligible
   // for third-party SDKs. New searches never put free text in the URL.
@@ -36,38 +57,37 @@ export function ToolsPage() {
       navigate({ pathname: location.pathname, search: next.toString() }, { replace: true, state: { ...location.state, worklazySearchQuery: legacyQuery ?? stateQuery ?? "" } });
       return;
     }
+    if (location.search !== canonicalSearch || location.hash) {
+      navigate({ pathname: location.pathname, search: canonicalSearch, hash: "" }, { replace: true, state: location.state });
+      return;
+    }
     const externalQuery = stateQuery ?? "";
     setQuery((current) => (current === externalQuery ? current : externalQuery));
-  }, [location.pathname, location.state, navigate, searchParams, stateQuery]);
+  }, [canonicalSearch, location.pathname, location.search, location.hash, location.state, navigate, stateQuery]);
 
   const groupedTools = useMemo(() => toolCategories
     .filter((category) => activeCategory === "all" || category.id === activeCategory)
     .map((category) => ({
       category,
-      tools: tools.filter((tool) => {
-        if (tool.category !== category.id) return false;
-        if (!normalizedQuery) return true;
-        const searchText = [
-          tool.title,
-          tool.shortTitle,
-          tool.description,
-          tool.eyebrow,
-          category.label,
-          category.shortLabel,
-          ...tool.highlights.map((highlight) => highlight.label),
-          ...(tool.id === "product-banner" ? toolAliasesFor(tool.id) : []),
-        ].join(" ").toLowerCase();
-        return searchText.includes(normalizedQuery);
-      }),
+      tools: matchTools(tools.filter((tool) => tool.category === category.id && (!from || fromToolIds[from]?.includes(tool.id)) && (!action || tool.actions.includes(action as typeof tool.actions[number]))).map((tool) => ({
+        ...tool,
+        categoryLabel: category.label,
+        categoryShortLabel: category.shortLabel,
+      })), query),
     }))
-    .filter((group) => group.tools.length > 0), [activeCategory, normalizedQuery, toolCategories, tools]);
+    .filter((group) => group.tools.length > 0), [activeCategory, from, action, query, toolCategories, tools]);
 
   const visibleToolCount = groupedTools.reduce((count, group) => count + group.tools.length, 0);
-  const selectCategory = (category: CategoryFilter) => {
-    const next = new URLSearchParams(searchParams);
-    if (category === "all") next.delete("category");
-    else next.set("category", category);
-    setSearchParams(next, { replace: true, state: { ...location.state, worklazySearchQuery: query } });
+  const selectFilter = (key: "category" | "from" | "do", value: string) => {
+    // Read at event time: a preceding navigation may not have rendered yet.
+    const next = new URLSearchParams(normalizeToolsSearch(window.location.search));
+    if (!value || value === "all") next.delete(key); else next.set(key, value);
+    navigate({ pathname: location.pathname, search: normalizeToolsSearch(next.toString()), hash: "" }, { replace: true, state: { ...location.state, worklazySearchQuery: query } });
+  };
+  const selectCategory = (category: CategoryFilter) => selectFilter("category", category);
+  const selectView = (next: "list" | "grid") => {
+    setView(next);
+    try { localStorage.setItem("worklazy:tools-view", next); } catch { /* Still usable without storage. */ }
   };
 
   return (
@@ -101,6 +121,14 @@ export function ToolsPage() {
         })}
       </div>
 
+      <div className="tool-catalog-controls">
+        {(["from", "do"] as const).map((key) => <label key={key}>{t(`tools:index.${key}Label`)}<select data-testid={`tools-${key}-filter`} value={key === "from" ? from : action} onChange={(event) => selectFilter(key, event.target.value)}><option value="">{t("tools:index.any")}</option>{toolFilterValues[key].map((value) => <option key={value} value={value}>{t(`tools:index.${key}Options.${value}` as never)}</option>)}</select></label>)}
+        <div className="tool-view-switch" role="group" aria-label={t("tools:index.viewLabel")}>
+          <button type="button" data-testid="tools-view-list" aria-pressed={view === "list"} onClick={() => selectView("list")}><List size={17} aria-hidden="true" />{t("tools:index.listView")}</button>
+          <button type="button" data-testid="tools-view-grid" aria-pressed={view === "grid"} onClick={() => selectView("grid")}><LayoutGrid size={17} aria-hidden="true" />{t("tools:index.gridView")}</button>
+        </div>
+      </div>
+
       <PrivacyBanner compact />
 
       <div className="tool-category-groups">
@@ -113,8 +141,11 @@ export function ToolsPage() {
                 <span><h2 id={`tool-category-${category.id}`}>{category.label}</h2><p>{category.description}</p></span>
                 <b>{t("common:format.tools", { count: categoryTools.length })}</b>
               </header>
-              <div className="tool-grid all-tools-grid">
-                {categoryTools.map((tool) => <ToolCard key={tool.id} tool={tool} />)}
+              <div className={view === "list" ? "tool-list" : "tool-grid all-tools-grid"} data-testid="tool-results" data-view={view}>
+                {categoryTools.map((tool) => {
+                  const Icon = tool.icon;
+                  return view === "grid" ? <ToolCard key={tool.id} tool={tool} /> : <Link key={tool.id} to={tool.path} className="tool-list-row" data-ui-component="tool-card" onClick={() => trackToolOpen(tool.id, "tools_card", language)}><span className="tool-list-icon tone-icon-badge" data-icon-tone={getToolIconTone(tool.id)}><Icon size={22} aria-hidden="true" /></span><span><h3>{tool.title}</h3><p data-testid="tool-tagline">{tool.tagline}</p></span><ArrowRight size={18} aria-hidden="true" /></Link>;
+                })}
               </div>
             </section>
           );

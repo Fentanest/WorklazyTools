@@ -86,6 +86,7 @@
     "removed": "Never uploaded"
   },
   "home": {
+    "scenariosLabel": "What would you like to do?",
     "kicker": "Small tools for everyday work",
     "titleBefore": "Let the tools handle",
     "titleAccent": "the tedious file work.",
