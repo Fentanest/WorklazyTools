@@ -1,5 +1,13 @@
 {
   "index": {
+    "fromLabel": "Files or content",
+    "doLabel": "Task",
+    "any": "Any",
+    "viewLabel": "Tool view",
+    "listView": "List",
+    "gridView": "Cards",
+    "fromOptions": {"pdf": "PDF", "image": "Images", "spreadsheet": "Spreadsheets", "document": "Documents", "hwp": "Hangul", "text": "Text", "audio": "Audio"},
+    "doOptions": {"cut": "Cut or extract", "merge": "Merge", "convert": "Convert", "clean": "Clean", "compare": "Compare", "protect": "Protect", "create": "Create"},
     "eyebrow": "ALL TOOLS",
     "title": "All tools",
     "description": "Choose a category or search for the feature you need.",

@@ -1,5 +1,13 @@
 {
   "index": {
+    "fromLabel": "파일·내용",
+    "doLabel": "할 작업",
+    "any": "전체",
+    "viewLabel": "도구 보기 방식",
+    "listView": "목록",
+    "gridView": "카드",
+    "fromOptions": {"pdf": "PDF", "image": "이미지", "spreadsheet": "엑셀·표", "document": "문서", "hwp": "한글", "text": "텍스트", "audio": "오디오"},
+    "doOptions": {"cut": "자르기·추출", "merge": "합치기", "convert": "변환", "clean": "정리", "compare": "비교", "protect": "보호", "create": "만들기"},
     "eyebrow": "ALL TOOLS",
     "title": "모든 도구",
     "description": "업무 목적에 맞는 카테고리를 고르거나 필요한 기능을 검색하세요.",

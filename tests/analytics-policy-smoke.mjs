@@ -56,6 +56,39 @@ async function counts(page) {
 }
 
 try {
+  for (const language of ["ko", "en"]) for (const [raw, expected] of [
+    ["?category=documents&from=pdf&do=protect", "?category=documents&from=pdf&do=protect"],
+    ["?do=protect&from=pdf&category=documents", "?category=documents&from=pdf&do=protect"],
+    ["?file=private-r9-note.pdf&category=media", "?category=media"],
+    ["?category=documents&category=media&from=image", "?from=image"],
+    ["?category=&from=PDF&do=merge", "?do=merge"],
+    ["?%E0%A4%A=x&from=pdf&do=%ZZ", "?from=pdf"],
+    ["?from=audio#private-r9-note.pdf", "?from=audio"],
+    ["?q=private-r9-note.pdf&do=clean&category=spreadsheets", "?category=spreadsheets&do=clean"],
+    ["?%63ategory=%6dedia", "?category=media"],
+  ]) {
+    const { context, page, external } = await trackedContext();
+    await context.addInitScript(() => {
+      window.__providerLocations = [];
+      const append = Element.prototype.appendChild;
+      Element.prototype.appendChild = function (node) {
+        if (node instanceof HTMLScriptElement && (node.dataset.worklazyGoogleAnalytics || node.hasAttribute("data-worklazy-google-analytics") || node.hasAttribute("data-worklazy-naver-analytics") || node.hasAttribute("data-worklazy-adsense") || node.src === "https://ads-partners.coupang.com/g.js")) window.__providerLocations.push({ search: location.search, hash: location.hash });
+        return append.call(this, node);
+      };
+    });
+    try {
+      await page.goto(`${server.url}/${language}/tools/${raw}`, { waitUntil: "domcontentloaded" });
+      await page.waitForFunction(() => window.__naverViews.length === 1 && (window.dataLayer || []).some((entry) => entry[0] === "event" && entry[1] === "page_view"));
+      assert.equal(new URL(page.url()).search, expected); assert.equal(new URL(page.url()).hash, "");
+      const locations = await page.evaluate(() => window.__providerLocations);
+      assert.ok(locations.length >= 3); assert.ok(locations.every((value) => value.search === expected && value.hash === ""));
+      const result = await counts(page); assert.equal(result.google, 1); assert.equal(result.adScripts, 1);
+      for (const view of result.views) { assert.equal(view.page_path, `/${language}/tools/`); assert.equal(new URL(view.page_location).search, ""); }
+      assert.ok(!JSON.stringify(await page.evaluate(() => window.dataLayer)).includes("private-r9-note"));
+      assert.ok(!JSON.stringify(external).includes("private-r9-note"));
+      console.log(`PASS R9 ${language} ${raw}: normalized before ${locations.length} provider scripts, path-only analytics`);
+    } finally { await context.close(); }
+  }
   {
     const { context, page } = await trackedContext();
     try {

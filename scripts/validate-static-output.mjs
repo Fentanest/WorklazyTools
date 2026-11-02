@@ -112,6 +112,14 @@ for (const language of ["ko", "en"]) {
 for (const route of routes) {
   const filePath = path.join("dist", language, route, "index.html");
   const html = await fs.readFile(filePath, "utf8");
+  if (route === "tools") {
+    const document = new JSDOM(html).window.document;
+    const canonical = `https://worklazy.net/${language}/tools/`;
+    if (document.querySelector('link[rel="canonical"]')?.getAttribute("href") !== canonical || document.querySelector('meta[property="og:url"]')?.getAttribute("content") !== canonical) throw new Error(`${filePath}: catalog canonical/OG must stay query-free`);
+    for (const locale of ["ko", "en"]) if (document.querySelector(`link[hreflang="${locale}"]`)?.getAttribute("href") !== `https://worklazy.net/${locale}/tools/`) throw new Error(`${filePath}: catalog hreflang changed`);
+    const sitemap = await fs.readFile("dist/sitemap.xml", "utf8");
+    if (/\/tools\/?\?(?:category|from|do)=/.test(sitemap)) throw new Error("Filtered catalog URL leaked into sitemap");
+  }
   if (route === "tools/hwp-editor") {
     for (const [locale, target] of [["ko", "ko"], ["en", "en"], ["x-default", "en"]]) {
       if (!html.includes(`hreflang="${locale}" href="https://worklazy.net/${target}/tools/hwp-editor/"`)) {
