@@ -105,6 +105,7 @@ export function DocumentPdfPanel() {
     controller.current?.abort(); controller.current = undefined;
     setLoading(false); operation.reset();
   };
+  const requireReload = () => { officeSessionNeedsReload = true; setNeedsReload(true); };
   const run = async () => {
     if (!file || isHwp || loading || needsReload) return;
     const active = new AbortController(); controller.current = active;
@@ -123,8 +124,7 @@ export function DocumentPdfPanel() {
       if (active.signal.aborted) return;
       const code = (reason as Error).message;
       if (code === "office-operation-timeout") {
-        officeSessionNeedsReload = true;
-        setNeedsReload(true);
+        requireReload();
       }
       const message = code === "encrypted-document"
         ? L("암호화된 Office 파일은 지원하지 않습니다. 암호를 해제한 사본을 선택해 주세요.", "Encrypted Office files are not supported. Choose an unlocked copy.")
@@ -138,7 +138,7 @@ export function DocumentPdfPanel() {
       if (controller.current === active) { controller.current = undefined; setLoading(false); }
     }
   };
-  if (batchFiles) return <div ref={intakeRoot}>{recovery}<BatchConversionPanel mode="document-pdf" files={batchFiles} onClose={() => setBatchFiles(undefined)} /></div>;
+  if (batchFiles) return <div ref={intakeRoot}>{recovery}<BatchConversionPanel mode="document-pdf" files={batchFiles} needsReload={needsReload} onNeedsReload={requireReload} onClose={() => setBatchFiles(undefined)} /></div>;
   return <div ref={intakeRoot} data-document-pdf-ready={crossOriginIsolated}>
     {recovery}
     <SectionCard step={1} title={L("문서 선택", "Choose a document")} description="HWP · HWPX · DOC · DOCX · XLS · XLSX · PPT · PPTX">

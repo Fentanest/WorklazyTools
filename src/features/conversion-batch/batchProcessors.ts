@@ -46,7 +46,8 @@ export function batchProcessor(mode: BatchMode, options: BatchOptions, language:
     } catch (error) {
       if (signal.aborted || error instanceof BatchFailure) throw error;
       const code = error && typeof error === "object" && "code" in error ? error.code : error instanceof Error ? error.message : "";
-      throw new BatchFailure(code === "ENCRYPTED" || code === "encrypted-document" ? "encrypted"
+      throw new BatchFailure(mode === "document-pdf" && code === "office-operation-timeout" ? "reload-required"
+        : code === "ENCRYPTED" || code === "encrypted-document" ? "encrypted"
         : code === "NO_TEXT" ? "no-text" : code === "NO_TABLES" ? "no-tables" : code === "OCR_REQUIRED_FOR_TABLES" ? "ocr-required-for-tables" : code === "SCAN_TABLE_UNAVAILABLE" ? "scan-table-unavailable" : code === "IMAGE_DECODE" ? "image-decode" : code === "BATCH_IMAGE_LIMIT" ? "output-limit"
         : code === "RUNTIME_UNAVAILABLE" || code === "isolation-required" ? "unavailable"
         : ["WORKER_TIMEOUT", "CONVERSION_TIMEOUT", "office-operation-timeout"].includes(String(code)) ? "timeout" : "conversion");

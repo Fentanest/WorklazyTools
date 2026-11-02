@@ -87,3 +87,28 @@ test("healthy document PDF handoff still accepts input and installs protection",
   assert.equal(p.find(p.render(), "FileDropZone").files[0], original);
   assert.deepEqual(p.counts(), { inspections: 1, conversions: 0, guards: 1 });
 });
+
+
+test("batch timeout persists the reload guard across removal, single-file view and remount", async () => {
+  const p = panel(); const originals = [input(), input()];
+  p.find(p.render(), "FileDropZone").onFiles(originals);
+  let batch = p.find(p.render(), "BatchConversionPanel");
+  assert.equal(batch.needsReload, false);
+  batch.onNeedsReload();
+  batch = p.find(p.render(), "BatchConversionPanel");
+  assert.equal(batch.needsReload, true);
+  assert.equal(batch.files, originals);
+  assert.equal(p.find(p.render(), "PersistentHandoffNotice").disabled, true);
+  p.adapter().invalidate();
+  assert.equal(p.find(p.render(), "BatchConversionPanel").files, originals);
+  const result = await p.adapter().receive([input()], context());
+  assert.equal(result.status, "rejected");
+  assert.equal(result.rejected[0].reasonCode, "reload-required");
+  batch.onClose();
+  let tree = p.render();
+  assert.equal(p.find(tree, "FileDropZone").disabled, true);
+  assert.equal(p.find(tree, "PrimaryButton").children, "documentPdf.reload");
+  tree = p.remount();
+  assert.equal(p.find(tree, "PrimaryButton").children, "documentPdf.reload");
+  assert.deepEqual(p.counts(), { inspections: 0, conversions: 0, guards: 0 });
+});

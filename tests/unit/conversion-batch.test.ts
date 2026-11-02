@@ -53,3 +53,22 @@ test("maximum-length duplicate filenames terminate with distinct valid UTF-8 nam
   await queue.run(async () => output("가".repeat(83) + ".docx"));
   const names = queue.items.map(item => item.output!.fileName); assert.notEqual(names[0], names[1]); assert.ok(names.every(name => new TextEncoder().encode(name).length <= 255)); assert.match(names[1], /-2\.docx$/); queue.dispose();
 });
+
+
+test("Office session timeout stops the batch without losing completed downloads or pending originals", async () => {
+  const queue = new BatchQueue(() => undefined);
+  queue.add([file("saved.docx"), file("timeout.docx"), file("pending.docx")]);
+  const seen: string[] = [];
+  await queue.run(async input => {
+    seen.push(input.name);
+    if (input.name === "timeout.docx") throw new BatchFailure("reload-required");
+    return output("saved.pdf");
+  });
+  assert.deepEqual(seen, ["saved.docx", "timeout.docx"]);
+  assert.deepEqual(queue.items.map(item => item.status), ["success", "failed", "pending"]);
+  assert.equal(queue.items[1].error, "reload-required");
+  assert.equal(await queue.items[0].output?.blob.text(), "result");
+  assert.equal(queue.items[2].file.name, "pending.docx");
+  assert.equal(queue.running, false);
+  queue.dispose();
+});
