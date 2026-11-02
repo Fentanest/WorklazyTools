@@ -2947,6 +2947,7 @@
     "fallbackNotice": "The file processing engine could not be initialized in the current environment. File selection is disabled, but you can view the usage guide and precautions below."
   },
   "documentGenerator": {
+    "handoffTemplateOnly": "The template opened, but the data files could not be opened. Select the data files again.",
     "eyebrow": "Word Mail Merge",
     "title": "Template-based Bulk Document Generator",
     "description": "Replace variables in a Word template with Excel data to automatically generate multiple documents at once.",

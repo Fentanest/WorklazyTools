@@ -197,7 +197,9 @@ export function DocumentGeneratorPage() {
 
   return <UtilityPage toolId="document-generator"><div ref={intakeRoot} className="contents">
       {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
-        <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+        <p>{handoff.result?.status === "partial" && templateFile && !dataFiles.length
+          ? tr("features:documentGenerator.handoffTemplateOnly")
+          : ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
         <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
         <div className="flex flex-wrap gap-2">
           {!!handoff.recoveryFiles.length && <Button type="button" variant="outline" onClick={() => {
