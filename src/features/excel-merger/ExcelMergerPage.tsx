@@ -95,6 +95,7 @@ export function ExcelMergerPage() {
   const standardPath = useLocalizedPath("/tools/excel-merger/");
   const preservePath = useLocalizedPath("/tools/excel-merger/xls-preserve/");
   const [entries, setEntries] = useState<ExcelFileEntry[]>([]);
+  const handoffRollback = useRef<{ generation: number; signal: AbortSignal; ids: Set<string> } | null>(null);
   const [mergeMode, setMergeMode] = useState<MergeMode>("sheets");
   const [xlsxFormulas, setXlsxFormulas] = useState(true);
   const [xlsxFormatting, setXlsxFormatting] = useState(true);
@@ -187,9 +188,9 @@ export function ExcelMergerPage() {
       sheetNames: [],
       selectedSheetNames: [],
     }));
+    if (context) handoffRollback.current = { generation, signal: context.signal, ids: new Set(additions.map(item => item.id)) };
     setEntries((current) => [...current, ...additions]);
-    clearResult();
-    setError(null);
+    if (!context) { clearResult(); setError(null); }
 
     const legacyAdditions = preserveLegacyXls
       ? (await Promise.all(additions.map(async (entry) => ({
@@ -206,6 +207,7 @@ export function ExcelMergerPage() {
     return await inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
       .then((inspectionResults) => {
         if (!currentIntake()) return [];
+        if (context) { handoffRollback.current = null; clearResult(); setError(null); }
         const byId = new Map(inspectionResults.map((item) => [item.id, item]));
         setEntries((current) => current.map((entry) => {
           const inspectionResult = byId.get(entry.id);
@@ -218,6 +220,7 @@ export function ExcelMergerPage() {
       })
       .catch((inspectionError: Error) => {
         if (!currentIntake()) return [];
+        if (context) handoffRollback.current = null;
         setEntries((current) => current.map((entry) => additions.some((item) => item.id === entry.id)
           ? { ...entry, inspection: "error", error: inspectionError.message }
           : entry));
@@ -494,7 +497,13 @@ export function ExcelMergerPage() {
   useUnsavedWorkGuard("excel-merger", entries.length > 0 || !!result, { kind: "files", scopePath: "/tools/excel-merger", safePaths: ["/tools/excel-merger", "/tools/excel-merger/xls-preserve"] });
   const handoff = useHandoffReceiver("excel-merger", {
     kind: "inspection",
-    invalidate: () => { intakeGeneration.current++; setEntries([]); clearResult(); setError(null); },
+    invalidate: () => {
+      const rollback = handoffRollback.current;
+      if (!rollback?.signal.aborted) return;
+      handoffRollback.current = null;
+      if (rollback.generation === intakeGeneration.current) intakeGeneration.current++;
+      setEntries(current => current.filter(item => !rollback.ids.has(item.id)));
+    },
     receive: async (entry, context) => {
       const eligible = entry.files.filter(file => acceptsFile("excel-merger", file)).slice(0, Math.max(0, 50 - entries.length));
       const accepted = await handleFiles(eligible, context);

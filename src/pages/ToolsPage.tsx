@@ -16,16 +16,6 @@ import { useToolCatalog } from "../i18n/useToolCatalog";
 import { cn } from "../lib/utils";
 
 type CategoryFilter = "all" | ToolCategoryId;
-// These are topic filters, not another accepted-file contract or receiver list.
-const fromToolIds: Record<string, readonly string[]> = {
-  pdf: ["pdf-editor", "pdf-converter", "pdf-compare", "document-redactor", "document-markdown"],
-  image: ["image-studio", "image-privacy", "image-compare", "document-redactor", "pdf-converter", "qr-studio"],
-  spreadsheet: ["excel-merger", "excel-cleaner", "excel-compare", "data-converter", "document-generator", "document-markdown", "office-editor", "product-banner", "qr-studio"],
-  document: ["document-compare", "document-generator", "document-markdown", "office-editor", "pdf-converter", "hwp-editor"],
-  hwp: ["hwp-editor", "document-compare", "pdf-converter"],
-  text: ["text-compare", "text-merger", "text-tools", "text-formatter", "data-converter", "qr-studio"],
-  audio: ["audio-studio"],
-};
 
 export function ToolsPage() {
   const { t } = useTranslation(["tools", "common"]);
@@ -69,7 +59,7 @@ export function ToolsPage() {
     .filter((category) => activeCategory === "all" || category.id === activeCategory)
     .map((category) => ({
       category,
-      tools: matchTools(tools.filter((tool) => tool.category === category.id && (!from || fromToolIds[from]?.includes(tool.id)) && (!action || tool.actions.includes(action as typeof tool.actions[number]))).map((tool) => ({
+      tools: matchTools(tools.filter((tool) => tool.category === category.id && (!from || tool.inputTopics.some(topic => topic === from)) && (!action || tool.actions.includes(action as typeof tool.actions[number]))).map((tool) => ({
         ...tool,
         categoryLabel: category.label,
         categoryShortLabel: category.shortLabel,
