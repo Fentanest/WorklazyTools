@@ -11,7 +11,7 @@ import type { ImageEditorDirectHandle } from '../ImageStudioPage';
 import type { ImageDirectPreset } from '../imageDirect';
 import { ClipboardHint, filterRasterImages, RASTER_IMAGE_ACCEPT } from '../imageStudioShared';
 import { BackgroundRemovalController, BgRemovalError, messages, type BgMode, type ConsentInfo } from '../bgRemoval';
-import { actualShrinkNotice, classifyD6, draftD6Props } from './d6Policy';
+import { actualShrinkNotice, classifyD6, draftD6Props, flattenWorkingSceneTarget } from './d6Policy';
 import { prepareImage, type PreparedImage } from './prepareImage';
 import { resizeResult } from './resizeResult';
 import type { PixelSize } from './d6Policy';
@@ -42,11 +42,13 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [outputSize, setOutputSize] = useState<PixelSize>();
   const [ratioLocked, setRatioLocked] = useState(true);
   const documentRevision = useRef(0);
-  const pendingCommits = useRef<{ version: number; revision: number; destination: 'result' | 'batch'; size?: PixelSize }[]>([]);
+  const pendingCommits = useRef<{ version: number; revision: number; destination: 'result' | 'batch' | 'download'; size?: PixelSize }[]>([]);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [hasTemplateInput, setHasTemplateInput] = useState(false);
   const [error, setError] = useState('');
+  const [errorCode, setErrorCode] = useState<string>();
+  const [flattenTarget, setFlattenTarget] = useState<PixelSize>();
   const [notice, setNotice] = useState('');
   const [mode, setMode] = useState<BgMode>('person');
   const modeRef = useRef(mode); modeRef.current = mode;
@@ -54,6 +56,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [bgBusy, setBgBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<File>();
+  const [resultSize, setResultSize] = useState<PixelSize>();
   const [resultUrl, setResultUrl] = useState<string>();
   const [adding, setAdding] = useState(false);
   const [exportPrompt, setExportPrompt] = useState<PendingDecision<ExportDecision>>();
@@ -66,7 +69,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const activeRef = useRef(active); activeRef.current = active;
   const onDirtyRef = useRef(onDirty); onDirtyRef.current = onDirty;
   const loadedAck = useRef<{ resolve: (ok: boolean) => void; version: number } | undefined>(undefined);
-  const destination = useRef<'result' | 'batch'>('result');
+  const destination = useRef<'result' | 'batch' | 'download'>('result');
   const batchLock = useRef(false);
   const batchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const saving = useRef(false);
@@ -119,7 +122,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const receive = async (file: File, context?: IntakeContext) => {
     if (!filterRasterImages([file]).length || context?.signal.aborted) return false;
     cancel(); const request = version.current;
-    setLoading(true); setError(''); setNotice(''); setResult(undefined); setOutputSize(undefined);
+    setLoading(true); setError(''); setErrorCode(undefined); setNotice(''); setResult(undefined); setOutputSize(undefined);
     const abort = () => { if (request === version.current) cancel(); };
     context?.signal.addEventListener('abort', abort, { once: true });
     try {
@@ -157,6 +160,23 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     return () => document.removeEventListener('paste', paste, true);
   }, []);
   const editorArea = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const area = editorArea.current;
+    if (!area) return;
+    const sync = () => {
+      const canvas = area.querySelector<HTMLCanvasElement>('.lower-canvas');
+      if (!canvas) return;
+      // Fabric writes logical scene pixels to inline width/height; backing width
+      // additionally contains retina scaling and must not set the export target.
+      const width = Math.round(parseFloat(canvas.style.width));
+      const height = Math.round(parseFloat(canvas.style.height));
+      const next = flattenWorkingSceneTarget({ width, height }, policy.resolutionLimits.flattenMaxPixels);
+      if (next) setFlattenTarget(old => old?.width === next.width && old.height === next.height ? old : next);
+    };
+    const observer = new MutationObserver(sync);
+    observer.observe(area, { childList: true, subtree: true, attributes: true, attributeFilter: ['width', 'height', 'style'] });
+    sync(); return () => observer.disconnect();
+  }, [generation, policy]);
   const clearWatermarkDraft = () => {
     const input = editorArea.current?.querySelector<HTMLInputElement>('#asp-text-input');
     if (!input) return;
@@ -202,7 +222,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const finishExport = (value: ExportDecision) => { exportPending.current?.resolve(value); exportPending.current = undefined; setExportPrompt(undefined); };
   const finishConsent = (value: boolean) => { consentPending.current?.resolve(value); consentPending.current = undefined; setConsent(undefined); };
   const backgroundRemovalLoader = async () => ({ removeBackground: async (input: Blob | string) => {
-    const request = version.current; setBgBusy(true); setProgress(0); setError('');
+    const request = version.current; setBgBusy(true); setProgress(0); setError(''); setErrorCode(undefined);
     try {
       const controller = bg.current;
       if (!controller || !activeRef.current) throw new BgRemovalError('ai-cancelled');
@@ -210,7 +230,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         if (request === version.current) setProgress(total > 0 ? Math.round(current / total * 100) : 0);
       } });
     } catch (cause) {
-      if (request === version.current && cause instanceof BgRemovalError && cause.code !== 'ai-cancelled') setError(messages[language][cause.code]);
+      if (request === version.current && cause instanceof BgRemovalError && cause.code !== 'ai-cancelled') { setErrorCode(cause.code); setError(messages[language][cause.code]); }
       throw cause;
     } finally { if (request === version.current) setBgBusy(false); }
   } });
@@ -220,9 +240,18 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     const { version: request, revision, size: target } = intent;
     try {
       const encoded = await resizeResult(blob, target);
-      if (!activeRef.current || request !== version.current || revision !== documentRevision.current) return;
+      if (!activeRef.current || request !== version.current) return;
+      if (revision !== documentRevision.current) { setNotice(t('image.library.resultChanged')); return; }
       const file = new File([encoded], `${(sourceRef.current?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited.png`, { type: 'image/png' });
-      if (intent.destination === 'batch') onEditedResult(file); else setResult(file);
+      if (intent.destination === 'batch') onEditedResult(file);
+      else {
+        setResultSize(undefined); setResult(file);
+        if (intent.destination === 'download') {
+          const url = URL.createObjectURL(file), anchor = document.createElement('a');
+          anchor.href = url; anchor.download = file.name; anchor.click();
+          setTimeout(() => URL.revokeObjectURL(url), 30_000);
+        }
+      }
     } catch { if (request === version.current) setError(t('image.library.exportFailed')); }
     finally { if (request === version.current) { destination.current = 'result'; saving.current = false; } }
   };
@@ -237,7 +266,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     if (next[other] > edge) { next[axis] = Math.max(1, Math.round(next[axis] * edge / next[other])); next[other] = edge; }
     setOutputSize(next); setResult(undefined);
   };
-  const commit = (target: 'result' | 'batch') => {
+  const commit = (target: 'result' | 'batch' | 'download') => {
     if (target === 'batch') {
       clearTimeout(batchTimer.current);
       batchTimer.current = setTimeout(() => { batchLock.current = false; setAdding(false); }, 600);
@@ -251,14 +280,15 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     const button = editorArea.current?.querySelector<HTMLButtonElement>('.asp-commit');
     if (button) button.click(); else { saving.current = false; destination.current = 'result'; setError(t('image.library.exportFailed')); }
   };
+  const displayedError = errorCode?.startsWith('bg-') ? messages[language][errorCode as keyof typeof messages.ko] || error : error;
   const shrink = source && actualShrinkNotice(source.original, source.decoded, language);
   return <UtilitySectionCard title={t('image.editor.title')} description={t('image.library.description')}>
     <div ref={root} data-testid="library-image-editor">
       <FileDropZone files={source ? [source.file] : []} disabled={loading || bgBusy} accept={RASTER_IMAGE_ACCEPT} hint={t('image.editor.hint')} onFiles={files => { const next = filterRasterImages(files).at(-1); if (next) void receiveRef.current(next); }} accent="sky" />
       <ClipboardHint mode="replace" />
       {shrink && <UtilityNotice role="status" className="mt-2" data-testid="image-editor-shrink">{shrink}</UtilityNotice>}
-      {error && <UtilityNotice kind="error" role="alert" className="mt-2">{error}{mode === 'product' && ['bg-inference-failed', 'bg-unsupported'].some(code => messages[language][code as 'bg-unsupported'] === error) && <Button className="ml-2" type="button" variant="outline" onClick={() => {
-        modeChosen.current = true; modeRef.current = 'person'; setMode('person'); setError(''); setNotice(t('image.library.retryReady'));
+      {displayedError && <UtilityNotice kind="error" role="alert" className="mt-2">{displayedError}{mode === 'product' && (errorCode === 'bg-inference-failed' || errorCode === 'bg-unsupported') && <Button className="ml-2" type="button" variant="outline" onClick={() => {
+        modeChosen.current = true; modeRef.current = 'person'; setMode('person'); setError(''); setErrorCode(undefined); setNotice(t('image.library.retryReady'));
       }}>{t('image.library.retryPerson')}</Button>}</UtilityNotice>}
       {notice && <UtilityNotice role="status" className="mt-2">{notice}</UtilityNotice>}
       <UtilityNotice className="mt-2">{t('image.library.redactionHint')}</UtilityNotice>
@@ -295,7 +325,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       }}>
         <ImageEditor key={generation} src={source?.file ?? null} mode="full" height={640} themeMode={theme} baseColor={theme === 'dark' ? '#18181b' : '#ffffff'} accentColor="#0284c7"
           exportFormats={FORMATS} exportQuality={92} jpegExportQuality={95} commitFormat="png" showCommit commitLabel={t('image.library.makeResult')}
-          resolutionLimits={policy.resolutionLimits} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
+          resolutionLimits={policy.resolutionLimits} flattenTarget={flattenTarget} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
           labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
           onImageLoaded={() => { if (generation !== latestGeneration.current) return; lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false); loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false); if (selectedPreset?.purpose === 'watermark') requestAnimationFrame(clearWatermarkDraft); }}
           onDirtyChange={value => { if (generation !== latestGeneration.current) return; setDirty(value); if (value) setResult(undefined); }}
@@ -303,7 +333,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
             if (generation !== latestGeneration.current) return true;
             saving.current = false; destination.current = 'result'; pendingCommits.current = []; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);
-            if (!failure.code.endsWith('cancelled')) setError(messages[language][failure.code as keyof typeof messages.ko] || labels[ERROR_MESSAGES[failure.code]] || t('image.library.failed'));
+            if (!failure.code.endsWith('cancelled')) { setErrorCode(failure.code); setError(messages[language][failure.code as keyof typeof messages.ko] || labels[ERROR_MESSAGES[failure.code]] || t('image.library.failed')); }
             return true;
           }} />
       </div>
@@ -311,10 +341,11 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         <Button variant="outline" type="button" data-testid="image-editor-add-to-batch" aria-disabled={adding} className={adding ? 'opacity-60' : ''} disabled={!loaded || loading || bgBusy} onClick={() => commit('batch')}>{t('image.handoff.add', { count: batchCount })}</Button>
         {batchNotice && <span role="status">{t(`image.handoff.${batchNotice}`)}</span>}
       </div>
-      {result && resultUrl && <div className="mt-3 rounded-xl border border-border p-3" data-testid="image-editor-result">
-        <img src={resultUrl} alt={t('image.library.resultAlt')} className="max-h-64 max-w-full object-contain" />
+      <div className="mt-3" data-testid="image-editor-export-action"><Button type="button" variant="outline" disabled={!loaded || loading || bgBusy} onClick={() => commit('download')}>{t('image.editor.download')}</Button></div>
+      {result && resultUrl && <div className="mt-3 rounded-xl border border-border p-3" data-testid="image-editor-export-result" data-width={resultSize?.width} data-height={resultSize?.height}><div data-testid="image-editor-result">
+        <img src={resultUrl} onLoad={event => { const image = event.currentTarget; if (image.currentSrc === resultUrl) setResultSize({ width: image.naturalWidth, height: image.naturalHeight }); }} alt={t('image.library.resultAlt')} className="max-h-64 max-w-full object-contain" />
         <a className="mt-2 inline-flex min-h-11 items-center text-primary underline" href={resultUrl} download={result.name}>{t('image.editor.download')}</a>
-      </div>}
+      </div></div>}
       {exportPrompt && <DecisionDialog title={t('image.library.exportWarningTitle')} onCancel={() => finishExport('cancel')}>
         <p>{t('image.library.exportWarning')}</p><div className="mt-4 flex flex-wrap gap-2">
           <Button autoFocus onClick={() => finishExport('flatten')}>{t('image.library.flatten')}</Button><Button variant="outline" onClick={() => finishExport('proceed')}>{t('image.library.proceed')}</Button><Button variant="ghost" onClick={() => finishExport('cancel')}>{t('image.cancel')}</Button>

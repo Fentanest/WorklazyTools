@@ -1,3 +1,4 @@
+import { isLibraryImageEditor, runLibraryImageSmoke, assertLibraryDirectTool } from './image-editor-library-smoke.mjs';
 // Core ownership evidence. D3 owns full static/SEO and 14-row navigation integration.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -45,9 +46,11 @@ try{
     continue;
   }
   await page.goto(`${base}/${lang}${row.path}/`);
-  await page.locator(row.readySelector).waitFor();
+  const libraryRow = row.owner === 'image-studio' && await isLibraryImageEditor(page);
+  if(libraryRow) await assertLibraryDirectTool(page,row.purpose,lang);
+  else await page.locator(row.readySelector).waitFor();
   if(row.owner==='pdf-organize') { const expected=row.purpose==='split'?1:0;assert.equal(await page.locator('.pdf-output-mode-list [role=radio]').nth(expected).getAttribute('aria-checked'),'true'); }
-  if(row.owner==='image-studio') assert.equal(await page.locator('[data-testid=image-editor-options-panel]').getAttribute('data-panel'),row.postLoadAssertions.panel);
+  if(row.owner==='image-studio' && !libraryRow) assert.equal(await page.locator('[data-testid=image-editor-options-panel]').getAttribute('data-panel'),row.postLoadAssertions.panel);
   if(row.owner==='pdf-convert') assert.equal(await page.locator('.pdf-format-grid [role=radio]').nth(row.purpose==='ocr'?3:0).getAttribute('aria-checked'),'true');
   report.direct.push(`${lang}:${row.path}`);
  }
@@ -90,6 +93,8 @@ try{
  assert.equal(await page.locator('.pdf-page-card').count(),3);check('PDF back/forward use the same approval contract and retain pages');
  }
  if(selected.has('image')) {
+ await page.goto(`${base}/en/tools/image-studio/resize/`);
+ if(await isLibraryImageEditor(page)) { await runLibraryImageSmoke(base,path.join(out,'library'));check('library image direct-entry, W2, H1 and export contracts'); } else {
  await page.goto(`${base}/en/tools/image-studio/resize/`);await purpose('resize');
  await page.locator('[data-testid=image-editor-options-panel][data-panel=size]').waitFor();
  await page.locator('[data-testid=image-editor-panel-text]').click();
@@ -112,6 +117,7 @@ try{
  await page.getByRole('button',{name:'Batch edit',exact:true}).click();assert.equal(await page.locator('[data-image-owner=batch]').getByText('input.png',{exact:true}).count(),1);
  await page.keyboard.press('Delete');
  await page.getByRole('button',{name:'Image editor',exact:true}).click();await page.locator('[data-image-owner=editor]').getByText('1 files selected',{exact:true}).waitFor();check('image other-tab inputs retained after purpose acceptance; hidden editor key listener gated');
+ }
  }
  if(selected.has('audio')) {
  await page.goto(`${base}/en/tools/audio-studio/trim/`);await purpose('trim');await page.locator('input[type=file]').first().setInputFiles(path.join(out,'input.wav'));

@@ -129,6 +129,13 @@ jobs:
           path: .cache/zetaoffice/2026-08-25
           key: zetaoffice-2026-08-25-9ebd9a48-3dab0a54-nanum76f45ef4
 
+      - name: Restore pinned background removal models
+        uses: actions/cache@v4
+        with:
+          path: .cache/image-studio-assets/bg-removal
+          key: bg-removal-v1-${{ hashFiles('src/features/image-studio/bgRemoval/model.manifest.json') }}
+          restore-keys: bg-removal-v1-
+
       - name: Build static site
         run: npm run build
         env:
@@ -176,6 +183,10 @@ jobs:
 
       - name: Validate SEO and AdSense files
         run: npm run test:static
+
+      - name: Enforce final uncompressed Pages tree budget
+        # Includes FolioTrace/calendar additions above. No upload on a budget failure.
+        run: node scripts/check-pages-budget.mjs dist
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

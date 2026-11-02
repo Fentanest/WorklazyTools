@@ -52,3 +52,11 @@ test('notice omits unchanged, upscaled, invalid, and unnormalized orientation si
     assert.equal(actualShrinkNotice(from, to, 'en'), null);
   }
 });
+
+test('flatten output retains the logical full scene rather than upsampling to the input cap', async () => {
+  const { flattenWorkingSceneTarget } = await import('../../src/features/image-studio/editor/d6Policy.ts');
+  assert.deepEqual(flattenWorkingSceneTarget({width:1000,height:700},draftD6Props('B').resolutionLimits.flattenMaxPixels),{width:1000,height:700});
+  for(const tier of ['A','B'] as const) { const cap=draftD6Props(tier).resolutionLimits.flattenMaxPixels;const target=flattenWorkingSceneTarget({width:12000,height:8000},cap)!;assert.ok(target.width*target.height<=cap);assert.ok(Math.abs(target.width/target.height-1.5)<.001); }
+  assert.deepEqual(flattenWorkingSceneTarget({width:1000000000,height:1},100),{width:100,height:1});
+  assert.equal(flattenWorkingSceneTarget({width:0,height:700},100),undefined);
+});

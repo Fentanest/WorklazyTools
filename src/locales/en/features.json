@@ -1368,7 +1368,7 @@
       "makeResult": "Create edited result",
       "resultAlt": "Edited result preview",
       "exportWarningTitle": "This format may retain the original",
-      "exportWarning": "This image has used concealment. SVG, JSON and templates may retain the original image. Flatten the layers or save as PNG. Flattening combines the entire working scene into one image and preserves the editing scene.",
+      "exportWarning": "This image has used concealment. SVG, JSON and templates may retain the original image. Flatten the layers or save as PNG. Flattening combines the entire working scene into one image and preserves the editing scene. Export as is keeps the original pixels beneath concealment; removing those objects can reveal them.",
       "flatten": "Flatten layers and export",
       "proceed": "Export as is",
       "downloadTitle": "Download background removal files",
@@ -1605,7 +1605,8 @@
       "pngSize": "PNG result size",
       "pngSizeHelp": "Applies to Create edited result and Add to batch. The Export menu uses the editor’s own output settings.",
       "keepRatio": "Keep aspect ratio",
-      "autoSize": "Automatic size"
+      "autoSize": "Automatic size",
+      "resultChanged": "The edit changed while the result was being prepared. Create the result again."
     }
   },
   "video": {

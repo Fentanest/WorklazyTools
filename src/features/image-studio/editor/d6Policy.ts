@@ -51,3 +51,17 @@ export function actualShrinkNotice(original: PixelSize, decoded: PixelSize, loca
     ? `이미지가 ${from}에서 ${to}픽셀로 줄어들었습니다. 현재 편집에는 줄어든 이미지를 사용합니다.`
     : `The image was reduced from ${from} to ${to} pixels. Editing uses the reduced image.`;
 }
+
+/** Full working-scene output, never the CSS/retina backing size or a source-photo upsample. */
+export function flattenWorkingSceneTarget(surface: PixelSize, maxPixels: number): PixelSize | undefined {
+  if (![surface.width, surface.height, maxPixels].every(n => Number.isSafeInteger(n) && n > 0)) return undefined;
+  const scale = Math.min(1, Math.sqrt(maxPixels / (surface.width * surface.height)));
+  let width = Math.max(1, Math.floor(surface.width * scale));
+  let height = Math.max(1, Math.floor(surface.height * scale));
+  // The one-pixel minimum can exceed an area cap for extremely thin surfaces.
+  if (width * height > maxPixels) {
+    if (width >= height) width = Math.floor(maxPixels / height);
+    else height = Math.floor(maxPixels / width);
+  }
+  return { width, height };
+}

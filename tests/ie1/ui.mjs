@@ -4,8 +4,10 @@ import fs from 'node:fs/promises';
 import { chromium } from 'playwright';
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4196';
 const out = process.env.IE1_OUTPUT || '/tmp/sol-ie1';
+const dpr = Number(process.env.IE1_DPR || 1);
+assert.ok(Number.isFinite(dpr) && dpr > 0 && dpr <= 4, 'IE1_DPR must be in (0,4]');
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-const context = await browser.newContext();
+const context = await browser.newContext({ deviceScaleFactor:dpr });
 const requests = [], errors = [];
 await context.route('**/*', route => {
   const url = route.request().url(); requests.push(url);
@@ -79,6 +81,24 @@ try {
       const downloading=p.waitForEvent('download');await p.locator('[data-testid=image-batch-action] button').click();const download=await downloading;const zip=await JSZip.loadAsync(await fs.readFile(await download.path()));const entry=Object.values(zip.files).find(value=>!value.dir);const {PNG}=await import('pngjs');const image=PNG.sync.read(await entry.async('nodebuffer'));assert.deepEqual([image.width,image.height],[200,120]);
       await fresh();await put();
     });
+    await scenario('legacy export identifiers provide a PNG download and actual result dimensions', async () => {
+      await fresh();await put();const downloading=p.waitForEvent('download');await p.locator('[data-testid=image-editor-export-action] button').click();const download=await downloading;assert.ok((await fs.stat(await download.path())).size>0);
+      await p.waitForFunction(()=>Number(document.querySelector('[data-testid=image-editor-export-result]')?.dataset.width)>0);
+      const expected=await p.locator('[data-testid=image-editor-result] img').evaluate(async image=>{await image.decode();return[image.naturalWidth,image.naturalHeight]});
+      const actual=await p.locator('[data-testid=image-editor-export-result]').evaluate(node=>[Number(node.dataset.width),Number(node.dataset.height)]);assert.deepEqual(actual,expected);
+    });
+    await scenario('product retry survives language changes using the error code', async () => {
+      await fresh();await put();await p.evaluate(()=>Object.defineProperty(navigator,'gpu',{value:undefined,configurable:true}));await p.locator('[data-testid=image-background-controls] select').selectOption('product');
+      await editor.getByRole('button',{name:'Magic — more tools',exact:true}).click();await editor.getByRole('menuitem',{name:'Remove background',exact:true}).click();await editor.getByRole('button',{name:'Remove background',exact:true}).last().click();
+      await editor.getByRole('button',{name:'Retry portrait mode',exact:true}).waitFor();await p.locator('.wl-topbar select[data-ui-component="language-switcher"]').selectOption('ko');
+      const retry=editor.getByRole('button',{name:'인물 모드로 다시',exact:true});await retry.waitFor();await retry.click();assert.equal(await p.locator('[data-testid=image-background-controls] select').inputValue(),'person');assert.equal(await editor.locator('[role=alert]').count(),0);
+    });
+    await scenario('an edit during result encoding discards the old result with a notice', async () => {
+      await fresh('watermark/');await put();const size=p.locator('[data-testid=image-editor-png-size]');await size.locator('input[type=number]').first().fill('200');
+      await p.evaluate(()=>{window.__ie1OriginalBlob=HTMLCanvasElement.prototype.toBlob;window.__ie1Hold=true;HTMLCanvasElement.prototype.toBlob=function(callback,...args){if(window.__ie1Hold){window.__ie1Hold=false;window.__ie1Release=()=>window.__ie1OriginalBlob.call(this,callback,...args)}else window.__ie1OriginalBlob.call(this,callback,...args)}});
+      await p.locator('[data-testid=image-editor-add-to-batch]').click();await p.waitForFunction(()=>typeof window.__ie1Release==='function');await editor.locator('#asp-text-input').fill('New edit');await editor.locator('.asp-text-add .asp-btn-accent').click();await p.evaluate(()=>window.__ie1Release());
+      await editor.getByText('The edit changed while the result was being prepared. Create the result again.',{exact:true}).waitFor();assert.equal(await p.locator('[data-testid=image-editor-result]').count(),0);await p.evaluate(()=>HTMLCanvasElement.prototype.toBlob=window.__ie1OriginalBlob);
+    });
     await scenario('W2 repeated trusted activations extend 600ms burst and enqueue one image', async () => {
       await fresh(); await put();
       const add = p.locator('[data-testid=image-editor-add-to-batch]');
@@ -121,7 +141,7 @@ try {
       const chooseJSON = async () => {
         await editor.getByRole('button', { name: 'Export', exact: true }).click();
         await editor.getByRole('button', { name: 'JSON', exact: true }).click();
-        await editor.getByRole('button', { name: 'Download image', exact: true }).click();
+        await editor.locator('.asp-menu--export .asp-download').click();
       };
       await chooseJSON(); const warning = p.getByRole('dialog', { name: 'This format may retain the original' }); await warning.waitFor();
       let downloadCount=0; const listener=()=>downloadCount++; p.on('download',listener);
@@ -129,6 +149,9 @@ try {
       await chooseJSON(); await warning.waitFor(); const downloading=p.waitForEvent('download');
       await warning.getByRole('button',{name:'Flatten layers and export',exact:true}).click();
       const file=await downloading; const json=JSON.parse(await fs.readFile(await file.path(),'utf8'));
+      const size = await p.evaluate(async src => { const bitmap=await createImageBitmap(await (await fetch(src)).blob());const out=[bitmap.width,bitmap.height];bitmap.close();return out; },json.objects[0].src);
+      const logical = await editor.locator('.lower-canvas').evaluate(canvas=>[Math.round(parseFloat(canvas.style.width)),Math.round(parseFloat(canvas.style.height))]);
+      assert.deepEqual(size,logical,'flatten uses logical working scene pixels, not DPR backing pixels or source-photo dimensions');
       assert.equal(json.objects.length,1); assert.match(json.objects[0].src,/^data:image\/png/); assert.notEqual(json.objects[0].aspRole,'redaction');
       p.off('download',listener);
       await p.screenshot({path:`${out}/mobile-editor.png`,fullPage:true});
