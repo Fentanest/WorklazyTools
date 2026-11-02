@@ -254,3 +254,31 @@ test("P3 aborted pending cancellation preserves the old token; malformed/missing
     await core.cancelPendingPersistentHandoff("document-redactor"); assert.equal(cleared, value !== null);
   }
 });
+
+const corruptExpiries = [undefined, null, "9999999999999", "invalid", NaN, Infinity, -Infinity, {}, []];
+test("P3b purge scans missing/non-numeric/non-finite expiry keys and preserves the strict boundary", async () => {
+  const now = 1000000;
+  const h = transactionHarness({ Date: class extends Date { static now() { return now; } } });
+  const pending = h.core.purgeExpired(); await tick();
+  const values = [...corruptExpiries, now - 1, now, now + 1];
+  const removed: number[] = [];
+  for (const [index, expiresAt] of values.entries()) {
+    h.requests[0].result = { value: { id: index, ...(expiresAt === undefined ? {} : { expiresAt }) },
+      delete: () => removed.push(index), continue: () => {} };
+    h.requests[0].onsuccess();
+  }
+  h.requests[0].result = null; h.requests[0].onsuccess();
+  let settled = false; void pending.then(() => { settled = true; }); await tick(); assert.equal(settled, false);
+  h.transaction.oncomplete(); await pending;
+  assert.deepEqual(removed, values.slice(0, -2).map((_, index) => index));
+});
+test("P3b stage retires corrupt expiries before quota accounting and preserves live records", async () => {
+  const now = 1000000;
+  const h = transactionHarness({ Date: class extends Date { static now() { return now; } } });
+  const pending = h.core.stagePersistentHandoff(file); await tick();
+  const records = corruptExpiries.map((expiresAt, id) => ({ id, expiresAt }));
+  h.requests[0].result = [...records, { id: "boundary", receiverId: "office-editor", file, expiresAt: now },
+    { id: "live", receiverId: "office-editor", file, expiresAt: now + 1 }];
+  h.requests[0].onsuccess(); h.transaction.oncomplete(); await pending;
+  assert.deepEqual(h.deleted, records.map(record => record.id)); assert.equal(h.inserted.length, 1);
+});
