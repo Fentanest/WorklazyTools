@@ -158,6 +158,7 @@ test("StrictMode lazy rejection shows only recovery, and a late owner result can
     if (name === "react-i18next") return { useTranslation: () => ({ t: (key: string) => key }) };
     if (name === "react-router-dom") return { useLocation: () => location };
     if (name.includes("chunkRecovery")) return recovery.exports;
+    if (name.includes("memoryHandoff")) return { transferToRecovery: () => {}, getRecovery: () => null, deferErrorNavigation: () => false };
     if (name.includes("adEligibility")) return { setAdIneligible: (_: string, value: boolean) => adStates.push(value) };
     if (name.includes("siteBasePath")) return { withSiteBasePath: (path: string) => path };
     return { Button: "button" };

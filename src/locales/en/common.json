@@ -186,5 +186,22 @@
     "characters": "{{count}} characters",
     "files": "{{count}} files",
     "tools": "{{count}} tools"
+  },
+  "handoff": {
+    "notReceived": "Please select your files again.",
+    "recoveryTitle": "Your result is still available.",
+    "downloadResult": "Download the result being transferred",
+    "discard": "Discard",
+    "unsavedResult": "The result being transferred has not been saved. Leaving will discard it.",
+    "memoryOnly": "This result is only in this tab. Download it before refreshing or closing the tab.",
+    "failed": "Could not transfer the files. Download the result or try again.",
+    "retry": "Try again",
+    "downloadReceived": "Download received files",
+    "partial": "Could not open {{count}} files",
+    "close": "Close",
+    "selectAgain": "Select again",
+    "count": "Check the number of files.",
+    "destination": "Files cannot be sent to this screen.",
+    "roles": "Select one template and at least one data file."
   }
 }

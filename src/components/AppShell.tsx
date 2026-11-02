@@ -28,10 +28,45 @@ export function useFocusMode() { return useContext(FocusModeContext); }
  * and may return false to report that the navigation did not happen (the
  * consumed one-shot allowance is then restored).
  */
-export const GuardedNavigateContext = createContext<(to: string, perform: () => boolean | void) => void>(
-  (_to, perform) => { perform(); },
+export type GuardedPerform = () => boolean | void | Promise<boolean | void>;
+export const GuardedNavigateContext = createContext<(to: string, perform: GuardedPerform) => void>(
+  (_to, perform) => { void perform(); },
 );
 export function useGuardedNavigate() { return useContext(GuardedNavigateContext); }
+/** Preflight precedes confirmation; staging happens only in the approved action. */
+export function useMemoryHandoff() {
+  const request = useGuardedNavigate();
+  const navigate = useNavigate();
+  const language = useAppLanguage();
+  const [reason, setReason] = useState<string | null>(null);
+  const busy = useRef(false);
+  const send = (input: HandoffInput) => {
+    const isolated = document.querySelector('meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"], meta[name="worklazy-video-isolation"]') || isRedactorDocument();
+    const invalid = isolated ? "destination" : validateHandoff(input);
+    setReason(invalid);
+    if (invalid || busy.current) return;
+    const to = localizedPath(language, input.entryPath);
+    request(to, async () => {
+      if (busy.current) return false;
+      busy.current = true;
+      const releaseHold = input.origin === "generated" ? acquireGeneratedHold() : undefined;
+      const sourcePath = `${window.location.pathname}${window.location.search}`;
+      let token: ReturnType<typeof stageHandoff> | undefined;
+      try {
+        if (input.origin === "generated") await preloadReceiver(input.receiverId);
+        if (`${window.location.pathname}${window.location.search}` !== sourcePath) return false;
+        token = stageHandoff(input);
+        navigate(to, { state: { wlHandoff: token } });
+        return true;
+      } catch {
+        if (token) cancelStagedHandoff(token);
+        setReason("failed"); return false;
+      } finally { releaseHold?.(); busy.current = false; }
+    });
+  };
+  return { send, reason };
+}
+
 import { useTranslation } from "react-i18next";
 import { Link, NavLink, Outlet, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -48,6 +83,9 @@ import { AnalyticsLoader, trackToolOpen } from "./AnalyticsLoader";
 import { AppInstallControl } from "./AppInstallControl";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { RouteSeo } from "./RouteSeo";
+import { HandoffRecoveryHost } from "./HandoffRecoveryHost";
+import { acquireGeneratedHold, cancelStagedHandoff, stageHandoff, validateHandoff, type HandoffInput } from "../app/memoryHandoff";
+import { preloadReceiver } from "../app/routePreload";
 import { RouteErrorBoundary } from "./RouteErrorBoundary";
 import { getUnsavedWorkKind, getUnsavedWorkMessageKey, hasUnsavedWork, isGuardedTarget, restoreLastOneShotSafeTarget, subscribeUnsavedWork } from "../app/toolState";
 import { featureMessage } from "../i18n/featureMessages";
@@ -110,7 +148,7 @@ export function AppShell() {
     leavingRef.current = false;
     setGuardOpen(false);
     if (hasUnsavedWork() && !guardEntryRef.current) {
-      window.history.pushState({ worklazyUnsavedGuard: true }, "", window.location.href);
+      window.history.pushState({ ...window.history.state, worklazyUnsavedGuard: true }, "", window.location.href);
       guardEntryRef.current = true;
       guardKeyRef.current = location.key;
     }
@@ -148,37 +186,40 @@ export function AppShell() {
     }
   }, []);
 
-  const requestGuardedNavigate = useCallback((to: string, perform: () => boolean | void) => {
-    let target: URL | null = null;
+  const runGuardedPerform = useCallback((perform: GuardedPerform) => {
+    const sourceHref = window.location.href;
+    const rearm = () => {
+      if (window.location.href !== sourceHref) return;
+      restoreLastOneShotSafeTarget();
+      leavingRef.current = false;
+      setGuardTick(tick => tick + 1);
+      if (hasUnsavedWork() && !guardEntryRef.current) {
+        window.history.pushState({ ...window.history.state, worklazyUnsavedGuard: true }, "", window.location.href);
+        guardEntryRef.current = true;
+        guardKeyRef.current = location.key;
+      }
+    };
     try {
-      target = new URL(to, window.location.href);
-    } catch {
-      perform();
-      return;
-    }
-    if (target.origin !== window.location.origin) {
-      perform();
-      return;
-    }
+      const result = perform();
+      if (result instanceof Promise) void result.then(value => { if (value === false) rearm(); }, rearm);
+      else if (result === false) rearm();
+    } catch (error) { rearm(); throw error; }
+  }, [location.key]);
+
+  const requestGuardedNavigate = useCallback((to: string, perform: GuardedPerform) => {
+    const run = () => runGuardedPerform(perform);
+    let target: URL;
+    try { target = new URL(to, window.location.href); } catch { run(); return; }
+    if (target.origin !== window.location.origin) { run(); return; }
     const targetRoute = stripSiteBasePath(target.pathname, import.meta.env.BASE_URL) ?? target.pathname;
     const currentRoute = stripSiteBasePath(window.location.pathname, import.meta.env.BASE_URL) ?? window.location.pathname;
     const targetStripped = stripLanguagePrefix(targetRoute).replace(/\/+$/, "") || "/";
     const currentStripped = stripLanguagePrefix(currentRoute).replace(/\/+$/, "") || "/";
-    if (targetStripped === currentStripped || !hasUnsavedWork() || !isGuardedTarget(targetStripped)) {
-      let result: boolean | void;
-      try {
-        result = perform();
-      } catch (error) {
-        restoreLastOneShotSafeTarget();
-        throw error;
-      }
-      if (result === false) restoreLastOneShotSafeTarget();
-      return;
-    }
-    pendingActionRef.current = perform;
+    if (targetStripped === currentStripped || !hasUnsavedWork() || !isGuardedTarget(targetStripped)) { run(); return; }
+    pendingActionRef.current = run;
     pendingIsBackRef.current = false;
     setGuardOpen(true);
-  }, []);
+  }, [runGuardedPerform]);
 
   useEffect(() => {
     const onClickCapture = (event: MouseEvent) => {
@@ -218,7 +259,8 @@ export function AppShell() {
   useEffect(() => {
     if (!unsavedActive) return;
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
+      // Recovery can clear the registry before React removes this listener.
+      if (hasUnsavedWork()) event.preventDefault();
     };
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
@@ -236,7 +278,7 @@ export function AppShell() {
       // always intercepted first and silent removal only ever pops our own
       // same-URL entry.
       if (!guardEntryRef.current || guardKeyRef.current !== location.key) {
-        window.history.pushState({ worklazyUnsavedGuard: true }, "", window.location.href);
+        window.history.pushState({ ...window.history.state, worklazyUnsavedGuard: true }, "", window.location.href);
         guardEntryRef.current = true;
         guardKeyRef.current = location.key;
       }
@@ -448,6 +490,7 @@ export function AppShell() {
       {focusMode !== "editor" && <TopBar theme={theme} onCycleTheme={cycleTheme} onToggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} onGuardedNavigate={requestGuardedNavigate} />}
 
       <main className={`main-content${redactorActive ? " redactor-main-content" : ""}`} id="main-content">
+        <HandoffRecoveryHost />
         <RouteErrorBoundary>
           {(!redactorActive || redactorDocument) && (!videoStudioActive || !import.meta.env.PROD || videoIsolationDocument && videoControllerReady) && <Outlet />}
           {redactorActive && !redactorDocument && <DocumentRedactorFallback />}
@@ -537,7 +580,7 @@ function TopBar({ theme, onCycleTheme, onToggleSidebar, sidebarCollapsed, onGuar
   onCycleTheme: () => void;
   onToggleSidebar: () => void;
   sidebarCollapsed: boolean;
-  onGuardedNavigate: (to: string, perform: () => boolean | void) => void;
+  onGuardedNavigate: (to: string, perform: GuardedPerform) => void;
 }) {
   const { t } = useTranslation("common");
   const language = useAppLanguage();

@@ -186,5 +186,22 @@
     "characters": "{{count}}자",
     "files": "{{count}}개 파일",
     "tools": "{{count}}개 도구"
+  },
+  "handoff": {
+    "notReceived": "파일을 다시 선택해 주세요.",
+    "recoveryTitle": "넘기던 결과가 남아 있습니다.",
+    "downloadResult": "넘기던 결과 다운로드",
+    "discard": "버리기",
+    "unsavedResult": "넘기던 결과가 아직 저장되지 않았습니다. 이동하면 결과가 사라집니다.",
+    "memoryOnly": "이 결과는 이 탭에만 있습니다. 새로고침하거나 탭을 닫기 전에 다운로드하세요.",
+    "failed": "파일을 넘기지 못했습니다. 결과를 다운로드하거나 다시 시도하세요.",
+    "retry": "다시 시도",
+    "downloadReceived": "받은 파일 다운로드",
+    "partial": "열지 못한 파일 {{count}}개",
+    "close": "닫기",
+    "selectAgain": "다시 선택",
+    "count": "파일 개수를 확인해 주세요.",
+    "destination": "이 화면으로 파일을 넘길 수 없습니다.",
+    "roles": "양식 파일 1개와 데이터 파일을 선택해 주세요."
   }
 }
