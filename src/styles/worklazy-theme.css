@@ -528,14 +528,14 @@
 .ui-tool-card-top > span:first-child { width: 46px; height: 46px; border-radius: 14px; }
 .ui-card-arrow { width: 34px; height: 34px; }
 .ui-tool-card-copy { margin-top: 16px; }
-.ui-tool-card-copy h2 { font-size: 17px; font-weight: 800; }
+.ui-tool-card-copy :is(h2, h3) { font-size: 17px; font-weight: 800; }
 .ui-tool-card-copy > p:last-child { min-height: 0; font-size: 13.5px; }
 .ui-tool-highlights span { background: var(--bg-muted); font-size: 12px; }
 .wl-local-card {
   border-color: var(--brand-border);
   background: linear-gradient(140deg, var(--brand-soft), transparent 70%), var(--bg-elevated);
 }
-.wl-local-card .ui-tool-card-copy h2 { color: var(--brand-on-bg); }
+.wl-local-card .ui-tool-card-copy :is(h2, h3) { color: var(--brand-on-bg); }
 
 /* ---------- Shared accent touch-ups ---------- */
 .ui-operation-progress.ui-accent-coral .ui-operation-state-icon { color: #d63a1f; background: rgba(232, 80, 47, 0.12); }
@@ -773,6 +773,7 @@ input:focus-visible {
 .tool-view-switch button[aria-pressed="true"] { background: var(--brand-soft); border-color: var(--brand-border); color: var(--brand-on-bg); }
 .tool-list { display: grid; gap: 8px; margin-top: 14px; }
 .tool-list-row { display: grid; grid-template-columns: 44px minmax(0,1fr) 18px; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--separator); border-radius: 14px; background: var(--bg-elevated); color: var(--foreground); }
+.tool-list-row-with-favorite { padding-right: 64px; }
 .tool-list-row:hover { border-color: var(--brand-border); background: var(--brand-soft); }
 .tool-list-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; }
 .tool-list-row h3 { margin: 0; font-size: 15px; font-weight: 750; overflow-wrap: anywhere; }

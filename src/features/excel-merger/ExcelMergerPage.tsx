@@ -157,9 +157,9 @@ export function ExcelMergerPage() {
   const visibleFiles = useMemo(() => entries.map((entry) => entry.file), [entries]);
 
   const handleFiles = async (nextFiles: File[], context?: IntakeContext): Promise<File[]> => {
+    if (precisionPreparing) return [];
     const generation = ++intakeGeneration.current;
     const currentIntake = () => generation === intakeGeneration.current && !context?.signal.aborted;
-    if (precisionPreparing) return [];
     const accepted: File[] = [];
     const rejected: string[] = [];
     const existingKeys = new Set(entries.map((entry) => fileKey(entry.file)));
@@ -200,15 +200,22 @@ export function ExcelMergerPage() {
       : [];
     if (!currentIntake()) return [];
     if (legacyAdditions.length) {
-      try {
-        const ready = await prepareLegacyInputs(additions, legacyAdditions, context, generation);
-        if (currentIntake() && context && ready.length) { clearResult(); setError(null); }
-        return ready;
-      } finally {
-        // Completed legacy inspection owns the inputs now; a late invalidate
-        // must not roll them back. Aborted inspections retain their rollback.
-        if (currentIntake() && handoffRollback.current?.generation === generation) handoffRollback.current = null;
+      const preparation = prepareLegacyInputs(additions, legacyAdditions, context, generation);
+      // Handoff must acknowledge inspected files; manual selection releases the
+      // drop zone while the cancellable preparation owns its separate UI lock.
+      if (context) {
+        try {
+          const ready = await preparation;
+          if (currentIntake() && ready.length) { clearResult(); setError(null); }
+          return ready;
+        } finally {
+          // Completed legacy inspection owns the inputs now; a late invalidate
+          // must not roll them back. Aborted inspections retain their rollback.
+          if (currentIntake() && handoffRollback.current?.generation === generation) handoffRollback.current = null;
+        }
       }
+      void preparation;
+      return [];
     }
 
     return await inspectExcelFiles(additions.map(({ id, file }) => ({ id, file, csvEncoding })), language)
@@ -516,16 +523,25 @@ export function ExcelMergerPage() {
     });
   };
 
+  const invalidateHandoff = () => {
+    const rollback = handoffRollback.current;
+    if (!rollback?.signal.aborted) return;
+    handoffRollback.current = null;
+    if (rollback.generation === intakeGeneration.current) {
+      intakeGeneration.current++;
+      if (precisionControllerRef.current) {
+        precisionControllerRef.current.abort();
+        setPrecisionPreparing(false);
+        operation.reset();
+      }
+    }
+    setEntries(current => current.filter(item => !rollback.ids.has(item.id)));
+  };
+
   useUnsavedWorkGuard("excel-merger", entries.length > 0 || !!result, { kind: "files", scopePath: "/tools/excel-merger", safePaths: ["/tools/excel-merger", "/tools/excel-merger/xls-preserve"] });
   const memoryHandoff = useHandoffReceiver("excel-merger", {
     kind: "inspection",
-    invalidate: () => {
-      const rollback = handoffRollback.current;
-      if (!rollback?.signal.aborted) return;
-      handoffRollback.current = null;
-      if (rollback.generation === intakeGeneration.current) intakeGeneration.current++;
-      setEntries(current => current.filter(item => !rollback.ids.has(item.id)));
-    },
+    invalidate: invalidateHandoff,
     receive: async (entry, context) => {
       const eligible = entry.files.filter(file => acceptsFile("excel-merger", file)).slice(0, Math.max(0, 50 - entries.length));
       const accepted = await handleFiles(eligible, context);
@@ -536,7 +552,7 @@ export function ExcelMergerPage() {
   });
   const persistentHandoff = usePersistentHandoffReceiver("xls-preserve", {
     kind: "inspection",
-    invalidate: () => { intakeGeneration.current++; precisionControllerRef.current?.abort(); setPrecisionPreparing(false); setEntries([]); clearResult(); setError(null); operation.reset(); },
+    invalidate: invalidateHandoff,
     receive: async (files, context) => {
       const accepted = await handleFiles(files.filter(file => acceptsFile("excel-merger", file)), context);
       if (context.signal.aborted) return { status: "cancelled", accepted: [], rejected: [] };

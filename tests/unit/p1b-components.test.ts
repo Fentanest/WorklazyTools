@@ -98,7 +98,7 @@ test("OperationProgress keeps W-D stage rows, active spinner, percentages, and p
   assert.match(source, /ui-status-\$\{status\}/);
 });
 
-test("ToolCard keeps a link root, per-tool accent, h2 title, and capped tags", () => {
+test("ToolCard keeps a link root, per-tool accent, contextual heading, and capped tags", () => {
   const source = read("src/components/ToolCard.tsx");
   const accentStyles = read("src/components/toolAccentStyles.ts");
   const registry = read("src/app/toolRegistry.ts");
@@ -109,9 +109,11 @@ test("ToolCard keeps a link root, per-tool accent, h2 title, and capped tags", (
   assert.match(source, /trackToolOpen\(tool\.id, featured \? "home_card" : "tools_card", language\)/);
   assert.match(source, /getToolIconTone\(tool\.id\)/);
   assert.match(source, /data-icon-tone=\{getToolIconTone\(tool\.id\)\}/);
-  // Card titles are h2; visible tags cap at 3 with icons while the registry
+  // Card titles use a contextual heading; visible tags cap at 3 with icons while the registry
   // keeps the full highlight list; the arrow lives in the top row.
-  assert.match(source, /<h2>\{tool\.title\}<\/h2>/);
+  assert.match(source, /<Heading>\{tool\.title\}<\/Heading>/);
+  assert.match(source, /headingLevel = 2/);
+  assert.match(source, /headingLevel === 3 \? "h3" : "h2"/);
   assert.match(source, /tool\.highlights\.slice\(0, 3\)\.map\(\(item\) => \{/);
   assert.match(source, /<span className="ui-card-arrow"><ArrowRight size=\{18\} \/><\/span>/);
   // Registry/key completeness only; rendered color is covered by UI checks.

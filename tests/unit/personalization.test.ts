@@ -75,3 +75,29 @@ test("route matching uses segment boundaries and maps nested tool screens to cat
   assert.equal(toolIdForPersonalization('/tools/excel-merger/xls-preserve'), 'excel-merger');
   for (const route of ['/', '/privacy', '/tools', '/tools/pdf-editor-secret', '/tools/video-studio']) assert.equal(toolIdForPersonalization(route), undefined);
 });
+
+test("writes merge remote visits and favorites before queued storage events refresh snapshots", () => {
+  const { store: first, values } = fixture();
+  const second = createPersonalizationStore(() => ({
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => { values.set(key, value); },
+    removeItem: key => { values.delete(key); },
+  }));
+  first.getSnapshot(); second.getSnapshot();
+  const [a, b, c] = tools.map(tool => tool.id);
+  first.toggle(a); second.toggle(b);
+  assert.deepEqual(JSON.parse(values.get(keys.favorites)!), [a, b]);
+  first.toggle(c);
+  assert.deepEqual(first.getSnapshot().favorites, [a, b, c]);
+  second.toggle(a);
+  assert.deepEqual(second.getSnapshot().favorites, [b, c]);
+  first.toggle(b); // Preserve the removal of a from the other tab.
+  assert.deepEqual(JSON.parse(values.get(keys.favorites)!), [c]);
+  first.record(a); second.record(b); first.record(a); // Local first ID was already a.
+  assert.deepEqual(first.getSnapshot().recent, [a, b]);
+  for (const tool of tools.slice(2, 8)) second.record(tool.id);
+  first.record(a);
+  assert.deepEqual(first.getSnapshot().recent, [a, ...tools.slice(3, 8).map(tool => tool.id).reverse()]);
+  second.clear("favorites"); first.toggle(b);
+  assert.deepEqual(JSON.parse(values.get(keys.favorites)!), [b]);
+});
