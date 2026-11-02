@@ -8,6 +8,10 @@ export interface HandoffReceiverDefinition {
 const spreadsheets = ["xlsx", "xlsm", "xls", "xlsb", "csv"];
 const images = ["jpg", "jpeg", "png", "webp"];
 export const fileAccepts = {
+  "excel-compare": { paths: ["/tools/excel-compare"], extensions: spreadsheets, max: 2, kind: "inspection" },
+  "pdf-compare": { paths: ["/tools/pdf-compare"], extensions: ["pdf"], max: 2, kind: "inspection" },
+  "image-compare": { paths: ["/tools/image-compare"], extensions: images, max: 2, kind: "inspection" },
+  "document-compare": { paths: ["/tools/document-compare"], extensions: ["docx", "doc", "hwp", "hwpx"], max: 2, kind: "inspection" },
   "excel-cleaner": { paths: ["/tools/excel-cleaner"], extensions: spreadsheets, max: 50, kind: "inspection" },
   "excel-merger": { paths: ["/tools/excel-merger"], extensions: spreadsheets, max: 50, kind: "inspection" },
   "document-generator": { paths: ["/tools/document-generator"], extensions: ["docx", "xlsx", "csv"], max: 50, kind: "inspection" },

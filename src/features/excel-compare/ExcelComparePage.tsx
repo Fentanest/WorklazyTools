@@ -1,3 +1,6 @@
+import { acceptsFile } from "../../app/fileAccepts";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import { initialColumnMapping } from "./headerColumns.ts";
 import {stringDatePolicy} from "./stringDates.ts";
 import { ComparisonGrid } from "./ComparisonGrid.tsx";
@@ -78,6 +81,7 @@ type LooseT = (key: string, options?: Record<string, unknown>) => string;
 
 export function ExcelComparePage() {
  const { t, i18n } = useTranslation(["features", "common"]);
+ const ht = useTranslation("common").t;
  const translate = t as unknown as LooseT;
  const language = i18n.language.startsWith("en") ? "en" : "ko";
  const nextPairId = useRef(2);
@@ -121,6 +125,7 @@ export function ExcelComparePage() {
  }, []);
 
  const updatePair = (id: number, update: Partial<PairState> | ((pair: PairState) => PairState)) => {
+  handoffGeneration.current++;
   setPairs((current) => current.map((pair) => pair.id !== id ? pair : typeof update === "function" ? update(pair) : { ...pair, ...update }));
  };
 
@@ -197,8 +202,9 @@ export function ExcelComparePage() {
   if (!cached) void refreshHeader(pairId, side, file, row);
  };
 
- const addPair = () => setPairs((current) => [...current, newPair(nextPairId.current++)]);
+ const addPair = () => { handoffGeneration.current++; setPairs((current) => [...current, newPair(nextPairId.current++)]); };
  const removePair = (id: number) => {
+  handoffGeneration.current++;
   inspectionRequestsRef.current.cancelPair(id);
   setPairs((current) => current.length === 1 ? current : current.filter((pair) => pair.id !== id));
  };
@@ -209,6 +215,42 @@ export function ExcelComparePage() {
   setZipResult(undefined);
  };
 
+
+  const handoffGeneration = useRef(0), pendingHandoff = useRef<number | undefined>(undefined);
+  const handoff = useHandoffReceiver("excel-compare", {
+    kind: "inspection",
+    invalidate: () => {
+      if (pendingHandoff.current !== handoffGeneration.current) return;
+      handoffGeneration.current++;
+      inspectionRequestsRef.current.cancelAll(); setPairs([newPair(1)]); cleanupResults();
+    },
+    receive: async (entry, context) => {
+      const epoch = ++handoffGeneration.current; pendingHandoff.current = epoch;
+      const current = () => !context.signal.aborted && epoch === handoffGeneration.current;
+      const accepted: File[] = [];
+      const validRoles = entry.files.length === 2 && entry.roles?.length === 2 && entry.roles.includes("before") && entry.roles.includes("after");
+      if (!validRoles) return { status: "rejected", accepted, rejected: entry.files.map(file => ({ file, reasonCode: "roles" })) };
+      let pair = newPair(1);
+      for (const [index, file] of entry.files.entries()) {
+        if (!current()) break;
+        if (!acceptsFile("excel-compare", file)) continue;
+        const side = entry.roles![index] === "before" ? "left" : "right";
+        try {
+          const inspection = await inspectExcelCompareFile(file, language, context.signal, [1], true);
+          if (!current()) break;
+          pair = applyInitialInspection(resetPairFile(pair, side, file), side, inspection);
+          pair = { ...pair, [`${side}Inspecting`]: false }; accepted.push(file);
+        } catch { /* Rejected originals remain in the handoff chip. */ }
+      }
+      if (!current()) return { status: "cancelled", accepted: [], rejected: [] };
+      inspectionRequestsRef.current.cancelAll(); cleanupResults(); setPairs([pair]);
+      if (accepted.length) setUnsavedWork("excel-compare", { hasWork: true, kind: "files", scopePath: "/tools/excel-compare" });
+      return { status: accepted.length === 2 ? "accepted" : accepted.length ? "partial" : "rejected", accepted,
+        rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
+  });
+
+ useUnsavedWorkGuard("excel-compare", pairs.some(pair => pair.left || pair.right) || completed.length > 0, { kind: "files", scopePath: "/tools/excel-compare" });
  const ready = pairs.length> 0 && pairs.every((pair) => pairConfigured(pair, mode)) && pairs.some((pair) => pairReady(pair, mode));
 
  const run = async () => {
@@ -289,6 +331,19 @@ export function ExcelComparePage() {
  return (
   <UtilityPage toolId="excel-compare">
    <div className="contents" data-testid="excel-compare-page">
+
+    {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
+      <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+      <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+      <div className="flex flex-wrap gap-2">
+        {!!handoff.recoveryFiles.length && <Button variant="outline" onClick={() => {
+          for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+          handoff.dismiss();
+        }}>{ht("handoff.downloadReceived")}</Button>}
+        <Button variant="ghost" onClick={handoff.dismiss}>{ht("handoff.close")}</Button>
+      </div>
+    </UtilityNotice>}
+    {pairs.some(pair => pair.left || pair.right) && <UtilityNotice kind="info" className="mb-3" data-handoff-order>{ht("u5CompareHandoff.order")}</UtilityNotice>}
    <PageHeader eyebrow="EXCEL COMPARE" title={t("features:excelCompare.title")} description={t("features:excelCompare.description")} />
 
    <UtilitySectionCard step={1} title={t("features:excelCompare.pairs.title")} description={t("features:excelCompare.pairs.description")}>

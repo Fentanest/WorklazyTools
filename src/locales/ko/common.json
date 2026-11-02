@@ -142,7 +142,11 @@
         "image-edit": "이미지 편집",
         "image-batch": "이미지 일괄 편집",
         "image-privacy": "이미지 개인정보 제거",
-        "office": "Office에서 열기"
+        "office": "Office에서 열기",
+        "excel-compare": "$t(u5CompareHandoff.receivers.excel-compare)",
+        "pdf-compare": "$t(u5CompareHandoff.receivers.pdf-compare)",
+        "image-compare": "$t(u5CompareHandoff.receivers.image-compare)",
+        "document-compare": "$t(u5CompareHandoff.receivers.document-compare)"
       },
       "hints": {
         "excel": "엑셀 파일을 하나 더 넣으면 병합할 수 있어요.",
@@ -246,5 +250,17 @@
     "count": "파일 개수를 확인해 주세요.",
     "destination": "이 화면으로 파일을 넘길 수 없습니다.",
     "roles": "양식 파일 1개와 데이터 파일을 선택해 주세요."
+  },
+  "u5CompareHandoff": {
+    "order": "수정 전·후 파일 순서를 확인하세요. 필요하면 순서를 바꾼 뒤 비교를 시작하세요.",
+    "swap": "수정 전·후 바꾸기",
+    "receivers": {
+      "excel-compare": "엑셀 비교",
+      "pdf-compare": "PDF 비교",
+      "image-compare": "이미지 비교",
+      "document-compare": "문서 비교"
+    },
+    "before": "수정 전",
+    "after": "수정 후"
   }
 }

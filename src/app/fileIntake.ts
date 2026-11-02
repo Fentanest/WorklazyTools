@@ -1,7 +1,7 @@
 import { fileAccepts, type ReceiverId } from "./fileAccepts.ts";
 
 export type FileKind = "spreadsheet" | "pdf" | "image" | "office" | "video" | "other";
-export interface IntakeCandidate { receiverId: ReceiverId | "office"; entryPath: string; files: File[]; roles?: ("template" | "data")[]; tab?: "edit" | "batch" }
+export interface IntakeCandidate { receiverId: ReceiverId | "office"; entryPath: string; files: File[]; roles?: ("template" | "data" | "before" | "after")[]; tab?: "edit" | "batch" }
 export interface IntakeGroup { kind: FileKind | "mailmerge"; files: File[]; candidates: IntakeCandidate[]; hint?: "excel" | "data" | "pdf" | "image" | "template" }
 export interface FileIntake { groups: IntakeGroup[]; count: number; tooMany: boolean; mixed: boolean }
 const sheets = fileAccepts["excel-cleaner"].extensions as readonly string[];
@@ -23,7 +23,7 @@ export async function classifyFile(file: File): Promise<{ file: File; kind: File
     if (ext) file = new File([file], `${file.name}.${ext}`, { type: file.type, lastModified: file.lastModified });
   }
   const kind = sheets.includes(ext) ? "spreadsheet" : ext === "pdf" ? "pdf" : images.includes(ext) ? "image"
-    : office.includes(ext) ? "office" : /^(mp4|webm|mov|avi|mkv|m4v|mpeg|mpg|ogv)$/.test(ext) ? "video" : "other";
+    : [...office, ...fileAccepts["document-compare"].extensions].includes(ext) ? "office" : /^(mp4|webm|mov|avi|mkv|m4v|mpeg|mpg|ogv)$/.test(ext) ? "video" : "other";
   return { file, kind };
 }
 function candidate(receiverId: ReceiverId, files: File[], extra: Partial<IntakeCandidate> = {}): IntakeCandidate {
@@ -44,9 +44,18 @@ function group(kind: FileKind, files: File[]): IntakeGroup {
   } else if (kind === "image") {
     candidates.push(candidate(files.length === 1 ? "image-edit" : "image-batch", files, { tab: files.length === 1 ? "edit" : "batch" }), candidate("image-privacy", files));
     if (files.length === 1) { candidates.push(candidate("image-batch", files, { tab: "batch" })); hint = "image"; }
-  } else if (kind === "office" && files.length === 1) {
+  } else if (kind === "office" && files.length === 1 && office.includes(extension(first))) {
     candidates.push({ receiverId: "office", entryPath: "/tools/office-editor/app", files });
     if (extension(first) === "docx") hint = "template";
+  }
+  // Only a complete pair of the same format is offered; never pick two out of a larger batch.
+  const format = (file: File) => extension(file) === "jpeg" ? "jpg" : extension(file);
+  if (files.length === 2 && format(files[0]) === format(files[1])) {
+    const receiverId = kind === "spreadsheet" ? "excel-compare" : kind === "pdf" ? "pdf-compare"
+      : kind === "image" ? "image-compare" : kind === "office" ? "document-compare" : undefined;
+    if (receiverId && files.every(file => (fileAccepts[receiverId].extensions as readonly string[]).includes(extension(file)))) {
+      candidates.push(candidate(receiverId, files, { roles: ["before", "after"] }));
+    }
   }
   return { kind, files, candidates, hint };
 }

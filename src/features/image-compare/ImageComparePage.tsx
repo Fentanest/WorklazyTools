@@ -1,3 +1,6 @@
+import { acceptsFile } from "../../app/fileAccepts";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import {ImageWorkingHistory,ImageFileCatalog,type ImageWorkingState} from "./history.ts";
 import {pixelOptionMeaning} from "./optionMeaning.ts";
 import {ImageReportPanel} from "../comparison-report/ToolReportPanels.tsx";
@@ -22,6 +25,7 @@ import { ImageViews, type ImageT } from "./ImageViews.tsx";
 import { applyMatrix, inverseMatrix } from "./geometry.ts";
 import { DEFAULT_PIXEL_OPTIONS, DEFAULT_REGION_OPTIONS, IDENTITY_TRANSFORM, type ImageCompareResult, type RegionPass, type Transform } from "./types.ts";
 export function ImageComparePage() {
+  const ht = useTranslation("common").t;
   const { t: translate,i18n } = useTranslation(); const i18nT = translate as unknown as ImageT; const t: ImageT = (key, values) => i18nT(`features:imageCompare.${key === "working" ? "processing" : key}`, values);
   const [left, setLeft] = useState<File>(), [right, setRight] = useState<File>();
   const [options, setOptions] = useState({ ...DEFAULT_PIXEL_OPTIONS }), [transform, setTransform] = useState({ ...IDENTITY_TRANSFORM });
@@ -56,8 +60,48 @@ export function ImageComparePage() {
     finally {lease.release(); if (token === generation.current) { operations.current.busy=false;setBusy(false); controller.current = undefined; } }
   };
   const restore=(state:Readonly<ImageWorkingState>)=>{pendingViewBytes.current=Math.max(pendingViewBytes.current,(resultRef.current?resultRef.current.width*resultRef.current.height*16:0)+(previewRef.current?previewRef.current.width*previewRef.current.height*16:0));invalidate();setLeft(catalog.current.get(state.left));setRight(catalog.current.get(state.right));setOptions({...state.options});setTransform({...state.transform});setAutoMatrix(state.matrix?.slice() as Matrix3|undefined);setFeatureRois(state.featureRois?structuredClone(state.featureRois):undefined);setRegionOptions({...state.regionOptions??DEFAULT_REGION_OPTIONS});setAlignmentMode(state.alignmentMode??"affine");setRevertState(undefined);refreshHistory(v=>v+1);};
-  const transact=(patch:Partial<ImageWorkingState>,gesture?:string)=>{const state=history.current.commit({...history.current.current,...patch},gesture);restore(state);return state;};
-  const selectFile=(side:'left'|'right',file?:File)=>{if(!file)return;const id=catalog.current.add(file),state=history.current.reset({...history.current.current,[side]:id,transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined});catalog.current.retain([state.left,state.right]);restore(state);};
+  const transact=(patch:Partial<ImageWorkingState>,gesture?:string)=>{handoffGeneration.current++;const state=history.current.commit({...history.current.current,...patch},gesture);restore(state);return state;};
+  const selectFile=(side:'left'|'right',file?:File)=>{if(!file)return;handoffGeneration.current++;const id=catalog.current.add(file),state=history.current.reset({...history.current.current,[side]:id,transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined});catalog.current.retain([state.left,state.right]);restore(state);};
+
+  const handoffGeneration = useRef(0), pendingHandoff = useRef<number | undefined>(undefined);
+  const handoff = useHandoffReceiver("image-compare", {
+    kind: "inspection",
+    invalidate: () => {
+      if (pendingHandoff.current !== handoffGeneration.current) return;
+      handoffGeneration.current++;
+      const state = history.current.reset({ ...history.current.current, left: undefined, right: undefined });
+      catalog.current.retain([]); restore(state);
+    },
+    receive: async (entry, context) => {
+      const epoch = ++handoffGeneration.current; pendingHandoff.current = epoch;
+      const current = () => !context.signal.aborted && epoch === handoffGeneration.current;
+      const accepted: File[] = [];
+      const validRoles = entry.files.length === 2 && entry.roles?.length === 2 && entry.roles.includes("before") && entry.roles.includes("after");
+      if (!validRoles) return { status: "rejected", accepted, rejected: entry.files.map(file => ({ file, reasonCode: "roles" })) };
+      let before: File | undefined, after: File | undefined;
+      for (const [index, file] of entry.files.entries()) {
+        if (!current()) break;
+        if (!acceptsFile("image-compare", file)) continue;
+        try {
+          const preview = await loadAlignPreview(file, alignRetained.current + alignBytes.current);
+          releaseAlignPreview(preview);
+          if (!current()) break;
+          if (entry.roles![index] === "before") before = file; else after = file;
+          accepted.push(file);
+        } catch { /* Header, memory and actual decode admission use the existing loader. */ }
+      }
+      if (!current()) return { status: "cancelled", accepted: [], rejected: [] };
+      const state = history.current.reset({ ...history.current.current,
+        left: before ? catalog.current.add(before) : undefined, right: after ? catalog.current.add(after) : undefined,
+        transform: { ...IDENTITY_TRANSFORM }, matrix: undefined, featureRois: undefined });
+      catalog.current.retain([state.left, state.right]); restore(state);
+      if (accepted.length) setUnsavedWork("image-compare", { hasWork: true, kind: "files", scopePath: "/tools/image-compare" });
+      return { status: accepted.length === 2 ? "accepted" : accepted.length ? "partial" : "rejected", accepted,
+        rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
+  });
+
+  useUnsavedWorkGuard("image-compare", Boolean(left || right), { kind: "files", scopePath: "/tools/image-compare" });
   const changeOption=<K extends keyof typeof options>(key:K,value:typeof options[K],gesture?:string)=>transact({options:{...history.current.current.options,[key]:value}},gesture);
   const moveHistory=(direction:'undo'|'redo')=>{if(reportOwner.current.busy||ocrBusy||alignLoading)return;const state=history.current[direction]();restore(state);void run(state);};
   const suggest = async () => {
@@ -115,7 +159,23 @@ export function ImageComparePage() {
   const updateTransform = <K extends keyof Transform>(key: K, value: Transform[K],gesture?:string) => {const current=history.current.current.transform;transact({matrix:undefined,transform:tidyTransform({...current,...(key==='scale'?{scaleY:current.scaleY??current.scale}:{}),[key]:value})},gesture);};
   const selectedPass = passes.find((pass) => pass.id === activePass), regions = selectedPass?.regions ?? [], focus = regions.find((region) => region.id === focusId);
   const reportRevision=generation.current;
-  return <UtilityPage toolId="image-compare"><PageHeader eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
+  return <UtilityPage toolId="image-compare">
+    {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
+      <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+      <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+      <div className="flex flex-wrap gap-2">
+        {!!handoff.recoveryFiles.length && <Button variant="outline" onClick={() => {
+          for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+          handoff.dismiss();
+        }}>{ht("handoff.downloadReceived")}</Button>}
+        <Button variant="ghost" onClick={handoff.dismiss}>{ht("handoff.close")}</Button>
+      </div>
+    </UtilityNotice>}
+    {Boolean(left || right) && <UtilityNotice kind="info" className="mb-3 flex-col items-start gap-2" data-handoff-order>
+      <p>{ht("u5CompareHandoff.order")}</p>
+      <p className="max-w-full break-all">{ht("u5CompareHandoff.before")}: {left?.name ?? "—"} · {ht("u5CompareHandoff.after")}: {right?.name ?? "—"}</p>
+    </UtilityNotice>}
+    <PageHeader eyebrow={t("eyebrow")} title={t("title")} description={t("description")} />
     <UtilitySectionCard title={t("files")} description={t("filesDescription")} step={1}><div className="grid grid-cols-2 gap-4 max-[720px]:grid-cols-1">{(["left", "right"] as const).map((side) => <FileDropZone key={side} label={t(side)} hint={t("formats")} accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" files={(side === "left" ? left : right) ? [side === "left" ? left! : right!] : []} onFiles={(files) => selectFile(side,files[0])} disabled={busy||ocrBusy||exportBusy||alignLoading} />)}</div></UtilitySectionCard>
     <div className="my-3 flex flex-wrap gap-2" data-testid="image-history"><Button variant="secondary" data-testid="image-undo" disabled={!history.current.canUndo||ocrBusy||exportBusy||alignLoading} onClick={()=>moveHistory('undo')}>{ko?'실행 취소':'Undo'}</Button><Button variant="secondary" data-testid="image-redo" disabled={!history.current.canRedo||ocrBusy||exportBusy||alignLoading} onClick={()=>moveHistory('redo')}>{ko?'다시 실행':'Redo'}</Button><Button variant="secondary" data-testid="image-swap" disabled={!left||!right||busy||ocrBusy||exportBusy||alignLoading} onClick={()=>transact({left:history.current.current.right,right:history.current.current.left,transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined})}>{ko?'원본·비교 바꾸기':'Swap images'}</Button><Button variant="secondary" data-testid="image-settings-reset" disabled={ocrBusy||exportBusy} onClick={()=>transact({options:{...DEFAULT_PIXEL_OPTIONS},transform:{...IDENTITY_TRANSFORM},matrix:undefined,featureRois:undefined,regionOptions:{...DEFAULT_REGION_OPTIONS},alignmentMode:"affine"})}>{ko?'설정 초기화':'Reset settings'}</Button><p className="text-xs text-muted-foreground">{ko?'최근 20단계까지 되돌립니다. 파일을 새로 선택하면 기록을 새로 시작합니다.':'Undo up to 20 recent steps. Choosing a new file starts a new history.'}</p></div>
     <UtilitySectionCard title={t("settings")} description={t("settingsDescription")} step={2}><div className="grid grid-cols-3 gap-3 max-[620px]:grid-cols-1">

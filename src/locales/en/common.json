@@ -142,7 +142,11 @@
         "image-edit": "Edit image",
         "image-batch": "Batch edit images",
         "image-privacy": "Remove image metadata",
-        "office": "Open in Office"
+        "office": "Open in Office",
+        "excel-compare": "$t(u5CompareHandoff.receivers.excel-compare)",
+        "pdf-compare": "$t(u5CompareHandoff.receivers.pdf-compare)",
+        "image-compare": "$t(u5CompareHandoff.receivers.image-compare)",
+        "document-compare": "$t(u5CompareHandoff.receivers.document-compare)"
       },
       "hints": {
         "excel": "Add another spreadsheet to merge files.",
@@ -246,5 +250,17 @@
     "count": "Check the number of files.",
     "destination": "Files cannot be sent to this screen.",
     "roles": "Select one template and at least one data file."
+  },
+  "u5CompareHandoff": {
+    "order": "Check the before and after order. Swap the files if needed, then start comparison.",
+    "swap": "Swap before and after",
+    "receivers": {
+      "excel-compare": "Compare spreadsheets",
+      "pdf-compare": "Compare PDFs",
+      "image-compare": "Compare images",
+      "document-compare": "Compare documents"
+    },
+    "before": "Before",
+    "after": "After"
   }
 }

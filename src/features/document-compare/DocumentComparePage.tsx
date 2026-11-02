@@ -1,3 +1,7 @@
+import { acceptsFile } from "../../app/fileAccepts";
+import { useHandoffReceiver } from "../../app/useHandoffReceiver";
+import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
+import { useTranslation } from "react-i18next";
 import { hasNativeHeader } from "./nativeHeader";
 import { formattingGroups, maskLabels } from "./formattingMask";
 import { AlertCircle, Download, FileText, Info, LoaderCircle, LockKeyhole, TextSearch } from "lucide-react";
@@ -5,7 +9,6 @@ import type { WordCompareResult } from "../excel-merger/types";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { useUnsavedWorkGuard } from "../../app/toolState";
 
 import { FileShareButton } from "../../components/FileShareButton";
 import { OperationProgress } from "../../components/OperationProgress";
@@ -19,7 +22,7 @@ import { UtilityInput, UtilityNotice, UtilityPage, UtilitySectionCard } from "..
 import { useOperationProgress } from "../../hooks/useOperationProgress";
 import { useAppLanguage, useLocalizedPath } from "../../i18n/routing";
 import { createComparisonExcelReports, createComparisonReportArtifact } from "./comparisonResults";
-import { compareDocumentFilePairs } from "./documentCompareClient";
+import { compareDocumentFilePairs, inspectPairs } from "./documentCompareClient";
 import { fileKey, useDocumentCompareSession } from "./documentCompareSession";
 import { DocumentFileColumn } from "./DocumentFileColumn";
 import { DocumentPairingPreview } from "./DocumentPairingPreview";
@@ -27,6 +30,7 @@ import { isSupportedDocumentName, stripDocumentExtension } from "./filePairs";
 import { useDocumentPairFiles } from "./useDocumentPairFiles";
 
 export function DocumentComparePage() {
+  const ht = useTranslation("common").t;
   const language = useAppLanguage();
   const L = (ko: string, en: string) => language === "en" ? en : ko;
   const resultBasePath = useLocalizedPath("/tools/document-compare/results");
@@ -69,10 +73,40 @@ export function DocumentComparePage() {
     setBeforeFiles: session.setBeforeFiles,
     setAfterFiles: session.setAfterFiles,
     accepts: isSupportedDocumentName,
-    onReset: resetOutput,
+    onReset: () => { handoffGeneration.current++; resetOutput(); },
+  });
+
+  const handoffGeneration = useRef(0), pendingHandoff = useRef<number | undefined>(undefined);
+  const handoff = useHandoffReceiver("document-compare", {
+    kind: "inspection",
+    invalidate: () => {
+      if (pendingHandoff.current !== handoffGeneration.current) return;
+      handoffGeneration.current++;
+      resetOutput(); session.setBeforeFiles([]); session.setAfterFiles([]);
+    },
+    receive: async (entry, context) => {
+      const epoch = ++handoffGeneration.current; pendingHandoff.current = epoch;
+      const current = () => !context.signal.aborted && epoch === handoffGeneration.current;
+      const accepted: File[] = [];
+      const validRoles = entry.files.length === 2 && entry.roles?.length === 2 && entry.roles.includes("before") && entry.roles.includes("after");
+      if (!validRoles) return { status: "rejected", accepted, rejected: entry.files.map(file => ({ file, reasonCode: "roles" })) };
+      const before = entry.files[entry.roles!.indexOf("before")], after = entry.files[entry.roles!.indexOf("after")];
+      try {
+        if (entry.files.every(file => acceptsFile("document-compare", file))) {
+          await inspectPairs([{ beforeFile: before, afterFile: after }], language, context.signal);
+          if (current()) accepted.push(...entry.files);
+        }
+      } catch { /* Reuse the comparison client's actual-format/family admission, without comparison. */ }
+      if (!current()) return { status: "cancelled", accepted: [], rejected: [] };
+      resetOutput(); session.setBeforeFiles(accepted.length ? [before] : []); session.setAfterFiles(accepted.length ? [after] : []); setSaved(false);
+      if (accepted.length) setUnsavedWork("document-compare", { hasWork: true, kind: "files", scopePath: "/tools/document-compare" });
+      return { status: accepted.length === 2 ? "accepted" : accepted.length ? "partial" : "rejected", accepted,
+        rejected: entry.files.filter(file => !accepted.includes(file)).map(file => ({ file, reasonCode: "inspection" })) };
+    },
   });
 
   const updateFiles = (files: File[], side: "before" | "after") => {
+    handoffGeneration.current++;
     const rejected = pairFiles.updateFiles(files, side);
     setError(rejected.length
       ? L(`DOCX·DOC·HWP·HWPX가 아닌 파일을 제외했습니다: ${rejected.map((file) => file.name).join(", ")}`, `Files other than DOCX, DOC, HWP, and HWPX were excluded: ${rejected.map((file) => file.name).join(", ")}`)
@@ -219,6 +253,19 @@ export function DocumentComparePage() {
 
   return (
     <UtilityPage toolId="document-compare">
+
+    {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
+      <p>{ht(handoff.recoveryFiles.length ? "handoff.partial" : "handoff.notReceived", { count: handoff.recoveryFiles.length })}</p>
+      <ul className="max-w-full break-all">{handoff.recoveryFiles.map((file, index) => <li key={index}>{file.name}</li>)}</ul>
+      <div className="flex flex-wrap gap-2">
+        {!!handoff.recoveryFiles.length && <Button variant="outline" onClick={() => {
+          for (const file of handoff.recoveryFiles) { const url = URL.createObjectURL(file); const a = document.createElement("a"); a.href = url; a.download = file.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+          handoff.dismiss();
+        }}>{ht("handoff.downloadReceived")}</Button>}
+        <Button variant="ghost" onClick={handoff.dismiss}>{ht("handoff.close")}</Button>
+      </div>
+    </UtilityNotice>}
+    {hasFiles && <UtilityNotice kind="info" className="mb-3" data-handoff-order>{ht("u5CompareHandoff.order")}</UtilityNotice>}
       <PageHeader eyebrow="DOCUMENT TOOL" title={L("문서 비교", "Document Compare")} description={L("DOCX·DOC 또는 HWP·HWPX 문서 쌍을 같은 메뉴에서 정확히 비교하세요.", "Compare DOCX/DOC or HWP/HWPX document pairs accurately from one tool.")}>
         <div className="mb-1 flex shrink-0 items-center gap-2 rounded-full border border-border bg-card px-3 py-2 text-sm font-bold text-green-700 shadow-sm dark:text-green-300"><span className="size-2 rounded-full bg-green-600 shadow-[0_0_0_3px_rgba(34,197,94,.13)]" /> {L("서버 전송 없이 비교", "Compare without server uploads")}</div>
       </PageHeader>
@@ -254,6 +301,9 @@ export function DocumentComparePage() {
           />
         </div>
         {pairingError && <UtilityNotice className="mt-3.5" kind="error" role="alert"><span className="flex min-w-0 flex-col"><strong>{L("파일 수가 맞지 않습니다.", "File counts do not match.")}</strong><small className="mt-1 text-muted-foreground">{pairingError}</small></span></UtilityNotice>}
+        {!pairingError && session.beforeFiles.length > 0 && <Button variant="outline" data-testid="document-pair-swap" disabled={loading} onClick={() => {
+          handoffGeneration.current++; const before = session.beforeFiles; session.setBeforeFiles(session.afterFiles); session.setAfterFiles(before); resetOutput();
+        }}>{ht("u5CompareHandoff.swap")}</Button>}
         {!pairingError && session.beforeFiles.length > 0 && <DocumentPairingPreview beforeFiles={session.beforeFiles} afterFiles={session.afterFiles} language={language} />}
       </UtilitySectionCard>
 

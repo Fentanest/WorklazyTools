@@ -15,7 +15,7 @@ test("(a)(b) complete rule rows: candidates belong to receiver table and every f
     [[file("xls")], ["excel-cleaner", "office"]], [[file("csv")], ["excel-cleaner", "excel-merger"]],
     [[file("xlsx"),file("xlsm")], ["excel-merger", "excel-cleaner"]],
     [[file("docx"),file("csv")], ["document-generator"]],
-    [[file("pdf")], ["pdf-organize", "pdf-finish"]], [[file("pdf"),file("pdf")], ["pdf-organize", "pdf-finish"]],
+    [[file("pdf")], ["pdf-organize", "pdf-finish"]], [[file("pdf"),file("pdf")], ["pdf-organize", "pdf-finish", "pdf-compare"]],
     [[file("webp")], ["image-edit", "image-privacy", "image-batch"]], [[file("png"),file("jpg")], ["image-batch", "image-privacy"]],
     ...["docx","doc","odt","pptx","ppt","odp","ods"].map(ext => [[file(ext)], ["office"]] as [File[], string[]]),
   ];
@@ -69,4 +69,35 @@ test("mixed groups forward only their own files, unsupported/video have no recei
 test("(d) intake imports only fileAccepts, never a feature page or network/parser module", () => {
   const source=readFileSync(new URL("../../src/app/fileIntake.ts",import.meta.url),"utf8");
   assert.deepEqual([...source.matchAll(/(?:from\s+|import\s*\()"([^"]+)"/g)].map(match=>match[1]),["./fileAccepts.ts"]);
+});
+
+// U5: only a full, same-format pair is eligible; no subset/truncation or cross-family guesses.
+test("U5 (a)(b)(c) comparison pairs map roles in input order and honor shared receiver definitions", async () => {
+  for (const [kind, extensions, expected] of [
+    ["spreadsheet", ["xlsx","xlsm","xlsb","xls","csv"], "excel-compare"],
+    ["pdf", ["pdf"], "pdf-compare"], ["image", ["png","jpg","jpeg","webp"], "image-compare"],
+    ["office", ["docx","doc","hwp","hwpx"], "document-compare"],
+  ] as const) for (const ext of extensions) {
+    for (const count of [1,2,3,49,50,51]) {
+      const files = Array.from({length:count}, (_,i)=>new File([String(i)], `${i}.${ext.toUpperCase()}`));
+      const groups = (await intakeFiles(files)).groups;
+      const comparisons = groups.flatMap(group=>group.candidates).filter(item=>item.receiverId.endsWith("-compare"));
+      assert.equal(comparisons.length,count===2?1:0,`${ext}:${count}`);
+      if (count!==2) continue;
+      const candidate = comparisons[0]; assert.equal(candidate.receiverId,expected);
+      assert.equal(groups[0].kind,kind); assert.deepEqual(candidate.files,files);
+      assert.deepEqual(candidate.roles,["before","after"]);
+      assert.equal(candidate.entryPath,fileAccepts[expected].paths[0]);
+      assert.equal(fileAccepts[expected].max,2); assert.equal(fileAccepts[expected].kind,"inspection");
+      assert.ok(candidate.files.every(file=>acceptsFile(expected,file)));
+      if (groups[0].candidates.length>1) assert.ok(groups[0].candidates.indexOf(candidate)>=1);
+    }
+  }
+  for (const files of [[file("xlsx"),file("csv")],[file("png"),file("webp")],[file("docx"),file("doc")],[file("hwp"),file("hwpx")],[file("pptx"),file("pptx")]]) {
+    assert.ok(!(await intakeFiles(files)).groups.flatMap(group=>group.candidates).some(item=>item.receiverId.endsWith("-compare")));
+  }
+  assert.ok((await receivers([file("jpg"),file("jpeg")])).includes("image-compare"));
+  const mixed=await intakeFiles([file("pdf"),file("pdf"),file("png")]);
+  const candidate=mixed.groups[0].candidates.find(item=>item.receiverId==="pdf-compare")!;
+  assert.equal(candidate.files.length,2); assert.ok(candidate.files.every(file=>file.name.endsWith("pdf")));
 });
