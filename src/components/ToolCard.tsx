@@ -57,7 +57,7 @@ export function FavoriteToolButton({ tool, list = false }: { tool: Pick<ToolDefi
   const label = t(selected ? "personalization.removeFavorite" : "personalization.addFavorite", { tool: tool.title });
   return <button type="button" data-favorite-tool={tool.id} aria-pressed={selected} aria-label={label} title={favoritesEnabled ? label : t("personalization.unavailable")}
     disabled={!favoritesEnabled} onClick={() => personalization.toggle(tool.id)}
-    className={cn("absolute right-3 z-10 grid size-11 place-items-center rounded-xl text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-on-bg)] disabled:opacity-40", list ? "top-1/2 -translate-y-1/2" : "top-3")}
+    className={cn("absolute right-3 z-10 grid size-11 place-items-center rounded-xl border-0 bg-transparent text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-on-bg)] disabled:opacity-40", list ? "top-1/2 -translate-y-1/2" : "top-3")}
     style={selected ? { color: "var(--brand-on-bg)" } : undefined}>
     <Star size={18} fill={selected ? "currentColor" : "none"} aria-hidden="true" />
   </button>;

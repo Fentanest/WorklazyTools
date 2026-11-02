@@ -84,6 +84,7 @@ try {
         const toggle = page.locator('[data-favorite-tool="excel-merger"]').first();
         const href = page.url(); await toggle.focus(); await page.keyboard.press("Enter");
         assert.equal(page.url(), href); assert.equal(await toggle.getAttribute("aria-pressed"), "false");
+        assert.equal(await toggle.evaluate(node => getComputedStyle(node).backgroundColor), "rgba(0, 0, 0, 0)", "use the theme surface instead of the browser button background");
         await page.keyboard.press("Space"); assert.equal(await toggle.getAttribute("aria-pressed"), "true");
         await page.locator('[data-testid="home-personalization"]').scrollIntoViewIfNeeded();
         await page.evaluate(() => document.fonts.ready);

@@ -87,6 +87,8 @@ test("five designs × two previews use the chosen real export, with matching pro
       await page.waitForFunction(() => Array.from(document.querySelectorAll('iframe[data-testid="banner-preview"]')).every((e) => (e as HTMLIFrameElement).contentWindow));
       assert.ok(code.includes("Synthetic product 1"));
       assert.ok(code.includes("sponsored noopener"));
+      const readyHost = preview.contentFrame();
+      await (format === "iframe" ? readyHost.frameLocator("iframe[data-wlpb-frame]") : readyHost).locator("[data-wlpb-ready]").waitFor();
       const host = await (await preview.elementHandle())!.contentFrame();
       const banner = format === "iframe" ? await host!.locator("iframe[data-wlpb-frame]").elementHandle().then((element) => element!.contentFrame()) : host;
       await banner!.locator("[data-wlpb-ready]").waitFor();
