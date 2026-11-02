@@ -117,3 +117,13 @@ test('MODNet short edge remains exactly512 for rounding boundary inputs and tran
   assert.deepEqual(inputSize(958,1280,'person'),{width:512,height:672});
   assert.deepEqual(inputSize(1280,958,'person'),{width:672,height:512});
 });
+test('clearStoredModels reports blocked deletion instead of false success', async () => {
+  const { BackgroundRemovalController } = await import('../controller.ts');
+  for (const cacheStorage of [null, { delete: async () => { throw new DOMException('blocked', 'SecurityError'); } } as unknown as CacheStorage]) {
+    const notices: string[] = [];
+    const controller = new BackgroundRemovalController({ confirm: () => false, cacheStorage, notice: value => notices.push(value) });
+    assert.equal(await controller.clearStoredModels(), false); assert.equal(notices.length, 1);
+  }
+  const controller = new BackgroundRemovalController({ confirm: () => false, cacheStorage: { delete: async () => true } as unknown as CacheStorage });
+  assert.equal(await controller.clearStoredModels(), true);
+});

@@ -293,7 +293,7 @@ export const seoByPath: Record<string, SeoDefinition> = {
   "/tools/image-studio": {
     title: "온라인 사진 편집 - 자르기·그리기·콜라주 | Worklazy Tools",
     description: "사진 크기 조절, 자르기, 모자이크, 필터 적용 및 자유 그리기 기능을 제공하는 다목적 사진 편집기입니다.",
-    application: { name: "사진 편집", featureList: ["사진·빈 캔버스 통합 편집", "선택 영역 모자이크·블러", "블러 강도 조절", "연필·붓·지우개", "Undo·Redo", "자르기·이미지·캔버스 크기 조절", "내보내기 크기 지정", "텍스트·도형·스티커 레이어", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
+    application: { name: "사진 편집", featureList: ["사진·레이어 통합 편집", "선택 영역 모자이크·블러", "블러 강도 조절", "연필·붓·지우개", "Undo·Redo", "자르기·이미지·캔버스 크기 조절", "내보내기 크기 지정", "텍스트·도형·스티커 레이어", "인물·사물 배경 제거", "SVG·JSON·템플릿 병합 내보내기", "일괄 리사이즈", "워터마크", "콜라주", "GIF 애니메이션"] },
   },
   "/tools/text-merger": {
     title: "텍스트 파일 합치기 - TXT·메모 순서대로 병합 | Worklazy Tools",

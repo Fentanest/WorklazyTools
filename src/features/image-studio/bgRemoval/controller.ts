@@ -32,10 +32,10 @@ export class BackgroundRemovalController {
   cancel(): void { this.generation++; this.active?.abort(); this.worker?.terminate(); this.worker = undefined; }
   onImageReplaced(): void { this.cancel(); }
   dispose(): void { this.cancel(); }
-  async clearStoredModels(): Promise<void> {
+  async clearStoredModels(): Promise<boolean> {
     this.cancel();
-    try { await this.storage()?.delete(CACHE_NAME); }
-    catch { this.notice(); }
+    try { const storage = this.storage(); if (!storage) { this.notice(); return false; } await storage.delete(CACHE_NAME); return true; }
+    catch { this.notice(); return false; }
   }
   private storage(): CacheStorage | null {
     return this.options.cacheStorage === undefined ? (typeof caches === 'undefined' ? null : caches) : this.options.cacheStorage;

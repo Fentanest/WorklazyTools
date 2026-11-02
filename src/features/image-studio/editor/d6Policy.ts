@@ -1,4 +1,4 @@
-/** IE1 integration draft only: no browser reads, UA parsing, or runtime registration. */
+/** Pure D6 policy. IE1 samples device signals once when the editing session opens. */
 export type D6Candidate = 'primary-pointer' | 'coarse-or-touch-screen' | 'touch-memory-assisted';
 export interface D6Signals {
   readonly primaryPointerCoarse?: boolean | null;
@@ -31,7 +31,7 @@ export function draftD6Props(tier: D6Tier) {
     resolutionLimits: {
       inputMaxDimension: edge,
       cropMaxPixels: edge ** 2,
-      // A's flatten and URL/blob choices are proposals, not additional user decisions (see draft).
+      // IE1 uses the conservative A cap for flattened output and URL/blob imports too.
       flattenMaxPixels: edge ** 2,
       limitUrlInputs: true,
     },

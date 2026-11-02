@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "size": {
+    "width": 640,
+    "height": 480
+  },
+  "region": {
+    "left": 140,
+    "top": 170,
+    "width": 360,
+    "height": 120
+  },
+  "outputResolution": {
+    "width": 640,
+    "height": 480
+  },
+  "quality": 0.92,
+  "reference": "Independent canvas.toCanvasElement at identity viewport; entire scene, same size.",
+  "criteria": {
+    "lossless": {
+      "fractionChannelDeltaLE1": 0.9999,
+      "maxChannelDelta": 8
+    },
+    "lossy": {
+      "minimumPSNRdB": 38
+    },
+    "solid": {
+      "inset": 2,
+      "pngMaxDelta": 0,
+      "lossyFractionDeltaLE6": 0.995,
+      "lossyMaxDelta": 16
+    },
+    "payload": "one data/blob base src; no original src or history keys"
+  },
+  "scenes": [
+    {
+      "id": "photo-solid",
+      "input": "photo.png",
+      "sha256": "46a040987319dddb96b22f69162b05d0c7d2c81de3e8a6174d2c41c928cef813",
+      "mode": "solid",
+      "nested": false,
+      "requiresIEBG": false
+    },
+    {
+      "id": "screen-solid",
+      "input": "screen.png",
+      "sha256": "82605e9a7cb410fc2585b856599a64513c665981b3a772e6fa4c8f69bbf687c9",
+      "mode": "solid",
+      "nested": false,
+      "requiresIEBG": false
+    },
+    {
+      "id": "photo-blur",
+      "input": "photo.png",
+      "sha256": "46a040987319dddb96b22f69162b05d0c7d2c81de3e8a6174d2c41c928cef813",
+      "mode": "blur",
+      "nested": false,
+      "requiresIEBG": false
+    },
+    {
+      "id": "screen-pixelate",
+      "input": "screen.png",
+      "sha256": "82605e9a7cb410fc2585b856599a64513c665981b3a772e6fa4c8f69bbf687c9",
+      "mode": "pixelate",
+      "nested": false,
+      "requiresIEBG": false
+    },
+    {
+      "id": "nested-group",
+      "input": "photo.png",
+      "sha256": "46a040987319dddb96b22f69162b05d0c7d2c81de3e8a6174d2c41c928cef813",
+      "mode": "solid",
+      "nested": true,
+      "requiresIEBG": false
+    },
+    {
+      "id": "background-removal",
+      "input": "photo.png",
+      "sha256": "46a040987319dddb96b22f69162b05d0c7d2c81de3e8a6174d2c41c928cef813",
+      "mode": "solid",
+      "nested": false,
+      "requiresIEBG": true
+    }
+  ]
+}

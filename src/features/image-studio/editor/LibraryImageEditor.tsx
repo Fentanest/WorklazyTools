@@ -14,6 +14,8 @@ import { ClipboardHint, filterRasterImages, RASTER_IMAGE_ACCEPT } from '../image
 import { BackgroundRemovalController, BgRemovalError, messages, type BgMode, type ConsentInfo } from '../bgRemoval';
 import { actualShrinkNotice, classifyD6, draftD6Props } from './d6Policy';
 import { prepareImage, type PreparedImage } from './prepareImage';
+import { resizeResult } from './resizeResult';
+import type { PixelSize } from './d6Policy';
 import './libraryImageEditor.css';
 
 interface Props {
@@ -33,13 +35,21 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const root = useRef<HTMLDivElement>(null);
   const [source, setSource] = useState<PreparedImage>();
   const [generation, setGeneration] = useState(0);
+  const latestGeneration = useRef(generation); latestGeneration.current = generation;
+  const lastStableSource = useRef<PreparedImage | undefined>(undefined);
   const [selectedPreset, setSelectedPreset] = useState(preset);
   const [loaded, setLoaded] = useState(false);
+  const [outputSize, setOutputSize] = useState<PixelSize>();
+  const [ratioLocked, setRatioLocked] = useState(true);
+  const documentRevision = useRef(0);
+  const exportRevision = useRef(0);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [mode, setMode] = useState<BgMode>('person');
+  const modeRef = useRef(mode); modeRef.current = mode;
+  const modeChosen = useRef(false);
   const [bgBusy, setBgBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<File>();
@@ -71,7 +81,10 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   }, []);
   const cancel = useCallback(() => {
     version.current++; bg.current?.cancel(); dismissPending();
-    loadedAck.current?.resolve(false); loadedAck.current = undefined;
+    if (loadedAck.current) {
+      loadedAck.current.resolve(false); loadedAck.current = undefined;
+      setSource(lastStableSource.current); setGeneration(value => value + 1);
+    }
     saving.current = false; destination.current = 'result';
     setBgBusy(false); setLoading(false);
   }, [dismissPending]);
@@ -82,7 +95,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       }), notice: setNotice,
     });
     bg.current = controller;
-    void controller.defaultMode().then(value => { if (bg.current === controller) setMode(value); });
+    void controller.defaultMode().then(value => { if (bg.current === controller && !modeChosen.current) setMode(value); });
     return () => { controller.dispose(); dismissPending(); if (bg.current === controller) bg.current = undefined; };
   }, [language, dismissPending]);
   useEffect(() => { if (!active) cancel(); }, [active, cancel]);
@@ -103,7 +116,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const receive = async (file: File, context?: IntakeContext) => {
     if (!filterRasterImages([file]).length || context?.signal.aborted) return false;
     cancel(); const request = version.current;
-    setLoading(true); setError(''); setNotice(''); setResult(undefined);
+    setLoading(true); setError(''); setNotice(''); setResult(undefined); setOutputSize(undefined);
     const abort = () => { if (request === version.current) cancel(); };
     context?.signal.addEventListener('abort', abort, { once: true });
     try {
@@ -130,6 +143,16 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     handleRef.current = handle;
     return () => { if (handleRef.current === handle) handleRef.current = undefined; };
   }, [handleRef, cancel]);
+  useEffect(() => {
+    const paste = (event: ClipboardEvent) => {
+      if (!activeRef.current || (event.target instanceof Element && event.target.closest('input, textarea, [contenteditable="true"]'))) return;
+      const file = Array.from(event.clipboardData?.files ?? []).find(value => filterRasterImages([value]).length);
+      if (!file) return;
+      event.preventDefault(); event.stopImmediatePropagation(); void receiveRef.current(file);
+    };
+    document.addEventListener('paste', paste, true);
+    return () => document.removeEventListener('paste', paste, true);
+  }, []);
   const editorArea = useRef<HTMLDivElement>(null);
   useFileDropTarget({ element: () => editorArea.current, label: () => t('image.editor.title'), accept: RASTER_IMAGE_ACCEPT,
     disabled: !active || loading || bgBusy, receive: files => receiveRef.current(files.at(-1)!).then(() => {}),
@@ -147,7 +170,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     try {
       const controller = bg.current;
       if (!controller || !activeRef.current) throw new BgRemovalError('ai-cancelled');
-      return await controller.removeBackground(input, { mode, progress: (_key, current, total) => {
+      return await controller.removeBackground(input, { mode: modeRef.current, progress: (_key, current, total) => {
         if (request === version.current) setProgress(total > 0 ? Math.round(current / total * 100) : 0);
       } });
     } catch (cause) {
@@ -155,12 +178,26 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       throw cause;
     } finally { if (request === version.current) setBgBusy(false); }
   } });
-  const saved = (blob: Blob) => {
-    if (!activeRef.current) return;
-    const file = new File([blob], `${(sourceRef.current?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited.png`, { type: 'image/png' });
-    if (destination.current === 'batch') onEditedResult(file);
-    else setResult(file);
-    destination.current = 'result'; saving.current = false;
+  const saved = async (blob: Blob) => {
+    const request = version.current, revision = exportRevision.current, target = outputSize;
+    try {
+      const encoded = await resizeResult(blob, target);
+      if (!activeRef.current || request !== version.current || revision !== documentRevision.current) return;
+      const file = new File([encoded], `${(sourceRef.current?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited.png`, { type: 'image/png' });
+      if (destination.current === 'batch') onEditedResult(file); else setResult(file);
+    } catch { if (request === version.current) setError(t('image.library.exportFailed')); }
+    finally { if (request === version.current) { destination.current = 'result'; saving.current = false; } }
+  };
+  const changeOutputSize = (axis: 'width' | 'height', value: number) => {
+    const canvas = editorArea.current?.querySelector<HTMLCanvasElement>('.lower-canvas');
+    const current = outputSize ?? { width: Math.round(parseFloat(canvas?.style.width || '') || 640), height: Math.round(parseFloat(canvas?.style.height || '') || 480) };
+    const edge = policy.resolutionLimits.inputMaxDimension;
+    const bounded = Math.max(1, Math.min(edge, Math.round(value) || 1));
+    const other = axis === 'width' ? 'height' : 'width';
+    const next = { ...current, [axis]: bounded };
+    if (ratioLocked) next[other] = Math.max(1, Math.round(bounded * current[other] / current[axis]));
+    if (next[other] > edge) { next[axis] = Math.max(1, Math.round(next[axis] * edge / next[other])); next[other] = edge; }
+    setOutputSize(next); setResult(undefined);
   };
   const commit = (target: 'result' | 'batch') => {
     if (target === 'batch') {
@@ -171,7 +208,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       if (batchCount >= 50) { setNotice(t('image.handoff.limit')); return; }
     }
     if (saving.current || !loaded || loading || bgBusy) return;
-    destination.current = target; saving.current = true;
+    destination.current = target; saving.current = true; exportRevision.current = documentRevision.current;
     // The fork's public commit action owns export hooks and forced PNG encoding.
     const button = editorArea.current?.querySelector<HTMLButtonElement>('.asp-commit');
     if (button) button.click(); else { saving.current = false; setError(t('image.library.exportFailed')); }
@@ -182,21 +219,34 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       <FileDropZone files={source ? [source.file] : []} disabled={loading || bgBusy} accept={RASTER_IMAGE_ACCEPT} hint={t('image.editor.hint')} onFiles={files => { const next = filterRasterImages(files).at(-1); if (next) void receiveRef.current(next); }} accent="sky" />
       <ClipboardHint mode="replace" />
       {shrink && <UtilityNotice role="status" className="mt-2" data-testid="image-editor-shrink">{shrink}</UtilityNotice>}
-      {error && <UtilityNotice kind="error" role="alert" className="mt-2">{error}</UtilityNotice>}
+      {error && <UtilityNotice kind="error" role="alert" className="mt-2">{error}{mode === 'product' && ['bg-inference-failed', 'bg-unsupported'].some(code => messages[language][code as 'bg-unsupported'] === error) && <Button className="ml-2" type="button" variant="outline" onClick={() => {
+        modeChosen.current = true; modeRef.current = 'person'; setMode('person'); setError(''); setNotice(t('image.library.retryReady'));
+      }}>{t('image.library.retryPerson')}</Button>}</UtilityNotice>}
       {notice && <UtilityNotice role="status" className="mt-2">{notice}</UtilityNotice>}
       <UtilityNotice className="mt-2">{t('image.library.redactionHint')}</UtilityNotice>
       <div className="my-3 flex flex-wrap items-center gap-2" data-testid="image-background-controls">
-        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => setMode(event.target.value as BgMode)}>
+        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { modeChosen.current = true; setMode(event.target.value as BgMode); }}>
           <option value="person">{t('image.library.person')}</option><option value="product">{t('image.library.product')}</option>
         </select></label>
-        <Button type="button" variant="outline" onClick={() => { cancel(); void bg.current?.clearStoredModels().then(() => setNotice(t('image.library.modelsCleared'))); }}>{t('image.library.clearModels')}</Button>
+        <Button type="button" variant="outline" onClick={() => { cancel(); void bg.current?.clearStoredModels().then(ok => { if (ok) setNotice(t('image.library.modelsCleared')); }); }}>{t('image.library.clearModels')}</Button>
         {bgBusy && <><span role="status">{t('image.library.processing', { progress })}</span><Button type="button" variant="secondary" onClick={cancel}>{t('image.cancel')}</Button></>}
       </div>
       <p className="mb-3 text-sm text-muted-foreground">{t('image.library.magicWandHint')}</p>
-      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onChangeCapture={event => {
+      <fieldset className="mb-3 rounded-xl border border-border p-3" data-testid="image-editor-png-size">
+        <legend className="px-1 text-sm font-medium">{t('image.library.pngSize')}</legend>
+        <p className="mb-2 text-xs text-muted-foreground">{t('image.library.pngSizeHelp')}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          {(['width','height'] as const).map(axis => <label key={axis} className="flex items-center gap-2 text-sm">{t(axis === 'width' ? 'image.editor.dimensionWidth' : 'image.editor.dimensionHeight')}<input className="min-h-11 w-24 rounded-lg border border-border bg-background px-2" type="number" min={1} max={policy.resolutionLimits.inputMaxDimension} placeholder="auto" value={outputSize?.[axis] ?? ''} onChange={event => changeOutputSize(axis, Number(event.target.value))} /></label>)}
+          <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={ratioLocked} onChange={event => setRatioLocked(event.target.checked)} />{t('image.library.keepRatio')}</label>
+          {outputSize && <Button type="button" variant="ghost" onClick={() => { setOutputSize(undefined); setResult(undefined); }}>{t('image.library.autoSize')}</Button>}
+        </div>
+      </fieldset>
+      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onClickCapture={event => {
+        if (event.target instanceof Element && event.target.closest('.asp-commit')) exportRevision.current = documentRevision.current;
+      }} onChangeCapture={event => {
         const input = event.target;
         // Route source replacement through the host's measured File-only import.
-        if (input instanceof HTMLInputElement && input.type === 'file' && input.accept === 'image/*' && !input.closest('label')?.classList.contains('asp-mt-sm')) {
+        if (input instanceof HTMLInputElement && input.type === 'file' && input.accept === 'image/*' && input.closest('.asp-menu') && !input.closest('label')?.classList.contains('asp-mt-sm')) {
           event.stopPropagation(); const file = input.files?.[0]; input.value = ''; if (file) void receiveRef.current(file);
         }
       }}>
@@ -204,17 +254,17 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           exportFormats={FORMATS} exportQuality={92} jpegExportQuality={95} commitFormat="png" showCommit commitLabel={t('image.library.makeResult')}
           resolutionLimits={policy.resolutionLimits} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
           labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
-          onImageLoaded={() => { bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false); loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false); }}
-          onDirtyChange={value => { setDirty(value); if (value) setResult(undefined); }}
-          onHistoryChange={() => { setResult(undefined); }}
-          onSaved={saved} suppressHandledErrorToast onError={failure => {
+          onImageLoaded={() => { if (generation !== latestGeneration.current) return; lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false); loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false); }}
+          onDirtyChange={value => { if (generation !== latestGeneration.current) return; setDirty(value); if (value) setResult(undefined); }}
+          onHistoryChange={() => { if (generation === latestGeneration.current) { documentRevision.current++; setResult(undefined); } }}
+          onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
+            if (generation !== latestGeneration.current) return true;
             saving.current = false; destination.current = 'result'; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);
             if (!failure.code.endsWith('cancelled')) setError(messages[language][failure.code as keyof typeof messages.ko] || labels[ERROR_MESSAGES[failure.code]] || t('image.library.failed'));
             return true;
           }} />
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="image-editor-result-actions">
-        <Button variant="outline" type="button" disabled={!loaded || loading || bgBusy} onClick={() => commit('result')}>{t('image.library.makeResult')}</Button>
         <Button variant="outline" type="button" data-testid="image-editor-add-to-batch" aria-disabled={adding} className={adding ? 'opacity-60' : ''} disabled={!loaded || loading || bgBusy} onClick={() => commit('batch')}>{t('image.handoff.add', { count: batchCount })}</Button>
         {batchNotice && <span role="status">{t(`image.handoff.${batchNotice}`)}</span>}
       </div>

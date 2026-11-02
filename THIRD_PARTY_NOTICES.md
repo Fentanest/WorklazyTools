@@ -50,6 +50,8 @@ notices are included in the generated deployed notice bundle rather than being
 repeated in this summary.
 
 ## Runtime resources loaded on demand
+- Xenova/modnet @ fa2fa546052fba4c08921230a26cc69a333fca12 — Apache-2.0; https://raw.githubusercontent.com/ZHKKKe/MODNet/28165a451e4610c9d77cfdf925a94610bb2810fb/LICENSE
+- studioludens/birefnet-lite-512 @ 962e67969ec6acec9c19fab76acee4f5e22e990c — MIT; https://huggingface.co/studioludens/birefnet-lite-512/raw/962e67969ec6acec9c19fab76acee4f5e22e990c/LICENSE
 
 - Pyodide 0.29.4 is copied into the Worklazy Tools GitHub Pages deployment and
   loaded from the same origin for Word comparison and Markdown extraction. It is distributed under
