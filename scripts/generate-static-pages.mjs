@@ -16,6 +16,10 @@ const { getGuideData, getGuideKeyForPath } = await import("../src/i18n/guideData
 const { relatedToolsFor } = await import("../src/app/relatedTools.ts");
 const koToolsJson = JSON.parse(await fs.readFile(path.join(sourceRoot, "src/locales/ko/tools.json"), "utf8"));
 const enToolsJson = JSON.parse(await fs.readFile(path.join(sourceRoot, "src/locales/en/tools.json"), "utf8"));
+const privacyRecipeCopy = Object.fromEntries(await Promise.all(languages.map(async (language) => {
+  const pages = JSON.parse(await fs.readFile(path.join(sourceRoot, `src/locales/${language}/pages.json`), "utf8"));
+  return [language, pages.privacy.cleanerRecipes];
+})));
 const TOOL_CATEGORY = {
   "market-calendar": "investment-research",
   "image-compare": "media",
@@ -192,6 +196,11 @@ function makePage(language, route) {
   const socialImage = getSocialImageDefinition(language, pathname);
   
   let blocks = [];
+  if (route === "privacy") {
+    // Share the client policy's copy; the storage-clearing action requires JS.
+    const copy = privacyRecipeCopy[language];
+    blocks = [{ title: copy.title, paragraphs: [copy.description] }];
+  }
   const slug = toolSlugByPath[pathname] || Object.keys(toolSlugByPath).find(p => pathname.startsWith(p + "/")) && toolSlugByPath[Object.keys(toolSlugByPath).find(p => pathname.startsWith(p + "/"))];
   if (slug) {
     const guideKey = getGuideKeyForPath(slug, pathname);

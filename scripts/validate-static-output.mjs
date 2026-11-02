@@ -44,6 +44,21 @@ export function assertStaticFaqHtml(html, { filePath = "static output", expected
   }
 }
 
+export function assertStaticPrivacyRecipesHtml(html, { title, description, filePath = "static privacy output" }) {
+  if (typeof title !== "string" || !title.trim() || typeof description !== "string" || !description.trim()) {
+    throw new Error(`${filePath}: missing Excel cleaner recipe policy copy`);
+  }
+  const document = new JSDOM(html).window.document;
+  const headings = [...document.querySelectorAll("main.seo-static-fallback > h2")]
+    .filter((heading) => heading.textContent === title);
+  const heading = headings[0];
+  const paragraph = heading?.nextElementSibling;
+  if (headings.length !== 1 || heading.closest("[hidden]") || paragraph?.tagName !== "P"
+    || paragraph.hasAttribute("hidden") || paragraph.textContent !== description) {
+    throw new Error(`${filePath}: missing, duplicated or mismatched static Excel cleaner recipe policy`);
+  }
+}
+
 async function main() {
 const { VIDEO_STUDIO_PUBLIC, COMPARISON_PORT_PUBLIC, COMPARISON_TOOL_IDS, isComparisonPathPublished } = await import("../src/app/publicServiceConfig.mjs");
 
@@ -615,6 +630,13 @@ const [koreanPages, englishPages] = await Promise.all([
   fs.readFile("src/locales/ko/pages.json", "utf8"),
   fs.readFile("src/locales/en/pages.json", "utf8"),
 ]);
+for (const [language, pages] of [["ko", koreanPages], ["en", englishPages]]) {
+  const filePath = path.join("dist", language, "privacy", "index.html");
+  assertStaticPrivacyRecipesHtml(await fs.readFile(filePath, "utf8"), {
+    ...JSON.parse(pages).privacy.cleanerRecipes,
+    filePath,
+  });
+}
 if (!koreanPages.includes("정상 공개 페이지는 도구 종류만으로 제외하지 않으며")
   || !englishPages.includes("Available pages are not excluded by tool type")
   || koreanPages.includes("방문 분석도 불러오지 않습니다")

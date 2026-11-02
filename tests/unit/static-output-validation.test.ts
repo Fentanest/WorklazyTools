@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assertStaticFaqHtml } from "../../scripts/validate-static-output.mjs";
+import { assertStaticFaqHtml, assertStaticPrivacyRecipesHtml } from "../../scripts/validate-static-output.mjs";
 
 const expectedQuestion = "Can it perfectly restore Word or Excel structure?";
 
@@ -44,4 +44,34 @@ test("static FAQ validation separates body and JSON-LD mismatch", () => {
     () => assertStaticFaqHtml(faqFixture({ bodyQuestions: [expectedQuestion, "Body only"] }), { expectedQuestion }),
     /본문 FAQ와 JSON-LD 불일치/,
   );
+});
+
+const recipePolicy = { title: "Saved cleaning rules", description: "Explicitly saved rules remain in this browser." };
+const recipePolicyBody = `<h2>${recipePolicy.title}</h2><p>${recipePolicy.description}</p>`;
+const privacyFixture = (body: string) => `<main class="seo-static-fallback">${body}</main>`;
+
+test("static privacy recipe validation accepts the shared heading and full policy text", () => {
+  assert.doesNotThrow(() => assertStaticPrivacyRecipesHtml(privacyFixture(recipePolicyBody), recipePolicy));
+});
+
+test("static privacy recipe validation rejects a missing notice and script-only copy", () => {
+  for (const html of [privacyFixture(""), `<script>${recipePolicyBody}</script>`, recipePolicyBody]) {
+    assert.throws(() => assertStaticPrivacyRecipesHtml(html, recipePolicy), /static Excel cleaner recipe policy/);
+  }
+});
+
+test("static privacy recipe validation rejects a heading without the full policy paragraph", () => {
+  for (const text of ["", "Partial policy"]) {
+    assert.throws(() => assertStaticPrivacyRecipesHtml(privacyFixture(`<h2>${recipePolicy.title}</h2><p>${text}</p>`), recipePolicy), /static Excel cleaner recipe policy/);
+  }
+});
+
+test("static privacy recipe validation rejects duplicate and hidden notices", () => {
+  for (const html of [privacyFixture(recipePolicyBody.repeat(2)), `<main class="seo-static-fallback" hidden>${recipePolicyBody}</main>`, privacyFixture(`<h2>${recipePolicy.title}</h2><p hidden>${recipePolicy.description}</p>`)]) {
+    assert.throws(() => assertStaticPrivacyRecipesHtml(html, recipePolicy), /static Excel cleaner recipe policy/);
+  }
+});
+
+test("static privacy recipe validation rejects empty expected copy", () => {
+  assert.throws(() => assertStaticPrivacyRecipesHtml(privacyFixture(recipePolicyBody), { ...recipePolicy, description: "" }), /missing Excel cleaner recipe policy copy/);
 });
