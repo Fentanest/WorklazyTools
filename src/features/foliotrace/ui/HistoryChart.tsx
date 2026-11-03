@@ -5,7 +5,7 @@ import type { Snapshot } from '../contracts';
 import { useAppliedTheme } from '../../../theme';
 import { formatCount, formatKrw } from './holdings';
 import type { Lang } from './holdings';
-import { chartHistory, formatHistoryAxis, formatHistoryDate, historyChange, HISTORY_COPY, HISTORY_COORDINATE_SCALE } from './history';
+import { chartHistory, formatHistoryAxis, formatHistoryDate, formatHistoryChange, historyChange, HISTORY_COPY, HISTORY_COORDINATE_SCALE } from './history';
 import type { ChartHistoryPoint, HistoryOrigin } from './history';
 
 function timeKey(time: Time): string {
@@ -14,13 +14,20 @@ function timeKey(time: Time): string {
   return `${time.year}-${String(time.month).padStart(2, '0')}-${String(time.day).padStart(2, '0')}`;
 }
 
-export const HistoryChart = memo(function HistoryChart({ snapshot, lang }: { snapshot: Snapshot; lang: Lang }) {
+export const HistoryChart = memo(function HistoryChart({ snapshot, lang, unavailable = false }: { snapshot: Snapshot; lang: Lang; unavailable?: boolean }) {
   const t = HISTORY_COPY[lang], theme = useAppliedTheme();
   const model = useMemo(() => chartHistory(snapshot.history, snapshot.valuationSeries, snapshot), [snapshot]);
   const host = useRef<HTMLDivElement>(null), tooltip = useRef<HTMLDivElement>(null);
   const tooltipDate = useRef<HTMLTimeElement>(null), tooltipValue = useRef<HTMLElement>(null);
   const tooltipOrigin = useRef<HTMLSpanElement>(null), tooltipCounts = useRef<HTMLSpanElement>(null);
+  const tooltipChange = useRef<HTMLElement>(null), tooltipScope = useRef<HTMLElement>(null);
   const [renderError, setRenderError] = useState(false);
+  const changes = (['published', 'reconstructed'] as const).map(origin => {
+    const points = model[origin].filter(point => point.estimatedValue !== null);
+    return { origin, points, change: historyChange(points) };
+  }).filter(row => row.points.length > 0);
+  const reconstructedChange = changes.find(row => row.origin === 'reconstructed');
+  const reconstructionChangeText = reconstructedChange ? `${t.reconstructedChange}: ${formatHistoryChange(reconstructedChange.change, lang)} (${formatHistoryDate(reconstructedChange.points[0].tradeDate, lang, true)} – ${formatHistoryDate(reconstructedChange.points.at(-1)!.tradeDate, lang, true)})` : '';
   const countText = (point: ChartHistoryPoint) => point.pricedCount === undefined ? t.countsMissing : t.counts
     .replace('{priced}', formatCount(point.pricedCount)).replace('{tracked}', formatCount(point.trackedCount!))
     .replace('{excluded}', formatCount(point.unvaluedCount!));
@@ -28,7 +35,7 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang }: { sna
   useEffect(() => {
     setRenderError(false);
     const element = host.current, tip = tooltip.current;
-    if (!element || !tip || !model.available) return;
+    if (!element || !tip || !model.available || unavailable) return;
     const style = getComputedStyle(element), publishedColor = style.getPropertyValue('--brand-on-bg').trim() || style.color;
     const reconstructedColor = style.color, separator = style.getPropertyValue('--separator').trim() || style.color;
     let chart: IChartApi | null = null, observer: ResizeObserver | null = null;
@@ -71,14 +78,24 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang }: { sna
         if (tooltipCounts.current) tooltipCounts.current.textContent = point.pricedCount === undefined ? t.countsMissing : t.counts
           .replace('{priced}', formatCount(point.pricedCount)).replace('{tracked}', formatCount(point.trackedCount!))
           .replace('{excluded}', formatCount(point.unvaluedCount!));
+        if (tooltipChange.current) {
+          tooltipChange.current.textContent = point.origin === 'reconstructed' ? reconstructionChangeText : '';
+          tooltipChange.current.hidden = point.origin !== 'reconstructed';
+        }
+        if (tooltipScope.current) {
+          tooltipScope.current.textContent = point.origin === 'reconstructed' ? t.reconstructionScope : '';
+          tooltipScope.current.hidden = point.origin !== 'reconstructed';
+        }
         tip.dataset.origin = point.origin;
         tip.hidden = false;
-        tip.style.left = `${Math.min(Math.max(8, event.point.x + 12), Math.max(8, element.clientWidth - tip.offsetWidth - 8))}px`;
-        tip.style.top = `${Math.min(Math.max(8, event.point.y + 12), Math.max(8, element.clientHeight - tip.offsetHeight - 8))}px`;
+        const compact = element.clientWidth <= 640;
+        tip.style.left = compact ? '8px' : `${Math.min(Math.max(8, event.point.x + 12), Math.max(8, element.clientWidth - tip.offsetWidth - 8))}px`;
+        tip.style.top = compact ? '8px' : `${Math.min(Math.max(8, event.point.y + 12), Math.max(8, element.clientHeight - tip.offsetHeight - 8))}px`;
       };
       created.subscribeCrosshairMove(crosshair);
       const resize = () => {
         if (disposed) return;
+        tip.hidden = true;
         created.resize(element.clientWidth, element.clientHeight);
         const scale = created.timeScale(), width = scale.width() || Math.max(1, element.clientWidth - 80);
         // Keep both endpoint date labels inside narrow canvases as well.
@@ -96,14 +113,15 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang }: { sna
       if (chart && crosshair) chart.unsubscribeCrosshairMove(crosshair);
       chart?.remove(); tip.hidden = true; delete element.dataset.chartReady;
     };
-  }, [model, lang, theme, t]);
+  }, [model, lang, theme, t, unavailable, reconstructionChangeText]);
 
   const latest = model.points.at(-1);
   const originLabel = (origin: HistoryOrigin) => origin === 'published' ? t.published : t.reconstructed;
-  const changes = (['published', 'reconstructed'] as const).map(origin => {
-    const points = model[origin].filter(point => point.estimatedValue !== null);
-    return { origin, points, change: historyChange(points) };
-  }).filter(row => row.points.length > 0);
+
+  if (unavailable) return <section className="foliotrace-block foliotrace-trend" aria-labelledby="foliotrace-history-h">
+    <h2 id="foliotrace-history-h" className="foliotrace-h2">{t.title}</h2>
+    <p className="foliotrace-state-text" role="status" data-testid="foliotrace-chart-unavailable">{t.invalidData}</p>
+  </section>;
 
   return <section className="foliotrace-block foliotrace-trend" aria-labelledby="foliotrace-history-h">
     <h2 id="foliotrace-history-h" className="foliotrace-h2">{t.title}</h2>
@@ -111,9 +129,9 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang }: { sna
       <div><span>{t.latest}</span><strong>{latest?.estimatedValue == null ? '—' : formatKrw(latest.estimatedValue, lang)}</strong>
         {latest && <small>{formatHistoryDate(latest.tradeDate, lang)} · {latest.origin === 'published' ? t.published : t.reconstructed}</small>}</div>
       <div><span>{t.period}</span><strong>{model.points.length ? `${formatHistoryDate(model.points[0].tradeDate, lang)} – ${formatHistoryDate(model.points[model.points.length - 1].tradeDate, lang)}` : '—'}</strong></div>
-      {changes.map(({ origin, points, change }) => <div key={origin}>
+      {changes.filter(row => row.origin === 'published').map(({ origin, points, change }) => <div key={origin}>
         <span>{origin === 'published' ? t.publicChange : t.reconstructedChange}</span>
-        <strong>{change ? `${change.direction === 'up' ? '+' : change.direction === 'down' ? '−' : ''}${formatKrw(change.amount, lang)}${change.percent === null ? '' : ` (${change.direction === 'up' ? '+' : change.direction === 'down' ? '−' : ''}${change.percent}%)`}` : t.noChange}</strong>
+        <strong>{formatHistoryChange(change, lang)}</strong>
         <small>{formatHistoryDate(points[0].tradeDate, lang, true)} – {formatHistoryDate(points[points.length - 1].tradeDate, lang, true)}</small>
       </div>)}
     </div>
@@ -123,13 +141,16 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang }: { sna
           data-testid="foliotrace-history-chart" data-point-count={model.points.length} data-chart-theme={theme} />
         <div ref={tooltip} className="foliotrace-chart-tooltip" role="tooltip" hidden>
           <time ref={tooltipDate} /><strong ref={tooltipValue} /><span ref={tooltipOrigin} /><small ref={tooltipCounts} />
+          <small ref={tooltipChange} /><small ref={tooltipScope} />
         </div>
       </div> : <p className="foliotrace-state-text" role="status">{t.empty}</p>}
       {renderError && <p className="foliotrace-state-text" role="status">{t.unavailable}</p>}
       <figcaption className="foliotrace-trend-legend">
         {(['published', 'reconstructed'] as const).filter(origin => model[origin].length > 0).map(origin => <span key={origin} data-history-origin={origin}>
           <i aria-hidden="true" className={`foliotrace-history-line foliotrace-history-line-${origin}`} />
-          {originLabel(origin)} · {formatCount(model[origin].length)}
+          <span>{originLabel(origin)} · {formatCount(model[origin].length)}
+            {origin === 'reconstructed' && <small className="foliotrace-reconstruction-change">{reconstructionChangeText}</small>}
+          </span>
         </span>)}
       </figcaption>
     </figure>

@@ -1050,7 +1050,7 @@ function ReadyView({
         </div>
       </section>
 
-      <HistoryChart snapshot={snapshot} lang={lang} />
+      <HistoryChart snapshot={snapshot} lang={lang} unavailable={view.chartUnavailable} />
 
       <div className="foliotrace-status-line" role="status" aria-live="polite">
         <span className={stale ? "foliotrace-badge-warn" : "foliotrace-badge-ok"}>{stale ? t.staleBadge : t.freshBadge}</span>

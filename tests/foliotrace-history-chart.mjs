@@ -50,10 +50,17 @@ try {
         await page.locator('#foliotrace-events li').first().waitFor();
         assert.equal(await page.getByTestId('foliotrace-history-chart').count(), 1);
         const chart = page.locator('[data-testid=foliotrace-history-chart][data-chart-ready=true]'); await chart.waitFor();
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+          await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        });
         assert.equal(await chart.getAttribute('data-point-count'), '19');
         const region = page.locator('.foliotrace-trend');
         assert.match(await region.locator('[data-history-origin=published]').innerText(), /7$/);
-        assert.match(await region.locator('[data-history-origin=reconstructed]').innerText(), /0\.06%.*12$/);
+        assert.match(await region.locator('[data-history-origin=reconstructed]').innerText(), /≤0\.06%.*12/);
+        assert.ok(!(await region.locator('.foliotrace-trend-summary').innerText()).includes('20.77%'));
+        assert.ok((await region.locator('.foliotrace-trend-summary').innerText()).includes('+5.51%'));
+        assert.match(await region.locator('.foliotrace-reconstruction-change').innerText(), /−20\.77%/);
         assert.ok((await region.locator('.foliotrace-trend-summary').innerText()).includes(money(original.history.at(-1).estimatedValue)));
         await page.waitForFunction(() => window.__f6Dashes.length > 0);
         await page.waitForFunction(lang => window.__f6Text.some(text => lang === 'ko' ? text.includes('조원') : /₩.*T/.test(text)), lang);
@@ -65,17 +72,24 @@ try {
         assert.ok((await last.innerText()).includes(money(original.history.at(-1).estimatedValue)));
         assert.ok(!(await last.innerText()).includes(money(reconstruction.points.at(-1).estimatedValue)));
         await summary.focus(); await page.keyboard.press('Space');
-        await chart.evaluate(node => window.scrollTo(0, node.getBoundingClientRect().top + scrollY - 100));
+        await chart.evaluate(node => window.scrollTo({ top: node.getBoundingClientRect().top + scrollY - 100, behavior: 'instant' }));
         const box = await chart.boundingBox();
-        await page.mouse.move(box.x + (box.width - 80) * 0.2, box.y + box.height * 0.5);
+        await chart.hover({ position: { x: (box.width - 80) * 0.2, y: box.height * 0.5 } });
         const tooltip = region.getByRole('tooltip'); await tooltip.waitFor();
         assert.equal(await tooltip.getAttribute('data-origin'), 'reconstructed'); assert.match(await tooltip.innerText(), /0\.06%/);
+        assert.match(await tooltip.innerText(), /−20\.77%/);
+        assert.match(await tooltip.innerText(), lang === 'ko' ? /가격·기업행위 잔차 0/ : /zero price\/corporate-action residual/);
+        const tipBounds = await tooltip.boundingBox(), plotBounds = await region.locator('.foliotrace-trend-plot').boundingBox();
+        assert.ok(tipBounds.x >= plotBounds.x && tipBounds.y >= plotBounds.y);
+        assert.ok(tipBounds.x + tipBounds.width <= plotBounds.x + plotBounds.width + 1);
+        assert.ok(tipBounds.y + tipBounds.height <= plotBounds.y + plotBounds.height + 1);
+        assert.ok(await tooltip.evaluate(node => node.scrollWidth <= node.clientWidth + 1 && node.scrollHeight <= node.clientHeight + 1), 'tooltip text fits without clipping');
         const day = await tooltip.locator('time').getAttribute('datetime');
         assert.ok((await tooltip.locator('strong').innerText()).includes(money(reconstruction.points.find(point => point.tradeDate === day).estimatedValue)));
         await region.locator('.foliotrace-trend-plot').screenshot({ path: path.join(out, `${id}-reconstructed-tooltip.png`), style: '.wl-topbar,.mobile-header,.bottom-tabs{visibility:hidden!important}' });
-        await chart.evaluate(node => window.scrollTo(0, node.getBoundingClientRect().top + scrollY - 100));
+        await chart.evaluate(node => window.scrollTo({ top: node.getBoundingClientRect().top + scrollY - 100, behavior: 'instant' }));
         const refreshedBox = await chart.boundingBox();
-        await page.mouse.move(refreshedBox.x + (refreshedBox.width - 80) * 0.87, refreshedBox.y + refreshedBox.height * 0.5);
+        await chart.hover({ position: { x: (refreshedBox.width - 80) * 0.87, y: refreshedBox.height * 0.5 } });
         await region.locator('[role=tooltip][data-origin=published]').waitFor();
         const publishedDay = await tooltip.locator('time').getAttribute('datetime');
         assert.equal(await tooltip.locator('strong').innerText(), money(original.history.find(point => point.tradeDate === publishedDay).estimatedValue));
@@ -117,17 +131,42 @@ try {
       assert.match(await row.innerText(), /No valuation/);
     } finally { await context.close(); }
   });
-  await test('invalid extension shows a schema error instead of silently plotting public-only data', async () => {
-    const series = structuredClone(reconstruction); series.points.reverse();
-    const { page, context } = await setup('en', 'light-coral', false, { ...original, valuationSeries: series });
-    try { await page.getByRole('alert').waitFor(); assert.equal(await page.locator('.foliotrace-trend').count(), 0); }
+  const invalidInputs = [
+    ['reversed extension', data => { data.valuationSeries.points.reverse(); }],
+    ['duplicate extension', data => { data.valuationSeries.points[1].tradeDate = data.valuationSeries.points[0].tradeDate; }],
+    ['1001 extension points', data => { data.valuationSeries.points = Array.from({ length: 1001 }, () => data.valuationSeries.points[0]); }],
+    ['inconsistent counts', data => { data.valuationSeries.points[0].pricedCount++; }],
+    ['duplicate public history', data => { data.history[1].tradeDate = data.history[0].tradeDate; }],
+    ['1001 public points', data => { data.history = Array.from({ length: 1001 }, () => data.history[0]); }],
+    ['non-array public history', data => { data.history = null; }],
+    ['wrong quantity origin type', data => { data.valuationSeries.points[0].quantityOrigin = ['stored-assembly']; }],
+  ];
+  for (const [name, mutate] of invalidInputs) for (const lang of ['ko', 'en']) await test(`chart-only failure: ${name} ${lang}`, async () => {
+    const data = { ...structuredClone(original), valuationSeries: structuredClone(reconstruction) }; mutate(data);
+    const { page, context, errors } = await setup(lang, 'dark-coral', lang === 'en', data);
+    try {
+      const notice = page.getByTestId('foliotrace-chart-unavailable'); await notice.waitFor({ timeout: 10000 });
+      assert.equal(await page.getByTestId('foliotrace-history-chart').count(), 0);
+      assert.equal(await page.locator('.foliotrace-trend details, .foliotrace-trend-legend').count(), 0);
+      assert.equal(await page.getByRole('alert').count(), 0);
+      assert.equal(await page.locator('#foliotrace-latest-list > li').count(), 30);
+      assert.equal(await page.locator('#foliotrace-holdings .foliotrace-table tbody tr, #foliotrace-holdings .foliotrace-mrow').count(), original.holdings.length);
+      assert.deepEqual(errors, []);
+      if (name === 'reversed extension') {
+        await notice.scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(out, `chart-unavailable-${lang}.png`), fullPage: false });
+      }
+    } catch (error) { await page.screenshot({ path: path.join(out, `isolation-${name.replaceAll(' ', '-')}-${lang}-failure.png`) }).catch(() => {}); throw error; }
     finally { await context.close(); }
   });
-  await test('wrongly typed reconstruction quantity origin is rejected by the browser loader', async () => {
-    const series = structuredClone(reconstruction); series.points[0].quantityOrigin = ['stored-assembly'];
-    const { page, context } = await setup('en', 'light-coral', false, { ...original, valuationSeries: series });
-    try { await page.getByRole('alert').waitFor(); assert.equal(await page.locator('.foliotrace-trend').count(), 0); }
-    finally { await context.close(); }
+  await test('core schema violation still hides the portfolio even with bad chart data', async () => {
+    const data = { ...structuredClone(original), valuationSeries: structuredClone(reconstruction) };
+    data.valuationSeries.points.reverse(); data.portfolio.currency = 'USD';
+    const { page, context } = await setup('en', 'light-coral', false, data);
+    try {
+      await page.getByRole('alert').waitFor();
+      assert.equal(await page.locator('#foliotrace-holdings, #foliotrace-events, .foliotrace-trend').count(), 0);
+    } finally { await context.close(); }
   });
   await test('theme changes and resizing replace chart resources without duplicate canvases', async () => {
     const { page, context, errors } = await setup('en', 'light-coral', false, { ...original, valuationSeries: reconstruction });

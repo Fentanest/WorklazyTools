@@ -218,7 +218,10 @@ function validManifest(value: unknown): value is Manifest {
     typeof value.snapshotSha256 === 'string' && VERSION.test(value.snapshotSha256)
 }
 
-export function validSnapshot(value: unknown, version: string): value is Snapshot {
+type CoreSnapshot = Omit<Snapshot, 'history' | 'valuationSeries'> & { history?: unknown; valuationSeries?: unknown }
+
+/** Chart-only data must not prevent the holdings and filings from loading. */
+function validCoreSnapshot(value: unknown, version: string): value is CoreSnapshot {
   if (!isRecord(value) || value.schemaVersion !== 1 || value.datasetVersion !== version) return false
   if (!isRecord(value.portfolio) || !isRecord(value.entity)) return false
   if (!str(value.portfolio.id) || !str(value.portfolio.entityId) || value.portfolio.market !== 'KRX' ||
@@ -228,7 +231,7 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
     !str(value.entity.nameKo) || !str(value.entity.nameEn) || !nullable(value.entity.officialId, str) || !str(value.entity.source)) return false
   if (!nullable(value.valuationTradeDate, isoDate) || !nullable(value.filingsCheckedAt, timestamp) ||
     !timestamp(value.generatedAt) || !nullable(value.publishedAt, timestamp) || !nullable(value.latestReceiptDate, isoDate) ||
-    !Array.isArray(value.holdings) || !Array.isArray(value.events) || !Array.isArray(value.history) ||
+    !Array.isArray(value.holdings) || !Array.isArray(value.events) ||
     !nullable(value.estimatedValue, decimal)) return false
   if (!Number.isSafeInteger(value.trackedCount) || !Number.isSafeInteger(value.pricedCount) || !Number.isSafeInteger(value.unresolvedCount)) return false
   if (!['complete', 'partial', 'unavailable'].includes(String(value.valuationCoverage))) return false
@@ -243,15 +246,24 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
       (!Array.isArray(value.issuerScopeObservations) || !value.issuerScopeObservations.every(validIssuerScopeObservation))) return false
   if (value.issuerScopeLaterChanges !== undefined &&
       (!Array.isArray(value.issuerScopeLaterChanges) || !value.issuerScopeLaterChanges.every(validIssuerScopeLaterChange))) return false
+  if (value.holdings.length > SNAPSHOT_LIMITS.maxHoldings || value.events.length > SNAPSHOT_LIMITS.maxEvents) return false
+  return value.holdings.every(validHolding) && value.events.every(validEvent)
+}
+
+function validChartData(value: CoreSnapshot): value is Snapshot {
+  if (!validPublishedHistory(value.history)) return false
   if (value.valuationSeries !== undefined) {
     const valuationDay = typeof value.valuationTradeDate === 'string' ? value.valuationTradeDate : null
     if (!validValuationSeries(value.valuationSeries) || value.valuationSeries.portfolioId !== value.portfolio.id ||
       value.valuationSeries.methodologyVersion !== value.portfolio.methodologyVersion ||
       (valuationDay !== null && value.valuationSeries.points.some(point => point.tradeDate > valuationDay))) return false
   }
-  if (value.holdings.length > SNAPSHOT_LIMITS.maxHoldings || value.events.length > SNAPSHOT_LIMITS.maxEvents ||
-    value.history.length > SNAPSHOT_LIMITS.maxHistory) return false
-  return value.holdings.every(validHolding) && value.events.every(validEvent) && validPublishedHistory(value.history)
+  return true
+}
+
+/** Publication/file gate remains strict; the browser isolates chart failures below. */
+export function validSnapshot(value: unknown, version: string): value is Snapshot {
+  return validCoreSnapshot(value, version) && validChartData(value)
 }
 
 async function digestHex(data: ArrayBuffer): Promise<string> {
@@ -273,10 +285,18 @@ export async function loadFolioTraceSnapshot(signal?: AbortSignal): Promise<Foli
     if (payload.byteLength > SNAPSHOT_LIMITS.maxSnapshotBytes) return { status: 'schema-error' }
     if (await digestHex(payload) !== manifest.snapshotSha256) return { status: 'schema-error' }
     const snapshot: unknown = JSON.parse(new TextDecoder().decode(payload))
-    if (!validSnapshot(snapshot, manifest.datasetVersion)) return { status: 'schema-error' }
+    if (!validCoreSnapshot(snapshot, manifest.datasetVersion)) return { status: 'schema-error' }
+    let displaySnapshot: Snapshot
+    let chartUnavailable = false
+    if (validChartData(snapshot)) displaySnapshot = snapshot
+    else {
+      const { history: _history, valuationSeries: _series, ...core } = snapshot
+      displaySnapshot = { ...core, history: [] }
+      chartUnavailable = true
+    }
     const freshnessAt = Date.parse(snapshot.publishedAt ?? snapshot.generatedAt)
     const stale = !Number.isFinite(freshnessAt) || Date.now() - freshnessAt > 3 * 24 * 60 * 60 * 1000
-    return { status: 'ready', snapshot, stale }
+    return { status: 'ready', snapshot: displaySnapshot, stale, ...(chartUnavailable ? { chartUnavailable: true } : {}) }
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     return { status: 'load-error' }

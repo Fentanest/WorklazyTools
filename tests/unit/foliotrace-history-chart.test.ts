@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { chartHistory, historyChange, formatHistoryDate, formatHistoryAxis } from '../../src/features/foliotrace/ui/history.ts';
+import { chartHistory, historyChange, formatHistoryDate, formatHistoryAxis, formatHistoryChange } from '../../src/features/foliotrace/ui/history.ts';
 const snapshot = JSON.parse(readFileSync(new URL('../fixtures/foliotrace/chart-snapshot-20261103.json', import.meta.url), 'utf8'));
 const reconstruction = JSON.parse(readFileSync(new URL('../fixtures/foliotrace/valuation-series-20261103.json', import.meta.url), 'utf8'));
 
@@ -36,6 +36,8 @@ test('one and two points have no trend chart, three points do', () => {
 test('financial change text is exact above 2^53 and with fractional won', () => {
   const change = historyChange([{ estimatedValue: '9007199254740993.25' }, { estimatedValue: '9007199254740993.40' }]);
   assert.deepEqual(change, { direction: 'up', amount: '0.15', percent: '0.00' });
+  assert.equal(formatHistoryChange(change, 'ko'), '+₩0.15 (+0.00%)');
+  assert.equal(formatHistoryChange(null, 'en'), 'Not enough comparable records.');
   assert.deepEqual(historyChange([{ estimatedValue: '3' }, { estimatedValue: '2' }]), { direction: 'down', amount: '1', percent: '33.33' });
   assert.equal(historyChange([{ estimatedValue: '0' }, { estimatedValue: '2' }])?.percent, null);
 });

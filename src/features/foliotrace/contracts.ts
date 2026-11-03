@@ -247,7 +247,7 @@ export interface Snapshot {
 }
 
 export type FolioTraceView =
-  | { status: 'ready'; snapshot: Snapshot; stale: boolean }
+  | { status: 'ready'; snapshot: Snapshot; stale: boolean; chartUnavailable?: boolean }
   | { status: 'loading' | 'missing-import' | 'load-error' | 'schema-error'; message?: string }
 
 /** Muse owns this component and its scoped styles. Sol owns the data loader. */
