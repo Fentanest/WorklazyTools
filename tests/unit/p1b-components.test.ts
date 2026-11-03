@@ -46,6 +46,7 @@ test("ToolGuide keeps its public structure and localized eyebrow through shadcn 
     "text-tools/TextToolsPage.tsx",
     "timezone-calculator/TimezoneCalculatorPage.tsx",
     "video-studio/VideoStudioPage.tsx",
+    "word-compare/WordCompareResultPage.tsx",
     "work-calculator/WorkCalculatorPage.tsx",
   ];
 
