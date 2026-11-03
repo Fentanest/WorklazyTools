@@ -1,6 +1,6 @@
 import { ImageEditor, ERROR_MESSAGES, type BeforeExportContext, type ExportDecision } from '@ascentsparksoftware/react-image-editor';
 import '@ascentsparksoftware/react-image-editor/styles.css';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '../../../components/ui';
 import { Button } from '../../../components/ui/button';
@@ -10,7 +10,7 @@ import { setUnsavedWork } from '../../../app/toolState';
 import type { ImageEditorDirectHandle } from '../ImageStudioPage';
 import type { ImageDirectPreset } from '../imageDirect';
 import { ClipboardHint, filterRasterImages, RASTER_IMAGE_ACCEPT } from '../imageStudioShared';
-import { BackgroundRemovalController, BgRemovalError, messages, type BgMode, type ConsentInfo } from '../bgRemoval';
+import { BackgroundRemovalController, BgRemovalError, messages, productDeviceRestriction, type BgMode, type ConsentInfo } from '../bgRemoval';
 import { actualShrinkNotice, classifyD6, draftD6Props } from './d6Policy';
 import { prepareImage, type PreparedImage } from './prepareImage';
 import { resizeResult } from './resizeResult';
@@ -32,6 +32,13 @@ const fontResolver = (family: string) => localFonts.has(family) || family.includ
 const readThemeMode = (): 'light' | 'dark' => document.documentElement.dataset.theme?.startsWith('dark') || getComputedStyle(document.documentElement).colorScheme === 'dark' ? 'dark' : 'light';
 const resultPlanKey = (format: ImageOutputFormat, size?: PixelSize) => `${format}:${size?.width ?? 'auto'}x${size?.height ?? 'auto'}`;
 const initialTool = (preset?: ImageDirectPreset) => preset?.purpose === 'mosaic' ? 'redact' : preset?.purpose === 'watermark' ? 'text' : preset?.purpose === 'resize' ? 'resize' : 'select';
+const coarsePrimaryPointer = () => matchMedia('(pointer: coarse)').matches;
+const subscribePrimaryPointer = (notify: () => void) => {
+  const query = matchMedia('(pointer: coarse)');
+  query.addEventListener('change', notify);
+  return () => query.removeEventListener('change', notify);
+};
+const serverPrimaryPointer = () => false;
 
 export default function LibraryImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: Props) {
   const { t, i18n } = useTranslation('features');
@@ -105,11 +112,14 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     maxTouchPoints: navigator.maxTouchPoints, screenShortEdgeCssPx: Math.min(screen.width, screen.height),
   })));
   const secureBackgroundContext = globalThis.isSecureContext && !!globalThis.crypto?.subtle;
+  const productRestricted = !!productDeviceRestriction();
+  const touchInput = useSyncExternalStore(subscribePrimaryPointer, coarsePrimaryPointer, serverPrimaryPointer);
   const labels = useMemo<Record<string, string>>(() => ({
     ...t('image.library.labels', { returnObjects: true }) as Record<string, string>,
+    ...(touchInput ? { 'Click an object on the canvas to select it. Use the Layers panel to lock, reorder, group, align, or change opacity. Shift-click to multi-select.': t('image.library.touchSelectionHelp') } : {}),
     'This browser cannot encode this image format. Choose PNG or JPEG.': t('image.library.unsupportedFormat'),
-    'runs an AI model entirely in your browser — no upload. The model (~tens of MB) downloads once on first use, then is cached.': t(!secureBackgroundContext ? 'image.library.httpsHint' : mode === 'person' ? 'image.library.personModelHelp' : 'image.library.productModelHelp'),
-  }), [t, mode, secureBackgroundContext]);
+    'runs an AI model entirely in your browser — no upload. The model (~tens of MB) downloads once on first use, then is cached.': !secureBackgroundContext ? t('image.library.httpsHint') : mode === 'product' && productRestricted ? messages[language]['bg-product-device-restricted'] : t(mode === 'person' ? 'image.library.personModelHelp' : 'image.library.productModelHelp'),
+  }), [t, mode, secureBackgroundContext, productRestricted, language, touchInput]);
   const exportFileName = `${(source?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited`;
   const labelsRef = useRef(labels); labelsRef.current = labels;
   const applyPresetRef = useRef<(next?: ImageDirectPreset) => void>(() => {});
@@ -325,14 +335,14 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       <FileDropZone files={source ? [source.file] : []} disabled={loading || bgBusy} accept={RASTER_IMAGE_ACCEPT} hint={t('image.editor.hint')} onFiles={files => { const next = filterRasterImages(files).at(-1); if (next) void receiveRef.current(next); }} accent="sky" />
       <ClipboardHint mode="replace" />
       {shrink && <UtilityNotice role="status" className="mt-2" data-testid="image-editor-shrink">{shrink}</UtilityNotice>}
-      {displayedError && <div className="mt-2"><h3 tabIndex={-1} data-testid="image-editor-operation-error" className="mb-1 text-sm font-medium">{t('image.library.operationErrorTitle')}</h3><UtilityNotice kind="error" role="alert">{displayedError}{mode === 'product' && (errorCode === 'bg-inference-failed' || errorCode === 'bg-unsupported') && <Button className="ml-2" type="button" variant="outline" onClick={() => {
+      {displayedError && <div className="mt-2"><h3 tabIndex={-1} data-testid="image-editor-operation-error" className="mb-1 text-sm font-medium">{t('image.library.operationErrorTitle')}</h3><UtilityNotice kind="error" role="alert">{displayedError}{mode === 'product' && (errorCode === 'bg-inference-failed' || errorCode === 'bg-unsupported' || errorCode === 'bg-product-device-restricted') && <Button className="ml-2" type="button" variant="outline" onClick={() => {
         modeChosen.current = true; modeRef.current = 'person'; setMode('person'); setError(''); setErrorCode(undefined); setNotice(t('image.library.retryReady'));
       }}>{t('image.library.retryPerson')}</Button>}</UtilityNotice></div>}
       {notice && <UtilityNotice role="status" className="mt-2">{notice}</UtilityNotice>}
       <UtilityNotice className="mt-2">{t('image.library.redactionHint')}</UtilityNotice>
       <div className="my-3 flex flex-wrap items-center gap-2" data-testid="image-background-controls">
-        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { clearFeedback(); modeChosen.current = true; setMode(event.target.value as BgMode); }}>
-          <option value="person">{t('image.library.person')}</option><option value="product">{t('image.library.product')}</option>
+        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select aria-describedby={productRestricted ? 'image-background-product-restriction' : undefined} className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { clearFeedback(); modeChosen.current = true; setMode(event.target.value as BgMode); }}>
+          <option value="person">{t('image.library.person')}</option><option value="product" disabled={productRestricted}>{t('image.library.product')}</option>
         </select></label>
         <Button type="button" variant="outline" onClick={() => {
           cancel(); clearFeedback(); const revision = noticeRevision.current; const controller = bg.current;
@@ -340,6 +350,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         }}>{t('image.library.clearModels')}</Button>
         {bgBusy && <><span role="status">{t(bgPhase === 'download' ? 'image.library.downloadProgress' : bgPhase === 'preparing' ? 'image.library.backgroundPreparing' : 'image.library.backgroundProcessing', { progress })}</span><Button type="button" variant="secondary" onClick={cancelBackgroundRemoval}>{t('image.cancel')}</Button></>}
       </div>
+      {productRestricted && <UtilityNotice kind="warning" role="status" id="image-background-product-restriction" data-testid="image-background-product-restriction">{messages[language]['bg-product-device-restricted']}</UtilityNotice>}
       <p className="mb-2 text-sm text-muted-foreground">{t('image.library.magicWandHint')}</p>
       <p className="mb-3 text-sm text-muted-foreground">{t('image.library.templateHelp')}</p>
       <fieldset className="mb-3 rounded-xl border border-border p-3" data-testid="image-editor-png-size">

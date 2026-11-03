@@ -1,6 +1,7 @@
 import { acquireAssets, assetsFor, CACHE_NAME, manifest, prepareAssets, type BgMode } from './assets.ts';
 import { BgRemovalError, cancelled, normalizeError, messages } from './errors.ts';
 import type { Diagnostic, WorkerRequest, WorkerResponse } from './protocol.ts';
+import { productDeviceRestriction } from './devicePolicy.ts';
 export interface ConsentInfo { mode: BgMode; label: string; downloadBytes: number; programFilesNote: string }
 export interface RemovalOptions { mode?: BgMode; signal?: AbortSignal; progress?: (key: string, current: number, total: number) => void }
 export interface ControllerOptions {
@@ -17,6 +18,7 @@ export interface ControllerOptions {
   productSupported?: () => Promise<boolean>;
 }
 export async function productSupported(): Promise<boolean> {
+  if (productDeviceRestriction()) return false;
   try {
     const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<{ features: { has(name: string): boolean } } | null> } }).gpu;
     return !!(await gpu?.requestAdapter())?.features.has('shader-f16');
@@ -28,7 +30,7 @@ export class BackgroundRemovalController {
   private worker?: Worker;
   private readonly options: ControllerOptions;
   constructor(options: ControllerOptions) { this.options = options; }
-  async defaultMode(): Promise<BgMode> { return await (this.options.productSupported ?? productSupported)() ? 'product' : 'person'; }
+  async defaultMode(): Promise<BgMode> { return !productDeviceRestriction() && await (this.options.productSupported ?? productSupported)() ? 'product' : 'person'; }
   cancel(): void { this.generation++; this.active?.abort(); this.worker?.terminate(); this.worker = undefined; }
   onImageReplaced(): void { this.cancel(); }
   dispose(): void { this.cancel(); }
@@ -52,6 +54,10 @@ export class BackgroundRemovalController {
       // Reject insecure LAN HTTP before cache planning, consent, fetch or worker creation.
       if (!globalThis.isSecureContext || !globalThis.crypto?.subtle) throw new BgRemovalError('bg-secure-context-required');
       ensureCurrent();
+      const mode = settings.mode ?? await this.defaultMode(); ensureCurrent();
+      // Block even warm caches / injected capability probes before loading any model bytes.
+      if (mode === 'product' && productDeviceRestriction()) throw new BgRemovalError('bg-product-device-restricted');
+      if (mode === 'product' && !(await (this.options.productSupported ?? productSupported)())) throw new BgRemovalError('bg-unsupported');
       let blob = input;
       if (typeof input === 'string') {
         if (!/^(data:|blob:)/i.test(input)) throw new BgRemovalError('bg-unsupported');
@@ -59,8 +65,6 @@ export class BackgroundRemovalController {
         catch (error) { cancelled(abort.signal); throw new BgRemovalError('bg-unsupported'); }
       }
       ensureCurrent();
-      const mode = settings.mode ?? await this.defaultMode(); ensureCurrent();
-      if (mode === 'product' && !(await (this.options.productSupported ?? productSupported)())) throw new BgRemovalError('bg-unsupported');
       const baseUrl = this.options.baseUrl ?? new URL(import.meta.env.BASE_URL, location.href).href;
       const plan = await prepareAssets(assetsFor(mode, baseUrl), this.storage(), abort.signal); ensureCurrent();
       const language = this.options.language ?? 'ko';
