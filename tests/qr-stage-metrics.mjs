@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,14 +73,7 @@ async function settle() {
 try {
   await fs.mkdir(outputDirectory, { recursive: true });
   if (!process.env.TEST_BASE_URL) {
-    server = spawn(process.execPath, [path.join(repositoryRoot, "node_modules/vite/bin/vite.js"), "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], { cwd: repositoryRoot, stdio: ["ignore", "pipe", "pipe"] });
-    const output = []; server.stdout.on("data", (chunk) => output.push(String(chunk))); server.stderr.on("data", (chunk) => output.push(String(chunk)));
-    const deadline = Date.now() + 30_000;
-    while (true) {
-      if (server.exitCode !== null || Date.now() > deadline) throw new Error(`Preview unavailable: ${output.join("")}`);
-      try { if ((await fetch(baseUrl)).ok) break; } catch {}
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
+    server = await startPreview();
   }
   fontServer = await createQrFontScenarioServer({ upstream: baseUrl,
     subsetPath: path.join(repositoryRoot, "dist/vendor/qr-label-font/noto-cjk-sans-2.004-ksx1001-v1/NotoSansKR-Regular.ksx1001.otf"), scenario });
@@ -241,9 +234,9 @@ try {
   await fs.writeFile(path.join(outputDirectory, "network-events.json"), JSON.stringify({ workerTargets, rows: [...rows.values()], networkEvents }, null, 2));
   await browser?.close();
   await fontServer?.close();
-  if (server && server.exitCode === null) {
-    server.kill("SIGTERM");
-    await Promise.race([new Promise((resolve) => server.once("exit", resolve)), new Promise((resolve) => setTimeout(resolve, 5_000))]);
-    if (server.exitCode === null) server.kill("SIGKILL");
-  }
+  await stopOwnedPreview(server);
+}
+
+async function startPreview() {
+  return startOwnedPreview({ repositoryRoot, port });
 }

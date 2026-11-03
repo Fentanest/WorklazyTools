@@ -1,5 +1,6 @@
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 import assert from "node:assert/strict";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -55,18 +56,6 @@ function fixtureUrl(type, pageCount) {
 
 function writeJson(name, value) {
   fs.writeFileSync(path.join(outputRoot, name), `${JSON.stringify(value, null, 2)}\n`);
-}
-
-async function waitForServer(child) {
-  for (let attempt = 0; attempt < 120; attempt += 1) {
-    if (child.exitCode !== null) throw new Error(`Vite exited before the benchmark started (${child.exitCode}).`);
-    try {
-      const response = await fetch(`${baseUrl}/en/tools/pdf-editor/finish`);
-      if (response.ok) return;
-    } catch { /* Server is still starting. */ }
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
-  throw new Error("Vite did not become ready for the raster benchmark.");
 }
 
 async function createHeapSampler(browser, page) {
@@ -324,18 +313,14 @@ if (process.argv.includes("--report-only")) {
 const manifest = JSON.parse(fs.readFileSync(path.join(fixtureRoot, "manifest.json"), "utf8"));
 assert.equal(manifest.files.length, 12);
 const viteLog = fs.openSync(path.join(outputRoot, "vite.log"), "w");
-const server = spawn(process.execPath, [path.join(repositoryRoot, "node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-  cwd: repositoryRoot,
-  env: { ...process.env, NODE_OPTIONS: "--max-old-space-size=4096" },
-  stdio: ["ignore", viteLog, viteLog],
-});
+let server;
 
 let browser;
 const rawCells = [];
 const readabilityFiles = [];
 const batchRaw = [];
 try {
-  await waitForServer(server);
+  server = await startDevServer();
   browser = await puppeteer.launch({
     headless: true,
     executablePath: chromeExecutable,
@@ -435,8 +420,10 @@ try {
   console.log(`READABILITY ${readability.results.length}/${readability.results.length} PASS`);
 } finally {
   if (browser) await browser.close().catch(() => undefined);
-  server.kill("SIGTERM");
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  if (server.exitCode === null) server.kill("SIGKILL");
+  await stopOwnedPreview(server);
   fs.closeSync(viteLog);
+}
+
+async function startDevServer() {
+  return startOwnedPreview({ repositoryRoot, port, mode: "dev", readinessPath: "/en/tools/pdf-editor/finish", env: { NODE_OPTIONS: "--max-old-space-size=4096" }, onOutput: (chunk) => fs.writeSync(viteLog, chunk) });
 }

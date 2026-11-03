@@ -1,13 +1,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { chromium } from "playwright";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
-import { spawn } from "node:child_process";
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 
 const output = process.env.FILE_DROP_OUTPUT || "/tmp/sol-h1core/browser";
 const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jP1sAAAAASUVORK5CYII=", "base64");
@@ -23,10 +23,14 @@ export async function dropFiles(page, files) {
 async function environment() {
   await fs.mkdir(output, { recursive: true });
   const base = process.env.TEST_BASE_URL || `http://127.0.0.1:${process.env.FILE_DROP_PORT || 5370}`;
-  const server = process.env.TEST_BASE_URL ? null : spawn(process.execPath, ["node_modules/vite/bin/vite.js", "preview", "--host", "127.0.0.1", "--port", new URL(base).port, "--strictPort"], { stdio: "ignore" });
-  if (server) { for (let attempt = 0; attempt < 150; attempt++) { try { if ((await fetch(base)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 100)); } }
-  const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", args: ["--no-sandbox", "--disable-dev-shm-usage"] });
-  return { browser, base, close: async () => { await browser.close(); if (server) { server.kill("SIGTERM"); await new Promise(resolve => server.once("exit", resolve)); } } };
+  const server = process.env.TEST_BASE_URL ? null : await startPreview(new URL(base).port);
+  try {
+    const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+    return { browser, base, close: async () => { try { await browser.close(); } finally { await stopOwnedPreview(server); } } };
+  } catch (error) {
+    await stopOwnedPreview(server);
+    throw error;
+  }
 }
 async function home(env, language = "ko", width = 1280, dark = false) {
   const context = await env.browser.newContext({ viewport: { width, height: 940 }, serviceWorkers: "block" });
@@ -258,4 +262,8 @@ try {
   console.log(`1..${results.length}\n# tests ${results.length}\n# pass ${results.length}\n# fail 0`);
 } catch (error) { await page.screenshot({ path: path.join(output, "failure.png"), fullPage: true }); throw error; } finally { await browser.close(); }
 
+}
+
+async function startPreview(port) {
+  return startOwnedPreview({ repositoryRoot: fileURLToPath(new URL("..", import.meta.url)), port: Number(port), timeoutMs: 15_000 });
 }

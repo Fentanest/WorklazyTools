@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -53,41 +53,9 @@ try {
 }
 
 async function startPreviewServer() {
-  const viteBin = path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js");
-  const child = spawn(process.execPath, [viteBin, "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-    cwd: repositoryRoot,
-    env: { ...process.env, BROWSER: "none", TZ: "UTC" },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const output = [];
-  child.stdout.on("data", (chunk) => output.push(chunk.toString()));
-  child.stderr.on("data", (chunk) => output.push(chunk.toString()));
-  child.unref();
-  try {
-    const deadline = Date.now() + 30_000;
-    while (Date.now() < deadline) {
-      if (child.exitCode !== null) throw new Error(`Vite exited with code ${child.exitCode}.`);
-      try {
-        const response = await fetch(baseUrl);
-        if (response.ok) return child;
-      } catch {
-        // The local preview is still starting.
-      }
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    }
-    throw new Error(`Timed out waiting for ${baseUrl}.`);
-  } catch (error) {
-    await stopServer(child);
-    throw new Error(`${error.message}\n${output.join("").trim()}`);
-  }
+  return startOwnedPreview({ repositoryRoot, port, env: { TZ: "UTC" } });
 }
 
 async function stopServer(child) {
-  if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5_000)),
-  ]);
-  if (child.exitCode === null) child.kill("SIGKILL");
+  await stopOwnedPreview(child);
 }

@@ -1,9 +1,9 @@
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 // U0: exercise the mounted AppShell search form -> useToolCatalog -> matcher
 // -> ToolsPage cards. The pre-U0 W2 fixture expected an unmounted combobox
 // and sidebar data attributes; those are not present in baseline 47f0678.
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
@@ -102,23 +102,8 @@ try {
 } finally { if (server) await stopServer(server); }
 
 async function startDevServer() {
-  const child = spawn(process.execPath, [path.join(repositoryRoot, "node_modules/vite/bin/vite.js"), "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
-    { cwd: repositoryRoot, env: { ...process.env, BROWSER: "none" }, stdio: ["ignore", "pipe", "pipe"] });
-  const output = [];
-  child.stdout.on("data", (chunk) => output.push(chunk.toString()));
-  child.stderr.on("data", (chunk) => output.push(chunk.toString()));
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`Vite exited (${child.exitCode}): ${output.join("")}`);
-    try { if ((await fetch(baseUrl)).ok) return child; } catch { /* starting */ }
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  child.kill("SIGTERM");
-  throw new Error(`Timed out waiting for ${baseUrl}: ${output.join("")}`);
+  return startOwnedPreview({ repositoryRoot, port, mode: "dev", timeoutMs: 60_000 });
 }
 async function stopServer(child) {
-  if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  await Promise.race([new Promise((resolve) => child.once("exit", resolve)), new Promise((resolve) => setTimeout(resolve, 5_000))]);
-  if (child.exitCode === null) child.kill("SIGKILL");
+  await stopOwnedPreview(child);
 }
