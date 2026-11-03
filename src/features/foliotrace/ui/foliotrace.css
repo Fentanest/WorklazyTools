@@ -176,6 +176,114 @@
   margin: 0;
 }
 
+.foliotrace-market-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 1.5rem;
+}
+
+.foliotrace-market-panel {
+  min-width: 0;
+  margin-top: 1.5rem;
+}
+
+.foliotrace-market-panel .foliotrace-controls {
+  width: 100%;
+}
+
+.foliotrace-market-panel .foliotrace-holdings-head {
+  align-items: stretch;
+}
+
+.foliotrace-market-panel .foliotrace-search,
+.foliotrace-market-panel .foliotrace-sort {
+  min-width: 0;
+  flex: 1 1 10rem;
+}
+
+.foliotrace-market-panel .foliotrace-pills {
+  flex-basis: 100%;
+}
+
+.foliotrace-market-panel .foliotrace-mrow-value {
+  white-space: normal;
+}
+
+.foliotrace-market-allocation {
+  margin: 1rem 0 0;
+  padding: 1.2rem;
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
+  border-radius: 18px;
+  background: var(--bg-solid, #ffffff);
+}
+
+.foliotrace-market-total {
+  margin: 0.8rem 0 1rem;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-market-bars {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.foliotrace-market-bar-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.foliotrace-market-value {
+  margin-left: auto;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-market-bars small {
+  color: var(--label-secondary, #636369);
+}
+
+.foliotrace-market-track {
+  overflow: hidden;
+  height: 0.55rem;
+  margin: 0.35rem 0;
+  border-radius: 99px;
+  background: var(--bg-muted, rgba(118, 118, 128, 0.08));
+}
+
+.foliotrace-market-track > span {
+  display: block;
+  height: 100%;
+  background: var(--brand-on-bg, var(--brand, #e8502f));
+}
+
+.foliotrace-market-track > [data-market-fill="KOSDAQ"],
+.foliotrace-market-track > [data-market-fill="KONEX"],
+.foliotrace-market-track > [data-market-fill="UNKNOWN"] {
+  background: var(--label-secondary, #636369);
+}
+
+@media (max-width: 900px) {
+  .foliotrace-market-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .foliotrace-market-panel .foliotrace-search,
+  .foliotrace-market-panel .foliotrace-sort {
+    flex: 0 0 auto;
+  }
+  .foliotrace-market-panel .foliotrace-pills {
+    flex-basis: auto;
+  }
+}
+
 .foliotrace-events li {
   border-top: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   padding-top: 0.5rem;
