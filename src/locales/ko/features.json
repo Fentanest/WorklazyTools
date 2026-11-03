@@ -2534,6 +2534,7 @@
       "retry": "다시 만들기",
       "cancel": "작업 취소",
       "canceled": "작업을 취소했습니다. 설정을 확인한 뒤 다시 시작할 수 있습니다.",
+      "partialResultsAvailable": "이미 완료된 결과는 아래에서 내려받을 수 있습니다.",
       "progressTitle": "PDF 마무리 진행 상황",
       "progress": {
         "reading": "원본 PDF를 읽는 중…",
@@ -2569,6 +2570,8 @@
       "errors": {
         "protected-document": "이 PDF는 보호되어 있어 편집할 수 없습니다. 보호가 해제된 사본을 준비해 주세요.",
         "unreadable-document": "PDF를 읽지 못했습니다. 파일을 확인한 뒤 다시 선택해 주세요.",
+        "processing-failed": "PDF 처리 중 문제가 발생했습니다. 다시 시도해 주세요.",
+        "save-failed": "결과 PDF를 만들지 못했습니다. 파일이 크거나 메모리가 부족할 수 있습니다. 파일 수나 페이지 범위를 줄여 다시 시도해 주세요.",
         "invalid-field": "입력값을 확인한 뒤 다시 시도해 주세요.",
         "invalid-text": "표시 내용에 지원하지 않는 제어 문자나 날짜 형식이 있습니다.",
         "control-character": "표시 내용에 사용할 수 없는 제어 문자가 있습니다.",

@@ -1,4 +1,5 @@
-import { spawn } from "node:child_process";
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
+import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -726,6 +727,9 @@ async function prepareDocumentResult(page, target) {
 
 async function prepareExcelDuplicateResult(page) {
   const input = page.locator('[data-testid="excel-compare-page"] input[type="file"]');
+  // Select both fixtures in one event: the shared drop zone stays disabled
+  // while its async consumer inspects this batch, so a second selection can
+  // otherwise be silently dropped. Verify both inspected sides below.
   await input.setInputFiles([{
     name: "a11y-duplicate-left.csv",
     mimeType: "text/csv",
@@ -736,12 +740,20 @@ async function prepareExcelDuplicateResult(page) {
     buffer: Buffer.from("Key,Value\nA,right-only", "utf8"),
   }]);
   await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+  assert.deepEqual(await page.locator('[data-testid="excel-selected-file"] strong').allTextContents(), [
+    "a11y-duplicate-left.csv", "a11y-duplicate-right.csv",
+  ]);
   await page.locator('[data-testid="excel-compare-mode-grid"] button:nth-child(2)').click();
-  await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
   await page.locator('[data-testid="excel-compare-actions"] [data-ui-component="primary-button"]').click();
   await page.locator('[data-testid="excel-duplicate-row"]').waitFor({ state: "visible", timeout: 240_000 });
   await page.locator('[data-testid="excel-duplicate-toggle"][data-side="left"]').click();
   await page.locator('[data-testid="excel-duplicate-list"][data-side="left"]').waitFor({ state: "visible" });
+  assert.equal(await page.locator('[data-testid="excel-duplicate-row"]').count(), 1);
+  assert.equal(await page.locator('[data-testid="excel-duplicate-list"][data-side="left"] li').count(), 2);
 }
 
 async function measureDuplicateResultContrast(page) {
@@ -1047,37 +1059,9 @@ function readInteger(name, fallback) {
 }
 
 async function startPreview() {
-  const viteBin = path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js");
-  const child = spawn(process.execPath, [viteBin, "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-    cwd: repositoryRoot,
-    env: { ...process.env, BROWSER: "none" },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const output = [];
-  child.stdout.on("data", (chunk) => output.push(chunk.toString()));
-  child.stderr.on("data", (chunk) => output.push(chunk.toString()));
-  child.unref();
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`Vite preview exited early (${child.exitCode}): ${output.join("")}`);
-    try {
-      const response = await fetch(baseUrl);
-      if (response.ok) return child;
-    } catch {
-      // Preview is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  child.kill("SIGTERM");
-  throw new Error(`Timed out waiting for ${baseUrl}: ${output.join("")}`);
+  return startOwnedPreview({ repositoryRoot, port });
 }
 
 async function stopServer(child) {
-  if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5_000)),
-  ]);
-  if (child.exitCode === null) child.kill("SIGKILL");
+  await stopOwnedPreview(child);
 }

@@ -1,5 +1,13 @@
 # 검토 기록 (Review Notes)
 
+## 2026-11-04 — U06 브랜치에 로컬 main 병합 (Codx, 병합 후보 정식 검수 대기)
+
+- U06 `65409720`에 로컬 main `3fd1fa63`을 병합했다. 실제 내용 충돌은 `tests/accessibility-audit.mjs`의 Excel 준비 한 곳이며 CHANGELOG·기존 review-notes 항목에는 충돌이 없었다. 기존 항목은 보존하고 이번 판단을 추가한다. U06의 16환경 프로필·화면별 즉시 저장과 main의 자기 preview PID/포트/token 검증·점유 포트 실패·종료 회수는 함께 유지한다.
+- Excel 준비는 U06의 두 fixture 단일 `setInputFiles`로 통일한다. `PairFileDropZone`은 multiple 입력이며 `ExcelComparePage`의 `addFiles`가 한 배치를 좌우에 할당하고 `Promise.all`로 검사를 기다린다. `FileDropZone`이 비동기 consumer 동안 추가 선택을 막기 때문에 두 번째 입력 이벤트 자체를 없애는 방식이 이 고정 fixture에 더 견고하다. main의 대안인 첫 파일 검사/입력 활성화 후 두 번째 선택은 중복 적용하지 않는다.
+- main의 양쪽 파일명/순서 검증, 실제 HTMLButtonElement 존재와 활성화 확인, 중복 결과 1행·왼쪽 상세 2항목 단언은 보존한다. fixture·준비·gate 기대값을 약화하지 않는다. 이번 두 조합 실행은 전체 16환경 재수집이나 기존 접근성 부채 해소를 뜻하지 않는다.
+- 병합 후 unit 1,478+36=1,514건·하네스 86건은 fail/skip 0, build·static도 종료 0/입력 불변이다. `light-coral|ko|desktop`과 `dark-mint|en|mobile`의 Excel 결과 준비·raw/즉시 저장·receipt 수집은 2/2 완료했다. 감사 자체는 각 위반 2종(color-contrast·select-name) 때문에 종료 1이며 0위반 gate를 유지한다. 위반 target/개수와 미확정 75/69노드는 각각 기존 U06 해당 프로필과 같다. 각 실행 외부 요청 0, 종료 후 자기 preview 포트 해제를 확인했다.
+- 실행 중 별도 main 갱신 `2452ab92`를 관측했지만 병합 부모는 승인된 `3fd1fa63`으로 고정했다. 이번 새 병합 후보의 정식 검수·Claude 감사·push·배포는 미실행이다. 초기 영수증 설정 오류는 실제 검사 미시작으로 보존했다. 원시 로그·해시·프로필별 보고서와 대조표는 `evidence/u06-merge/`, 최종 커밋 해시는 지정 `SOL-U06-MERGE.md`에 기록한다.
+
 ## 2026-11-04 — W6 일괄 결과 → 이미지 편집기 (정식 검수 대기·미배포)
 
 기준 `e4b06a85`, 브랜치 `ux-w6-batch-to-editor-20261104`에서 image worker 응답에 선택적 `images`를 추가했다. 각 항목은 ZIP 생성에 사용한 동일 Blob과 파일명·실제 MIME·바이트 수다. ZIP 버퍼의 기존 transfer·다운로드와 collage/GIF 응답은 그대로 유지한다. 일괄 결과 행에는 한영 네이티브 버튼과 파일명을 포함한 접근성 이름을 제공한다. 기존 `image.editor.confirm`으로 교체를 확인하고 원래 File 수신 경로를 호출한다. 취소하면 목록과 기존 편집 문서를 유지하며, 성공하면 편집 영역으로 키보드 초점을 옮긴다.

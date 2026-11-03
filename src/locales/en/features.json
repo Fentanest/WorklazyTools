@@ -2541,6 +2541,7 @@
       "retry": "Try again",
       "cancel": "Cancel operation",
       "canceled": "The operation was canceled. Check the settings and start again.",
+      "partialResultsAvailable": "Results already completed can be downloaded below.",
       "progressTitle": "PDF finishing progress",
       "progress": {
         "reading": "Reading the source PDF…",
@@ -2576,6 +2577,8 @@
       "errors": {
         "protected-document": "This PDF is protected and cannot be edited. Prepare an unlocked copy and try again.",
         "unreadable-document": "The PDF could not be read. Check the file and choose it again.",
+        "processing-failed": "A problem occurred while processing the PDF. Please try again.",
+        "save-failed": "The result PDF could not be created. The file may be too large or memory may be low. Reduce the number of files or the page range and try again.",
         "invalid-field": "Check the input values and try again.",
         "invalid-text": "The content contains an unsupported control character or date format.",
         "control-character": "The content contains an unsupported control character.",

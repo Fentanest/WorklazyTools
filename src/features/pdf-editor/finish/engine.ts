@@ -80,6 +80,8 @@ export const PDF_FINISH_OUTPUT_OPACITY = 0.9;
 export type PdfFinishEngineErrorCode =
   | "protected-document"
   | "unreadable-document"
+  | "save-failed"
+  | "processing-failed"
   | "invalid-field"
   | "control-character"
   | "date-format"
@@ -536,6 +538,16 @@ async function loadDocument(file: File, signal?: AbortSignal, structure?: PdfStr
       throw new PdfFinishEngineError(error.reason === "unsupported-form" ? "form-unsupported" : "structure-unsupported", {}, error);
     }
     throw new PdfFinishEngineError(isProtectedLoadError(error) ? "protected-document" : "unreadable-document", {}, error);
+  }
+}
+
+async function saveDocument(document: PDFDocument) {
+  try {
+    return await document.save({ updateFieldAppearances: false });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    if (error instanceof PdfFinishEngineError) throw error;
+    throw new PdfFinishEngineError("save-failed", {}, error);
   }
 }
 
@@ -1042,8 +1054,9 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
   const completed = { value: 0 };
   const resources = createBatchFontResources(input);
   const outputs: PdfFinishOutput[] = [];
-  const resultStore = input.resultStore ?? await createPdfFinishResultStore();
+  let resultStore = input.resultStore;
   try {
+    resultStore ??= await createPdfFinishResultStore();
     for (const [fileIndex, source] of input.files.entries()) {
       throwIfAborted(input.signal);
       await yieldToEventLoop();
@@ -1071,7 +1084,7 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       // large document must at least retain visible, truthful progress.
       await yieldToEventLoop();
       throwIfAborted(input.signal);
-      let bytes = await document.save({ updateFieldAppearances: false });
+      let bytes = await saveDocument(document);
       throwIfAborted(input.signal);
       if (input.options.watermark || input.options.stamp) {
         try {
@@ -1111,7 +1124,8 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
         if (error instanceof PdfFinishStorageError) {
           throw new PdfFinishPartialError(error.reason === "memory-limit" ? "result-memory-limit" : "result-storage", outputs, error);
         }
-        throw error;
+        if (error instanceof PdfFinishEngineError) throw error;
+        throw new PdfFinishEngineError("save-failed", {}, error);
       }
       outputs.push({
         key: source.key,
@@ -1127,13 +1141,15 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       throw new PdfFinishCanceledError(error.message, outputs);
     }
     if (outputs.length > 0 && !(error instanceof PdfFinishPartialError)) {
-      // Match the panel's fallback for unexpected failures (including save /
-      // serialization errors), retaining the original exception as the cause.
-      const code = error instanceof PdfFinishEngineError ? error.code : "unreadable-document";
+      // Only the read/save boundaries can attribute a failure to those stages.
+      // Unknown processing failures use the same code with or without results.
+      const code = error instanceof PdfFinishEngineError ? error.code : "processing-failed";
       throw new PdfFinishPartialError(code, outputs, error);
     }
-    if (outputs.length === 0) await resultStore.dispose();
-    throw error;
+    if (outputs.length === 0) await resultStore?.dispose();
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    if (error instanceof PdfFinishEngineError) throw error;
+    throw new PdfFinishEngineError("processing-failed", {}, error);
   }
   return outputs;
 }
