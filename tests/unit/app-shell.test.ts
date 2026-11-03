@@ -26,7 +26,10 @@ test("AppShell keeps SEO, analytics, ad isolation, navigation, and redirect owne
   assert.match(appShellSource, /normalizedPath === "\/tools\/pdf-converter\/document-to-pdf"/);
   assert.match(appShellSource, /target\.pathname = withSiteBasePath\(localizedPath\(language, "\/tools\/excel-merger\/xls-preserve\/"\), import\.meta\.env\.BASE_URL\)/);
   assert.match(appShellSource, /<aside className="sidebar glass-panel"/);
-  assert.match(appShellSource, /<nav className="bottom-tabs glass-bar"/);
+  assert.match(appShellSource, /<nav className="bottom-tabs glass-bar" aria-label=/);
+  const globalStyles = read("src/styles/global.css");
+  // More specific than both light and dark glass rules; background stays opaque.
+  assert.match(globalStyles, /:root\[data-theme\] \.bottom-tabs\.glass-bar\s*\{[^}]*background: var\(--bg-solid\);[^}]*backdrop-filter: none;[^}]*-webkit-backdrop-filter: none;/);
 });
 
 test("AppShell delegates the mobile modal and focus trap to the self-implemented sheet", () => {

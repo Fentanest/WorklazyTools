@@ -558,6 +558,7 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 .home-how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .home-how-grid > div { padding: 19px; border: 1px solid var(--separator); border-radius: 17px; background: rgba(255,255,255,.32); }
 .home-how-grid > div > span { width: 38px; height: 38px; display: grid; place-items: center; margin-bottom: 13px; color: var(--color-blue-700); background: var(--blue-soft); border-radius: 12px; }
+:root[data-theme^="dark"] .home-how-grid > div { background: var(--bg-elevated); }
 .home-how-grid strong { display: block; font-size: 15px; }
 .home-how-grid p { margin: 6px 0 0; color: var(--label-secondary); font-size: 14px; line-height: 1.6; }
 .coupang-banner { width: min(1030px, 100%); margin: 32px auto 20px; text-align: center; }
@@ -904,6 +905,12 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 }
 
 .bottom-tabs { display: none; }
+/* Keep fixed tab labels readable over document previews and override glass themes. */
+:root[data-theme] .bottom-tabs.glass-bar {
+  background: var(--bg-solid);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 
 @media (max-width: 820px) {
   .sidebar { display: none; }
