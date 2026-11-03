@@ -1,10 +1,11 @@
-export type BgErrorCode = 'ai-cancelled' | 'bg-model-fetch-failed' | 'bg-model-integrity' | 'bg-inference-failed' | 'bg-out-of-memory' | 'bg-unsupported' | 'bg-secure-context-required';
+export type BgErrorCode = 'ai-cancelled' | 'bg-model-fetch-failed' | 'bg-model-integrity' | 'bg-inference-failed' | 'bg-out-of-memory' | 'bg-unsupported' | 'bg-secure-context-required' | 'bg-product-device-restricted';
 export class BgRemovalError extends Error {
   readonly code: BgErrorCode;
   constructor(code: BgErrorCode) { super(code); this.code = code; this.name = 'BgRemovalError'; }
 }
 export const messages = {
   ko: {
+    'bg-product-device-restricted': '이 기기의 브라우저에서는 사물·제품 모드가 메모리를 많이 사용해 탭이 종료될 수 있어 사용을 제한합니다. 인물 모드나 수동 지우개를 사용해 주세요. 사물·제품 모델은 받거나 실행하지 않습니다.',
     'bg-secure-context-required': '배경 제거는 HTTPS 보안 연결이 필요합니다. HTTPS 주소로 다시 접속해 주세요. 모델은 받지 않았습니다.',
     'ai-cancelled': '', 'bg-model-fetch-failed': '배경 제거 파일을 받지 못했습니다. 다시 시도해 주세요.',
     'bg-model-integrity': '배경 제거 파일을 확인하지 못했습니다. 다시 받아 주세요.',
@@ -14,6 +15,7 @@ export const messages = {
     'cache-unavailable': '저장 공간 문제로 다음에 다시 받아야 합니다.',
   },
   en: {
+    'bg-product-device-restricted': 'This browser/device is restricted from object/product mode because its memory use may close the tab. Use portrait mode or the manual eraser. The object/product model will not be downloaded or run.',
     'bg-secure-context-required': 'Background removal requires a secure HTTPS connection. Open the HTTPS address to continue. No model was downloaded.',
     'ai-cancelled': '', 'bg-model-fetch-failed': 'Could not download background removal files. Please try again.',
     'bg-model-integrity': 'Could not verify background removal files. Please download them again.',

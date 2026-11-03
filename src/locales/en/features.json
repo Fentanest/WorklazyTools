@@ -1621,6 +1621,7 @@
       "resultChanged": "The edit changed while the result was being prepared. Create the result again.",
       "jpegTransparency": "JPG does not support transparency. Transparent areas are filled with white.",
       "outputFormatHelp": "The selected format applies to Create edited result, the footer download and Send-to. Add to batch always uses PNG.",
+      "touchSelectionHelp": "Tap an object on the canvas to select it. Use the Layers panel to lock, reorder, group, align, or change opacity.",
       "personModelHelp": "The portrait model and runtime are about 41MB. Missing files download after consent and are cached. Images are processed only on this device.",
       "productModelHelp": "The object/product model and runtime are about 127MB and require shader-f16 WebGPU. Missing files download after consent. Images stay on this device.",
       "backgroundPreparing": "Preparing model and runtime…",
