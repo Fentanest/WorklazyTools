@@ -68,7 +68,7 @@
     "test:product-banner": "node scripts/test-product-banner.mjs",
     "test:product-banner:real": "node tests/product-banner/real-xls.mjs",
     "test:product-banner:images": "node tests/product-banner/real-xls.mjs --images",
-    "test:bg-removal": "node --test --experimental-strip-types src/features/image-studio/bgRemoval/tests/unit.test.ts"
+    "test:bg-removal": "node --test --experimental-strip-types src/features/image-studio/bgRemoval/tests/*.test.ts"
   },
   "dependencies": {
     "@ascentsparksoftware/react-image-editor": "file:vendor/react-image-editor/ascentsparksoftware-react-image-editor-1.3.0-worklazy.5.tgz",

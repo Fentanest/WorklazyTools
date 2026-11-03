@@ -1,4 +1,27 @@
 import type { BgMode } from './assets.ts';
+import { BgRemovalError } from './errors.ts';
+
+export interface MaskStats { min: number; max: number; mean: number; variance: number }
+/** Check alpha, not raw logits: large varying logits can all saturate to one alpha. */
+export function validateMask(mask: Float32Array, logits: boolean): MaskStats {
+  let min = Infinity, max = -Infinity, mean = 0, m2 = 0, count = 0;
+  for (const raw of mask) {
+    if (!Number.isFinite(raw)) throw new BgRemovalError('bg-mask-unusable');
+    const alpha = logits ? 1 / (1 + Math.exp(-raw)) : Math.max(0, Math.min(1, raw));
+    min = Math.min(min, alpha); max = Math.max(max, alpha);
+    const delta = alpha - mean; mean += delta / ++count; m2 += delta * (alpha - mean);
+  }
+  const variance = m2 / count;
+  // Less than one 8-bit alpha step, or stddev <= .001: no meaningful separation.
+  if (!count || max - min <= 1 / 255 || variance <= 1e-6) throw new BgRemovalError('bg-mask-unusable');
+  return { min, max, mean, variance };
+}
+
+/** Validate the entire mask before touching any source pixel. */
+export function applyMask(rgba: Uint8ClampedArray, width: number, height: number, mask: Float32Array, mw: number, mh: number, logits: boolean): void {
+  validateMask(mask, logits);
+  multiplyAlpha(rgba, width, height, mask, mw, mh, logits);
+}
 export function inputSize(width: number, height: number, mode: BgMode): { width: number; height: number } {
   if (mode === 'product') return { width: 512, height: 512 };
   // Bitmap dimensions are positive integers. Keep the short side exact and
