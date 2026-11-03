@@ -856,7 +856,7 @@ function PdfModeNavigation({ mode, labels, ariaLabel, language }: {
               end={item.mode === "organize"}
               data-active={selected || undefined}
               data-pdf-nav-mode={item.mode}
-              className={`flex min-h-[43px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-bold outline-none transition-[color,background-color,box-shadow] focus-visible:ring-3 focus-visible:ring-primary/30 ${selected ? "bg-card text-primary shadow-sm dark:text-primary" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"}`}
+              className={`flex min-h-[43px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 text-sm font-bold outline-none transition-[color,background-color,box-shadow] focus-visible:ring-3 focus-visible:ring-primary/30 ${selected ? "bg-card text-[var(--brand-strong)] shadow-sm" : "text-muted-foreground hover:bg-card/60 hover:text-foreground"}`}
             >
               <Icon size={17} /><span>{labels[item.mode]}</span>
             </NavLink>

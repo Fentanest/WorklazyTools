@@ -559,7 +559,7 @@
 .tool-search-count { color: var(--brand-on-bg); background: var(--brand-soft); }
 .tool-category-filter button small { color: inherit; }
 .secondary-button { color: var(--brand-on-bg); background: var(--brand-soft); }
-.ui-step-number { background: var(--brand); box-shadow: 0 5px 12px var(--brand-glow); }
+.ui-step-number { color: var(--brand-ink); background: var(--brand-strong); box-shadow: 0 5px 12px var(--brand-glow); }
 .bottom-tab.active { color: var(--brand-on-bg); background: var(--brand-soft); }
 button:where(:not([data-slot])):focus-visible,
 a:focus-visible,
