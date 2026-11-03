@@ -107,7 +107,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   const [mobileWorkspaceOpen, setMobileWorkspaceOpen] = useState(false);
   const gridRef = useRef<HTMLDivElement>(null);
   const downloadResultRef = useRef<HTMLDivElement>(null);
-  const mobileWorkspaceRef = useRef<HTMLElement>(null);
+  const mobileWorkspaceRef = useRef<HTMLDivElement>(null);
   const mobileWorkspaceTriggerRef = useRef<HTMLButtonElement>(null);
   const mobileWorkspaceCloseRef = useRef<HTMLButtonElement>(null);
   const sourcesRef = useRef<PdfSourceFile[]>([]);
@@ -769,7 +769,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
         </div>
 
         <div className={cn("pdf-output-sidebar-shell contents max-[820px]:fixed max-[820px]:inset-0 max-[820px]:z-80 max-[820px]:hidden max-[820px]:items-end max-[820px]:justify-center max-[820px]:bg-black/25 max-[820px]:p-2.5 max-[820px]:backdrop-blur-sm", mobileWorkspaceOpen && "max-[820px]:flex")} data-open={mobileWorkspaceOpen || undefined} onMouseDown={() => mobileWorkspace && closeMobileOutputWorkspace()}>
-          <aside ref={mobileWorkspaceRef} className="pdf-output-workspace sticky top-6 min-w-0 max-[820px]:static max-[820px]:max-h-[calc(100dvh-20px)] max-[820px]:w-[min(560px,100%)]" role={mobileWorkspace ? "dialog" : undefined} aria-modal={mobileWorkspace || undefined} aria-labelledby="pdf-output-workspace-title" onMouseDown={(event) => event.stopPropagation()}>
+          <div ref={mobileWorkspaceRef} className="pdf-output-workspace sticky top-6 min-w-0 max-[820px]:static max-[820px]:max-h-[calc(100dvh-20px)] max-[820px]:w-[min(560px,100%)]" role={mobileWorkspace ? "dialog" : "complementary"} aria-modal={mobileWorkspace && mobileWorkspaceOpen || undefined} aria-labelledby="pdf-output-workspace-title" onMouseDown={(event) => event.stopPropagation()}>
             <Card as="section" data-testid="pdf-output-card" className="pdf-output-card max-h-[calc(100dvh-48px)] gap-0 overflow-hidden rounded-3xl border border-border py-0 shadow-sm ring-0 max-[820px]:max-h-[calc(100dvh-20px)] max-[820px]:rounded-[28px] max-[820px]:bg-card max-[820px]:shadow-2xl">
               <div className="pdf-output-mobile-header relative hidden min-h-[45px] shrink-0 items-center justify-center px-3.5 pt-2 max-[820px]:flex">
                 <span className="h-[5px] w-9 rounded-full bg-muted-foreground/25" />
@@ -858,7 +858,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
                 </div>}
               </div>
             </Card>
-          </aside>
+          </div>
         </div>
       </div>
       {mobileWorkspace && (pages.length > 0 || operation.status === "running" || !!download.result) && (

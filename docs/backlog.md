@@ -104,6 +104,7 @@
 
 ## 접근성 (2026-09-22)
 
+- **후속 — PDF 정리의 모바일 출력 생성 버튼 대비** — 준비 완료한 출력 dialog에서 light-coral/light-mint × ko/en의 `새 PDF 만들기/Create PDF` 버튼이 기존3.54~3.73:1이다. 2차의 dialog 역할·포커스 수정과 구분하며, 전후 동일4노드·신규0으로 확인했다. 별도 국소 색상 수정 후보. 근거: `evidence/a11yfix2/dialog-validation.json` 및 `dialog-steady/`. — Codx (2026-11-04)
 - **완료 — 대비·랜드마크 수정** — 자동 위반 64→28, `region` 57→0, `color-contrast` 위반 89→72, incomplete 1,858→1,807. 라이트 `--label-secondary` 한 단계 하향 + 미달 tertiary 소비자 4곳 교체(위계 보존), 320px 배지 겹침 수정, 상단바 `role=region`. — Muse 구현 / Claude 감사
 - **기각 — 브랜드 카드 흰 글씨 대비** — 사용자 결정. 코랄을 눈에 띄게 어둡게 해야 하므로 채택하지 않았다. **수용된 부채이며 이후 감사에서 새 결함으로 보고하지 않는다.** 결정이 바뀌면 `docs/jobs/archive/TODO-STATUS-AUDIT-20260920.md` §F를 갱신한다. — Claude 판정
 - **완료 — 접근성 감사기 언어 정합** — 루트 `/`를 ko-KR로 가정해 첫 페이지에서 중단되던 것을 제품 기본 언어(`en`)를 읽도록 고쳤다. 선언을 못 찾으면 실패하므로 조용히 어긋나지 않는다. — Codx 구현 / Claude 감사

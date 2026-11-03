@@ -265,7 +265,7 @@ export function FileList({ files, onRemove, accent = "blue" }: {
     <Card as="ul" data-ui-component="file-list" className="mt-[11px] gap-0 overflow-hidden rounded-3xl border border-border py-0 shadow-sm ring-0">
       {files.map((file, index) => (
         <li className="flex min-h-[53px] items-center gap-2.5 border-t border-border bg-white/40 p-2 first:border-t-0 dark:bg-white/[.025]" key={`${file.name}-${file.lastModified}-${index}`}>
-          <span className={cn("grid h-[31px] w-10 place-items-center rounded-lg text-xs font-extrabold", accentSoftClasses[accent])}>{file.name.split(".").pop()?.slice(0, 4).toUpperCase()}</span>
+          <span className={cn("grid h-[31px] w-10 place-items-center rounded-lg text-xs font-extrabold", accentSoftClasses[accent], "text-foreground")}>{file.name.split(".").pop()?.slice(0, 4).toUpperCase()}</span>
           <span className="min-w-0 flex-1"><strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{file.name}</strong><small className="mt-1 block overflow-hidden text-ellipsis whitespace-nowrap text-sm text-muted-foreground">{formatBytes(file.size)}</small></span>
           <Button className="size-[31px] rounded-full text-muted-foreground hover:bg-red-500/10 hover:text-red-600 max-[620px]:size-11" variant="ghost" size="icon-sm" onClick={() => onRemove(index)} aria-label={t("files.remove", { name: file.name })}><X size={17} /></Button>
         </li>
