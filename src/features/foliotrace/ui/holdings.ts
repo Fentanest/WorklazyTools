@@ -474,6 +474,12 @@ export function latestFilingsByStock(events: readonly FilingEvent[]): FilingEven
     b.receiptNo.localeCompare(a.receiptNo));
 }
 
+/** A later receipt can describe an earlier holding date; this does not change the selected filing. */
+export function isLateFilingWithOlderBasis(event: FilingEvent, holding: Holding | undefined): boolean {
+  return !!(holding?.holdingDate && event.basisDate && event.receiptDate > holding.receiptDate &&
+    event.basisDate < holding.holdingDate);
+}
+
 export function eventRangeOf(events: FilingEvent[]): EventRange | null {
   if (!events.length) return null;
   const dates = events.map((e) => e.receiptDate).sort();

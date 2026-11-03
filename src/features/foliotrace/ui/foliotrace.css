@@ -163,6 +163,19 @@
   font-size: 0.9rem;
 }
 
+.foliotrace-log-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.foliotrace-log-pagination p {
+  margin: 0;
+}
+
 .foliotrace-events li {
   border-top: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   padding-top: 0.5rem;

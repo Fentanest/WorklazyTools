@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
 import type { FilingEvent } from "../../src/features/foliotrace/contracts.ts";
-import { latestFilingsByStock } from "../../src/features/foliotrace/ui/holdings.ts";
+import { latestFilingsByStock, isLateFilingWithOlderBasis } from "../../src/features/foliotrace/ui/holdings.ts";
 import { validSnapshot } from "../../src/features/foliotrace/data/loadSnapshot.ts";
 
 test("the latest-filings browser fixture satisfies the unchanged snapshot contract", () => {
@@ -67,4 +67,14 @@ test("selection never changes the raw events used by security history, including
   assert.equal(input.length, 2);
   assert.equal(input[1].quantity, "200");
   assert.deepEqual(latestFilingsByStock([]), []);
+});
+
+test("late receipt note needs both a later receipt and an earlier basis than the current holding", () => {
+  const current = { holdingDate: "2026-09-29", receiptDate: "2026-09-30" } as import("../../src/features/foliotrace/contracts.ts").Holding;
+  const late = event({ receiptDate: "2026-10-02", basisDate: "2026-07-30" });
+  assert.equal(isLateFilingWithOlderBasis(late, current), true);
+  assert.equal(isLateFilingWithOlderBasis({ ...late, basisDate: current.holdingDate }, current), false);
+  assert.equal(isLateFilingWithOlderBasis({ ...late, receiptDate: current.receiptDate }, current), false);
+  assert.equal(isLateFilingWithOlderBasis({ ...late, basisDate: null }, current), false);
+  assert.equal(isLateFilingWithOlderBasis(late, undefined), false);
 });

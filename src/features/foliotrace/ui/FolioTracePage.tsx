@@ -39,6 +39,7 @@ import {
   isBelowFivePercent,
   latestUnresolvedReasonLabel,
   latestFilingsByStock,
+  isLateFilingWithOlderBasis,
   quotePriceDetail,
   sortHoldings,
   sumPercentText,
@@ -52,6 +53,8 @@ import delistedReference from "../data/delistedReference.json";
 const delistedItems = [...delistedReference.items].sort((a, b) =>
   (a.delistedDate === null ? 1 : 0) - (b.delistedDate === null ? 1 : 0) ||
   (a.delistedDate ?? "").localeCompare(b.delistedDate ?? "") || a.nameKo.localeCompare(b.nameKo, "ko"));
+
+const LATEST_FILINGS_PREVIEW = 30;
 
 const STR = {
   ko: {
@@ -182,6 +185,10 @@ const STR = {
     eventsTitle: "최근 공시 변화",
     eventsDesc: "공시 {total}건에서 종목별 최신 {shown}건을 표시합니다. 접수일·접수번호가 큰 순서이며 정정·철회도 포함합니다. 종목명을 누르면 이전 공시를 볼 수 있습니다. 수량·지분율은 공시에 적힌 값입니다.",
     eventCorrection: "정정·철회 공시",
+    eventOlderBasis: "현재 보유값보다 과거 기준일",
+    eventsVisible: "최신 {total}건 중 {shown}건 표시",
+    eventsMore: "더 보기 (남은 {remaining}건 전체 펼치기)",
+    eventsCollapse: "접기 (처음 {limit}건)",
     historyOnly: "현재 보유 목록에 없는 종목의 공시 이력입니다.",
     eventPointChange: "이전 기록과 차이: {amount}퍼센트포인트",
     eventsEmpty: "해당 기간의 공시 변화가 없습니다.",
@@ -388,6 +395,10 @@ const STR = {
     eventsTitle: "Recent filing changes",
     eventsDesc: "Showing {shown} latest filings by stock from {total} records, newest receipt date then receipt number first, including corrections and withdrawals. Select a name for earlier filings. Quantities and percentages are as reported.",
     eventCorrection: "Correction/withdrawal filing",
+    eventOlderBasis: "Earlier basis than current holding",
+    eventsVisible: "Showing {shown} of {total} latest filings",
+    eventsMore: "Show more (expand all {remaining} remaining)",
+    eventsCollapse: "Collapse to first {limit}",
     historyOnly: "Filing history for a security outside the current holdings list.",
     eventPointChange: "Change from the prior record: {amount} percentage points",
     eventsEmpty: "No filing changes in this period.",
@@ -631,6 +642,7 @@ function ReadyView({
   const [quality, setQuality] = useState<QualityFilter>("all");
   const [sortKey, setSortKey] = useState<SortKey>("value");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [showAllFilings, setShowAllFilings] = useState(false);
 
   const filtered = useMemo(
     () => sortHoldings(filterHoldings(snapshot.holdings, query, quality), sortKey),
@@ -672,6 +684,7 @@ function ReadyView({
 
   const eventRange = useMemo(() => eventRangeOf(snapshot.events), [snapshot.events]);
   const latestEvents = useMemo(() => latestFilingsByStock(snapshot.events), [snapshot.events]);
+  const visibleLatestEvents = showAllFilings ? latestEvents : latestEvents.slice(0, LATEST_FILINGS_PREVIEW);
   const recentEvents = useMemo(
     () => [...snapshot.events]
       .sort((a, b) => (b.basisDate ?? b.receiptDate).localeCompare(a.basisDate ?? a.receiptDate) ||
@@ -1127,13 +1140,26 @@ function ReadyView({
           <h2 id="foliotrace-events-h" className="foliotrace-h2">{t.eventsFullTitle}</h2>
           <span className="foliotrace-block-hint">{eventsDescription}</span>
         </div>
+        {latestEvents.length > LATEST_FILINGS_PREVIEW && (
+          <div className="foliotrace-log-pagination">
+            <p className="foliotrace-block-hint" role="status" aria-live="polite">
+              {t.eventsVisible.replace("{total}", formatCount(latestEvents.length))
+                .replace("{shown}", formatCount(visibleLatestEvents.length))}
+            </p>
+            <button type="button" className="foliotrace-retry" aria-controls="foliotrace-latest-list"
+              aria-expanded={showAllFilings} onClick={() => setShowAllFilings((expanded) => !expanded)}>
+              {showAllFilings ? t.eventsCollapse.replace("{limit}", String(LATEST_FILINGS_PREVIEW)) :
+                t.eventsMore.replace("{remaining}", formatCount(latestEvents.length - visibleLatestEvents.length))}
+            </button>
+          </div>
+        )}
         {latestEvents.length === 0 ? (
           <p className="foliotrace-state-text" role="status">
             {t.eventsEmpty} {t.lastChange}: {snapshot.latestReceiptDate ?? "—"}
           </p>
         ) : (
-          <ul className="foliotrace-events">
-            {latestEvents.map((event) => {
+          <ul className="foliotrace-events" id="foliotrace-latest-list">
+            {visibleLatestEvents.map((event) => {
               const currentName = currentNameByCorpCode.get(event.corpCode);
               return (
                 <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}:${event.kind}:${event.basisDate ?? ""}`}>
@@ -1143,6 +1169,7 @@ function ReadyView({
                     {currentName && event.stockCode && <code className="foliotrace-code">{event.stockCode}</code>}
                     <span>{t.eventReceipt}: {event.receiptDate}</span>
                     {event.basisDate && <span>{t.eventBasis}: {event.basisDate}</span>}
+                    {isLateFilingWithOlderBasis(event, holdingByStockCode.get(event.stockCode ?? "")) && <small>{t.eventOlderBasis}</small>}
                     {(event.correctionOf || event.isCorrectionOrWithdrawal) && <small>{t.eventCorrection}</small>}
                     <span>{event.kind === "tracking-reentry" && event.source === "indirect-observation" ?
                       t.eventIndirectReentry : EVENT_KIND[lang][event.kind]}</span>
