@@ -286,6 +286,88 @@ test("finish storage failure preserves completed outputs, discards the current r
   assert.equal(thirdReads, 0);
 });
 
+test("finish save failures preserve only registered results and their ownership", async (t) => {
+  for (const failAt of [1, 2]) {
+    for (const failureMode of ["throw", "reject"]) {
+      await t.test(`save ${failAt}: ${failureMode}`, async () => {
+        const files = await Promise.all(["first", "second", "third"].map((name) => fixture(`${name}.pdf`)));
+        const reads = [0, 0, 0];
+        files.forEach((file, index) => {
+          const read = file.arrayBuffer.bind(file);
+          file.arrayBuffer = async () => { reads[index] += 1; return read(); };
+        });
+        const store = await createPdfFinishResultStore({ storage: {} });
+        let registrations = 0;
+        let storeDisposals = 0;
+        let resultDisposals = 0;
+        const resultStore: PdfFinishResultStore = {
+          mode: store.mode,
+          async store(bytes, fileName, signal) {
+            registrations += 1;
+            const stored = await store.store(bytes, fileName, signal);
+            return { ...stored, dispose: async () => { resultDisposals += 1; await stored.dispose(); } };
+          },
+          async dispose() { storeDisposals += 1; await store.dispose(); },
+        };
+        const failure = new RangeError("injected PDF serialization allocation failure");
+        const originalSave = PDFDocument.prototype.save;
+        let saves = 0;
+        let partial: PdfFinishPartialError | undefined;
+        PDFDocument.prototype.save = function (options) {
+          saves += 1;
+          if (saves === failAt) {
+            if (failureMode === "reject") return Promise.reject(failure);
+            throw failure;
+          }
+          return originalSave.call(this, options);
+        };
+        try {
+          await assert.rejects(
+            finishPdfFiles({
+              files: files.map((file, index) => ({ key: `${index}`, file, selection: selection(3, "1") })),
+              options: { template: "{page}", region: "bottom-center", fontSize: 10, color: "#34343a", margin: 24, startNumber: 1, startPage: 1, excludeCover: false },
+              locale: "en-US",
+              resultStore,
+            }),
+            (error: unknown) => {
+              if (failAt === 1) {
+                assert.equal(error, failure, "zero completed outputs must retain the original exception");
+              } else {
+                assert.ok(error instanceof PdfFinishPartialError);
+                partial = error;
+                // This is the panel's existing fallback for a raw RangeError.
+                assert.equal(error.code, "unreadable-document");
+                assert.equal(error.cause, failure);
+                assert.equal(failure.name, "RangeError");
+                assert.equal(failure.message, "injected PDF serialization allocation failure");
+                assert.deepEqual(error.partialResults.map(({ key }) => key), ["0"]);
+              }
+              return true;
+            },
+          );
+          assert.equal(saves, failAt);
+          assert.equal(registrations, failAt - 1);
+          assert.deepEqual(reads, failAt === 1 ? [1, 0, 0] : [1, 1, 0]);
+          assert.equal(storeDisposals, failAt === 1 ? 1 : 0);
+          assert.equal(resultDisposals, 0, "completed output belongs to the caller until released");
+          if (partial) {
+            const [output] = partial.partialResults;
+            assert.equal(output.fileName, "first-finished.pdf");
+            const document = await PDFDocument.load(await output.blob.arrayBuffer());
+            assert.equal(document.getPageCount(), 3);
+            assert.match(decodedPageStreams(document).join("\n"), /Tj/u);
+            await output.dispose();
+            assert.equal(resultDisposals, 1);
+          }
+        } finally {
+          PDFDocument.prototype.save = originalSave;
+          await store.dispose();
+        }
+      });
+    }
+  }
+});
+
 test("finish Blob allocation failure exposes completed outputs and never starts the next file", async () => {
   const files = await Promise.all(["first", "second", "third"].map((name) => fixture(`${name}.pdf`)));
   const originalThirdRead = files[2].arrayBuffer.bind(files[2]);
