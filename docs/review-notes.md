@@ -14,6 +14,12 @@
 
 Chrome 모바일 에뮬레이션이며 iPhone/Safari 실기기와 실제 손가락 스와이프 검사는 하지 않았다. 상세 로그·변경 전 실패·스크린샷·소스 고정 정보는 지정 `SOL-MOBILE-RAIL-REPORT.md`와 `/tmp/sol-mobile-rail-p2j4b7i0/`에 보존한다. — Codx
 
+## 2026-11-03 — 배경 제거 iOS 경고와 제한 안내 수명 (정식 검수 대기·미배포)
+
+iPhone 11 한 대의 탭 종료를 iOS 전체 차단으로 확대하지 말라는 사용자 결정이다. low-memory만 restriction으로 남기고 iOS WebKit은 별도 warning으로 분리한다. 선택은 허용하되 controller가 캐시·다운로드 동의 전에 사용자 위험 선택을 받고, 취소·늦은 승인·새 입력/비활성화는 기존 세대/AbortSignal로 종료한다. 기존 다운로드 동의와 모델 해시·GPU·HTTPS 검사는 유지한다.
+
+IE1 P3 clearFeedback은 status 안내만 정리하여 restriction error가 모드 변경 후 남았다. 제한 오류만 순수 functional updater로 정리하고, 성공 완료는 현재 입력 버전에만 적용한다. 다른 새 오류와 취소·지연 완료는 숨기지 않는다. UA/기능 모의 및 제어된 worker 회귀와 실제 iPhone 모델 추론/메모리 계측을 구분한다. 근거·실행·전후 재현은 SOL-BG-NOTICE-REPORT.md에 남긴다. — Codx
+
 ## 2026-11-03 — 시간대 지도 SVG 계측 시점·정착 대기 수리 (정식 재검수 대기)
 
 `6de64be`의 재검수 간헐 실패를 기존 빌드로 재현했다. 다섯 번째 입력에서 pin baseVal/라벨 DOM transform은 `(72,-16.67)`인데 `getScreenCTM()`으로 읽은 라벨 이동량은 네 번째 입력 `(57.6,-13.33)`이었다. 검사기가 서로 다른 SVG 갱신 시점을 섞어 Berlin–Casablanca 거리를 잘못 계산한 사례다. pin과 leader 양쪽을 비변경 SVG transform baseVal 체인으로 같은 좌표계에서 읽고, 검사 중 consolidate()로 DOM을 바꾸지 않는다. 배치 완료도 paint 전에 한 번 확인하고 끝내지 않고 view/route/text/viewport가 두 번 연속 동일하고 pending이 해제됐는지 프레임마다 확인한다. 드래그 중에는 paint만 기다리고 해제 후 정착을 별도로 기다린다.
@@ -3459,3 +3465,14 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - UtilityPage의 예전 fixed104px 헤더용 모바일 padding이 static 검색줄 뒤에서 중복됐다. 모바일만 16px로 줄여 Chrome 414/390/320에서 검색줄-제목 간격을 114→26px로 맞췄으며 desktop61px은 유지했다.
 - 이미지/Folio 18조합(모바일 3폭×한영×라이트/다크, inset47, desktop1440 네 조합과 1024 추가), Office768/1440 4조합의 총3,885 hit 지점이 모두 대상 컨트롤이었다. source sticky 선언 전수와 공개30도구+Office 작업 route의 안정 초기 화면을 확인했다. 표/모달 내부 sticky와 모바일 static은 구분하고 범용 top override는 하지 않았다.
 - unit1,357·i18n·build·static 통과. WebKit은 ICU74/xml2 호스트 라이브러리 부재로 실행 불가였으며, 실제 iPhone Safari/터치 재검증을 했다고 주장하지 않는다. 로그·전후 좌표·화면·전수 분류는 SOL-MOBILE-STICKY-REPORT.md에 둔다. push·merge·배포는 수행하지 않았다.
+
+
+## 2026-11-03 — R30 Linux 국소 성능 조사 (Codx, 정식 검수 대기)
+
+- 대상은 문서 비교의 변경 추적 DOCX 생성이다. 최초 작업서의 PDF 변환 표현은 사용자 확인으로 정정했다. 원 50쌍 코퍼스/Windows 하네스는 총괄도 찾지 못했으며, 과거 1.34배·2.40배와 직접 비교하거나 R30을 닫지 않는다.
+- a8fb85c9 기준 실제 Word Worker·Pyodide 0.29.4 하네스로 저장소 6쌍+합성 4쌍, 전후 순서 교대 각 3회(60실행)를 측정했다. 화면·복원 모델·manifest·ZIP 내부 모든 파트 해시는 전후 및 반복 간 일치했다. 동일 런타임의 추가 생성 대조 36회와 기존 기록 보존 모드 2쌍도 별도로 검사했다. 재현: docs/word-performance.md.
+- 큰 합성 문서(1,800문단×8런) 프로파일은 생성의 문자 토큰 서식 deepcopy를 병목으로 보였다. 같은 런의 독립 서식 스냅샷을 한 번만 만들고 토큰 간 읽기 전용으로 공유한다. 실제 출력/투영은 계속 복사하며 원천 목록·계약·검증을 바꾸지 않았다. 긴 두 런의 속성 복사 예산 회귀는 수정 전 12,006회로 실패, 수정 후 2회 이하로 통과했다.
+- 프로파일 오버헤드가 없는 Worker 완료 중앙값: medium 7.024→5.714s, large 44.631→34.522s, QName 24.210→15.660s. 생성 중앙값은 large 29.654→22.181s다. 프로파일의 deepcopy 재귀 포함 호출은 2,184,023→163,367회로 줄었으며 cProfile 시간을 속도 표본으로 쓰지 않았다.
+- 전 입력에 보편적인 이득은 아니다. 작은 저장소 fixture는 Worker 완료 비율 1.005~1.162, 전체 10쌍 중앙 비율은 1.023이었다. 같은 런타임의 작은 생성 대조도 일부 1~4ms 증가를 보였다. 큰 입력 개선과 작은 입력의 미개선을 함께 보고하며 원 코퍼스 개선으로 일반화하지 않는다. 호스트 load1 36.57~50.55를 기록했고 부하를 기다리거나 표본을 제거하지 않았다.
+- 메모리 감소는 확인하지 못했다. large 작업 RSS 관측 최고 중앙값 604.2→614.2MiB, WASM 힙은 약 180MiB로 같았다. 20ms 관측치와 초기화 포함 최고를 구분하며 순간 최고/실기기 보장을 하지 않는다. R30 추출 구조·메모리 후속은 남는다.
+- Word 단위 10파일 24건·출력 회귀 7모듈, i18n·build·static을 통과했다. dist 817,651,850B로 1GiB 미만이다. 실제 Chrome156의 medium 표본은 화면 15.881s·DOCX 준비 18.230s·상세 진입 0.991s, 측정 구간 새 폰트 요청 0건·main Layout 263ms·RecalcStyle 164ms였다. Node 수치와 브라우저 냉간 수치는 직접 비교하지 않는다. 브라우저 ZIP CRC·한글·추적 삽입을 확인했고 자세한 로그/환경/한계는 SOL-DOCX-SPEED-REPORT.md에 둔다. push·merge·배포 없음.

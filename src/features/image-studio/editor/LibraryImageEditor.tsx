@@ -10,7 +10,7 @@ import { setUnsavedWork } from '../../../app/toolState';
 import type { ImageEditorDirectHandle } from '../ImageStudioPage';
 import type { ImageDirectPreset } from '../imageDirect';
 import { ClipboardHint, filterRasterImages, RASTER_IMAGE_ACCEPT } from '../imageStudioShared';
-import { BackgroundRemovalController, BgRemovalError, messages, productDeviceRestriction, type BgMode, type ConsentInfo } from '../bgRemoval';
+import { BackgroundRemovalController, BgRemovalError, messages, productRiskMessages, productDeviceRestriction, type BgMode, type ConsentInfo } from '../bgRemoval';
 import { actualShrinkNotice, classifyD6, draftD6Props } from './d6Policy';
 import { prepareImage, type PreparedImage } from './prepareImage';
 import { resizeResult } from './resizeResult';
@@ -68,6 +68,10 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [errorPresentation, setErrorPresentation] = useState(0);
   const setError = useCallback((message: string) => { setErrorText(message); if (message) setErrorPresentation(value => value + 1); }, []);
   const [errorCode, setErrorCode] = useState<string>();
+  const clearProductRestrictionError = useCallback(() => {
+    setErrorText(current => current === messages.ko['bg-product-device-restricted'] || current === messages.en['bg-product-device-restricted'] ? '' : current);
+    setErrorCode(current => current === 'bg-product-device-restricted' ? undefined : current);
+  }, []);
   const [notice, setNoticeText] = useState('');
   const [jpegTransparencyNotice, setJpegTransparencyNotice] = useState(false);
   const transientFeedback = useRef(false);
@@ -87,6 +91,8 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [resultUrl, setResultUrl] = useState<string>();
   const [adding, setAdding] = useState(false);
   const [exportPrompt, setExportPrompt] = useState<PendingDecision<ExportDecision>>();
+  const [riskConsent, setRiskConsent] = useState<PendingDecision<boolean>>();
+  const riskPending = useRef<PendingDecision<boolean> | undefined>(undefined);
   const [consent, setConsent] = useState<ConsentInfo & PendingDecision<boolean>>();
   const exportPending = useRef<PendingDecision<ExportDecision> | undefined>(undefined);
   const consentPending = useRef<PendingDecision<boolean> | undefined>(undefined);
@@ -127,6 +133,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const applyPresetRef = useRef<(next?: ImageDirectPreset) => void>(() => {});
 
   const dismissPending = useCallback(() => {
+    riskPending.current?.resolve(false); riskPending.current = undefined; setRiskConsent(undefined);
     exportPending.current?.resolve('cancel'); exportPending.current = undefined; setExportPrompt(undefined);
     consentPending.current?.resolve(false); consentPending.current = undefined; setConsent(undefined);
   }, []);
@@ -142,6 +149,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const cancelBackgroundRemoval = useCallback(() => { cancel(); clearFeedback(); transientFeedback.current = true; setBackgroundCancelled(true); }, [cancel, clearFeedback]);
   useEffect(() => {
     const controller = new BackgroundRemovalController({ language,
+      confirmProductRisk: () => new Promise<boolean>(resolve => { const pending = { resolve }; riskPending.current = pending; setRiskConsent(pending); }),
       confirm: info => new Promise<boolean>(resolve => {
         consentPending.current = { resolve }; setConsent({ ...info, resolve });
       }), notice: setNotice,
@@ -257,18 +265,24 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     consentPending.current?.resolve(value); consentPending.current = undefined; setConsent(undefined);
     if (!value) { clearFeedback(); transientFeedback.current = true; setBackgroundCancelled(true); }
   };
+  const finishProductRisk = (value: boolean) => {
+    riskPending.current?.resolve(value); riskPending.current = undefined; setRiskConsent(undefined);
+    if (!value) { clearFeedback(); transientFeedback.current = true; setBackgroundCancelled(true); }
+  };
   const backgroundRemovalLoader = async () => ({ removeBackground: async (input: Blob | string, options?: { progress?: (key: string, current: number, total: number) => void }) => {
     const request = version.current; clearFeedback(); setBgBusy(true); setProgress(0); setBgPhase('preparing'); setError(''); setErrorCode(undefined);
     try {
       const controller = bg.current;
       if (!controller || !activeRef.current) throw new BgRemovalError('ai-cancelled');
-      return await controller.removeBackground(input, { mode: modeRef.current, progress: (key, current, total) => {
+      const cutout = await controller.removeBackground(input, { mode: modeRef.current, progress: (key, current, total) => {
         if (request === version.current) {
           setBgPhase(key.startsWith('fetch') ? 'download' : 'processing');
           setProgress(total > 0 ? Math.round(current / total * 100) : 0);
           options?.progress?.(key, current, total);
         }
       } });
+      if (request === version.current) clearProductRestrictionError();
+      return cutout;
     } catch (cause) {
       if (request === version.current && cause instanceof BgRemovalError && cause.code !== 'ai-cancelled') { setErrorCode(cause.code); setError(messages[language][cause.code]); }
       throw cause;
@@ -343,7 +357,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       {notice && <UtilityNotice role="status" className="mt-2">{notice}</UtilityNotice>}
       <UtilityNotice className="mt-2">{t('image.library.redactionHint')}</UtilityNotice>
       <div className="my-3 flex flex-wrap items-center gap-2" data-testid="image-background-controls">
-        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select aria-describedby={productRestricted ? 'image-background-product-restriction' : undefined} className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { clearFeedback(); modeChosen.current = true; setMode(event.target.value as BgMode); }}>
+        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select aria-describedby={productRestricted ? 'image-background-product-restriction' : undefined} className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { clearFeedback(); clearProductRestrictionError(); modeChosen.current = true; modeRef.current = event.target.value as BgMode; setMode(modeRef.current); }}>
           <option value="person">{t('image.library.person')}</option><option value="product" disabled={productRestricted}>{t('image.library.product')}</option>
         </select></label>
         <Button type="button" variant="outline" onClick={() => {
@@ -434,6 +448,10 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         <p>{t('image.library.exportWarning')}</p><div className="mt-4 flex flex-wrap gap-2">
           <Button autoFocus onClick={() => finishExport('flatten')}>{t('image.library.flatten')}</Button><Button variant="outline" onClick={() => finishExport('proceed')}>{t('image.library.proceed')}</Button><Button variant="ghost" onClick={() => finishExport('cancel')}>{t('image.cancel')}</Button>
         </div>
+      </DecisionDialog>}
+      {riskConsent && <DecisionDialog title={productRiskMessages[language].title} onCancel={() => finishProductRisk(false)}>
+        <p>{productRiskMessages[language].body}</p>
+        <div className="mt-4 flex gap-2"><Button variant="ghost" autoFocus onClick={() => finishProductRisk(false)}>{productRiskMessages[language].cancel}</Button><Button onClick={() => finishProductRisk(true)}>{productRiskMessages[language].proceed}</Button></div>
       </DecisionDialog>}
       {consent && <DecisionDialog title={t('image.library.downloadTitle')} onCancel={() => finishConsent(false)}>
         <p>{t('image.library.downloadDescription', { mode: consent.label, bytes: consent.downloadBytes.toLocaleString(language === 'ko' ? 'ko-KR' : 'en-US') })}</p>

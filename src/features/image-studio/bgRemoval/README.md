@@ -88,3 +88,17 @@ Current environment has no shader-f16 adapter. Person-mode cache/lifecycle and
 localized unsupported result with zero downloads. A real GPU and the 30-image
 reference comparison remain IE0b tasks. Model license texts are under `licenses/`;
 no MODNet NOTICE file exists in the recursively checked pinned upstream tree.
+
+## iOS product-mode choice
+
+iOS/iPadOS WebKit alone warns rather than blocks. Portrait remains the default
+recommendation; product selection is enabled when feature requirements permit it.
+The controller checks an explicitly reported deviceMemory bucket <=4 first, then
+GPU capability, then calls optional `confirmProductRisk` on every product run
+(including warm-cache runs), before cache/model access and download consent.
+The host uses a ko/en choice dialog; adapters without the hook use a native confirm.
+Declining or cancelling invalidates the operation before download. A missing memory
+signal is unknown, not a low-memory measurement. No warning acknowledgement is saved.
+
+`tests/ie1/bg-restrict-notice.mjs` verifies simulated device signals and modal/alert
+lifecycle with a controlled person worker, not actual iOS inference or crash safety.

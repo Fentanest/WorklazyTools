@@ -5,7 +5,7 @@ export class BgRemovalError extends Error {
 }
 export const messages = {
   ko: {
-    'bg-product-device-restricted': '이 기기의 브라우저에서는 사물·제품 모드가 메모리를 많이 사용해 탭이 종료될 수 있어 사용을 제한합니다. 인물 모드나 수동 지우개를 사용해 주세요. 사물·제품 모델은 받거나 실행하지 않습니다.',
+    'bg-product-device-restricted': '브라우저가 보고한 기기 메모리 구간이 4GB 이하라 사물·제품 모드를 제한합니다. 이 값은 실제 여유 메모리 측정치가 아닙니다. 인물 모드나 수동 지우개를 사용해 주세요. 사물·제품 모델은 받거나 실행하지 않습니다.',
     'bg-secure-context-required': '배경 제거는 HTTPS 보안 연결이 필요합니다. HTTPS 주소로 다시 접속해 주세요. 모델은 받지 않았습니다.',
     'ai-cancelled': '', 'bg-model-fetch-failed': '배경 제거 파일을 받지 못했습니다. 다시 시도해 주세요.',
     'bg-model-integrity': '배경 제거 파일을 확인하지 못했습니다. 다시 받아 주세요.',
@@ -15,7 +15,7 @@ export const messages = {
     'cache-unavailable': '저장 공간 문제로 다음에 다시 받아야 합니다.',
   },
   en: {
-    'bg-product-device-restricted': 'This browser/device is restricted from object/product mode because its memory use may close the tab. Use portrait mode or the manual eraser. The object/product model will not be downloaded or run.',
+    'bg-product-device-restricted': 'The browser reports a device-memory bucket of 4 GB or less, so object/product mode is restricted. This is not a measurement of free memory. Use portrait mode or the manual eraser. The object/product model will not be downloaded or run.',
     'bg-secure-context-required': 'Background removal requires a secure HTTPS connection. Open the HTTPS address to continue. No model was downloaded.',
     'ai-cancelled': '', 'bg-model-fetch-failed': 'Could not download background removal files. Please try again.',
     'bg-model-integrity': 'Could not verify background removal files. Please download them again.',
@@ -34,3 +34,16 @@ export function normalizeError(error: unknown): BgRemovalError {
   if (error instanceof Error && /out of memory|memory access|allocation|bad_alloc/i.test(error.message)) return new BgRemovalError('bg-out-of-memory');
   return new BgRemovalError('bg-inference-failed');
 }
+
+export const productRiskMessages = {
+  ko: {
+    title: '사물·제품 모드를 실행할까요?',
+    body: 'iOS·iPadOS에서는 기기나 이미지에 따라 사물·제품 배경 제거가 많은 메모리를 사용해 탭이 종료될 수 있습니다. 중요한 작업은 먼저 저장하세요. 인물 모드나 수동 지우개를 대신 사용할 수 있습니다.',
+    proceed: '그래도 진행', cancel: '취소',
+  },
+  en: {
+    title: 'Run object/product mode?',
+    body: 'On iOS and iPadOS, object/product background removal may use enough memory to close the tab, depending on the device and image. Save important work first. You can use portrait mode or the manual eraser instead.',
+    proceed: 'Continue anyway', cancel: 'Cancel',
+  },
+} as const;
