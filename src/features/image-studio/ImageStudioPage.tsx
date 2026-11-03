@@ -185,6 +185,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       <PageHeader eyebrow="IMAGE EDITOR" title={t("image.title")} description={t("image.description")}>
         <PrivacyBanner compact />
       </PageHeader>
+      <p className="mb-3 text-sm"><ToolGuideLink /></p>
       <Card as="nav" className="studio-tabs mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0 max-[620px]:grid-cols-2" aria-label={t("image.tabs.label")} data-testid="image-studio-tabs">
         {([
           ["editor", t("image.tabs.editor"), ImageIcon], ["batch", t("image.tabs.batch"), Images], ["collage", t("image.tabs.collage"), LayoutGrid], ["gif", t("image.tabs.gif"), Sparkles],

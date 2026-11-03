@@ -779,3 +779,16 @@ input:focus-visible {
 .tool-list-row h3 { margin: 0; font-size: 15px; font-weight: 750; overflow-wrap: anywhere; }
 .tool-list-row p { margin: 4px 0 0; font-size: 13px; line-height: 1.5; color: var(--label-secondary); overflow-wrap: anywhere; }
 .tool-list-row:focus-visible, .tool-catalog-controls :is(select, button):focus-visible { outline: 2px solid var(--brand-on-bg); outline-offset: 3px; }
+
+/* Keep native keyboard-focus scrolling inside the shell's unobscured viewport.
+   Header clearance includes its floating inset; mobile tabs are 72px high. */
+html:has(.app-shell) {
+  scroll-padding-block-start: calc(80px + env(safe-area-inset-top));
+  scroll-padding-block-end: 1rem;
+}
+@media (max-width: 820px) {
+  html:has(.app-shell) {
+    scroll-padding-block-end: calc(72px + max(9px, env(safe-area-inset-bottom)) + 8px);
+  }
+}
+html:has(.app-shell.editor-mode) { scroll-padding-block: 0; }
