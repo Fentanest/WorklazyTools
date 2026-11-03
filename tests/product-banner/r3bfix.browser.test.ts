@@ -50,7 +50,11 @@ async function open() {
   await page.evaluate(() => {
     const w = window as any, original = File.prototype.text;
     w.__reads = { held: {}, started: [], settled: [], confirmations: [], approve: true };
-    window.confirm = (message) => { w.__reads.confirmations.push(message); return w.__reads.approve; };
+    const showModal = HTMLDialogElement.prototype.showModal;
+    HTMLDialogElement.prototype.showModal = function () {
+      if (this.dataset.testid === "confirmation-dialog") w.__reads.confirmations.push(this.textContent);
+      return showModal.call(this);
+    };
     File.prototype.text = function () {
       const file = this;
       w.__reads.started.push(file.name);
@@ -65,8 +69,10 @@ async function open() {
 const names = (page: Page) => page.getByLabel(text.fields.name, { exact: true });
 async function expectName(page: Page, name: string) { await page.waitForFunction((name) => [...document.querySelectorAll<HTMLInputElement>("input")].some((input) => input.value === name), name); }
 async function choose(page: Page, name: string, fileName = `${name}.json`) {
+  const needsConfirmation = await names(page).count() > 0;
   const project = stateWith(1).project; project.products[0].name = name;
   await page.locator('input[accept=".json"]').setInputFiles({ name: fileName, mimeType: "application/json", buffer: Buffer.from(saveProjectJson(project)) });
+  if (needsConfirmation) await decide(page);
   await page.waitForFunction((name) => (window as any).__reads.started.includes(name), fileName);
 }
 async function release(page: Page, fileName: string, fail = false) {
@@ -77,6 +83,11 @@ async function release(page: Page, fileName: string, fail = false) {
   await page.waitForFunction((name) => (window as any).__reads.settled.includes(name), fileName);
 }
 async function confirmations(page: Page) { return page.evaluate(() => (window as any).__reads.confirmations.length); }
+async function decide(page: Page) {
+  await page.getByTestId("confirmation-dialog").waitFor({ state: "visible" });
+  const accepted = await page.evaluate(() => (window as any).__reads.approve);
+  await page.getByTestId(accepted ? "confirmation-accept" : "confirmation-cancel").click();
+}
 async function approve(page: Page, value: boolean) { await page.evaluate((value) => { (window as any).__reads.approve = value; }, value); }
 async function record(page: Page, id: string) {
   const capture = `${id}.png`; await page.screenshot({ path: `${root}/shots-${run}/${capture}` });
@@ -121,6 +132,7 @@ test("R3bfix JSON normal single read retains decline and approval confirmations"
   const page = await open(); await choose(page, "Original"); await expectName(page, "Original");
   await approve(page, false);
   await page.locator('input[accept=".json"]').setInputFiles({ name: "declined.json", mimeType: "application/json", buffer: Buffer.from(saveProjectJson(stateWith(1).project)) });
+  await decide(page);
   assert.equal(await confirmations(page), 1); assert.equal(await names(page).inputValue(), "Original");
   assert.equal(await page.evaluate(() => (window as any).__reads.started.includes("declined.json")), false);
   await approve(page, true); await choose(page, "Accepted", "held-normal.json");
@@ -161,12 +173,13 @@ test("R3bfix Worker replacement uses current work after delayed extraction", asy
   await button.click(); await page.waitForFunction(() => !!(window as any).__workerRelease);
   await page.getByLabel(text.width, { exact: true }).fill("480");
   await approve(page, false); await page.evaluate(() => (window as any).__workerRelease());
+  await decide(page);
   await button.waitFor({ state: "visible" });
   assert.equal(await confirmations(page), 1); assert.equal(await names(page).count(), 0);
   assert.equal(await page.getByLabel(text.width, { exact: true }).inputValue(), "480");
   // The rejected import remains selectable and a second approved extraction succeeds.
   await approve(page, true); await page.evaluate(() => { (window as any).__workerRelease = null; });
   await button.click(); await page.waitForFunction(() => !!(window as any).__workerRelease);
-  await page.evaluate(() => (window as any).__workerRelease()); await expectName(page, "Worker result");
+  await page.evaluate(() => (window as any).__workerRelease()); await decide(page); await expectName(page, "Worker result");
   assert.equal(await confirmations(page), 2); await record(page, "worker-current-confirmation");
 });
