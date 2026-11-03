@@ -266,20 +266,20 @@
       "synonyms": ["mp3 cutter", "mp3", "music cutter"]
     },
     "image-studio": {
-      "tagline": "Resize, mosaic and draw on photos",
-      "title": "Online Photo Editor",
-      "shortTitle": "Photo Editor",
-      "description": "A versatile photo editor providing image resizing, cropping, mosaic, filtering, and free-hand drawing features.",
+      "tagline": "Resize, mosaic and draw on images",
+      "title": "Image Editor",
+      "shortTitle": "Image Editor",
+      "description": "A versatile image editor providing image resizing, cropping, mosaic, filtering, and free-hand drawing features.",
       "eyebrow": "IMAGE EDITING",
       "highlights": [
         "Region mosaic & blur",
-        "Photo & drawing editor",
+        "Image & drawing editor",
         "Image & canvas resize",
         "Exact export size",
         "Shape & sticker layers",
         "Collages & GIFs"
       ],
-      "synonyms": ["png", "jpg", "image resizer", "pixelate", "mosaic", "resize", "blur", "face mosaic"]
+      "synonyms": ["png", "jpg", "image resizer", "pixelate", "mosaic", "resize", "blur", "face mosaic", "photo editor"]
     },
     "text-merger": {
       "tagline": "Combine text and TXT files",

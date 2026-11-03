@@ -114,10 +114,10 @@ export function App() {
           <Route path="tools/product-banner" element={<LazyToolRoute label="AliExpress Ad Banner Builder"><ProductBannerPage /></LazyToolRoute>} />
           <Route path="tools/audio-studio" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage /></LazyToolRoute>} />
           <Route path="tools/audio-studio/trim" element={<LazyToolRoute label="Audio Studio"><AudioStudioPage preset={{ purpose: "trim" }} /></LazyToolRoute>} />
-          <Route path="tools/image-studio" element={<LazyToolRoute label="Image Studio"><ImageStudioPage /></LazyToolRoute>} />
-          <Route path="tools/image-studio/resize" element={<LazyToolRoute label="Image Studio"><ImageStudioPage preset={{ purpose: "resize", tab: "editor", panel: "size", interactionMode: "select" }} /></LazyToolRoute>} />
-          <Route path="tools/image-studio/mosaic" element={<LazyToolRoute label="Image Studio"><ImageStudioPage preset={{ purpose: "mosaic", tab: "editor", panel: "effect", interactionMode: "effect", regionEffect: "mosaic" }} /></LazyToolRoute>} />
-          <Route path="tools/image-studio/watermark" element={<LazyToolRoute label="Image Studio"><ImageStudioPage preset={{ purpose: "watermark", tab: "editor", panel: "text", interactionMode: "select", text: "" }} /></LazyToolRoute>} />
+          <Route path="tools/image-studio" element={<LazyToolRoute label="Image Editor"><ImageStudioPage /></LazyToolRoute>} />
+          <Route path="tools/image-studio/resize" element={<LazyToolRoute label="Image Editor"><ImageStudioPage preset={{ purpose: "resize", tab: "editor", panel: "size", interactionMode: "select" }} /></LazyToolRoute>} />
+          <Route path="tools/image-studio/mosaic" element={<LazyToolRoute label="Image Editor"><ImageStudioPage preset={{ purpose: "mosaic", tab: "editor", panel: "effect", interactionMode: "effect", regionEffect: "mosaic" }} /></LazyToolRoute>} />
+          <Route path="tools/image-studio/watermark" element={<LazyToolRoute label="Image Editor"><ImageStudioPage preset={{ purpose: "watermark", tab: "editor", panel: "text", interactionMode: "select", text: "" }} /></LazyToolRoute>} />
           <Route path="tools/text-merger" element={<LazyToolRoute label="Text Merger"><TextMergerPage /></LazyToolRoute>} />
           <Route path="tools/text-tools" element={<LazyToolRoute label="Text Tools"><TextToolsPage /></LazyToolRoute>} />
           <Route path="tools/text-compare" element={<PublishedComparison id="text-compare"><LazyToolRoute label="Text compare"><TextComparePage /></LazyToolRoute></PublishedComparison>} />
@@ -187,7 +187,7 @@ function ToolRouteLoading({ tool }: { tool: string }) {
     setAdIneligible("routePending", true);
     return () => setAdIneligible("routePending", false);
   }, []);
-  const koreanToolNames: Record<string, string> = { "PDF converter": "PDF 변환", "Image to PDF": "이미지 → PDF", "PDF to image": "PDF → 이미지", "Document to PDF": "문서 → PDF", "PDF to document": "PDF → 문서", "PDF OCR": "PDF 문자 인식", "Document to Markdown": "문서 → Markdown", "PDF Tools": "PDF 도구" };
+  const koreanToolNames: Record<string, string> = { "Image Editor": "이미지 편집", "PDF converter": "PDF 변환", "Image to PDF": "이미지 → PDF", "PDF to image": "PDF → 이미지", "Document to PDF": "문서 → PDF", "PDF to document": "PDF → 문서", "PDF OCR": "PDF 문자 인식", "Document to Markdown": "문서 → Markdown", "PDF Tools": "PDF 도구" };
   const localizedTool = i18n.resolvedLanguage?.startsWith("ko") ? koreanToolNames[tool] ?? tool : tool;
   return <div className="page tool-page page-enter tool-route-loading min-h-screen" role="status">{t("status.loadingTool", { tool: localizedTool })}</div>;
 }

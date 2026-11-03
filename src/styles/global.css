@@ -249,7 +249,7 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 .sidebar-link:hover { color: var(--label); background: rgba(118, 118, 128, .08); }
 .sidebar-link:active { transform: scale(.98); }
 .sidebar-link.active { color: var(--wl-onSoft); background: var(--wl-soft); }
-.nav-icon { width: 27px; height: 27px; display: inline-grid; place-items: center; border-radius: 8px; }
+.nav-icon { flex-shrink: 0; width: 27px; height: 27px; display: inline-grid; place-items: center; border-radius: 8px; }
 .nav-icon.accent-green { color: var(--green); background: var(--green-soft); }
 .nav-icon.accent-blue { color: var(--color-blue-700); background: var(--blue-soft); }
 .nav-icon.accent-violet { color: var(--violet); background: var(--violet-soft); }

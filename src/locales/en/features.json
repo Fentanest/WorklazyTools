@@ -1052,7 +1052,7 @@
       "limit": "The batch list holds up to {{max}} images. Images over the limit were not added.",
       "source": "Edited result"
     },
-    "title": "Image Studio",
+    "title": "Image Editor",
     "description": "Decorate one image, batch-edit several files, or export a collage or animated GIF.",
     "tabs": {
       "label": "Image features",
