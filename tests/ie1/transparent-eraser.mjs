@@ -4,10 +4,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
+import { startRecoveryServer } from '../recovery-server.mjs';
 
 const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4207';
 const out = process.env.IE_TRANSPARENT_OUTPUT || '/tmp/ie-transparent-eraser';
 await fs.mkdir(out, { recursive: true });
+// UI checks use a completed immutable production build. Vite remains only the
+// QA engine host, so another suite's dependency discovery cannot reload the UI.
+const uiServer = process.env.IE_UI_BASE_URL ? undefined : await startRecoveryServer({ root: process.env.IE_DIST || 'dist', port: 0 });
+const uiBase = process.env.IE_UI_BASE_URL || uiServer.url;
+console.log(`UI snapshot: ${uiBase}; QA engine: ${base}`);
 const labels = Object.fromEntries(await Promise.all(['en', 'ko'].map(async language => [language,
   JSON.parse(await fs.readFile(new URL(`../../src/locales/${language}/features.json`, import.meta.url), 'utf8')).image.library.labels])));
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE, args: ['--no-sandbox'] });
@@ -16,11 +22,19 @@ async function setup(language = 'en', theme = 'light-coral', mobile = false, eng
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1100 },
     deviceScaleFactor: 1, isMobile: mobile, hasTouch: mobile });
   await context.addInitScript(theme => { window.__WORKLAZY_MOCK_PROVIDERS__ = true; localStorage.setItem('worklazy-theme', theme); }, theme);
-  await context.route('**/*', route => route.request().url().startsWith(base + '/') || /^(data:|blob:)/.test(route.request().url()) ? route.continue() : route.abort());
-  const page = await context.newPage(); page.setDefaultTimeout(60_000); page.on('dialog', dialog => dialog.accept());
-  await page.goto(engine ? `${base}/tests/ie1/engine.html` : `${base}/${language}/tools/image-studio/`);
+  await context.route('**/*', route => (route.request().url().startsWith(base + '/') || route.request().url().startsWith(uiBase + '/')) || /^(data:|blob:)/.test(route.request().url()) ? route.continue() : route.abort());
+  const page = await context.newPage();
+  const cpuThrottle = Number(process.env.IE_MOBILE_CPU_THROTTLE || 1);
+  assert.ok(Number.isFinite(cpuThrottle) && cpuThrottle >= 1 && cpuThrottle <= 10);
+  if (mobile && cpuThrottle > 1) {
+    const session = await context.newCDPSession(page); await session.send('Emulation.setCPUThrottlingRate', { rate: cpuThrottle });
+    console.log(`Mobile CPU throttle: ${cpuThrottle}x`);
+  }
+  page.setDefaultTimeout(60_000); page.on('dialog', dialog => dialog.accept());
+  await page.goto(engine ? `${base}/tests/ie1/engine.html` : `${uiBase}/${language}/tools/image-studio/`);
   if (engine) await page.waitForFunction(() => window.ready);
   else {
+    assert.equal(await page.locator('script[src*="/@vite/client"]').count(), 0, 'UI must use a completed production build, not the HMR dev host');
     await page.locator('[data-testid=library-image-editor] .lower-canvas').waitFor();
     await page.waitForFunction(() => !document.querySelector('[data-testid=image-editor-add-to-batch]')?.disabled);
   }
@@ -42,11 +56,32 @@ async function eraseUI(page, language) {
   const editor = page.getByTestId('library-image-editor');
   await editor.getByRole('button', { name: labels[language].Eraser, exact: true }).click();
   const range = editor.locator('.asp-options-panel input[type=range]').first(); await range.focus(); await range.press('End');
-  const canvas = editor.locator('.upper-canvas'); await canvas.scrollIntoViewIfNeeded();
-  // The mobile tool rail/header are sticky. Place the canvas below them before
-  // sending real pointer events, and prove the points hit the canvas itself.
-  await canvas.evaluate(node => window.scrollBy(0, node.getBoundingClientRect().top - 250));
-  const box = await canvas.boundingBox();
+  const canvas = editor.locator('.upper-canvas');
+  await page.evaluate(() => document.fonts.ready);
+  // Numeric scrollBy inherited html { scroll-behavior:smooth }, so the previous
+  // test sampled an animating rect. Instant positioning + stable RAF geometry
+  // removes that race. No stroke or pixel assertion is retried or weakened.
+  await canvas.scrollIntoViewIfNeeded();
+  await canvas.evaluate(node => {
+    window.scrollTo({ top: scrollY + node.getBoundingClientRect().top - 250, behavior: 'instant' });
+    delete window.__ieStrokeStability;
+  });
+  const stable = await page.waitForFunction(() => {
+    const node = document.querySelector('[data-testid=library-image-editor] .upper-canvas');
+    if (!node) return false;
+    const r = node.getBoundingClientRect();
+    if (Math.abs(r.top - 250) > 1) {
+      window.scrollTo({ top: scrollY + r.top - 250, behavior: 'instant' });
+      delete window.__ieStrokeStability; return false;
+    }
+    const hits = [0.35, 0.5, 0.65].every(f => document.elementFromPoint(r.x + r.width / 2, r.y + r.height * f) === node);
+    const key = [r.x, r.y, r.width, r.height, scrollX, scrollY].map(value => Math.round(value * 1000)).join(':');
+    const previous = window.__ieStrokeStability;
+    const frames = hits && previous?.key === key ? previous.frames + 1 : hits ? 1 : 0;
+    window.__ieStrokeStability = { key, frames };
+    return frames >= 6 ? { x: r.x, y: r.y, width: r.width, height: r.height } : false;
+  }, undefined, { polling: 'raf', timeout: 15000 });
+  const box = await stable.jsonValue(); await stable.dispose();
   for (const fraction of [0.35, 0.5, 0.65]) assert.ok(await canvas.evaluate((node, point) =>
     document.elementFromPoint(point.x, point.y) === node, { x: box.x + box.width / 2, y: box.y + box.height * fraction }), 'stroke must hit the actual canvas');
   await page.mouse.move(box.x + box.width / 2, box.y + box.height * 0.35); await page.mouse.down();
@@ -140,6 +175,40 @@ try {
       facts.push({ name: 'footer formats', formats });
     } finally { await context.close(); }
   });
+  for (const language of ['ko', 'en']) await test(`JPG alpha notice is accurate for footer/native ${language}`, async () => {
+    const { context, page } = await setup(language);
+    try {
+      const editor = page.getByTestId('library-image-editor');
+      const features = JSON.parse(await fs.readFile(new URL(`../../src/locales/${language}/features.json`, import.meta.url), 'utf8'));
+      const notice = page.getByTestId('image-jpeg-transparency');
+      for (const [kind, alpha] of [['transparent', 0], ['opaque', 255], ['partial', 128]]) {
+        const image = new PNG({ width: 64, height: 48 });
+        for (let i = 0; i < image.data.length; i += 4) image.data.set([32, 96, 208, 255], i);
+        image.data[3] = alpha;
+        await page.evaluate(() => window.__hintOldCanvas = document.querySelector('.lower-canvas'));
+        await editor.locator('input[type=file]').first().setInputFiles({ name: `${kind}.png`, mimeType: 'image/png', buffer: PNG.sync.write(image) });
+        await page.waitForFunction(() => document.querySelector('.lower-canvas') !== window.__hintOldCanvas && !document.querySelector('[data-testid=image-editor-add-to-batch]').disabled);
+        assert.equal(await notice.count(), 0, 'new document clears previous export notice');
+        for (const route of ['footer', 'native']) {
+          if (route === 'footer') {
+            await page.locator('[data-testid=image-editor-send-actions]').getByRole('button', { name: 'JPG', exact: true }).click();
+            const downloading = page.waitForEvent('download'); await page.locator('[data-testid=image-editor-export-action] button').click();
+            await (await downloading).saveAs(path.join(out, `hint-${language}-${kind}-${route}.jpg`));
+          } else {
+            await editor.getByRole('button', { name: labels[language].Export, exact: true }).click();
+            await editor.locator('.asp-menu--export').getByRole('button', { name: 'JPEG', exact: true }).click();
+            const downloading = page.waitForEvent('download'); await editor.locator('.asp-menu--export .asp-download').click();
+            await (await downloading).saveAs(path.join(out, `hint-${language}-${kind}-${route}.jpg`));
+          }
+          if (alpha < 255) { await notice.waitFor(); assert.equal(await notice.textContent(), features.image.library.jpegTransparency); }
+          else assert.equal(await notice.count(), 0, 'opaque output must not warn because of preview margins');
+        }
+        await footerPNG(page, `hint-${language}-${kind}-png.png`);
+        assert.equal(await notice.count(), 0, 'PNG output does not show the JPG notice');
+      }
+      facts.push({ name: `JPG hint ${language}`, opaque: 'hidden', partial: 'shown', transparent: 'shown', routes: ['footer', 'native'] });
+    } finally { await context.close(); }
+  });
   await test('eraser clears lower image/drawing layers, ignores colour and allows new drawing above', async () => {
     const { context, page } = await setup('en', 'light-coral', false, true);
     try {
@@ -194,4 +263,5 @@ try {
 } finally {
   await fs.writeFile(path.join(out, 'alpha-results.json'), JSON.stringify(facts, null, 2));
   await browser.close();
+  await uiServer?.close();
 }
