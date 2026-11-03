@@ -347,6 +347,9 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const [minibarPosition, setMinibarPosition] = useState<EditorMinibarPosition>();
   const [contextMenu, setContextMenu] = useState<EditorContextMenuState>();
   const [editorError, setEditorError] = useState("");
+  useEffect(() => {
+    if (editorError) canvasElement.current?.closest('[data-image-owner="editor"]')?.querySelector('[data-testid="image-editor-error"]')?.scrollIntoView({ block: 'center' });
+  }, [editorError]);
   const [cropSelection, setCropSelection] = useState<RegionSelection>();
   const [cropRatio, setCropRatio] = useState<CropRatio>(undefined);
   const [effectSelection, setEffectSelection] = useState<RegionSelection>();
@@ -1814,7 +1817,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   return (
     <UtilitySectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
       <FileDropZone disabled={loadingImage || regionEffectBusy || stickerBusy} files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
-      {editorError && <UtilityNotice kind="error" role="alert" className="mt-3">{editorError}</UtilityNotice>}
+      {editorError && <UtilityNotice kind="error" role="alert" data-testid="image-editor-error" className="mt-3">{editorError}</UtilityNotice>}
       <ClipboardHint mode="replace" />
       <div className="editor-source-actions mt-2 flex items-center justify-between gap-2.5"><Button type="button" className="rounded-xl" variant="secondary" onClick={() => newBlankCanvas()}><ImageIcon size={16} /> {t("image.editor.blank")}</Button>{file && <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground">{t("image.editor.editing", { name: file.name })}</span>}</div>
       <ImageEditorToolbar

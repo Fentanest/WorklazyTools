@@ -55,7 +55,9 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [dirty, setDirty] = useState(false);
   const [hasHistoryInput, setHasHistoryInput] = useState(false);
   const [hasTemplateInput, setHasTemplateInput] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setErrorText] = useState('');
+  const [errorPresentation, setErrorPresentation] = useState(0);
+  const setError = useCallback((message: string) => { setErrorText(message); if (message) setErrorPresentation(value => value + 1); }, []);
   const [errorCode, setErrorCode] = useState<string>();
   const [notice, setNotice] = useState('');
   const [mode, setMode] = useState<BgMode>('person');
@@ -79,6 +81,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const activeRef = useRef(active); activeRef.current = active;
   const onDirtyRef = useRef(onDirty); onDirtyRef.current = onDirty;
   const loadedAck = useRef<{ resolve: (ok: boolean) => void; version: number } | undefined>(undefined);
+  useEffect(() => { if (error) root.current?.querySelector('[role="alert"]')?.scrollIntoView({ block: 'center' }); }, [error, errorPresentation]);
   const destination = useRef<'result' | 'batch' | 'download' | 'privacy' | 'pdf'>('result');
   const batchLock = useRef(false);
   const batchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -208,6 +211,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
 
 
   const beforeExport = async ({ format, path, hasConcealment }: BeforeExportContext): Promise<ExportDecision> => {
+    setError(''); setErrorCode(undefined);
     // Commit may apply a pending crop before this hook. Snapshot the resulting
     // revision and each request's destination/size before asynchronous encoding.
     if (path === 'commit') {

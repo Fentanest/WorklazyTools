@@ -59,7 +59,7 @@ try {
         assert.deepEqual(heavy, []);
         assert.equal(await page.evaluate(() => window.__bgWorkers), 0);
         records.http = { heavy, workers: 0, alert: await page.getByRole('alert').allTextContents() };
-        await page.getByRole('alert').scrollIntoViewIfNeeded();
+        await page.waitForFunction(() => { const r = document.querySelector('[role=alert]').getBoundingClientRect(); return r.top >= 70 && r.bottom <= innerHeight; });
         await page.screenshot({ path: out + '/http-https-required.png' });
     }
     finally {
@@ -79,9 +79,11 @@ try {
         const cancel = page.locator('.asp-options-panel').getByRole('button', { name: 'Cancel background removal', exact: true });
         await cancel.waitFor();
         assert.equal(await cancel.isEnabled(), true);
+        await page.waitForFunction(() => { const n = document.querySelector('.asp-ai-cancel'); if (!n) return false; const r = n.getBoundingClientRect(); return r.top >= 70 && r.bottom <= innerHeight; });
         const box = await cancel.boundingBox();
-        assert.ok(box.y >= 0 && box.y + box.height <= 900, 'cancel stays visible at the run-action position');
+        records.cancelGeometry = {box,scrollY:await page.evaluate(()=>scrollY),alerts:await page.getByRole('alert').allTextContents()};
         await page.screenshot({ path: out + '/panel-cancel-cold.png' });
+        assert.ok(box.y >= 0 && box.y + box.height <= 900, 'cancel stays visible at the run-action position: '+JSON.stringify(records.cancelGeometry));
         assert.ok((await page.evaluate(() => window.__bgStages)).some(s => s.phase === 'cold' && s.stage === 'Downloading model…' && Number(s.value) > 0), 'native progress receives nonzero download progress');
         await cancel.click();
         await cancel.waitFor({ state: 'hidden' });
