@@ -13,15 +13,15 @@ const deferred = <T,>() => { let resolve!: (value:T)=>void; const promise=new Pr
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
 const file=()=>new File(["synthetic"],"input.HWP");
 const entry=(input:File):HandoffEntry=>({files:[input],receiverId:"hwp-editor",entryPath:"/tools/hwp-editor",origin:"user-input",source:"unit",schema:1,id:"id",nonce:"nonce",createdAt:0,expiresAt:60000});
-async function fixture(run:(f:{adapter:()=>HandoffAdapter; select:(files:File[])=>void; editors:any[]; dom:JSDOM; protected:()=>boolean; unmount:()=>Promise<void>; ready:ReturnType<typeof deferred<void>>; load:ReturnType<typeof deferred<void>>; hml:ReturnType<typeof deferred<void>>})=>Promise<void>,block:"ready"|"load"|"hml"|"fail"|"none") {
- const dom=new JSDOM("<div id='root'></div>",{url:"https://example.test/en/tools/hwp-editor"});
+async function fixture(run:(f:{adapter:()=>HandoffAdapter; select:(files:File[])=>void; editors:any[]; dom:JSDOM; protected:()=>boolean; unmount:()=>Promise<void>; ready:ReturnType<typeof deferred<void>>; load:ReturnType<typeof deferred<void>>; hml:ReturnType<typeof deferred<void>>})=>Promise<void>,block:"ready"|"load"|"hml"|"fail"|"none",language:"ko"|"en"="en") {
+ const dom=new JSDOM("<div id='root'></div>",{url:`https://example.test/${language}/tools/hwp-editor`});
  const saved=new Map(["window","document","IS_REACT_ACT_ENVIRONMENT"].map(key=>[key,Object.getOwnPropertyDescriptor(globalThis,key)]));
  for(const [key,value] of Object.entries({window:dom.window,document:dom.window.document,IS_REACT_ACT_ENVIRONMENT:true}))Object.defineProperty(globalThis,key,{configurable:true,value});
  const ready=deferred<void>(),load=deferred<void>(),hml=deferred<void>();
  let adapter:HandoffAdapter,select:(files:File[])=>void,protectedInput=false;
  const editors:any[]=[];
  const noop=()=>{},t=(key:string,options?:Record<string,unknown>)=>key+(options?.name?':'+options.name:'');
- const i18n={t,resolvedLanguage:"en"};
+ const i18n={t,resolvedLanguage:language};
  const progress={status:"idle",message:"",logs:[],start:noop,succeed:noop,fail:noop,reset:noop};
  const box=({children,...props}:any)=>React.createElement("div",Object.fromEntries(Object.entries(props).filter(([key])=>key.startsWith('data-'))),children);
  const stub=new Proxy({}, {get:()=>()=>null});
@@ -33,12 +33,13 @@ async function fixture(run:(f:{adapter:()=>HandoffAdapter; select:(files:File[])
   if(id==='../../app/useHandoffReceiver')return {useHandoffReceiver:(_id:string,next:HandoffAdapter)=>{adapter=next;return {recoveryFiles:[],dismiss:noop};}};
   if(id==='../../app/toolState')return {setUnsavedWork:()=>{protectedInput=true;},useUnsavedWorkGuard:noop};
   if(id==='../../hooks/useOperationProgress')return {useOperationProgress:()=>progress};
-  if(id==='../../config/rhwp')return {getRhwpStudioUrl:()=>'/studio'};
+  if(id==='../../i18n/routing')return {useAppLanguage:()=>language};
+  if(id==='../../config/rhwp')return {getRhwpStudioUrl:(lang:string)=>'/studio?lang='+lang};
   if(id==='../../lib/utils')return {cn:()=>''};
   if(id==='../../components/AppShell')return {useFocusMode:()=>noop};
-  if(id==='@rhwp/editor')return {createEditor:async()=>{
+  if(id==='@rhwp/editor')return {createEditor:async(_container:any,options:any)=>{
    const index=editors.length;
-   const editor={element:dom.window.document.createElement('iframe'),destroyed:false,calls:0,
+   const editor={element:dom.window.document.createElement('iframe'),studioUrl:options.studioUrl,destroyed:false,calls:0,
     destroy(){this.destroyed=true;},
     async loadFile(){this.calls++;if(index===0&&block==='load')await load.promise;if(block==='fail')throw Error('corrupt');return {pageCount:2};},
     async getHmlSaveState(){if(index===0&&block==='hml')await hml.promise;return {hmlSavable:true,blockers:[]};}};
@@ -117,3 +118,7 @@ test('P3b HWP second handoff cannot cancel an already pending manual open',async
  await React.act(async()=>{f.load.resolve();await tick();});
  assert.match(f.dom.window.document.body.textContent!,/manual.hwpx/);
 },'load'));
+
+for(const language of ['ko','en'] as const)test(`HWP initial Studio uses the ${language} route locale`,async()=>fixture(async f=>{
+ assert.equal(f.editors[0].studioUrl,`/studio?lang=${language}`);
+},'none',language));
