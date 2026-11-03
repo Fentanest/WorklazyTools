@@ -1586,7 +1586,7 @@
         "HD 16:9": "HD 16:9",
         "OG 1200×630": "OG 1200×630",
         "Drag the photo to reposition · zoom with the − / + controls. Pick Free to remove the frame.": "Drag the photo to reposition · zoom with the − / + controls. Pick Free to remove the frame.",
-        "Drag the frame and its handles to choose the area to keep, then Apply.": "Drag the frame and its handles to choose the area to keep, then Apply.",
+        "Drag the frame and its handles to choose the area to keep, then Apply.": "Drag the frame and its handles to choose the area to keep, then Apply. Crop values use preview coordinates; saved pixels use the source image’s pixel density.",
         "Click anywhere on the canvas to add text, then type. Or add a labelled box below.": "Click anywhere on the canvas to add text, then type. Or add a labelled box below.",
         "Add": "Add",
         "Loading…": "Loading…",
@@ -1606,7 +1606,7 @@
         "Preparing model and runtime…": "Preparing model and runtime…",
         "Cancel background removal": "Cancel background removal",
         "Background removal progress": "Background removal progress",
-        "This browser cannot encode this image format. Choose PNG or JPEG.": "This browser cannot encode this image format. Choose PNG or JPEG."
+        "This browser cannot encode this image format. Choose PNG or JPEG.": "This browser cannot encode this image format. Choose PNG or JPG."
       },
       "retryPerson": "Retry portrait mode",
       "retryReady": "Portrait mode selected. Press Remove background again.",

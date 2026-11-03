@@ -1579,7 +1579,7 @@
         "HD 16:9": "HD 16:9",
         "OG 1200×630": "OG 1200×630",
         "Drag the photo to reposition · zoom with the − / + controls. Pick Free to remove the frame.": "사진을 드래그하여 위치를 옮기고 − / +로 확대·축소하세요. 자유를 선택하면 프레임을 해제합니다.",
-        "Drag the frame and its handles to choose the area to keep, then Apply.": "프레임과 조절점을 움직여 남길 영역을 고른 다음 적용하세요.",
+        "Drag the frame and its handles to choose the area to keep, then Apply.": "프레임과 조절점을 움직여 남길 영역을 고른 다음 적용하세요. 좌표·크기는 미리보기 단위이며, 저장 크기는 원본 픽셀 밀도로 계산합니다.",
         "Click anywhere on the canvas to add text, then type. Or add a labelled box below.": "캔버스를 클릭한 뒤 글자를 입력하세요. 아래에서 텍스트 상자를 추가할 수도 있습니다.",
         "Add": "추가",
         "Loading…": "불러오는 중…",

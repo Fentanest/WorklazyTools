@@ -104,6 +104,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const secureBackgroundContext = globalThis.isSecureContext && !!globalThis.crypto?.subtle;
   const labels = useMemo<Record<string, string>>(() => ({
     ...t('image.library.labels', { returnObjects: true }) as Record<string, string>,
+    'This browser cannot encode this image format. Choose PNG or JPEG.': t('image.library.unsupportedFormat'),
     'runs an AI model entirely in your browser — no upload. The model (~tens of MB) downloads once on first use, then is cached.': t(!secureBackgroundContext ? 'image.library.httpsHint' : mode === 'person' ? 'image.library.personModelHelp' : 'image.library.productModelHelp'),
   }), [t, mode, secureBackgroundContext]);
   const exportFileName = `${(source?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited`;
