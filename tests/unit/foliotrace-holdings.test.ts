@@ -438,8 +438,8 @@ test("receipt-less year-end rows and the below-5% filter", () => {
 test("ratio-adjusted holdings get the new exclusion labels and stay neutral in filing changes", () => {
   assert.match(exclusionReasonLabel("corporate_action_pending", "ko") ?? "", /거래 정지/);
   assert.match(exclusionReasonLabel("corporate_action_pending", "en") ?? "", /corporate action/);
-  assert.match(exclusionReasonLabel("corporate_action_ratio_unverified", "ko") ?? "", /비율/);
-  assert.match(exclusionReasonLabel("corporate_action_ratio_unverified", "en") ?? "", /ratio/);
+  assert.match(exclusionReasonLabel("corporate_action_ratio_unverified", "ko") ?? "", /보유 수량·조정 근거 확인/);
+  assert.match(exclusionReasonLabel("corporate_action_ratio_unverified", "en") ?? "", /verification of holdings and corporate-action adjustments/);
   assert.doesNotMatch(exclusionReasonLabel("corporate_action_pending", "ko") ?? "", /corporate_action/);
 
   const previous = event({ receiptNo: "20260101000001", receiptDate: "2026-01-05", quantity: "1000" });

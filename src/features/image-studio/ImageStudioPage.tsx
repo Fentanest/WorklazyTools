@@ -1,3 +1,4 @@
+import { getSeoDefinition } from "../../app/seo";
 import { ToolGuideLink } from "../../components/ToolGuideLink";
 import type { HandoffInput } from "../../app/memoryHandoff";
 import { useImageSend } from "./editor/useImageSend";
@@ -182,9 +183,10 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
     <UtilityPage toolId="image-studio" className="image-studio-page">
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
       {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? ({ resize: "이미지 크기 조정", mosaic: "이미지 모자이크", watermark: "이미지 워터마크" })[direct.acceptedPreset.purpose] : ({ resize: "Resize an image", mosaic: "Mosaic an image", watermark: "Watermark an image" })[direct.acceptedPreset.purpose]} description={language === "ko" ? ({ resize: "이미지를 넣고 크기 패널에서 치수를 조정하세요.", mosaic: "이미지를 넣고 효과를 적용할 영역을 지정하세요.", watermark: "이미지를 넣고 텍스트를 입력한 뒤 직접 추가하세요. 자동으로 삽입하지 않습니다." })[direct.acceptedPreset.purpose] : ({ resize: "Add an image and adjust its dimensions in the size panel.", mosaic: "Add an image and select the area for the mosaic effect.", watermark: "Add an image, enter text, and add it when ready. Text is not inserted automatically." })[direct.acceptedPreset.purpose]} />}
-      <PageHeader eyebrow="IMAGE EDITOR" title={t("image.title")} description={t("image.description")}>
+      <PageHeader eyebrow="IMAGE EDITOR" title={language === "ko" && direct.acceptedPreset ? getSeoDefinition(language, `/tools/image-studio/${direct.acceptedPreset.purpose}`).title.split(" - ")[0] : t("image.title")} description={t("image.description")}>
         <PrivacyBanner compact />
       </PageHeader>
+      <p className="mb-3 text-sm"><ToolGuideLink /></p>
       <Card as="nav" className="studio-tabs mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0 max-[620px]:grid-cols-2" aria-label={t("image.tabs.label")} data-testid="image-studio-tabs">
         {([
           ["editor", t("image.tabs.editor"), ImageIcon], ["batch", t("image.tabs.batch"), Images], ["collage", t("image.tabs.collage"), LayoutGrid], ["gif", t("image.tabs.gif"), Sparkles],

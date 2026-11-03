@@ -60,11 +60,12 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const setError = useCallback((message: string) => { setErrorText(message); if (message) setErrorPresentation(value => value + 1); }, []);
   const [errorCode, setErrorCode] = useState<string>();
   const [notice, setNoticeText] = useState('');
+  const [jpegTransparencyNotice, setJpegTransparencyNotice] = useState(false);
   const transientFeedback = useRef(false);
   const setNotice = useCallback((message: string) => { transientFeedback.current = false; setNoticeText(message); }, []);
   const [backgroundCancelled, setBackgroundCancelled] = useState(false);
   const noticeRevision = useRef(0);
-  const clearFeedback = useCallback(() => { noticeRevision.current++; transientFeedback.current = false; setNoticeText(''); setBackgroundCancelled(false); }, []);
+  const clearFeedback = useCallback(() => { noticeRevision.current++; transientFeedback.current = false; setNoticeText(''); setBackgroundCancelled(false); setJpegTransparencyNotice(false); }, []);
   const [mode, setMode] = useState<BgMode>('person');
   const modeRef = useRef(mode); modeRef.current = mode;
   const modeChosen = useRef(false);
@@ -268,7 +269,9 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     try {
       let encoded = await resizeResult(blob, target);
       const sending = intent.destination === 'privacy' || intent.destination === 'pdf';
-      if (intent.destination !== 'batch') encoded = await encodeSendImage(encoded, intent.outputFormat);
+      if (intent.destination !== 'batch') encoded = await encodeSendImage(encoded, intent.outputFormat, hasTransparency => {
+        if (activeRef.current && request === version.current && revision === documentRevision.current && intent.sendRevision === captureSendRevision()) setJpegTransparencyNotice(hasTransparency);
+      });
       if (!activeRef.current || request !== version.current) return;
       if (revision !== documentRevision.current) { setNotice(t('image.library.resultChanged')); return; }
       const outputChanged = intent.sendRevision !== captureSendRevision();
@@ -369,6 +372,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         <ImageEditor key={generation} src={source?.file ?? null} mode="full" height={640} themeMode={theme} baseColor={theme === 'dark' ? '#18181b' : '#ffffff'} accentColor="#0284c7"
           exportFormats={FORMATS} exportQuality={92} jpegExportQuality={95} commitFormat="png" showCommit commitLabel={t('image.library.makeResult')}
           resolutionLimits={policy.resolutionLimits} exportArea="image" exportFileName={exportFileName} onCancelBackgroundRemoval={cancelBackgroundRemoval} onOutputSizeChange={size => { if (generation === latestGeneration.current) setNativeOutputSize(old => old?.width === size.width && old?.height === size.height ? old : size); }} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
+          onJpegTransparencyChange={hasTransparency => { if (generation === latestGeneration.current) setJpegTransparencyNotice(hasTransparency); }}
           labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
           onImageLoaded={() => {
             const request = version.current;
@@ -377,13 +381,13 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
               // Clear the fork's sample text before exposing readiness or H1 ack.
               // Otherwise a fast edit can race the next-frame initialization.
               if (selectedPreset?.purpose === 'watermark') clearWatermarkDraft();
-              lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false);
+              setJpegTransparencyNotice(false); lastStableSource.current = source; bg.current?.onImageReplaced(); setLoaded(true); setResult(undefined); setDirty(false);
               loadedAck.current?.resolve(true); loadedAck.current = undefined; setLoading(false);
             };
             if (selectedPreset?.purpose === 'watermark') requestAnimationFrame(ready); else ready();
           }}
           onDirtyChange={value => { if (generation !== latestGeneration.current) return; setDirty(value); if (value) setResult(undefined); }}
-          onHistoryChange={state => { if (generation === latestGeneration.current) { if (transientFeedback.current) clearFeedback(); else noticeRevision.current++; documentRevision.current++; setHasHistoryInput(state.length > 1); invalidatePrepared(); setResult(undefined); } }}
+          onHistoryChange={state => { if (generation === latestGeneration.current) { setJpegTransparencyNotice(false); if (transientFeedback.current) clearFeedback(); else noticeRevision.current++; documentRevision.current++; setHasHistoryInput(state.length > 1); invalidatePrepared(); setResult(undefined); } }}
           onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
             if (generation !== latestGeneration.current) return true;
             saving.current = false; destination.current = 'result'; pendingCommits.current = []; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);
@@ -406,6 +410,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         {outputFormat === 'webp' && <p id="image-send-webp-reason" className="w-full text-sm text-muted-foreground">{sendT('sendTo.webp')}</p>}
         {sendReason && preparedSend && <div role="alert" className="w-full"><p>{sendT('sendTo.failed')}</p><Button type="button" variant="outline" onClick={downloadPrepared}>{sendT('sendTo.download')}</Button><Button type="button" variant="outline" onClick={retryPrepared}>{sendT('sendTo.retry')}</Button></div>}
       </div>
+      {jpegTransparencyNotice && <p role="status" data-testid="image-jpeg-transparency" className="mt-2 text-sm text-muted-foreground">{t('image.library.jpegTransparency')}</p>}
       <div className="mt-3" data-testid="image-editor-export-action"><Button type="button" variant="outline" disabled={!loaded || loading || bgBusy} onClick={() => commit('download')}>{t('image.editor.download')}</Button></div>
       {result && resultUrl && resultPlan === resultPlanKey(outputFormat, outputSize) && <div className="mt-3 rounded-xl border border-border p-3" data-testid="image-editor-export-result" data-width={resultSize?.width} data-height={resultSize?.height}><div data-testid="image-editor-result">
         <img src={resultUrl} onLoad={event => { const image = event.currentTarget; if (image.currentSrc === resultUrl) setResultSize({ width: image.naturalWidth, height: image.naturalHeight }); }} alt={t('image.library.resultAlt')} className="max-h-64 max-w-full object-contain" />

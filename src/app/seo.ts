@@ -236,19 +236,19 @@ export const seoByPath: Record<string, SeoDefinition> = {
     application: { name: "스캔 PDF OCR", featureList: ["필요한 스캔 페이지 인식", "한국어·영어", "검색 가능한 PDF", "브라우저에서 처리"] },
   },
   "/tools/image-studio/resize": {
-    title: "사진 크기 줄이기·이미지 크기 조절 - 픽셀·비율 변경 | Worklazy Tools",
-    description: "이미지 비율을 유지하면서 원하는 정확한 픽셀 크기로 사진 크기를 조절하고 저장하세요.",
-    application: { name: "사진 크기 조절", featureList: ["픽셀 크기 지정", "비율 유지", "크기 패널 바로 열기", "브라우저 처리"] },
+    title: "이미지 크기 줄이기 - 픽셀·비율 조절 | Worklazy Tools",
+    description: "이미지 비율을 유지하면서 원하는 픽셀 크기로 줄이거나 조절한 뒤 저장하세요.",
+    application: { name: "이미지 크기 줄이기", featureList: ["픽셀 크기 지정", "비율 유지", "크기 패널 바로 열기", "브라우저 처리"] },
   },
   "/tools/image-studio/mosaic": {
-    title: "사진 모자이크 - 원하는 영역 직접 가리기 | Worklazy Tools",
-    description: "얼굴·차량 번호판처럼 가리고 싶은 영역을 직접 골라 모자이크나 블러를 적용하세요.",
-    application: { name: "사진 모자이크", featureList: ["선택 영역 모자이크", "효과 패널 바로 열기", "브라우저 처리"] },
+    title: "이미지 모자이크 - 원하는 영역 직접 가리기 | Worklazy Tools",
+    description: "이미지에서 얼굴·차량 번호판처럼 가리고 싶은 영역을 직접 골라 모자이크나 블러를 적용하세요.",
+    application: { name: "이미지 모자이크", featureList: ["선택 영역 모자이크", "효과 패널 바로 열기", "브라우저 처리"] },
   },
   "/tools/image-studio/watermark": {
-    title: "사진 워터마크 넣기 - 글자·출처 표시 | Worklazy Tools",
-    description: "사진에 텍스트 워터마크를 입력하여 저작권 표시나 출처 문구를 쉽게 추가하세요.",
-    application: { name: "사진 워터마크", featureList: ["글자 워터마크", "텍스트 패널 바로 열기", "자동 삽입 없음", "브라우저 처리"] },
+    title: "이미지 워터마크 넣기 - 글자·출처 표시 | Worklazy Tools",
+    description: "이미지에 텍스트 워터마크를 넣어 저작권 표시나 출처 문구를 추가하세요.",
+    application: { name: "이미지 워터마크 넣기", featureList: ["글자 워터마크", "텍스트 패널 바로 열기", "자동 삽입 없음", "브라우저 처리"] },
   },
   "/tools/video-studio/trim": {
     title: "동영상 자르기 - 필요한 구간을 MP4로 | Worklazy Tools",

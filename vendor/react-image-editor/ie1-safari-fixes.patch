@@ -1,3 +1,4 @@
+diff --git a/package-lock.json b/package-lock.json
 --- a/package-lock.json
 +++ b/package-lock.json
 @@ -5979,7 +5979,7 @@
@@ -5,10 +6,11 @@
      "packages/react-image-editor": {
        "name": "@ascentsparksoftware/react-image-editor",
 -      "version": "1.1.0",
-+      "version": "1.3.0-worklazy.3",
++      "version": "1.3.0-worklazy.5",
        "license": "MIT",
        "dependencies": {
          "fabric": "^7.4.0",
+diff --git a/packages/react-image-editor/package.json b/packages/react-image-editor/package.json
 --- a/packages/react-image-editor/package.json
 +++ b/packages/react-image-editor/package.json
 @@ -1,7 +1,7 @@
@@ -16,11 +18,12 @@
    "name": "@ascentsparksoftware/react-image-editor",
 -  "version": "1.3.0",
 -  "description": "Standalone, themeable React 19 image editor built on Fabric.js v7 (MIT). A free, open-source alternative to commercial image editors — crop, rotate, filters, draw, text, redact, export.",
-+  "version": "1.3.0-worklazy.3",
++  "version": "1.3.0-worklazy.5",
 +  "description": "Standalone, themeable React 19 image editor built on Fabric.js v7 (MIT). A free, open-source alternative to commercial image editors \u2014 crop, rotate, filters, draw, text, redact, export.",
    "keywords": [
      "react",
      "image-editor",
+diff --git a/packages/react-image-editor/src/controller/editor-controller.ts b/packages/react-image-editor/src/controller/editor-controller.ts
 --- a/packages/react-image-editor/src/controller/editor-controller.ts
 +++ b/packages/react-image-editor/src/controller/editor-controller.ts
 @@ -306,6 +306,7 @@
@@ -39,9 +42,17 @@
 +    const sizeKey = `${size.width}x${size.height}`;
 +    if (sizeKey !== this.lastOutputSize) { this.lastOutputSize = sizeKey; this.props.onOutputSizeChange?.(size); }
    }
- 
+
    /** Mirror the engine's zoom value and its honest slider bounds for the current interaction. */
-@@ -1189,9 +1193,10 @@
+@@ -976,6 +980,7 @@
+       drawing,
+       { color: this.state.annotationColor, strokeWidth: this.state.annotationWidth },
+       tool === 'highlighter',
++      tool === 'eraser',
+     );
+     // Text tool: click the canvas to drop an editable text box.
+     this.engine.setTextMode(tool === 'text');
+@@ -1189,9 +1194,10 @@
        return;
      }
      this.patch({ pickerOpen: false });
@@ -53,7 +64,7 @@
      } catch (error) {
        this.emitError('template-save-failed', error);
      }
-@@ -1234,15 +1239,18 @@
+@@ -1234,15 +1240,18 @@
        return;
      }
      this.patch({ exportOpen: false });
@@ -75,7 +86,7 @@
      } catch (error) {
        this.emitError('export-failed', error);
      }
-@@ -1631,7 +1639,7 @@
+@@ -1631,7 +1640,7 @@
        return;
      }
      const mode = this.state.activeTool === 'selectsubject' ? 'subject' : 'replace';
@@ -84,9 +95,63 @@
      void engine
        .removeImageBackground(mode)
        .then((ok) => {
+diff --git a/packages/react-image-editor/src/engine/alpha.spec.ts b/packages/react-image-editor/src/engine/alpha.spec.ts
+--- a/packages/react-image-editor/src/engine/alpha.spec.ts
++++ b/packages/react-image-editor/src/engine/alpha.spec.ts
+@@ -0,0 +1,26 @@
++import { describe, expect, it } from 'vitest';
++import { hasCanvasTransparency } from './alpha';
++function surface(width: number, height: number, alphaAt: (x: number, y: number) => number) {
++  const reads: number[][] = [];
++  return { reads, canvas: { width, height, getContext: () => ({ getImageData(x: number, y: number, w: number, h: number) {
++    reads.push([x, y, w, h]); const data = new Uint8ClampedArray(w * h * 4);
++    for (let row = 0; row < h; row++) for (let col = 0; col < w; col++) data[(row * w + col) * 4 + 3] = alphaAt(x + col, y + row);
++    return { data };
++  } }) } as unknown as HTMLCanvasElement };
++}
++describe('actual output alpha', () => {
++  it('does not confuse black RGB pixels with transparency', () => {
++    const { canvas } = surface(2, 2, () => 255); expect(hasCanvasTransparency(canvas)).toBe(false);
++  });
++  it('detects partial transparency, not only fully erased pixels', () => {
++    const { canvas } = surface(2, 2, (x, y) => x === 1 && y === 1 ? 254 : 255); expect(hasCanvasTransparency(canvas)).toBe(true);
++  });
++  it('finds alpha in the last row while bounding every readback', () => {
++    const { canvas, reads } = surface(3, 129, (_, y) => y === 128 ? 0 : 255);
++    expect(hasCanvasTransparency(canvas)).toBe(true); expect(reads.at(-1)).toEqual([0, 128, 3, 1]);
++    expect(reads.every(([, , , height]) => height <= 64)).toBe(true);
++  });
++  it('accepts an empty surface without allocating readback', () => {
++    const { canvas, reads } = surface(0, 0, () => 0); expect(hasCanvasTransparency(canvas)).toBe(false); expect(reads).toEqual([]);
++  });
++});
+diff --git a/packages/react-image-editor/src/engine/alpha.ts b/packages/react-image-editor/src/engine/alpha.ts
+--- a/packages/react-image-editor/src/engine/alpha.ts
++++ b/packages/react-image-editor/src/engine/alpha.ts
+@@ -0,0 +1,11 @@
++/** Inspect the actual output surface, with bounded readback instead of a second full RGBA buffer. */
++export function hasCanvasTransparency(canvas: Pick<HTMLCanvasElement, 'width' | 'height' | 'getContext'>): boolean {
++  if (!canvas.width || !canvas.height) return false;
++  const context = canvas.getContext('2d');
++  if (!context) throw new Error('Could not read image transparency.');
++  for (let y = 0; y < canvas.height; y += 64) {
++    const pixels = context.getImageData(0, y, canvas.width, Math.min(64, canvas.height - y)).data;
++    for (let i = 3; i < pixels.length; i += 4) if (pixels[i] < 255) return true;
++  }
++  return false;
++}
+diff --git a/packages/react-image-editor/src/engine/editor-engine.ts b/packages/react-image-editor/src/engine/editor-engine.ts
 --- a/packages/react-image-editor/src/engine/editor-engine.ts
 +++ b/packages/react-image-editor/src/engine/editor-engine.ts
-@@ -200,7 +200,7 @@
+@@ -45,6 +45,7 @@
+ } from '../types/editor.types';
+
+ import type { IntegrationOptions, ExportPath } from '../types/integration.types';
++import { hasCanvasTransparency } from './alpha';
+ import { assertLocalTemplate, checkPixels, hasConcealment, validateLimits, EditorOperationError } from './integration';
+
+ export interface EngineOptions extends IntegrationOptions {
+@@ -200,7 +201,7 @@
  /** Progress of an in-browser AI operation (model fetch + inference). */
  export interface AiProgress {
    /** `'loading'` while fetching the model, `'processing'` during inference, `'done'`. */
@@ -95,7 +160,34 @@
    /** 0–1 within the current stage (best-effort; some stages report no total). */
    readonly progress: number;
  }
-@@ -1482,14 +1482,19 @@
+@@ -486,7 +487,9 @@
+       if (path) {
+         path.set('aspId', this.nextId());
+       }
+-      this.commit('Draw');
++      const erasing = path?.get('aspRole') === 'eraser';
++      if (erasing) this.concealmentEverApplied = true;
++      this.commit(erasing ? 'Erase' : 'Draw');
+       this.notifyLayers();
+     });
+     // When a web font finishes loading, re-render so any text already set to it
+@@ -1469,41 +1472,69 @@
+
+   /** Render the output region to a data URL at its target pixel size. */
+   private artboardDataUrl(format: RasterExportFormat, quality: number): string {
++    // JPEG matting is final-surface only: report source alpha before it is lost.
++    if (format === 'jpeg') return this.renderOutputDataUrl(format, quality);
+     return this.withExportFill(format, () => this.renderOutputDataUrl(format, quality));
+   }
+
+   private renderOutputDataUrl(format: RasterExportFormat, quality: number): string {
+     const rect = this.outputRect();
+     if (!rect) {
+-      return this.canvas.toDataURL({ format, quality, multiplier: 1 });
++      return this.encodeRasterOutput(format, quality, 1);
+     }
+     // The region is in scene units, which are display-sized: exporting at 1x
+     // would pin the result to the host's canvas width and throw the photo's real
      // pixels away. A centered artboard targets its preset width; a crop region
      // recovers the source pixels beneath it, optionally capped by exportTarget.
      const multiplier = this.exportMultiplierFor(rect);
@@ -105,20 +197,47 @@
 +    const width = (size.width + 1e-7) / multiplier;
 +    const height = (size.height + 1e-7) / multiplier;
      return this.atIdentityViewport(() =>
-       this.canvas.toDataURL({
-         format,
-         quality,
-         left: rect.left,
-         top: rect.top,
+-      this.canvas.toDataURL({
+-        format,
+-        quality,
+-        left: rect.left,
+-        top: rect.top,
 -        width: rect.width,
 -        height: rect.height,
-+        width,
-+        height,
-         multiplier,
-       }),
+-        multiplier,
+-      }),
++      this.encodeRasterOutput(format, quality, multiplier, { left: rect.left, top: rect.top, width, height }),
      );
-@@ -1497,13 +1502,14 @@
- 
++  }
++
++  /** JPEG cannot carry alpha; fill the completed scene, including erased holes. */
++  private encodeRasterOutput(
++    format: RasterExportFormat,
++    quality: number,
++    multiplier: number,
++    crop: { left: number; top: number; width: number; height: number } | undefined = undefined,
++  ): string {
++    const surface = this.canvas.toCanvasElement(multiplier, crop);
++    if (format === 'jpeg') {
++      this.integration.onJpegTransparencyChange?.(hasCanvasTransparency(surface));
++      const ctx = surface.getContext('2d');
++      if (ctx) {
++        ctx.save();
++        ctx.globalCompositeOperation = 'destination-over';
++        ctx.fillStyle = this.exportBackground || '#ffffff';
++        ctx.fillRect(0, 0, surface.width, surface.height);
++        ctx.restore();
++      }
++    }
++    return surface.toDataURL(`image/${format}`, quality);
++  }
++
++  private hasEraserMask(): boolean {
++    const visit = (object: Fabric.FabricObject): boolean => object.get('aspRole') === 'eraser'
++      || (object.isType('group', 'activeselection') && (object as Fabric.Group).getObjects().some(visit));
++    return this.canvas.getObjects().some(visit);
+   }
+
    /** The render multiplier for the current output region. */
    private exportMultiplierFor(rect: FrameRect): number {
 -    if (!this.cropRegion) {
@@ -133,8 +252,8 @@
        target: this.exportTarget,
        maxPixels: this.integration.resolutionLimits?.cropMaxPixels,
      });
-@@ -1534,10 +1540,13 @@
- 
+@@ -1534,10 +1565,13 @@
+
    /** Pixel size of the delivered export (crop region at its export scale, else artboard preset). */
    private outputSize(): { width: number; height: number } | null {
 -    if (this.cropRegion) {
@@ -149,9 +268,9 @@
 +  getOutputSize(): AspExportTarget {
 +    return this.outputSize() ?? { width: this.canvas.getWidth(), height: this.canvas.getHeight() };
    }
- 
+
    /**
-@@ -1548,7 +1557,7 @@
+@@ -1548,7 +1582,7 @@
     */
    private drawArtboardMask(): void {
      const cropping = this.cropFrame !== null || this.imageCropActive;
@@ -160,7 +279,7 @@
      if (!rect) {
        return;
      }
-@@ -1629,7 +1638,13 @@
+@@ -1629,7 +1663,13 @@
      if (this.cropRegion) {
        return this.cropRegion;
      }
@@ -173,9 +292,36 @@
 +    }
 +    return null;
    }
- 
+
    /** The live crop frame's rectangle in scene coordinates (bakes its scale). */
-@@ -2568,7 +2583,7 @@
+@@ -2287,13 +2327,24 @@
+    * translucent and wider so strokes read as a highlight over the underlying
+    * content rather than an opaque line.
+    */
+-  setFreeDraw(enabled: boolean, style: AnnotationStyle, highlighter = false): void {
++  setFreeDraw(enabled: boolean, style: AnnotationStyle, highlighter = false, eraser = false): void {
+     this.canvas.isDrawingMode = enabled;
+     if (!enabled) {
+       return;
+     }
+     const brush = new this.fabric.PencilBrush(this.canvas);
+-    if (highlighter) {
++    if (eraser) {
++      brush.color = '#000000';
++      brush.width = style.strokeWidth;
++      const createPath = brush.createPath.bind(brush);
++      brush.createPath = (data) => {
++        const path = createPath(data);
++        // A reversible mask layer, composed against the scene below it. Never
++        // paint the host's colour: transparent PNG/WebP must contain real holes.
++        path.set({ globalCompositeOperation: 'destination-out', aspRole: 'eraser', aspConcealment: true });
++        return path;
++      };
++    } else if (highlighter) {
+       brush.color = translucent(style.color, 0.35);
+       brush.width = style.strokeWidth * 2;
+     } else {
+@@ -2568,7 +2619,7 @@
            "with provideAspBackgroundRemoval(() => import('@imgly/background-removal')).",
        );
      }
@@ -184,9 +330,9 @@
      const { removeBackground } = await this.bgRemovalLoader();
      const cutoutBlob = await removeBackground(source, {
        progress: (key: string, current: number, total: number) => {
-@@ -3115,18 +3130,21 @@
+@@ -3115,18 +3166,21 @@
    }
- 
+
    /** A fresh one-image scene, rendered from a detached copy; the editor is never flattened. */
 -  async flattenScene(target = { width: this.canvas.getWidth(), height: this.canvas.getHeight() }): Promise<EditorEngine> {
 +  async flattenScene(target?: AspExportTarget): Promise<EditorEngine> {
@@ -209,8 +355,17 @@
        copy.renderAll();
        const src = copy.getElement().toDataURL('image/png');
        const merged = await EditorEngine.create(document.createElement('canvas'), { width, height });
-@@ -3176,14 +3194,20 @@
+@@ -3174,16 +3228,29 @@
+       return new Blob([JSON.stringify(this.canvas.toJSON())], { type: cfg.mimeType });
+     }
      if (cfg.kind === 'vector') {
++      if (this.hasEraserMask()) {
++        // Fabric SVG does not encode destination-out. Embed the composited PNG
++        // so SVG matches the visible scene, without mutating the editable layers.
++        const png = this.artboardDataUrl('png', 1);
++        const image = await loadHtmlImage(png);
++        return new Blob([`<svg xmlns="http://www.w3.org/2000/svg" width="${image.naturalWidth}" height="${image.naturalHeight}" viewBox="0 0 ${image.naturalWidth} ${image.naturalHeight}"><image width="100%" height="100%" href="${png}"/></svg>`], { type: cfg.mimeType });
++      }
        // Embed the web fonts used by text so the SVG renders the true typeface in
        // any viewer instead of falling back to a generic family.
 -      const svg = await this.embedSvgFonts(this.canvas.toSVG());
@@ -230,8 +385,19 @@
 +    if (blob.type !== cfg.mimeType) throw new EditorOperationError('export-format-unsupported', 'This browser cannot encode this image format. Choose PNG or JPEG.');
 +    return blob;
    }
- 
+
    /**
+@@ -3324,6 +3391,9 @@
+   }
+   if (role === 'redaction') {
+     return 'Redaction';
++  }
++  if (role === 'eraser') {
++    return 'Eraser stroke';
+   }
+   if (object.isType('image')) {
+     return object.get('aspId') === 'base' ? 'Background' : 'Image';
+diff --git a/packages/react-image-editor/src/engine/export-scale.ts b/packages/react-image-editor/src/engine/export-scale.ts
 --- a/packages/react-image-editor/src/engine/export-scale.ts
 +++ b/packages/react-image-editor/src/engine/export-scale.ts
 @@ -22,6 +22,8 @@
@@ -254,6 +420,7 @@
    const wanted =
      target && isPositive(target.width)
        ? Math.min(target.width / regionWidth, sourceLimit)
+diff --git a/packages/react-image-editor/src/i18n.tsx b/packages/react-image-editor/src/i18n.tsx
 --- a/packages/react-image-editor/src/i18n.tsx
 +++ b/packages/react-image-editor/src/i18n.tsx
 @@ -8,6 +8,7 @@
@@ -264,6 +431,55 @@
    'template-save-failed': 'Could not save the template.',
    'template-load-failed': 'Could not load the template.',
    'template-remote-source': 'Templates may only contain data: or blob: sources.',
+diff --git a/packages/react-image-editor/src/index.ts b/packages/react-image-editor/src/index.ts
+--- a/packages/react-image-editor/src/index.ts
++++ b/packages/react-image-editor/src/index.ts
+@@ -96,3 +96,5 @@
+
+ export type { IntegrationOptions, ResolutionLimits, FontResolver, ExportPath, ExportDecision, BeforeExportContext, HistoryChange } from './types/integration.types';
+ export { ERROR_MESSAGES, KOREAN_LABELS } from './i18n';
++
++export { hasCanvasTransparency } from './engine/alpha';
+diff --git a/packages/react-image-editor/src/samples/sample-images.ts b/packages/react-image-editor/src/samples/sample-images.ts
+--- a/packages/react-image-editor/src/samples/sample-images.ts
++++ b/packages/react-image-editor/src/samples/sample-images.ts
+@@ -80,5 +80,11 @@
+
+ /** Build the sample image set. Call lazily (needs the DOM). */
+ export function buildSampleImages(): SampleImage[] {
+-  return GRADIENTS.map((g) => ({ key: g.key, label: g.label, dataUrl: renderGradient(g.stops) }));
++  const transparent = document.createElement('canvas');
++  transparent.width = 900;
++  transparent.height = 600;
++  return [
++    ...GRADIENTS.map((g) => ({ key: g.key, label: g.label, dataUrl: renderGradient(g.stops) })),
++    { key: 'transparent', label: 'Transparent background', dataUrl: transparent.toDataURL('image/png') },
++  ];
+ }
+diff --git a/packages/react-image-editor/src/styles/image-editor.css b/packages/react-image-editor/src/styles/image-editor.css
+--- a/packages/react-image-editor/src/styles/image-editor.css
++++ b/packages/react-image-editor/src/styles/image-editor.css
+@@ -690,3 +690,19 @@
+     flex: none;
+   }
+ }
++
++/* The transparent sample has no painted pixels; show its alpha in the picker. */
++.asp-image-editor .asp-sample[data-sample-key="transparent"] {
++  background-color: var(--asp-stage-checker-a);
++  background-image: conic-gradient(var(--asp-stage-checker-b) 25%, transparent 0 50%, var(--asp-stage-checker-b) 0 75%, transparent 0) !important;
++  background-size: 12px 12px;
++}
++
++.asp-image-editor .asp-sample__name {
++  display: inline-block;
++  padding: 3px 5px;
++  color: var(--asp-ink);
++  background: var(--asp-surface);
++  border-radius: 4px;
++  font-size: 11px;
++}
+diff --git a/packages/react-image-editor/src/styles/options-panel.css b/packages/react-image-editor/src/styles/options-panel.css
 --- a/packages/react-image-editor/src/styles/options-panel.css
 +++ b/packages/react-image-editor/src/styles/options-panel.css
 @@ -500,3 +500,11 @@
@@ -278,9 +494,10 @@
 +@media (prefers-reduced-motion: reduce) {
 +  .asp-options-panel .asp-ai-bar--indeterminate > span { animation: none; }
 +}
+diff --git a/packages/react-image-editor/src/types/integration.types.ts b/packages/react-image-editor/src/types/integration.types.ts
 --- a/packages/react-image-editor/src/types/integration.types.ts
 +++ b/packages/react-image-editor/src/types/integration.types.ts
-@@ -22,6 +22,12 @@
+@@ -22,6 +22,14 @@
    readonly limitUrlInputs?: boolean;
  }
  export interface IntegrationOptions {
@@ -290,9 +507,12 @@
 +  readonly exportFileName?: string;
 +  readonly onOutputSizeChange?: (size: AspExportTarget) => void;
 +  readonly onCancelBackgroundRemoval?: () => void;
++  /** Actual raster alpha immediately before JPEG matting; no preview-margin inference. */
++  readonly onJpegTransparencyChange?: (hasTransparency: boolean) => void;
    readonly onBeforeExport?: (context: BeforeExportContext) => ExportDecision | Promise<ExportDecision>;
    /** Entire scene output size for flattening; defaults to the working surface size. */
    readonly flattenTarget?: AspExportTarget;
+diff --git a/packages/react-image-editor/src/ui/ImageEditor.tsx b/packages/react-image-editor/src/ui/ImageEditor.tsx
 --- a/packages/react-image-editor/src/ui/ImageEditor.tsx
 +++ b/packages/react-image-editor/src/ui/ImageEditor.tsx
 @@ -595,6 +595,7 @@
@@ -303,6 +523,21 @@
                textBold={state.textBold}
                textItalic={state.textItalic}
                textUnderline={state.textUnderline}
+@@ -899,11 +900,12 @@
+                   key={sample.key}
+                   type="button"
+                   className="asp-sample"
++                  data-sample-key={sample.key}
+                   style={{ backgroundImage: `url(${sample.dataUrl})` }}
+                   title={sample.label}
+                   aria-label={sample.label}
+                   onClick={() => void controller.pickSample(sample)}
+-                ></button>
++                >{sample.key === 'transparent' && <span className="asp-sample__name">{sample.label}</span>}</button>
+               ))}
+             </div>
+             <label className="asp-upload">
+diff --git a/packages/react-image-editor/src/ui/OptionsPanel.tsx b/packages/react-image-editor/src/ui/OptionsPanel.tsx
 --- a/packages/react-image-editor/src/ui/OptionsPanel.tsx
 +++ b/packages/react-image-editor/src/ui/OptionsPanel.tsx
 @@ -194,6 +194,7 @@
@@ -321,7 +556,44 @@
    onAnnotationColorChange,
    onSizeInput,
    onSizeCommit,
-@@ -1105,22 +1107,22 @@
+@@ -787,7 +789,7 @@
+               </>
+             )}
+
+-            <div>
++            {activeTool !== 'eraser' && <div>
+               <span className="asp-field-label">{isText ? 'Text color' : 'Color'}</span>
+               <div className="asp-mt">
+                 <AspColorField
+@@ -796,7 +798,8 @@
+                   onColorChange={(color) => onAnnotationColorChange?.(color)}
+                 />
+               </div>
+-            </div>
++            </div>}
++            {activeTool === 'eraser' && <p className="asp-hint">Erase layers below to transparency. Layers added above remain visible.</p>}
+
+             {isShape && (
+               <div>
+@@ -963,7 +966,7 @@
+               </>
+             )}
+
+-            <p className="asp-hint">
++            {activeTool !== 'eraser' && <p className="asp-hint">
+               <AspIcon name="info" size={13} />{' '}
+               {fromSelection ? (
+                 <>
+@@ -982,7 +985,7 @@
+               ) : (
+                 <>Draw directly on the canvas. Manage objects in the Layers panel.</>
+               )}
+-            </p>
++            </p>}
+           </div>
+         )}
+
+@@ -1105,22 +1108,22 @@
              </p>
              <button
                type="button"

@@ -108,6 +108,10 @@ async function check(lang, tool, state, mobile = false) {
     await setup(page,tool,state,lang,gate,requested);
     const link=page.locator('a[href="#tool-guide-title"]').first();await link.waitFor();
     record.before=await position(page);assert.equal(record.before.count,1,'guide link needs one real target');
+    if (tool==='image-studio') {
+      await page.evaluate(async()=>{await document.fonts.ready;await Promise.all(document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{})));});
+      await page.screenshot({path:path.join(output,`${lang}-image-studio-initial.png`)});
+    }
     await link.click();await page.waitForTimeout(600);record.afterClick=await position(page);
     gate.resolve();
     if (state === 'late-failure') await page.locator('[data-tool-page=document-redactor] > [role=alert]').waitFor();
@@ -117,7 +121,7 @@ async function check(lang, tool, state, mobile = false) {
     assert.equal(record.settled.count,1);
     assert.ok(record.settled.top>=record.settled.headerBottom,`heading hidden above ${record.settled.headerBottom}: ${record.settled.top}`);
     assert.ok(record.settled.bottom<=record.settled.viewport,'heading below viewport');
-    if (tool==='document-redactor' || state==='expired') await page.screenshot({path:path.join(output,`${lang}-${tool.replaceAll('/','-')}-${state}-${mobile?'mobile':'desktop'}.png`)});
+    if (tool==='document-redactor' || tool==='image-studio' || state==='expired') await page.screenshot({path:path.join(output,`${lang}-${tool.replaceAll('/','-')}-${state}-${mobile?'mobile':'desktop'}.png`)});
     record.passed=true;
   } catch(error) {record.passed=false;record.error=error.message;throw error;}
   finally {gate.resolve();records.push(record);await context.close();}

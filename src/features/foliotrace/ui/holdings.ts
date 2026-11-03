@@ -320,16 +320,16 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     en: "Temporarily excluded: a corporate action is in progress (trading suspended)",
   },
   corporate_action_ratio_unverified: {
-    ko: "기업행위 비율을 확인하지 못해 평가에서 제외",
-    en: "Excluded: the corporate-action ratio could not be confirmed",
+    ko: "기업행위 후 보유 수량·조정 근거 확인을 기다려 평가에서 제외",
+    en: "Excluded pending verification of holdings and corporate-action adjustments",
   },
   delisting_pending: {
     ko: "상장폐지 진행 중이라 평가에서 제외",
     en: "Excluded while delisting is in progress",
   },
   corporate_action_unverified: {
-    ko: "공시 후 주식 변동 여부가 확인되지 않아 평가에서 제외",
-    en: "Excluded: share changes since the filing are unverified",
+    ko: "공시 후 주식 변동·실제 보유 수량 확인을 기다려 평가에서 제외",
+    en: "Excluded pending verification of share changes and actual holdings since the filing",
   },
 };
 
@@ -452,6 +452,32 @@ export interface EventRange {
   from: string;
   to: string;
   count: number;
+}
+
+/**
+ * A display-only projection: latest receipt date, then receipt number, per
+ * security (company fallback only when its stock code is unknown). Corrections
+ * and withdrawals participate normally, even if their holding date is older.
+ * Keep the original objects/array for the complete disclosure history.
+ */
+export function latestFilingsByStock(events: readonly FilingEvent[]): FilingEvent[] {
+  const latest = new Map<string, FilingEvent>();
+  for (const event of events) {
+    const key = event.stockCode ? `stock:${event.stockCode}` : `corp:${event.corpCode}`;
+    const prior = latest.get(key);
+    if (!prior || event.receiptDate > prior.receiptDate ||
+        (event.receiptDate === prior.receiptDate && event.receiptNo > prior.receiptNo)) {
+      latest.set(key, event);
+    }
+  }
+  return [...latest.values()].sort((a, b) => b.receiptDate.localeCompare(a.receiptDate) ||
+    b.receiptNo.localeCompare(a.receiptNo));
+}
+
+/** A later receipt can describe an earlier holding date; this does not change the selected filing. */
+export function isLateFilingWithOlderBasis(event: FilingEvent, holding: Holding | undefined): boolean {
+  return !!(holding?.holdingDate && event.basisDate && event.receiptDate > holding.receiptDate &&
+    event.basisDate < holding.holdingDate);
 }
 
 export function eventRangeOf(events: FilingEvent[]): EventRange | null {

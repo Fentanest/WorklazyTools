@@ -279,7 +279,7 @@
         "도형·스티커 레이어",
         "콜라주·GIF"
       ],
-      "synonyms": ["사진", "이미지", "png", "jpg", "리사이즈", "image resizer", "블러", "얼굴 모자이크", "pixelate", "mosaic", "resize", "blur", "face mosaic"]
+      "synonyms": ["사진", "사진 크기 줄이기", "사진 크기 조절", "사진 모자이크", "사진 워터마크 넣기", "이미지", "png", "jpg", "리사이즈", "image resizer", "블러", "얼굴 모자이크", "pixelate", "mosaic", "resize", "blur", "face mosaic"]
     },
     "text-merger": {
       "tagline": "여러 글과 텍스트 파일을 하나로",
