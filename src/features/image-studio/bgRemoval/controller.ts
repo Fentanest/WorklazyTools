@@ -1,13 +1,14 @@
 import { acquireAssets, assetsFor, CACHE_NAME, manifest, prepareAssets, type BgMode } from './assets.ts';
-import { BgRemovalError, cancelled, normalizeError, messages } from './errors.ts';
+import { BgRemovalError, cancelled, normalizeError, messages, productRiskMessages } from './errors.ts';
 import type { Diagnostic, WorkerRequest, WorkerResponse } from './protocol.ts';
-import { productDeviceRestriction } from './devicePolicy.ts';
+import { productDeviceRestriction, productDeviceWarning } from './devicePolicy.ts';
 export interface ConsentInfo { mode: BgMode; label: string; downloadBytes: number; programFilesNote: string }
 export interface RemovalOptions { mode?: BgMode; signal?: AbortSignal; progress?: (key: string, current: number, total: number) => void }
 export interface ControllerOptions {
   baseUrl?: string;
   language?: 'ko' | 'en';
   confirm: (info: ConsentInfo) => boolean | Promise<boolean>;
+  confirmProductRisk?: () => boolean | Promise<boolean>;
   notice?: (message: string) => void;
   diagnostic?: (event: Diagnostic) => void;
   /** Explicit test probes; they never change the production asset expectations. */
@@ -30,7 +31,7 @@ export class BackgroundRemovalController {
   private worker?: Worker;
   private readonly options: ControllerOptions;
   constructor(options: ControllerOptions) { this.options = options; }
-  async defaultMode(): Promise<BgMode> { return !productDeviceRestriction() && await (this.options.productSupported ?? productSupported)() ? 'product' : 'person'; }
+  async defaultMode(): Promise<BgMode> { return !productDeviceRestriction() && !productDeviceWarning() && await (this.options.productSupported ?? productSupported)() ? 'product' : 'person'; }
   cancel(): void { this.generation++; this.active?.abort(); this.worker?.terminate(); this.worker = undefined; }
   onImageReplaced(): void { this.cancel(); }
   dispose(): void { this.cancel(); }
@@ -57,7 +58,15 @@ export class BackgroundRemovalController {
       const mode = settings.mode ?? await this.defaultMode(); ensureCurrent();
       // Block even warm caches / injected capability probes before loading any model bytes.
       if (mode === 'product' && productDeviceRestriction()) throw new BgRemovalError('bg-product-device-restricted');
-      if (mode === 'product' && !(await (this.options.productSupported ?? productSupported)())) throw new BgRemovalError('bg-unsupported');
+      if (mode === 'product') {
+        const supported = await (this.options.productSupported ?? productSupported)(); ensureCurrent();
+        if (!supported) throw new BgRemovalError('bg-unsupported');
+        if (productDeviceWarning()) {
+          const choice = this.options.confirmProductRisk ?? (() => requestProductRiskConsent(this.options.language ?? 'ko'));
+          if (!(await withAbort(Promise.resolve(choice()), abort.signal))) throw new BgRemovalError('ai-cancelled');
+          ensureCurrent();
+        }
+      }
       let blob = input;
       if (typeof input === 'string') {
         if (!/^(data:|blob:)/i.test(input)) throw new BgRemovalError('bg-unsupported');
@@ -102,6 +111,10 @@ export class BackgroundRemovalController {
 /** Fork-compatible backgroundRemovalLoader adapter; no editor replacement or eager model load. */
 export function createBackgroundRemovalLoader(controller: BackgroundRemovalController, mode: () => BgMode) {
   return async () => ({ removeBackground: (blob: Blob | string, options?: { progress?: RemovalOptions['progress'] }) => controller.removeBackground(blob, { mode: mode(), progress: options?.progress }) });
+}
+export function requestProductRiskConsent(language: 'ko' | 'en'): boolean {
+  const copy = productRiskMessages[language];
+  return typeof globalThis.confirm === 'function' && globalThis.confirm(`${copy.title}\n${copy.body}\n${copy.proceed}`);
 }
 export function requestDownloadConsent(info: ConsentInfo): boolean {
   return window.confirm(`${info.label}\n${info.downloadBytes.toLocaleString()} bytes\n${info.programFilesNote}`);
