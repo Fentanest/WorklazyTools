@@ -216,6 +216,7 @@ interface FinishCopy {
   retry: string;
   cancel: string;
   canceled: string;
+  partialResultsAvailable: string;
   backToOrganize: string;
   suggestionTitle: string;
   suggestionInsert: string;
@@ -1012,8 +1013,8 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
         }
       }
       const canceled = reason instanceof DOMException && reason.name === "AbortError";
-      const code = reason instanceof PdfFinishEngineError ? reason.code : "unreadable-document";
-      const message = canceled ? copy.canceled : copy.errors[code] ?? copy.errors["unreadable-document"];
+      const code = reason instanceof PdfFinishEngineError ? reason.code : "save-failed";
+      const message = canceled ? copy.canceled : copy.errors[code] ?? copy.errors["save-failed"];
       setError(message);
       operation.fail(message);
     } finally {
@@ -1191,6 +1192,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
                   {operation.status === "running" && <Button type="button" variant="outline" className="mt-2 min-h-11 w-full rounded-xl text-destructive" data-testid="pdf-finish-cancel" onClick={() => controllerRef.current?.abort()}><X size={17} />{copy.cancel}</Button>}
                 </div>
                 <OperationProgress {...operation} compact accent="coral" title={copy.progressTitle} />
+                {operation.status === "error" && download.results.length > 0 && <UtilityNotice className="mt-3" kind="warning" role="status" data-testid="pdf-finish-partial-results">{copy.partialResultsAvailable}</UtilityNotice>}
                 {download.results.map((result) => <PdfDownloadCard key={result.url} compact result={result} title={copy.ready} onSaved={() => markResultSaved(result.url)} />)}
               </Card>
             </aside>

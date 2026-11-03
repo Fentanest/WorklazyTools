@@ -287,11 +287,11 @@ test("finish storage failure preserves completed outputs, discards the current r
 });
 
 test("finish save failures preserve only registered results and their ownership", async (t) => {
-  for (const failAt of [1, 2]) {
+  for (const [fileCount, failAt] of [[1, 1], [3, 1], [3, 2]]) {
     for (const failureMode of ["throw", "reject"]) {
-      await t.test(`save ${failAt}: ${failureMode}`, async () => {
-        const files = await Promise.all(["first", "second", "third"].map((name) => fixture(`${name}.pdf`)));
-        const reads = [0, 0, 0];
+      await t.test(`${fileCount} files, save ${failAt}: ${failureMode}`, async () => {
+        const files = await Promise.all(["first", "second", "third"].slice(0, fileCount).map((name) => fixture(`${name}.pdf`)));
+        const reads = files.map(() => 0);
         files.forEach((file, index) => {
           const read = file.arrayBuffer.bind(file);
           file.arrayBuffer = async () => { reads[index] += 1; return read(); };
@@ -330,14 +330,16 @@ test("finish save failures preserve only registered results and their ownership"
               resultStore,
             }),
             (error: unknown) => {
+              assert.ok(error instanceof PdfFinishEngineError);
+              assert.equal(error.code, "save-failed");
+              const classified = error instanceof PdfFinishPartialError ? error.cause : error;
+              assert.ok(classified instanceof PdfFinishEngineError);
+              assert.equal(classified.cause, failure);
               if (failAt === 1) {
-                assert.equal(error, failure, "zero completed outputs must retain the original exception");
+                assert.ok(!(error instanceof PdfFinishPartialError), "zero completed outputs must not claim partial results");
               } else {
                 assert.ok(error instanceof PdfFinishPartialError);
                 partial = error;
-                // This is the panel's existing fallback for a raw RangeError.
-                assert.equal(error.code, "unreadable-document");
-                assert.equal(error.cause, failure);
                 assert.equal(failure.name, "RangeError");
                 assert.equal(failure.message, "injected PDF serialization allocation failure");
                 assert.deepEqual(error.partialResults.map(({ key }) => key), ["0"]);
@@ -347,7 +349,7 @@ test("finish save failures preserve only registered results and their ownership"
           );
           assert.equal(saves, failAt);
           assert.equal(registrations, failAt - 1);
-          assert.deepEqual(reads, failAt === 1 ? [1, 0, 0] : [1, 1, 0]);
+          assert.deepEqual(reads, (failAt === 1 ? [1, 0, 0] : [1, 1, 0]).slice(0, fileCount));
           assert.equal(storeDisposals, failAt === 1 ? 1 : 0);
           assert.equal(resultDisposals, 0, "completed output belongs to the caller until released");
           if (partial) {
@@ -366,6 +368,61 @@ test("finish save failures preserve only registered results and their ownership"
       });
     }
   }
+});
+
+test("finish serialization preserves cancellation and classified engine errors", async (t) => {
+  for (const failAt of [1, 2]) {
+    for (const failure of [new DOMException("canceled", "AbortError"), new PdfFinishEngineError("output-validation")]) {
+      await t.test(`save ${failAt}: ${failure.name}`, async () => {
+        const files = await Promise.all([fixture("first.pdf"), fixture("second.pdf")]);
+        const originalSave = PDFDocument.prototype.save;
+        let saves = 0;
+        PDFDocument.prototype.save = function (options) {
+          if (++saves === failAt) return Promise.reject(failure);
+          return originalSave.call(this, options);
+        };
+        try {
+          await assert.rejects(finishPdfFiles({
+            files: files.map((file, index) => ({ key: `${index}`, file, selection: selection(3, "1") })),
+            options: { template: "{page}", region: "bottom-center", fontSize: 10, color: "#34343a", margin: 24, startNumber: 1, startPage: 1, excludeCover: false },
+            locale: "en-US",
+          }), (error: unknown) => {
+            if (failAt === 1) assert.equal(error, failure);
+            else {
+              if (failure.name === "AbortError") assert.ok(error instanceof PdfFinishCanceledError);
+              else {
+                assert.ok(error instanceof PdfFinishPartialError);
+                assert.equal(error.code, "output-validation");
+                assert.equal(error.cause, failure);
+              }
+              assert.ok(error instanceof PdfFinishCanceledError || error instanceof PdfFinishPartialError);
+              assert.deepEqual(error.partialResults.map(({ key }) => key), ["0"]);
+              void error.partialResults[0].dispose();
+            }
+            return true;
+          });
+        } finally {
+          PDFDocument.prototype.save = originalSave;
+        }
+      });
+    }
+  }
+});
+
+test("finish input read failures retain unreadable-document even for allocation errors", async () => {
+  const file = await fixture();
+  const failure = new RangeError("injected input allocation failure");
+  file.arrayBuffer = async () => { throw failure; };
+  await assert.rejects(finishPdfFiles({
+    files: [{ key: "input", file, selection: selection(3, "1") }],
+    options: { template: "{page}", region: "bottom-center", fontSize: 10, color: "#34343a", margin: 24, startNumber: 1, startPage: 1, excludeCover: false },
+    locale: "en-US",
+  }), (error: unknown) => {
+    assert.ok(error instanceof PdfFinishEngineError);
+    assert.equal(error.code, "unreadable-document");
+    assert.equal(error.cause, failure);
+    return true;
+  });
 });
 
 test("finish Blob allocation failure exposes completed outputs and never starts the next file", async () => {
