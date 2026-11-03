@@ -69,7 +69,9 @@ try {
         }
         await activate(kospi); await kospi.getByRole('combobox').selectOption('receipt');
         await activate(kosdaq); await kosdaq.getByRole('combobox').selectOption('ownership');
+        await activate(kospi);
         assert.equal(await kospi.getByRole('combobox').inputValue(), 'receipt');
+        await activate(kosdaq);
         assert.equal(await kosdaq.locator('.foliotrace-mrow .foliotrace-code-plain').first().innerText(), '247540');
         for (const panel of [kospi, kosdaq]) for (const key of ['weight', 'value']) {
           await activate(panel);
@@ -79,6 +81,7 @@ try {
         assert.ok(await kospi.locator('.foliotrace-change-up').count() > 0);
         assert.ok(await kosdaq.locator('.foliotrace-change-down').count() > 0);
         assert.ok(await kospi.locator('.foliotrace-mrow-note').count() > 0);
+        await activate(kospi);
         assert.match(await kospi.getByRole('button', { name: /KOSPI Unpriced/ }).innerText(), lang === 'ko' ? /거래\s*정지/ : /trading suspended/);
         assert.equal(await count(page.locator('[data-market=KONEX]')).innerText(), '1');
         assert.equal(await count(page.locator('[data-market=UNKNOWN]')).innerText(), '1');
