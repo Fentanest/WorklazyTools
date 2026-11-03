@@ -1,5 +1,6 @@
 import { PERSONALIZATION_KEYS, personalization, toolIdForPersonalization } from "../app/personalization";
 import { purgeExpired } from "../app/persistentHandoff";
+import { revealShellFocus, revealShellTab } from "../app/shellFocus";
 import { FileDropProvider } from "./FileDropProvider";
 import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
@@ -413,7 +414,9 @@ export function AppShell() {
     <GuardedNavigateContext.Provider value={requestGuardedNavigate}>
     <FileDropProvider routeKey={location.pathname}>
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen} triggerId="mobile-navigation-trigger">
-      <div className={cn("app-shell", sidebarCollapsed && "wl-collapsed", focusMode === "editor" && "editor-mode")}>
+      <div className={cn("app-shell", sidebarCollapsed && "wl-collapsed", focusMode === "editor" && "editor-mode")}
+        onFocusCapture={event => revealShellFocus(event.target)}
+        onKeyUpCapture={revealShellTab}>
       <RouteSeo />
       <VideoIsolationBoundary active={videoStudioActive} isolationDocument={videoIsolationDocument} onReady={setVideoControllerReady} onFailed={setVideoIsolationFailed} />
       <OfficeIsolationBoundary active={officeEditorAppActive} isolationDocument={officeIsolationDocument} />

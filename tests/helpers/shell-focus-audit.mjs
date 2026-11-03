@@ -36,7 +36,7 @@ export async function settledFocus(page) {
       .map(b=>({selector:b.className,rect:rect(b.getBoundingClientRect())}));
     const clipped={left:Math.max(0,r.left),right:Math.min(innerWidth,r.right),top:Math.max(0,r.top),bottom:Math.min(innerHeight,r.bottom)};
     const viewportArea=Math.max(0,clipped.right-clipped.left)*Math.max(0,clipped.bottom-clipped.top);
-    const intersections=bars.map(b=>({...b,area:overlap(clipped,b.rect)})).filter(b=>b.area>0);
+    const intersections=bars.map(b=>({...b,area:overlap(clipped,b.rect),overlapHeight:Math.max(0,Math.min(clipped.bottom,b.rect.bottom)-Math.max(clipped.top,b.rect.top))})).filter(b=>b.area>0);
     const blocked=intersections.reduce((sum,b)=>sum+b.area,0),remaining=Math.max(0,viewportArea-blocked);
     return {key:a.id(el),field:a.field(el)&&a.visible(el),tag:el.tagName,type:el.type||el.getAttribute('role')||'',
       label:el.getAttribute('aria-label')||el.getAttribute('placeholder')||el.labels?.[0]?.textContent?.trim()||'',rect:rect(r),scrollY,
@@ -46,11 +46,12 @@ export async function settledFocus(page) {
   });
 }
 
-export async function auditTabCycle(page,direction,first,maxSteps=800) {
+export async function auditTabCycle(page,direction,first,maxSteps=800,onStep) {
   const rows=[];let returned=false;
   for(let step=0;step<maxSteps;step++){
     await page.keyboard.press(direction==='forward'?'Tab':'Shift+Tab');
     const row=await settledFocus(page);rows.push({...row,step,direction});
+    if(onStep)await onStep(row);
     if(row.key===first){returned=true;break;}
   }
   if(!returned)throw Error('Keyboard traversal did not complete a cycle');

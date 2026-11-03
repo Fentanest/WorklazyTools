@@ -43,13 +43,18 @@ for(const [lang,theme] of matrix)for(const tool of tools)test(`${lang} ${theme} 
   }
   await captureViewport(page,path.join(output,`${lang}-${theme}-${tool}-200-top.png`));
   const start=await beginFocusAudit(page);assert.ok(start.expected.length>0,'positive native field selection');record.expectedFields=start.expected.length;
-  const forward=await auditTabCycle(page,'forward',start.first);const reverse=await auditTabCycle(page,'reverse',start.first);
+  let captured=false;
+  const forward=await auditTabCycle(page,'forward',start.first,800,async row=>{if(row.field&&row.partial&&!captured){captured=true;await captureViewport(page,path.join(output,`${lang}-${theme}-${tool}-overlap.png`));}});const reverse=await auditTabCycle(page,'reverse',start.first);
+  record.otherOverlaps=[...forward,...reverse].filter(r=>!r.field&&(r.partial||r.outsideViewport));
   record.tabStops=forward.length+reverse.length;record.fields=[...forward,...reverse].filter(r=>r.field);
   const seen=new Set(record.fields.map(r=>r.key));record.missingFields=start.expected.filter(id=>!seen.has(id));
+  record.missingByDirection=[forward,reverse].map(rows=>start.expected.filter(id=>!rows.some(r=>r.field&&r.key===id)));
+  assert.deepEqual(record.missingByDirection,[[],[]],'all initial fields must be visited in each direction');
   record.obscured=record.fields.filter(r=>r.partial||r.outsideViewport);record.fullyObscured=record.fields.filter(r=>r.fullyObscured||r.outsideViewport);
   assert.deepEqual(record.missingFields,[],'all visible enabled field tab stops must be visited');
   assert.equal(record.fullyObscured.length,0,'focused fields must not be fully obscured by fixed shell bars');
+  assert.equal(record.obscured.length,0,'focused fields must have no partial overlap with fixed shell bars');
   record.passed=true;
  }catch(error){record.passed=false;record.error=error.message;await captureViewport(page,path.join(output,`${lang}-${theme}-${tool}-failure.png`)).catch(()=>{});throw error;}
- finally{records.push(record);await page.close();}
+ finally{records.push(record);await fs.writeFile(path.join(output,'results.json'),JSON.stringify({phase,tools,matrix,records,externalOriginsBlocked:[...denied]},null,2));await page.close();}
 });
