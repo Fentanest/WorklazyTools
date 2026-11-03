@@ -454,6 +454,26 @@ export interface EventRange {
   count: number;
 }
 
+/**
+ * A display-only projection: latest receipt date, then receipt number, per
+ * security (company fallback only when its stock code is unknown). Corrections
+ * and withdrawals participate normally, even if their holding date is older.
+ * Keep the original objects/array for the complete disclosure history.
+ */
+export function latestFilingsByStock(events: readonly FilingEvent[]): FilingEvent[] {
+  const latest = new Map<string, FilingEvent>();
+  for (const event of events) {
+    const key = event.stockCode ? `stock:${event.stockCode}` : `corp:${event.corpCode}`;
+    const prior = latest.get(key);
+    if (!prior || event.receiptDate > prior.receiptDate ||
+        (event.receiptDate === prior.receiptDate && event.receiptNo > prior.receiptNo)) {
+      latest.set(key, event);
+    }
+  }
+  return [...latest.values()].sort((a, b) => b.receiptDate.localeCompare(a.receiptDate) ||
+    b.receiptNo.localeCompare(a.receiptNo));
+}
+
 export function eventRangeOf(events: FilingEvent[]): EventRange | null {
   if (!events.length) return null;
   const dates = events.map((e) => e.receiptDate).sort();

@@ -38,6 +38,7 @@ import {
   holdingStatus,
   isBelowFivePercent,
   latestUnresolvedReasonLabel,
+  latestFilingsByStock,
   quotePriceDetail,
   sortHoldings,
   sumPercentText,
@@ -179,7 +180,9 @@ const STR = {
     sourceTextRead: "공시 원문 판독",
     unknownDate: "기준일 모름",
     eventsTitle: "최근 공시 변화",
-    eventsDesc: "전체 {total}건 중 최근 {shown}건입니다. 보유 기준일순으로 정렬하며, 기준일이 없을 때만 접수일을 정렬에 사용합니다. 수량·지분율은 공시에 적힌 값입니다.",
+    eventsDesc: "공시 {total}건에서 종목별 최신 {shown}건을 표시합니다. 접수일·접수번호가 큰 순서이며 정정·철회도 포함합니다. 종목명을 누르면 이전 공시를 볼 수 있습니다. 수량·지분율은 공시에 적힌 값입니다.",
+    eventCorrection: "정정·철회 공시",
+    historyOnly: "현재 보유 목록에 없는 종목의 공시 이력입니다.",
     eventPointChange: "이전 기록과 차이: {amount}퍼센트포인트",
     eventsEmpty: "해당 기간의 공시 변화가 없습니다.",
     eventQuantity: "공시 수량",
@@ -237,8 +240,8 @@ const STR = {
     concentration: "상위 {a}종목이 {pa}, 상위 {b}종목이 {pb}를 차지합니다.",
     concentrationTop: "상위 {a}종목이 {pa}를 차지합니다.",
     topMore: "상위 종목 더 보기",
-    eventsAll: "전체 {total}건",
-    eventsFullTitle: "공시 변화 전체 기록",
+    eventsAll: "종목별 최신 {total}건",
+    eventsFullTitle: "종목별 최신 공시",
     excludedTitle: "평가에서 뺀 {n}종목",
     excludedFoot: "틀린 값을 보여 주지 않으려고 확인될 때까지 합계에서 뺍니다.",
     excludedView: "목록에서 보기",
@@ -383,7 +386,9 @@ const STR = {
     sourceTextRead: "Disclosure text reading",
     unknownDate: "Unknown (no holding date)",
     eventsTitle: "Recent filing changes",
-    eventsDesc: "Showing the latest {shown} of {total} records. We sort by the holding date, using the filing date only for sorting when the holding date is unknown. Quantities and percentages are as reported.",
+    eventsDesc: "Showing {shown} latest filings by stock from {total} records, newest receipt date then receipt number first, including corrections and withdrawals. Select a name for earlier filings. Quantities and percentages are as reported.",
+    eventCorrection: "Correction/withdrawal filing",
+    historyOnly: "Filing history for a security outside the current holdings list.",
     eventPointChange: "Change from the prior record: {amount} percentage points",
     eventsEmpty: "No filing changes in this period.",
     eventQuantity: "Filed quantity",
@@ -441,8 +446,8 @@ const STR = {
     concentration: "The top {a} holdings make up {pa}; the top {b} make up {pb}.",
     concentrationTop: "The top {a} holdings make up {pa}.",
     topMore: "See more holdings",
-    eventsAll: "All {total}",
-    eventsFullTitle: "Full filing log",
+    eventsAll: "Latest by stock ({total})",
+    eventsFullTitle: "Latest filings by stock",
     excludedTitle: "{n} securities left out of the valuation",
     excludedFoot: "To avoid showing wrong values, they stay out of the total until confirmed.",
     excludedView: "View in the list",
@@ -540,6 +545,28 @@ function useIsPhone(): boolean {
 function ratioLineText(t: { ratioLine: string }, qa: NonNullable<Holding["quantityAdjustment"]>): string {
   return t.ratioLine.replace("{r}", formatQty(qa.reportedQuantity))
     .replace("{n}", qa.ratioNumerator).replace("{d}", qa.ratioDenominator);
+}
+
+function FilingHistory({ events, lang }: { events: FilingEvent[]; lang: Lang }) {
+  const t = STR[lang];
+  return <>
+    <h3 className="foliotrace-detail-h3">{t.detailHistory}</h3>
+    {events.length === 0 ? <p className="foliotrace-state-text">{t.eventsEmpty}</p> : (
+      <ul className="foliotrace-events">
+        {events.map((e) => (
+          <li key={e.observationKey ?? `${e.receiptNo}:${e.corpCode}:${e.stockCode ?? ""}:${e.kind}:${e.basisDate ?? ""}`}>
+            <strong>{e.kind === "tracking-reentry" && e.source === "indirect-observation" ?
+              t.eventIndirectReentry : EVENT_KIND[lang][e.kind]}</strong>
+            {" · "}<span>{e.basisDate ? `${t.eventBasis}: ${e.basisDate}` : `${t.eventReceipt}: ${e.receiptDate}`}</span>{" "}
+            <code className="foliotrace-code">{e.receiptNo}</code>
+            {(e.correctionOf || e.isCorrectionOrWithdrawal) && <small> · {t.eventCorrection}</small>}
+            {e.correctionOf && <small> ← {e.correctionOf}</small>}
+            {e.filingUrl && <> <a href={e.filingUrl} target="_blank" rel="noreferrer">{t.openFiling}</a></>}
+          </li>
+        ))}
+      </ul>
+    )}
+  </>;
 }
 
 export function FolioTracePage({ lang, view, onRefresh }: FolioTracePageProps) {
@@ -644,6 +671,7 @@ function ReadyView({
   );
 
   const eventRange = useMemo(() => eventRangeOf(snapshot.events), [snapshot.events]);
+  const latestEvents = useMemo(() => latestFilingsByStock(snapshot.events), [snapshot.events]);
   const recentEvents = useMemo(
     () => [...snapshot.events]
       .sort((a, b) => (b.basisDate ?? b.receiptDate).localeCompare(a.basisDate ?? a.receiptDate) ||
@@ -660,17 +688,24 @@ function ReadyView({
     () => new Map(snapshot.holdings.map((holding) => [holding.corpCode, holding.name])),
     [snapshot.holdings],
   );
+  const holdingByStockCode = useMemo(
+    () => new Map(snapshot.holdings.map((holding) => [holding.stockCode, holding])),
+    [snapshot.holdings],
+  );
   const eventsDescription = t.eventsDesc
-    .replace("{shown}", String(recentEvents.length))
+    .replace("{shown}", formatCount(latestEvents.length))
     .replace("{total}", formatCount(snapshot.events.length));
 
   const selected: Holding | null =
-    selectedCode === null ? null : (snapshot.holdings.find((h) => h.stockCode === selectedCode) ?? null);
+    selectedCode === null ? null : (holdingByStockCode.get(selectedCode) ?? null);
+  const selectedEvent = selectedCode === null || selected ? null : latestEvents.find((event) =>
+    (event.stockCode ?? `corp:${event.corpCode}`) === selectedCode) ?? null;
+  const selectedCorpCode = selected?.corpCode ?? selectedEvent?.corpCode;
   const selectedEvents = useMemo(
-    () => (selected ? snapshot.events.filter((e) => e.corpCode === selected.corpCode)
+    () => (selectedCorpCode ? snapshot.events.filter((e) => e.corpCode === selectedCorpCode)
       .sort((a, b) => (b.basisDate ?? b.receiptDate).localeCompare(a.basisDate ?? a.receiptDate) ||
         b.receiptNo.localeCompare(a.receiptNo)) : []),
-    [selected, snapshot.events],
+    [selectedCorpCode, snapshot.events],
   );
   const recentObservations = useMemo(
     () => [...(snapshot.verifiedIndirectObservations ?? [])]
@@ -692,7 +727,7 @@ function ReadyView({
 
   const recentSummary = recentEvents.slice(0, 6);
   const eventDate = (event: FilingEvent) => (event.basisDate ?? event.receiptDate).slice(5).replace("-", ".");
-  const eventName = (event: FilingEvent) => currentNameByCorpCode.get(event.corpCode) ?? (event.stockCode
+  const eventName = (event: FilingEvent) => holdingByStockCode.get(event.stockCode ?? "")?.name ?? currentNameByCorpCode.get(event.corpCode) ?? (event.stockCode
     ? `${t.eventStockCode} ${event.stockCode}`
     : `${t.eventCorpCode} ${event.corpCode}`);
   const valueCompact = snapshot.estimatedValue === null ? null : compactKrw(snapshot.estimatedValue, lang, { decimals: 1 });
@@ -869,7 +904,7 @@ function ReadyView({
             <div className="foliotrace-block-head">
               <h2 id="foliotrace-recent-h" className="foliotrace-h2">{t.eventsTitle}</h2>
               <a className="foliotrace-more-link" href="#foliotrace-events">
-                {t.eventsAll.replace("{total}", formatCount(snapshot.events.length))}
+                {t.eventsAll.replace("{total}", formatCount(latestEvents.length))}
               </a>
             </div>
             {recentSummary.length === 0 ? (
@@ -1092,20 +1127,23 @@ function ReadyView({
           <h2 id="foliotrace-events-h" className="foliotrace-h2">{t.eventsFullTitle}</h2>
           <span className="foliotrace-block-hint">{eventsDescription}</span>
         </div>
-        {recentEvents.length === 0 ? (
+        {latestEvents.length === 0 ? (
           <p className="foliotrace-state-text" role="status">
             {t.eventsEmpty} {t.lastChange}: {snapshot.latestReceiptDate ?? "—"}
           </p>
         ) : (
           <ul className="foliotrace-events">
-            {recentEvents.map((event) => {
+            {latestEvents.map((event) => {
               const currentName = currentNameByCorpCode.get(event.corpCode);
               return (
                 <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}:${event.kind}:${event.basisDate ?? ""}`}>
                   <div className="foliotrace-event-heading">
-                    <strong>{eventName(event)}</strong>
+                    <strong><button type="button" className="foliotrace-name-btn"
+                      onClick={() => setSelectedCode(event.stockCode ?? `corp:${event.corpCode}`)}>{eventName(event)}</button></strong>
                     {currentName && event.stockCode && <code className="foliotrace-code">{event.stockCode}</code>}
-                    <span>{event.basisDate ? `${t.eventBasis}: ${event.basisDate}` : `${t.eventReceipt}: ${event.receiptDate}`}</span>
+                    <span>{t.eventReceipt}: {event.receiptDate}</span>
+                    {event.basisDate && <span>{t.eventBasis}: {event.basisDate}</span>}
+                    {(event.correctionOf || event.isCorrectionOrWithdrawal) && <small>{t.eventCorrection}</small>}
                     <span>{event.kind === "tracking-reentry" && event.source === "indirect-observation" ?
                       t.eventIndirectReentry : EVENT_KIND[lang][event.kind]}</span>
                   </div>
@@ -1188,7 +1226,7 @@ function ReadyView({
         </ul>
       </section>
 
-      <Sheet open={selected !== null} onOpenChange={(open) => { if (!open) setSelectedCode(null); }}>
+      <Sheet open={selected !== null || selectedEvent !== null} onOpenChange={(open) => { if (!open) setSelectedCode(null); }}>
         {selected && (
           <SheetContent side="center" className="foliotrace-detail-panel" showCloseButton={false} style={{ maxHeight: "100dvh" }} aria-label={`${selected.name} ${t.colDetail}`}>
             <SheetClose className="foliotrace-detail-close" aria-label={t.closeDetail}>
@@ -1374,21 +1412,18 @@ function ReadyView({
                 ))}
               </section>
             )}
-            <h3 className="foliotrace-detail-h3">{t.detailHistory}</h3>
-            {selectedEvents.length === 0 ? (
-              <p className="foliotrace-state-text">{t.eventsEmpty}</p>
-            ) : (
-              <ul className="foliotrace-events">
-                {selectedEvents.map((e) => (
-                  <li key={e.observationKey ?? `${e.receiptNo}:${e.corpCode}:${e.stockCode ?? ""}:${e.kind}:${e.basisDate ?? ""}`}>
-                    <strong>{e.kind === "tracking-reentry" && e.source === "indirect-observation" ?
-                      t.eventIndirectReentry : EVENT_KIND[lang][e.kind]}</strong>
-                    {" · "}<span>{e.basisDate ? `${t.eventBasis}: ${e.basisDate}` : `${t.eventReceipt}: ${e.receiptDate}`}</span>{" "}
-                    <code className="foliotrace-code">{e.receiptNo}</code>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <FilingHistory events={selectedEvents} lang={lang} />
+          </SheetContent>
+        )}
+        {selectedEvent && (
+          <SheetContent side="center" className="foliotrace-detail-panel" showCloseButton={false}
+            style={{ maxHeight: "100dvh" }} aria-label={`${eventName(selectedEvent)} ${t.colDetail}`}>
+            <SheetClose className="foliotrace-detail-close" aria-label={t.closeDetail}>
+              <XIcon aria-hidden="true" size={18} />
+            </SheetClose>
+            <SheetTitle>{eventName(selectedEvent)}</SheetTitle>
+            <SheetDescription>{t.historyOnly}</SheetDescription>
+            <FilingHistory events={selectedEvents} lang={lang} />
           </SheetContent>
         )}
       </Sheet>
