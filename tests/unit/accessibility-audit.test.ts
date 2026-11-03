@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import fs from "node:fs";
+import { createAccessibilityReceipt } from "../accessibility-evidence.mjs";
 import { finishInclusionContrastTargets, assertFinishInclusionContrast, pages, accessibilityExceptions, accessibilityOwnerFromResolution, assertAccessibilityResults, selectAccessibilityPages, f3OwnedSelector, f3StampOwnershipTargets, f4aOwnedSelector, f4aStructureOwnershipTargets, f4bOwnedSelector, f4bRasterOwnershipTargets } from "../accessibility-audit.mjs";
 
 function report() {
   return { summary: { violations: 0, placeholderContrast: { ratio: 4.8871 } }, externalRequests: [],
-    results: pages.map(({ id, scenario, readySelector }) => ({ id, violations: [], incomplete: [], ...(readySelector?.startsWith("[data-testid='pdf-finish-ready']") ? { inclusionContrast: finishInclusionContrastTargets.map((target) => ({ ...target, ratio: 7, samples: 100, matches: 1, backgroundSHA: "a".repeat(64) })) } : {}), ...(id.startsWith("pdf-stamp") ? {
+    results: pages.map(({ id, scenario, readySelector }) => ({ id, collectionReceipt: createAccessibilityReceipt({ violations: [], incomplete: [] }, id), violations: [], incomplete: [], ...(readySelector?.startsWith("[data-testid='pdf-finish-ready']") ? { inclusionContrast: finishInclusionContrastTargets.map((target) => ({ ...target, ratio: 7, samples: 100, matches: 1, backgroundSHA: "a".repeat(64) })) } : {}), ...(id.startsWith("pdf-stamp") ? {
       stampContrast: [{ target: "notice-body", ratio: 5.87 }, { target: "notice-title", ratio: 14.66 }],
     } : {}), ...(scenario === "pdf-stamp-editing" ? {
       stampOwnership: { owner: "f3-stamp", selector: f3OwnedSelector, targets: f3StampOwnershipTargets.map(({ id: targetId }) => ({ id: targetId, matches: 1 })) },
@@ -20,10 +21,19 @@ function report() {
     } : {}) })) };
 }
 
+// Synthetic axe inputs for policy tests; capture before checking the projection.
+function rawIncomplete() {
+  return { violations: [], incomplete: [{ id: "color-contrast", nodes: [{}] }] };
+}
+function recordCollected(result, raw) {
+  result.collectionReceipt = createAccessibilityReceipt(raw, result.id);
+}
+
 test("a11y zero passes; one violation fails even if stored summary still says zero", () => {
   assert.equal(assertAccessibilityResults(report()).violations, 0);
   const injected = report();
   injected.results[0].violations.push({ id: "color-contrast", impact: "moderate", nodes: 1 });
+  recordCollected(injected.results[0], { violations: [{ id: "color-contrast", nodes: [{}] }], incomplete: [] });
   assert.throws(() => assertAccessibilityResults(injected), /limits exceeded/);
 });
 
@@ -99,7 +109,7 @@ test("A11Y_ONLY=excel-compare selects the base page and all eight duplicate-resu
   assert.equal(selected[0].id, "excel-compare");
   assert.ok(selected.slice(1).every(({ id }) => id.startsWith("excel-compare-duplicates-")));
   assert.throws(() => selectAccessibilityPages("missing-page"), /did not match/);
-  const scoped = { summary: { violations: 0 }, externalRequests: [], results: selected.map(({ id }) => ({ id, violations: [], incomplete: [] })) };
+  const scoped = { summary: { violations: 0 }, externalRequests: [], results: selected.map(({ id }) => ({ id, collectionReceipt: createAccessibilityReceipt({ violations: [], incomplete: [] }, id), violations: [], incomplete: [] })) };
   assert.equal(assertAccessibilityResults(scoped, { registeredPages: selected }).violations, 0);
 });
 
@@ -113,17 +123,16 @@ test("a11y exception is exactly one upstream iframe with explicit owner and reas
   assert.ok(exception.reason.length > 20);
 });
 
-test("recorded desktop zero-result JSON passes and an injected violation fails", () => {
-  const measured = JSON.parse(fs.readFileSync(new URL("../fixtures/harness/a11y-zero.json", import.meta.url), "utf8"));
+test("historical reports without a collection receipt require recollection", () => {
+  const historical = JSON.parse(fs.readFileSync(new URL("../fixtures/harness/a11y-zero.json", import.meta.url), "utf8"));
   const registeredPages = pages.filter(({ id }) => ["home", "document-compare", "tools", "excel-compare", "pdf-editor"].includes(id));
-  assert.equal(assertAccessibilityResults(measured, { registeredPages }).violations, 0);
-  measured.results[0].violations.push({ id: "color-contrast", impact: "moderate", nodes: 1 });
-  assert.throws(() => assertAccessibilityResults(measured, { registeredPages }), /limits exceeded/);
+  assert.throws(() => assertAccessibilityResults(historical, { registeredPages }), /collection receipt/);
 });
 
 test("a11y incomplete targets and reasons remain visible while F2/F3-owned nodes fail the gate", () => {
   const inherited = report();
   inherited.results[0].incomplete.push({ id: "color-contrast", nodes: [{ target: [".shared"], reasons: ["Needs manual review"], owner: "shared-existing" }] });
+  recordCollected(inherited.results[0], rawIncomplete());
   const summary = assertAccessibilityResults(inherited);
   assert.equal(summary.incompleteNodes, 1);
   assert.equal(summary.inheritedIncompleteNodes, 1);
@@ -131,10 +140,12 @@ test("a11y incomplete targets and reasons remain visible while F2/F3-owned nodes
 
   const f2 = report();
   f2.results.find(({ id }) => id === "pdf-watermark-ko")?.incomplete.push({ id: "color-contrast", nodes: [{ target: ["[data-pdf-watermark-owned]"], reasons: ["Needs manual review"], owner: "f2-watermark" }] });
+  recordCollected(f2.results.find(({ id }) => id === "pdf-watermark-ko"), rawIncomplete());
   assert.throws(() => assertAccessibilityResults(f2), /F2 accessibility incomplete nodes/);
 
   const discarded = report();
   discarded.results[0].incomplete.push({ id: "color-contrast", nodes: [{ target: [], reasons: [], owner: "shared-existing" }] });
+  recordCollected(discarded.results[0], rawIncomplete());
   assert.throws(() => assertAccessibilityResults(discarded), /target or reason was discarded/);
 });
 
@@ -153,6 +164,7 @@ test("a11y F4a gate fails closed for missing ownership, omitted states, and inco
     id: "color-contrast",
     nodes: [{ target: ["[data-testid='pdf-finish-link-preservation']"], reasons: ["Needs manual review"], owner: "f4a-structure" }],
   });
+  recordCollected(unresolved.results.find(({ id }) => id === "pdf-structure-editing-en-light"), rawIncomplete());
   assert.throws(() => assertAccessibilityResults(unresolved), /F4a accessibility incomplete nodes/);
 });
 
@@ -171,6 +183,7 @@ test("a11y F4b gate fails closed for missing ownership, omitted states, and inco
     id: "color-contrast",
     nodes: [{ target: ["[data-testid='pdf-finish-raster-loss']"], reasons: ["Needs manual review"], owner: "f4b-raster" }],
   });
+  recordCollected(unresolved.results.find(({ id }) => id === "pdf-raster-editing-en-light"), rawIncomplete());
   assert.throws(() => assertAccessibilityResults(unresolved), /F4b accessibility incomplete nodes/);
 });
 
@@ -179,6 +192,7 @@ test("a11y gradient incomplete is separately retained only after reload pixel co
   measured.results.find(({ id }) => id === "pdf-watermark-display-error-ko-dark").resolvedIncomplete = [{
     rule: "color-contrast", target: ["[data-testid='pdf-display-reload']"], reasons: ["Background gradient"], resolution: "measured-pixel", owner: "f2-watermark",
   }];
+  recordCollected(measured.results.find(({ id }) => id === "pdf-watermark-display-error-ko-dark"), rawIncomplete());
   const summary = assertAccessibilityResults(measured);
   assert.equal(summary.pixelResolvedIncompleteNodes, 1);
   assert.equal(summary.inheritedIncompleteNodes, 0);
@@ -221,6 +235,7 @@ test("a11y F3 gate fails closed while an owned incomplete result remains unresol
     id: "color-contrast",
     nodes: [{ target: ["[data-testid='pdf-stamp-notice']"], reasons: ["Needs manual review"], owner: "f3-stamp" }],
   });
+  recordCollected(unresolved.results.find(({ id }) => id === "pdf-stamp-editing-en-light"), rawIncomplete());
   assert.throws(() => assertAccessibilityResults(unresolved), /F3 accessibility incomplete nodes/);
 });
 

@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
 import { PNG } from "pngjs";
+import { assertAccessibilityEvidence, createAccessibilityReceipt } from "./accessibility-evidence.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
@@ -172,6 +173,7 @@ export function summarizeAccessibility(results, registeredPages = pages) {
   for (const result of results) {
     if (!Array.isArray(result.violations)) throw new Error(`Missing accessibility violations: ${result.id}.`);
     if (!Array.isArray(result.incomplete)) throw new Error(`Missing accessibility incomplete results: ${result.id}.`);
+    assertAccessibilityEvidence(result);
     for (const violation of result.violations) {
       const severity = violation.impact || "unknown";
       severityCounts[severity] = (severityCounts[severity] || 0) + 1;
@@ -182,9 +184,6 @@ export function summarizeAccessibility(results, registeredPages = pages) {
       incompleteRules += 1;
       incompleteNodes += incomplete.nodes.length;
       for (const node of incomplete.nodes) {
-        if (!Array.isArray(node.target) || !node.target.length || !Array.isArray(node.reasons) || !node.reasons.length) {
-          throw new Error(`Incomplete accessibility target or reason was discarded: ${result.id}/${incomplete.id}.`);
-        }
         if (node.owner === "f2-watermark") f2IncompleteNodes += 1;
         else if (node.owner === "f3-stamp") f3IncompleteNodes += 1;
         else if (node.owner === "f4a-structure") f4aIncompleteNodes += 1;
@@ -194,8 +193,7 @@ export function summarizeAccessibility(results, registeredPages = pages) {
       }
     }
     for (const node of result.resolvedIncomplete ?? []) {
-      if (!Array.isArray(node.target) || !node.target.length || !Array.isArray(node.reasons) || !node.reasons.length
-        || node.resolution !== "measured-pixel" || !["f2-watermark", "f3-stamp"].includes(node.owner)) {
+      if (node.resolution !== "measured-pixel" || !["f2-watermark", "f3-stamp"].includes(node.owner)) {
         throw new Error(`Resolved accessibility incomplete evidence is invalid: ${result.id}.`);
       }
       pixelResolvedIncompleteNodes += 1;
@@ -482,6 +480,7 @@ export async function runAccessibilityAudit() {
         builder.exclude(exception.selector);
       }
       const audit = await builder.analyze();
+      const collectionReceipt = createAccessibilityReceipt(audit, target.id);
       const duplicateContrast = target.setup === "excel-duplicates" ? await measureDuplicateResultContrast(page) : undefined;
       if (duplicateContrast && duplicateContrast.minimum < 4.5) {
         throw new Error(`Excel duplicate result text contrast fell below 4.5:1: ${JSON.stringify(duplicateContrast)}`);
@@ -585,6 +584,7 @@ export async function runAccessibilityAudit() {
         viewport: page.viewportSize(),
         exceptions,
         passes: audit.passes.length,
+        collectionReceipt,
         ...(duplicateContrast ? { duplicateContrast } : {}),
         violations: audit.violations.map((violation) => ({
           id: violation.id,
