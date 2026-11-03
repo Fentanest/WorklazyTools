@@ -15,6 +15,25 @@ build112페이지·unit1,481+36=1,517건(fail/skip0)·i18n·static/direct-entry1
 빌드(정적페이지112개), 단위1,481+36=1,517건, i18n·static, W6 9건, 신규 확인창4건, 기존 배너12건이 모두 통과했다. 취소/Esc의 상태·픽셀 보존, 확인 후 교체, 포커스와 중복 요청·지연 읽기·동일 파일 재입력을 확인했다. 한영·390/1440px·라이트 코랄/다크 민트 대화상자를 실제 열람했다. 초기 의존성 누락과 시험 선택자/브라우저 탭 순환 가정/디코드 계수/렌더 시점 오류는 로그를 보존하고 검증 준비를 수정했다. 제품 기능 검사를 약화하지 않았으며 macOS Safari(AMD) 실기는 이번 실행 대상이 아니다.
 
 배경 제거는 조사만 했다. worker의 `mask-fallback` 및 `session.executionProvider` audit는 존재하지만 제품 편집기는 diagnostic 구독을 연결하지 않아 화면에 재시도 경로가 표시되지 않는다. 60.7초만으로 CPU 재시도를 확정할 수 없다. 후속 구현 의견은 실제 fallback 이벤트 때만 “정확도를 위해 다시 계산 중”을 표시하는 것이며 이번 변경에는 포함하지 않았다. 증거·명령·해시는 이 worktree의 `artifacts/confirm/`, W6 캡처는 `artifacts/w6/browser/`, 상세 결과는 발주 지정 `SOL-CONFIRM-REPORT.md`에 남긴다.
+## 2026-11-04 — 안내 fragment 사용자 스크롤 해제 (FIX2, Codx, 정식 재검수 대기·미배포)
+
+기준 `ab4b820c`의 scroll 리스너가 초기 10초 동안 모든 이동을 안내로 되돌리던 P3-1을 수정했다. `scrollIntoView` 직후 실제 scrollX/Y와 제목의 문서 좌표를 기록한다. 같은 목적지의 지연 scroll 이벤트는 무시하고, 제목 문서 좌표가 변한 레이아웃 이동은 계속 보정하며, 그 밖의 이동은 즉시 observer·예약 프레임·타이머·리스너를 모두 해제한다. 예약된 resize/font/load 콜백도 해제 뒤 재활성화하지 않는다.
+
+독립적인 `scrollTo(0)`은 브라우저 복원과 사용자 조작을 식별할 정보가 없다. 따라서 0이라는 좌표나 10초 타이머만으로 복원이라고 추측하지 않는다. `history.scrollRestoration`이 manual이 아니고 reload/back_forward 또는 persisted pageshow일 때 최초 pageshow부터 다음 보정 프레임까지 한 번만 복원 경합을 허용한다. [HTML 표준의 문서 재활성화·스크롤 복원 절차](https://html.spec.whatwg.org/multipage/browsing-the-web.html#restore-persisted-state)를 근거로 선택한 짧은 재조정 경계이며 모든 브라우저의 복원 시점을 보장하는 신호라고 해석하지 않는다. 그 경계 밖에서 레이아웃 변화 없는 스크롤은 사용자에게 우선권을 준다.
+
+기존의 임의 `scrollTo(0)` 복원 모사는 실제 reload에서 이미지 응답을 보류해 fonts/animation 정착 뒤 trusted pageshow를 늦추고, 해당 이벤트에서 0으로 덮어쓰는 시험으로 명확히 했다. 같은 페이지에서 다음 프레임 이후 동일한 무입력 scrollTo(0)은 유지돼야 한다. 별도의 navigate/reload × 0/320px 회귀는 최초 10초 내 observer 활성 상태에서 시작하고, 사용자 이동 직후 해제 및 후속 400px 레이아웃에도 좌표·hash 보존을 검사한다. 초기 지연 레이아웃·키보드 해제·10초 종료·한영 18조합의 좌표·확대·준비 검증은 유지한다. 실행 수치와 원시 증거는 지정 `SOL-ANCHOR-FIX2.md` 및 worktree `scratch/anchor-fix2/`로 인계한다.
+
+## 2026-11-04 — 안내 fragment 재진입 안정화 (Codx, 정식 검수 대기·미배포)
+
+기준 `88a15656`, 전용 `fix-guide-anchor-flaky-20261104` 브랜치에서 조사했다. 단발 `useLayoutEffect` 정렬 뒤에도 셸의 smooth top 초기화와 브라우저 복원이 스크롤을 바꾸며, redactor 준비 완료가 안내 위 레이아웃을 120px(320px 한글 163.42px) 늘리는 경로를 실제 프레임 기록으로 확인했다. 실패 좌표는 추가 대기 후에도 같고 focus 이벤트가 없어 shellFocus 보정과 분리했다. 셸 초기화만 차단한 대조 실험도 18건 중 8건 실패했다.
+
+초기 guide fragment에만 containing main의 크기·폰트 완료·조상 진입 애니메이션·문서 load에 따라 프레임 정렬한다. 타이머·포커스 이동·URL 변경은 없으며 첫 pointerdown/keydown/wheel/touchstart, hash 변경, unmount에서 observer·이벤트·대기 프레임을 해제한다. 일반 진입과 사용자 작업 뒤의 레이아웃 변화는 앵커로 다시 끌어오지 않는다. 셸의 경로 top 초기화는 fragment 없는 진입에 적용한다. scroll-padding 80px·guide scroll-margin 16px·gap 상한 48px를 바꾸지 않았다.
+
+회귀는 지연 레이아웃/폰트·사용자 개입과 cleanup 단위 검사, 실제 redactor 320px의 늦은 200px 삽입 뒤 정렬 및 Control+Home 뒤 추가 200px 변화에서 viewport 미탈취를 포함한다. 기존 18조합의 한영·데스크톱/320px/실제 200% 확대와 클릭/재진입 좌표 단언을 유지한다. 반복별 실패율·대상 분포·실제 검사 종료와 최종 커밋은 지정 `SOL-ANCHORFLAKY-REPORT.md`, 원문은 worktree의 `scratch/anchorflaky/`에 기록한다.
+
+기준 10회 180조합에서 클릭 실패 0·재진입 실패 30(16.7%)을 관측했다. 수정본의 최종 loopback 전용 network namespace 10회는 180/180 통과했고 늦은 레이아웃/사용자 이동 회귀도 10/10이다. 같은 격리 환경의 기준 빌드 음성 대조는 여전히 제목 viewport 이탈을 검출했다. build·unit 1,526건·static·국소 browser 영수증 4개는 입력 불변이며 선언 입력 1,860개 현재 바이트 불일치 0개다.
+
+격리 전 별도 준비 실패는 실패 그대로 보존했다. 추가 계측의 두 독립 브라우저는 로컬 bcmap 요청에 동시 `net::ERR_NETWORK_CHANGED`를 기록했고 worker 준비 전 실패 UI를 보였다. 제품·판정·timeout을 바꾸지 않고 QA 호스트 네트워크 간섭만 격리했다. 기존 준비 실패의 개별 원인 로그가 없는 건까지 같은 원인으로 단정하지 않으며, 향후 requestfailed·준비 상태 증거 보존은 backlog에 남긴다.
 
 ## 2026-11-04 — U06 브랜치에 로컬 main 병합 (Codx, 병합 후보 정식 검수 대기)
 
@@ -3540,3 +3559,13 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - 나머지는 수정하지 않았다. Excel 날짜 해석 select-name critical16노드, PDF/Excel/문서 비교의 국소 대비, 모바일 PDF aside role=dialog의 aria-allowed-role incomplete8노드, 셸 하단 탭을 후속 후보로 분리했다. incomplete 보조 스캔48화면3,408target 중179저비율은 후보 수로만 남겼고, 대표64개를 요소별로 다시 측정해38미달 표본을 확인했다(공유 번호 배지·홈 CTA/카드·선택 목록/안내·셸 안내). 이 보조 결과로 core incomplete를 임의 차감하지 않았다.
 - build·unit(1,452+36=1,488, fail/skip0)·i18n·static(독립 진입18행 포함) 종료0/입력 불변. 관련 감사 unit20/20, 원본 receipt/등록/프로필 검증32프로필·512화면을 통과했다. 원자료와 명령·입력 hash·로그는 worktree의 evidence/u06/, 승인 입력표는 docs/jobs/todo/u06-20261104/task.json에 보존한다.
 - 실패도 보존했다. 초기 MOCK opt-in에 의한 동적 광고 target 제거와 기존 연속 CSV 입력 경쟁을 감사 준비 코드에서 수리했다. 준비 중 소스 변경으로 무효화된 unit2회는 통과로 쓰지 않았다. 수정 후 1프로필은 로딩 DOM 교체를 U08이 거부해 동일 source/dist로 해당 조합만 재수집했다. 실패 로그·원 controller 종료2·재수집 manifest와 gate 실패를 모두 남겼다. 다른 서비스 종료·push·merge·배포는 수행하지 않았다. 상세 한국어 보고서는 지정 scratchpad의 SOL-U06-REPORT.md다.
+
+## 2026-11-04 — 안내 fragment 검수 보완 (Codx, 정식 재검수 대기)
+
+- fe60ae35의 P2-2/P3-2를 보완했다. AppShell의 top 초기화 예외는 공유 `GUIDE_FRAGMENT`(`#tool-guide-title`)로 한정한다. 안내 보정은 최초 mount 후 10초 또는 첫 pointerdown/keydown/wheel/touchstart/hashchange에서 영구 종료하며, resize/font/load 이벤트가 시한을 연장하지 않는다. 시한 만료도 observer·예약 frame·모든 listener를 해제한다.
+- 수정 전 빌드의 새 회귀 5건은 비안내 hash 언어 전환 2건과 무입력 종료 1건에서 실패하고 hash 없는 전환 2건은 통과했다. 수정 후 실제 LanguageSwitcher의 한·영 전환에서 hash 유지와 scrollY=0을 함께 확인하고, 무입력 자동 결과 삽입은 실제 observer 해제를 기다린 뒤 검증한다. 기존 안내 좌표·48px 간격·200% 실제 확대·입력 후 보정 해제 단언을 유지했다.
+- P2-1은 비격리 첫 반복 2회차에서 준비 실패 2건을 재현해 원인을 계측했다. 한글 모바일/200% reload 중 localhost WASM/JS/bcmap 요청의 `net::ERR_NETWORK_CHANGED` 뒤 준비 실패 UI가 나타났고, 앵커 좌표 단언 전 실패했다. 원래 Reviewer 1건은 개별 요청 로그가 없어 같은 원인으로 확정하지 않는다. 런타임은 자산 fetch 실패를 준비 실패로 처리하므로, 기존 바깥 locator timeout 메시지와 하위 네트워크 오류는 동시에 성립한다.
+- 시험은 실제 활성 input·선택 버튼을 기다리고 terminal 오류를 즉시 실패시킨다. 로컬 서버 응답은 Playwright HTTP 클라이언트로 받아 원래 상태·헤더·본문 그대로 전달한다(redirect/retry 모두 0, 외부 차단 유지, 네트워크 namespace·전역 설정 변경 없음). 고정 sleep·대체 자산·자동 reload·판정 완화를 넣지 않았다. 실제 자산 응답을 보류한 검사 1건은 준비 해제 후 통과했고, 네트워크 중단 1건과 실제 서버 HTTP 404 1건의 음성 대조는 준비 실패를 검출했다. 제품의 무결성 검사와 네트워크 오류 후 수동 새로고침 동작은 유지한다.
+- HTTP 전달 보완 뒤 9회 207건 중 en text-tools 200% reload 위치 실패 1건을 추가 발견해 보존했다(`scratch/anchor-fix1/pre-scroll/run-09/`). 별도 30건 계측은 모두 통과했지만 scrollIntoView 뒤 browser scroll이 다시 바뀌고 후속 animationend가 수습하는 경쟁 순서를 확인했다. 실패 1건 자체의 이벤트 trace는 없어 세부 순서는 소급 확정하지 않는다. 레이아웃/폰트/애니메이션 완료 뒤 scroll만 변경하는 단위·브라우저 음성 대조가 각각 수정 전 실패했다. 초기 10초 동안 scroll 이벤트도 보정하고 입력/시한 종료 시 함께 해제하도록 수리했다. 만료 뒤 programmatic scroll·자동 결과는 계속 보정하지 않아야 한다.
+- 다음 병렬 묶음 6회 138건 중 언어 전환 표본 1건이 top 위치 단언에 실패했다. 추가 발주를 멈추고 이미 시작한 4~6회는 완료·영수증을 회수했다(`pre-language/`, `parallel-stop.json`). 시험이 URL만 기다리던 공백을 보완해 실제 문서 언어·번역된 안내 제목·폰트·애니메이션 준비 후 geometry를 재도록 했다. 별도 30건 계측은 통과했으나 top 호출 때 URL은 ko, 안내 제목은 아직 영어인 중간 상태를 확인했다. 실패 1건의 상세 순서는 소급 확정하지 않는다. scrollY=0 대기는 넣지 않았으며 top 호출만 막은 유효한 음성 대조 4건은 모두 최종 위치 단언 실패를 검출했다. 최초 잘못된 wrapper 대조는 별도 보존하고 근거에서 제외했다.
+- 최종 소스/동일 dist의 비격리 반복 10회는 최대 3개 동시 실행하되 브라우저·서버 포트·프로필·출력·영수증 task를 분리했다. 23×10=230건 전부 통과, 준비/HTTP/pageerror 0건이다. 기존 안내 180건의 클릭·reload 각180 위치, 새 비안내 이동40·지연 복원10·무입력 자동 결과10, 기존 초기 layout/키보드 해제 각10을 확인했다. unit 1,492+36=1,528(fail/skip/cancel0)·build(112 localized 페이지)·static 종료0이다. 마지막 변경은 build가 소비하지 않는 browser smoke의 실제 번역 준비 조건뿐이며 제품·생성기·의존성 입력과 dist 1,209파일 해시 일치를 확인해 build만 재사용했다. unit/static/최종 반복은 마지막 시험 소스로 실행했다. 1,860입력 해시와 원본 로그·재사용 근거·최종 판정 수치는 `scratch/anchor-fix1/final-proof.json`, `verification.json`, `check-reuse.json`에 있다. push·merge·배포는 수행하지 않았다.

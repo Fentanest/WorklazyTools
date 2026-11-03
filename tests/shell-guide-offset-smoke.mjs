@@ -14,9 +14,17 @@ const views = [
 ];
 const records = [];
 let server, browser, zoomContext, profiles;
-const blockExternal = context => context.route('**/*', route => {
+const blockExternal = context => context.route('**/*', async route => {
   const url = new URL(route.request().url());
-  return !/^https?:$/.test(url.protocol) || url.origin === server.url ? route.continue() : route.abort();
+  if (!/^https?:$/.test(url.protocol)) return route.continue();
+  if (url.origin !== server.url) return route.abort();
+  // Host network-change notifications can cancel Chromium's loopback fetches
+  // mid-preparation. Fetch the real local response through Playwright's HTTP
+  // client, keeping status, headers and bytes; no retry or substitute content.
+  // Browser CSP, runtime integrity checks and readiness assertions still apply.
+  const response = await route.fetch({ maxRedirects: 0, maxRetries: 0 });
+  try { await route.fulfill({ response }); }
+  finally { await response.dispose(); }
 });
 before(async () => {
   await fs.mkdir(output, { recursive: true });
@@ -40,22 +48,233 @@ after(async () => {
 });
 async function ready(page, tool) {
   await page.locator('#tool-guide-title').waitFor();
-  if (tool === 'document-redactor') await page.locator('.redactor-file-picker input[type=file]').waitFor({ timeout: 45000 });
+  if (tool === 'document-redactor') {
+    // The input is sr-only. Wait for the completed engine preparation and
+    // usable picker, and report a terminal preparation failure immediately.
+    await page.waitForFunction(() => {
+      const root = document.querySelector('[data-tool-page="document-redactor"]');
+      const input = root?.querySelector('.redactor-file-picker input[type=file]');
+      return input && !input.disabled || root?.querySelector('[role=alert]');
+    }, null, { timeout: 45000 });
+    assert.equal(await page.locator('[data-tool-page="document-redactor"] [role=alert]').count(), 0, 'redactor preparation failed');
+    assert.equal(await page.locator('.redactor-file-picker input[type=file]').isEnabled(), true);
+    await page.locator('.redactor-file-picker [data-ui-part=drop-target] button:enabled').waitFor();
+  }
   await page.evaluate(async () => {
     await document.fonts.ready;
     await Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
   });
 }
+
+for (const lang of ['ko', 'en']) for (const hash of ['', '#other']) {
+  test(`${lang} language navigation ${hash || 'without hash'} retains top reset`, { timeout: 30000 }, async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
+    await blockExternal(context);
+    const page = await context.newPage();
+    const record = { lang, hash, regression: 'non-guide-route' };
+    diagnostics(page, record);
+    try {
+      await page.goto(`${server.url}/${lang}/tools/text-tools/${hash}`, { waitUntil: 'domcontentloaded' });
+      await ready(page, 'text-tools');
+      await position(page);
+      const next = lang === 'ko' ? 'en' : 'ko';
+      record.before = await page.evaluate(next => {
+        // Dispatch through the real LanguageSwitcher without scrolling its
+        // header control into view before the route reset is exercised.
+        scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+        const y = scrollY;
+        const select = document.querySelector('.wl-topbar select[data-ui-component=language-switcher]');
+        select.value = next;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        return y;
+      }, next);
+      assert.ok(record.before > 100, 'route must start scrolled away from the top');
+      await page.waitForURL(url => url.pathname === `/${next}/tools/text-tools` && url.hash === hash);
+      // History changes before React commits the translated route. Measure
+      // only after its real content, fonts and layout effects are ready.
+      const expectedGuide = JSON.parse(await fs.readFile(`src/locales/${next}/guides.json`, 'utf8')).textTools.title;
+      await page.waitForFunction(({ language, title }) => document.documentElement.lang === language
+        && document.querySelector('#tool-guide-title')?.textContent === title, { language: next, title: expectedGuide });
+      await ready(page, 'text-tools');
+      await position(page);
+      record.after = await page.evaluate(() => ({ y: scrollY, hash: location.hash }));
+      assert.equal(record.after.hash, hash);
+      assert.equal(record.after.y, 0, 'non-guide hash must retain the route top reset');
+      record.passed = true;
+    } catch (error) { record.passed = false; record.error = error.message; throw error; }
+    finally { records.push(record); await context.close(); }
+  });
+}
+
+test('automatic late result cannot reclaim the guide after the initial layout window', { timeout: 30000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 320, height: 640 }, serviceWorkers: 'block' });
+  await blockExternal(context);
+  const page = await context.newPage();
+  const record = { regression: 'automatic-late-result' };
+  diagnostics(page, record);
+  // Observe the actual lifecycle instead of sleeping until an assumed deadline.
+  await trackGuideObserver(page);
+  try {
+    await page.goto(`${server.url}/ko/tools/text-tools/#tool-guide-title`, { waitUntil: 'domcontentloaded' });
+    await ready(page, 'text-tools');
+    record.initial = await position(page); checkHeading(record.initial);
+    await page.waitForFunction(() => window.guideLayoutObserver.started && window.guideLayoutObserver.released, null, { timeout: 15000 });
+    record.before = await page.evaluate(() => {
+      // Remove native browser scroll anchoring from this product-correction test.
+      document.documentElement.style.overflowAnchor = 'none';
+      scrollTo({ top: 0, behavior: 'instant' });
+      return scrollY;
+    });
+    await position(page);
+    await page.evaluate(() => {
+      const result = document.createElement('section');
+      result.textContent = 'Automatic result'; result.style.height = '400px';
+      document.querySelector('.main-content').prepend(result);
+    });
+    record.after = await position(page);
+    assert.equal(record.after.hash, '#tool-guide-title');
+    assert.equal(await page.evaluate(() => scrollY), record.before, 'automatic result must not scroll without user input');
+    assert.ok(record.after.top > record.after.viewport.height, 'late results must not return to the guide');
+    record.passed = true;
+  } catch (error) { record.passed = false; record.error = error.message; throw error; }
+  finally { records.push(record); await context.close(); }
+});
+for (const navigation of ['navigate', 'reload']) for (const y of [0, 320]) {
+  test(`${navigation}: pointerless scroll to ${y} is never reclaimed`, { timeout: 30000 }, async () => {
+    const context = await browser.newContext({ viewport: { width: 320, height: 640 }, serviceWorkers: 'block' });
+    await blockExternal(context);
+    const page = await context.newPage();
+    const record = { regression: 'pointerless-user-scroll', navigation, y };
+    diagnostics(page, record);
+    await trackGuideObserver(page);
+    try {
+      await page.goto(`${server.url}/ko/tools/text-tools/#tool-guide-title`, { waitUntil: 'domcontentloaded' });
+      if (navigation === 'reload') await page.reload({ waitUntil: 'domcontentloaded' });
+      await ready(page, 'text-tools');
+      record.initial = await position(page); checkHeading(record.initial);
+      assert.equal(await page.evaluate(() => window.guideLayoutObserver.released), false, 'must test inside active correction window');
+      record.requested = await page.evaluate(y => {
+        document.documentElement.style.overflowAnchor = 'none';
+        window.scrollTo({ top: y, behavior: 'instant' });
+        return scrollY;
+      }, y);
+      record.afterScroll = await position(page);
+      assert.equal(record.afterScroll.scrollY, record.requested, 'pointerless user scroll must be preserved');
+      assert.equal(await page.evaluate(() => window.guideLayoutObserver.released), true, 'unexpected scroll must immediately disconnect');
+      await page.evaluate(() => {
+        const block = document.createElement('div'); block.style.height = '400px';
+        document.querySelector('.main-content').prepend(block);
+      });
+      record.afterLayout = await position(page);
+      assert.equal(record.afterLayout.scrollY, record.requested, 'release must survive later layout');
+      assert.equal(record.afterLayout.hash, '#tool-guide-title');
+      record.passed = true;
+    } catch (error) { record.passed = false; record.error = error.message; throw error; }
+    finally { records.push(record); await context.close(); }
+  });
+}
+
+async function trackGuideObserver(page) {
+  await page.addInitScript(() => {
+    const NativeObserver = ResizeObserver;
+    window.guideLayoutObserver = { started: false, released: false };
+    window.ResizeObserver = class extends NativeObserver {
+      observe(target, options) {
+        if (target.matches('.main-content')) { this.guide = true; window.guideLayoutObserver.started = true; }
+        super.observe(target, options);
+      }
+      disconnect() {
+        if (this.guide) window.guideLayoutObserver.released = true;
+        super.disconnect();
+      }
+    };
+  });
+}
+
+test('late reload restoration at pageshow is corrected after fonts and animation settle', { timeout: 30000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 320, height: 640 }, serviceWorkers: 'block' });
+  await blockExternal(context);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await context.route('**/restoration-gate.svg', async route => {
+    await gate;
+    await route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>' });
+  });
+  const page = await context.newPage();
+  const record = { regression: 'pageshow-delayed-restoration' };
+  diagnostics(page, record);
+  await trackGuideObserver(page);
+  await page.addInitScript(() => {
+    window.restorationEvents = [];
+    if (performance.getEntriesByType('navigation')[0]?.type !== 'reload') return;
+    document.addEventListener('DOMContentLoaded', () => {
+      // Delay load/pageshow without moving any layout or changing app bytes.
+      const image = document.createElement('img'); image.hidden = true;
+      image.src = '/restoration-gate.svg'; document.body.append(image);
+    });
+    window.addEventListener('pageshow', event => {
+      const before = scrollY;
+      // Simulate the traversal algorithm's scroll step at its actual browser
+      // lifecycle checkpoint, rather than labelling any later scrollTo as history.
+      scrollTo({ top: 0, behavior: 'instant' });
+      window.restorationEvents.push({ trusted: event.isTrusted, before, after: scrollY, type: performance.getEntriesByType('navigation')[0].type });
+    });
+  });
+  try {
+    await page.goto(`${server.url}/ko/tools/text-tools/#tool-guide-title`, { waitUntil: 'load' });
+    await ready(page, 'text-tools'); await position(page);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await ready(page, 'text-tools');
+    record.before = await position(page); checkHeading(record.before);
+    assert.equal(await page.evaluate(() => window.restorationEvents.length), 0, 'pageshow must still be gated');
+    release();
+    await page.waitForFunction(() => window.restorationEvents.length === 1);
+    record.restoration = await page.evaluate(() => window.restorationEvents[0]);
+    assert.equal(record.restoration.trusted, true);
+    assert.equal(record.restoration.type, 'reload');
+    assert.ok(record.restoration.before > 320);
+    assert.equal(record.restoration.after, 0, 'restoration must actually overwrite the scroll');
+    record.after = await position(page); checkHeading(record.after);
+    assert.equal(await page.evaluate(() => window.guideLayoutObserver.released), false);
+    // Its one-shot exception ends at the correction paint. The same bare
+    // scrollTo(0) now represents the user and must permanently release us.
+    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+    record.userScroll = await position(page);
+    assert.equal(record.userScroll.scrollY, 0);
+    assert.equal(await page.evaluate(() => window.guideLayoutObserver.released), true);
+    record.passed = true;
+  } catch (error) { record.passed = false; record.error = error.message; throw error; }
+  finally { release(); records.push(record); await context.close(); }
+});
+function diagnostics(page, record) {
+  record.diagnostics = [];
+  const log = (kind, details) => record.diagnostics.push({ kind, at: Date.now(), stage: record.stage, ...details });
+  page.on('pageerror', error => log('pageerror', { message: error.message }));
+  page.on('requestfailed', request => log('requestfailed', { url: request.url(), error: request.failure()?.errorText }));
+  page.on('response', response => { if (!response.ok()) log('http-error', { url: response.url(), status: response.status() }); });
+  page.on('worker', worker => log('worker', { url: worker.url() }));
+}
+async function preparationState(page) {
+  return page.evaluate(() => ({
+    url: location.href, readyState: document.readyState, fonts: document.fonts.status,
+    inert: document.documentElement.inert,
+    isolation: Boolean(document.querySelector('meta[name="worklazy-redactor-isolation"]')),
+    picker: Boolean(document.querySelector('.redactor-file-picker input[type=file]:enabled')),
+    messages: [...document.querySelectorAll('[role=status],[role=alert]')].map(el => el.textContent),
+    resources: performance.getEntriesByType('resource').map(r => ({ name: r.name, duration: r.duration, bytes: r.transferSize })),
+  })).catch(error => ({ error: error.message }));
+}
 async function position(page) {
-  await page.waitForTimeout(600);
-  // Native smooth scrolling can still be moving at 600ms on tall 200% pages.
-  // Measure its settled endpoint without changing the geometry assertions.
+  // Wait for painted geometry, not a fixed sleep or the desired destination.
+  // A wrong but settled endpoint must still fail checkHeading below.
   await page.evaluate(async () => {
-    let previous = scrollY, stable = 0;
+    let previous, stable = 0;
     for (let frame = 0; frame < 150; frame++) {
       await new Promise(requestAnimationFrame);
-      stable = Math.abs(scrollY - previous) < 0.1 ? stable + 1 : 0;
-      previous = scrollY;
+      const rect = document.querySelector('#tool-guide-title').getBoundingClientRect();
+      const geometry = [scrollY, rect.top, rect.bottom, document.documentElement.scrollHeight, innerHeight];
+      stable = document.fonts.status === 'loaded' && previous && geometry.every((n, i) => Math.abs(n - previous[i]) < 0.1) ? stable + 1 : 0;
+      previous = geometry;
       if (stable >= 5) return;
     }
     throw new Error('Anchor scroll did not settle');
@@ -66,7 +285,7 @@ async function position(page) {
     const headers = [...document.querySelectorAll('.wl-topbar,.mobile-header,.app-topbar')].filter(el =>
       el.getClientRects().length && ['fixed', 'sticky'].includes(getComputedStyle(el).position));
     const headerBottom = Math.max(0, ...headers.map(el => el.getBoundingClientRect().bottom));
-    return { count: document.querySelectorAll('#tool-guide-title').length, top: rect.top, bottom: rect.bottom,
+    return { count: document.querySelectorAll('#tool-guide-title').length, top: rect.top, bottom: rect.bottom, scrollY,
       headerBottom, gap: rect.top - headerBottom, viewport: { width: innerWidth, height: innerHeight },
       outerWidth, dpr: devicePixelRatio, scale: visualViewport.scale, hash: location.hash,
       padding: getComputedStyle(document.documentElement).scrollPaddingBlockStart,
@@ -85,7 +304,9 @@ for (const lang of ['ko', 'en']) for (const tool of ['text-tools', 'payroll-calc
     const context = view.zoom ? zoomContext : await browser.newContext({ viewport: { width: view.width, height: view.height }, serviceWorkers: 'block' });
     if (!view.zoom) await blockExternal(context);
     const page = await context.newPage(); const record = { lang, tool, view: view.name };
+    diagnostics(page, record);
     try {
+      record.stage = 'initial-preparation';
       await page.goto(`${server.url}/${lang}/tools/${tool}/`, { waitUntil: 'domcontentloaded' });
       await ready(page, tool);
       await page.locator('a[href="#tool-guide-title"]').first().click();
@@ -99,11 +320,35 @@ for (const lang of ['ko', 'en']) for (const tool of ['text-tools', 'payroll-calc
         const image = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
         await fs.writeFile(path.join(output, `${lang}-${tool}-${view.name}.png`), Buffer.from(image.data, 'base64'));
       } finally { await cdp.detach(); }
+      record.stage = 'fragment-reload-preparation';
       await page.reload({ waitUntil: 'domcontentloaded' }); await ready(page, tool);
+      record.stage = 'fragment-geometry';
       record.directFragment = await position(page);
       checkHeading(record.click); checkHeading(record.directFragment);
+      if (lang === 'ko' && tool === 'document-redactor' && view.name === 'mobile-320') {
+        // Force a late layout change after entry has already settled. Then
+        // verify that keyboard navigation releases alignment, even with the
+        // guide hash still present and another layout change afterwards.
+        await page.evaluate(() => {
+          const block = document.createElement('div');
+          block.id = 'guide-layout-regression'; block.style.height = '200px';
+          document.querySelector('.main-content').prepend(block);
+        });
+        record.lateLayout = await position(page); checkHeading(record.lateLayout);
+        await page.keyboard.press('Control+Home');
+        record.userScroll = await position(page);
+        assert.ok(record.userScroll.top > record.userScroll.viewport.height, 'keyboard navigation must leave the guide');
+        await page.evaluate(() => { document.getElementById('guide-layout-regression').style.height = '400px'; });
+        record.releasedLayout = await position(page);
+        assert.equal(record.releasedLayout.hash, '#tool-guide-title');
+        assert.ok(record.releasedLayout.top > record.releasedLayout.viewport.height, 'later layout must not steal the viewport from the user');
+      }
       record.passed = true;
-    } catch (error) { record.passed = false; record.error = error.message; throw error; }
-    finally { records.push(record); await page.close(); if (!view.zoom) await context.close(); }
+    } catch (error) { record.passed = false; record.error = error.message; record.preparation = await preparationState(page); throw error; }
+    finally {
+      records.push(record);
+      await fs.writeFile(path.join(output, 'results.json'), JSON.stringify(records, null, 2));
+      await page.close(); if (!view.zoom) await context.close();
+    }
   });
 }

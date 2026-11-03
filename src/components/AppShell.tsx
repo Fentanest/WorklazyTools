@@ -1,6 +1,7 @@
 import { PERSONALIZATION_KEYS, personalization, toolIdForPersonalization } from "../app/personalization";
 import { purgeExpired } from "../app/persistentHandoff";
 import { revealShellFocus, revealShellTab } from "../app/shellFocus";
+import { GUIDE_FRAGMENT } from "../app/guideFragment";
 import { FileDropProvider } from "./FileDropProvider";
 import { isVideoDirectPath, videoParentAssetUrl } from "../features/video-studio/videoDirectPaths";
 import { isRedactorDocument, isRedactorPath } from "../app/redactorIsolation";
@@ -385,7 +386,9 @@ export function AppShell() {
 
   useEffect(() => {
     setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Only guide entry owns its destination during lazy tool hydration.
+    // Other hashes (also preserved by LanguageSwitcher) retain the route's top reset.
+    if (window.location.hash !== GUIDE_FRAGMENT) window.scrollTo({ top: 0, behavior: "smooth" });
   }, [location.pathname]);
 
   useEffect(() => {
