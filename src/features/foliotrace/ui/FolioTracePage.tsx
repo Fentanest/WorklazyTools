@@ -27,6 +27,10 @@ import {
   eventRangeOf,
   exclusionReasonLabel,
   filingChangesForHoldings,
+  filingChangesForEvents,
+  compareFilingOrder,
+  formatFilingDelta,
+  filingDeltaLabel,
   filterHoldings,
   formatKstTimestamp,
   formatCount,
@@ -118,7 +122,8 @@ const STR = {
     marketTabs: "보유 종목 시장 선택",
     marketReferenceOld: "시장 구분 자료가 평가일보다 {days}일 오래되었습니다. 출처 기준일 {reference} · 평가일 {valuation}. 최근 이전상장 등은 KRX에서 확인해 주세요.",
     tableUnavailable: "—는 확인된 평가 금액이 없다는 뜻입니다. 종목명 아래에서 제외 사유를 확인하세요.",
-    tableChangeNote: "같은 종목의 직전 공시 숫자보다 크면 빨강, 작으면 파랑으로 표시합니다. 첫 확인·비교 불가 값은 기본색이며, 색이 실제 매매를 뜻하지는 않습니다.",
+    tableChangeNote: "같은 종목의 직전 공시와 비교해 수량·지분율을 각각 표시합니다. 증가는 빨강, 감소는 파랑이며 지분율 차이는 %p입니다. 첫 확인·비교 불가·동일 값은 기본색이며, 색이 실제 매매를 뜻하지는 않습니다.",
+    tableDetailNote: "좁은 표에서는 평가금액·종가·비중·기준일을 폭에 따라 생략합니다. 종목명을 누르면 모든 수치와 접수일·제외 사유를 볼 수 있습니다.",
     changeUp: "직전 공시 수치보다 증가",
     changeDown: "직전 공시 수치보다 감소",
     searchLabel: "종목명·종목코드 검색",
@@ -139,6 +144,7 @@ const STR = {
     colName: "종목",
     colQuantity: "공시 수량",
     colOwnership: "회사 지분율",
+    colOwnershipShort: "지분율",
     colClose: "정규장 종가·기준일",
     colValue: "추정 금액",
     colWeight: "평가 금액 비중",
@@ -199,7 +205,7 @@ const STR = {
     sourceTextRead: "공시 원문 판독",
     unknownDate: "기준일 모름",
     eventsTitle: "최근 공시 변화",
-    eventsDesc: "공시 {total}건에서 종목별 최신 {shown}건을 표시합니다. 접수일·접수번호가 큰 순서이며 정정·철회도 포함합니다. 종목명을 누르면 이전 공시를 볼 수 있습니다. 수량·지분율은 공시에 적힌 값입니다.",
+    eventsDesc: "공시 {total}건에서 종목별 최신 {shown}건을 표시합니다. 기준일·접수일·접수번호가 큰 순서이며 정정·철회도 포함합니다. 종목명을 누르면 이전 공시를 볼 수 있습니다. 수량·지분율은 공시에 적힌 값입니다.",
     eventCorrection: "정정·철회 공시",
     eventOlderBasis: "현재 보유값보다 과거 기준일",
     eventsVisible: "최신 {total}건 중 {shown}건 표시",
@@ -333,7 +339,8 @@ const STR = {
     marketTabs: "Select holdings market",
     marketReferenceOld: "Listing-market data is {days} days older than the valuation date (reference {reference}; valuation {valuation}). Check KRX for recent listing changes.",
     tableUnavailable: "— means no verified valuation is available. See the exclusion reason under the security name.",
-    tableChangeNote: "Reported numbers appear red when above the previous filing for the same security and blue when below it. First reports and incomparable values keep the usual color; colors do not establish a trade.",
+    tableChangeNote: "Quantity and ownership are compared independently with the previous filing for the same security: red for increases, blue for decreases. Ownership differences use percentage points (%p). First reports, incomparable and unchanged values keep the usual color; colors do not establish a trade.",
+    tableDetailNote: "Narrow tables hide value, price, weight and holding date as space requires. Select a name for all figures, receipt date and exclusion details.",
     changeUp: "Higher than the previous filing",
     changeDown: "Lower than the previous filing",
     searchLabel: "Search name / stock code",
@@ -354,6 +361,7 @@ const STR = {
     colName: "Security",
     colQuantity: "Filed quantity",
     colOwnership: "Company ownership",
+    colOwnershipShort: "Ownership",
     colClose: "Regular close · date",
     colValue: "Estimated value",
     colWeight: "Share of valued total",
@@ -414,7 +422,7 @@ const STR = {
     sourceTextRead: "Disclosure text reading",
     unknownDate: "Unknown (no holding date)",
     eventsTitle: "Recent filing changes",
-    eventsDesc: "Showing {shown} latest filings by stock from {total} records, newest receipt date then receipt number first, including corrections and withdrawals. Select a name for earlier filings. Quantities and percentages are as reported.",
+    eventsDesc: "Showing {shown} latest filings by stock from {total} records, newest basis date, receipt date, then receipt number first, including corrections and withdrawals. Select a name for earlier filings. Quantities and percentages are as reported.",
     eventCorrection: "Correction/withdrawal filing",
     eventOlderBasis: "Earlier basis than current holding",
     eventsVisible: "Showing {shown} of {total} latest filings",
@@ -547,31 +555,33 @@ function breakableValue(text: string): ReactNode {
   );
 }
 
-function FilingChangeValue({ value, direction, upLabel, downLabel }: {
+function FilingChangeValue({ value, direction, delta, metric, lang }: {
   value: string;
   direction: FilingChangeDirection;
-  upLabel: string;
-  downLabel: string;
+  delta: string | null;
+  metric: "quantity" | "ownership";
+  lang: Lang;
 }) {
-  if (direction === null) return value;
-  const label = direction === "up" ? upLabel : downLabel;
+  if (delta === null) return value;
+  const label = filingDeltaLabel(delta, metric, lang);
   return (
-    <span className={`foliotrace-change-${direction}`} title={label}>
-      <span aria-hidden="true">{direction === "up" ? "↑ " : "↓ "}</span>
-      {value}<span className="sr-only"> · {label}</span>
+    <span className={direction ? `foliotrace-change-${direction}` : undefined} title={label}>
+      {value}{" "}<small className="foliotrace-change-delta" aria-hidden="true">({formatFilingDelta(delta, metric, lang)})</small>
+      <span className="sr-only"> · {label}</span>
     </span>
   );
 }
 
 function subscribePhone(callback: () => void): () => void {
-  const query = window.matchMedia("(max-width: 640px)");
+  const query = window.matchMedia("(max-width: 1023px)");
   query.addEventListener("change", callback);
   return () => query.removeEventListener("change", callback);
 }
 
-/** True at phone width: the holdings table becomes a two-line list. */
+/** Preserve cards on mobile and intermediate widths. At 1024px the two market
+ * tables can retain readable names and figures by omitting secondary columns. */
 function useIsPhone(): boolean {
-  return useSyncExternalStore(subscribePhone, () => window.matchMedia("(max-width: 640px)").matches, () => false);
+  return useSyncExternalStore(subscribePhone, () => window.matchMedia("(max-width: 1023px)").matches, () => false);
 }
 
 function subscribeMarketWidth(callback: () => void): () => void {
@@ -707,6 +717,7 @@ function ReadyView({
     () => filingChangesForHoldings(snapshot.holdings, snapshot.events),
     [snapshot.holdings, snapshot.events],
   );
+  const eventChanges = useMemo(() => filingChangesForEvents(snapshot.events), [snapshot.events]);
 
   const topWeights = useMemo(() => topHoldings(snapshot.holdings), [snapshot.holdings]);
   const top10 = useMemo(() => topHoldings(snapshot.holdings, 10), [snapshot.holdings]);
@@ -742,8 +753,7 @@ function ReadyView({
   const visibleLatestEvents = showAllFilings ? latestEvents : latestEvents.slice(0, LATEST_FILINGS_PREVIEW);
   const recentEvents = useMemo(
     () => [...snapshot.events]
-      .sort((a, b) => (b.basisDate ?? b.receiptDate).localeCompare(a.basisDate ?? a.receiptDate) ||
-        b.receiptNo.localeCompare(a.receiptNo))
+      .sort((a, b) => compareFilingOrder(b, a))
       .slice(0, 30),
     [snapshot.events],
   );
@@ -771,8 +781,7 @@ function ReadyView({
   const selectedCorpCode = selected?.corpCode ?? selectedEvent?.corpCode;
   const selectedEvents = useMemo(
     () => (selectedCorpCode ? snapshot.events.filter((e) => e.corpCode === selectedCorpCode)
-      .sort((a, b) => (b.basisDate ?? b.receiptDate).localeCompare(a.basisDate ?? a.receiptDate) ||
-        b.receiptNo.localeCompare(a.receiptNo)) : []),
+      .sort((a, b) => compareFilingOrder(b, a)) : []),
     [selectedCorpCode, snapshot.events],
   );
   const recentObservations = useMemo(
@@ -902,7 +911,7 @@ function ReadyView({
               <p className="foliotrace-state-text" role="status">
                 <strong>{t.searchNoResults}</strong> {t.searchNoResultsDesc}
               </p>
-            ) : (isPhone || market === "KOSPI" || market === "KOSDAQ") ? (
+            ) : isPhone ? (
               <ul className="foliotrace-mlist">
                 {filtered.map((h) => {
                   const change = filingChanges.get(h);
@@ -915,10 +924,10 @@ function ReadyView({
                         <span className="foliotrace-mrow-value foliotrace-num">{amountText(h)}</span>
                         <span className="foliotrace-mrow-sub foliotrace-num">
                           <FilingChangeValue value={`${formatQty(h.quantity)}${lang === "ko" ? t.mQty : ` ${t.mQty}`}`}
-                            direction={change?.quantity ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
+                            direction={change?.quantity ?? null} delta={change?.quantityDelta ?? null} metric="quantity" lang={lang} />
                           {" · "}{t.mOwn}{" "}
                           <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind, true)}
-                            direction={change?.ownership ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
+                            direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null} metric="ownership" lang={lang} />
                         </span>
                         <span className="foliotrace-mrow-weight foliotrace-num">{t.mWeight} {formatPctShort(h.portfolioWeightPercent)}</span>
                         <span className="foliotrace-mrow-note">{t.colClose}: {h.quote ? `${formatKrw(h.quote.close, lang)} · ${h.quote.tradeDate}` : "—"}</span>
@@ -934,16 +943,16 @@ function ReadyView({
               </ul>
             ) : (
               <div className="foliotrace-table-wrap">
-                <table className="foliotrace-table">
+                <table className="foliotrace-table" aria-label={`${marketLabels[market]} ${t.tableAll}`}>
                   <thead>
                     <tr>
                       <th scope="col">{t.colName}</th>
-                      <th scope="col" className="foliotrace-num">{t.colQuantity}</th>
-                      <th scope="col" className="foliotrace-num">{t.colOwnership}</th>
-                      <th scope="col" className="foliotrace-num">{t.colCloseShort}</th>
-                      <th scope="col" className="foliotrace-num">{t.colValue}</th>
-                      <th scope="col" className="foliotrace-num">{t.colWeight}</th>
-                      <th scope="col">{t.colHoldingDate}</th>
+                      <th scope="col" className="foliotrace-num foliotrace-col-quantity">{t.colQuantity}</th>
+                      <th scope="col" className="foliotrace-num foliotrace-col-ownership" title={t.colOwnership}>{t.colOwnershipShort}</th>
+                      <th scope="col" className="foliotrace-num foliotrace-col-close">{t.colCloseShort}</th>
+                      <th scope="col" className="foliotrace-num foliotrace-col-value">{t.colValue}</th>
+                      <th scope="col" className="foliotrace-num foliotrace-col-weight" title={t.colWeight}>{t.mWeight}</th>
+                      <th scope="col" className="foliotrace-col-date">{t.colHoldingDate}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -952,34 +961,34 @@ function ReadyView({
                       return (
                         <tr key={h.stockCode} onClick={() => setSelectedCode(h.stockCode)}>
                           <th scope="row">
-                            <button type="button" className="foliotrace-name-btn" onClick={() => setSelectedCode(h.stockCode)}
+                            <button type="button" className="foliotrace-name-btn" title={`${h.name} · ${h.stockCode}`} onClick={() => setSelectedCode(h.stockCode)}
                               aria-label={`${h.name} ${h.stockCode} ${t.detailButton}`}>
                               {h.name}
-                            </button>{" "}
-                            <span className="foliotrace-code-plain foliotrace-num">{h.stockCode}</span>
+                            </button>
+                            <span className="foliotrace-code-plain foliotrace-num foliotrace-table-code">{h.stockCode}</span>
                             {h.quantityAdjustment && (
-                              <small className="foliotrace-row-reason foliotrace-marker" title={t.ratioMarkerTitle}>
+                              <small className="foliotrace-row-reason foliotrace-marker" title={`${t.ratioMarkerTitle} · ${ratioLineText(t, h.quantityAdjustment)}`}>
                                 {ratioLineText(t, h.quantityAdjustment)}
                               </small>
                             )}
-                            {reasons.map((reason) => <small key={reason} className="foliotrace-row-reason">{reason}</small>)}
+                            {reasons.map((reason) => <small key={reason} className="foliotrace-row-reason" title={reason}>{reason}</small>)}
                           </th>
                           <td className="foliotrace-num">
                             <FilingChangeValue value={formatQty(h.quantity)} direction={filingChanges.get(h)?.quantity ?? null}
-                              upLabel={t.changeUp} downLabel={t.changeDown} />
+                              delta={filingChanges.get(h)?.quantityDelta ?? null} metric="quantity" lang={lang} />
                           </td>
                           <td className="foliotrace-num" title={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}>
                             <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind, true)}
-                              direction={filingChanges.get(h)?.ownership ?? null} upLabel={t.changeUp} downLabel={t.changeDown} />
+                              direction={filingChanges.get(h)?.ownership ?? null} delta={filingChanges.get(h)?.ownershipDelta ?? null} metric="ownership" lang={lang} />
                           </td>
-                          <td className="foliotrace-num" title={h.quote ? `${t.detailPrice}: ${h.quote.tradeDate}` : undefined}>
+                          <td className="foliotrace-num foliotrace-col-close" title={h.quote ? `${t.detailPrice}: ${h.quote.tradeDate}` : undefined}>
                             {h.quote ? formatKrw(h.quote.close, lang) : "—"}
                           </td>
-                          <td className="foliotrace-num foliotrace-strong" title={h.estimatedValue === null ? undefined : formatKrw(h.estimatedValue, lang)}>
+                          <td className="foliotrace-num foliotrace-strong foliotrace-col-value" title={h.estimatedValue === null ? undefined : formatKrw(h.estimatedValue, lang)}>
                             {amountText(h)}
                           </td>
-                          <td className="foliotrace-num" title={formatPct(h.portfolioWeightPercent)}>{formatPctShort(h.portfolioWeightPercent)}</td>
-                          <td className="foliotrace-receipt-date" title={`${t.eventReceipt}: ${h.receiptDate}`}>{h.holdingDate ?? t.unknownDate}</td>
+                          <td className="foliotrace-num foliotrace-col-weight" title={formatPct(h.portfolioWeightPercent)}>{formatPctShort(h.portfolioWeightPercent)}</td>
+                          <td className="foliotrace-receipt-date foliotrace-col-date" title={`${t.eventReceipt}: ${h.receiptDate}`}>{h.holdingDate ?? t.unknownDate}</td>
                         </tr>
                       );
                     })}
@@ -988,7 +997,7 @@ function ReadyView({
               </div>
             )}
             <p className="foliotrace-note">{t.tableUnavailable}</p>
-            <p className="foliotrace-note">{t.tableChangeNote}</p>
+            <p className="foliotrace-note">{t.tableChangeNote} {t.tableDetailNote}</p>
           </>
         )}
       </section>
@@ -1149,19 +1158,20 @@ function ReadyView({
             ) : (
               <ul className="foliotrace-recent">
                 {recentSummary.map((event) => {
-                  const direction: FilingChangeDirection = event.kind === "increase" ? "up" : event.kind === "decrease" ? "down" : null;
+                  const change = eventChanges.get(event);
                   return (
                     <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.kind}`}>
                       <span className="foliotrace-recent-date foliotrace-num">{eventDate(event)}</span>
                       <span className="foliotrace-recent-name">
                         {eventName(event)}
-                        {direction === null && <small>{event.kind === "tracking-reentry" && event.source === "indirect-observation" ?
+                        {!change?.quantity && !change?.ownership && <small>{event.kind === "tracking-reentry" && event.source === "indirect-observation" ?
                           t.eventIndirectReentry : EVENT_KIND[lang][event.kind]}</small>}
                       </span>
                       <span className="foliotrace-recent-value foliotrace-num">
-                        <FilingChangeValue
-                          value={event.companyOwnershipPercent === null ? "—" : observedPercent(event.companyOwnershipPercent, event.numericKind, true)}
-                          direction={direction} upLabel={t.changeUp} downLabel={t.changeDown} />
+                        <span><FilingChangeValue value={`${formatQty(event.quantity)}${lang === "ko" ? "주" : " shares"}`}
+                          direction={change?.quantity ?? null} delta={change?.quantityDelta ?? null} metric="quantity" lang={lang} /></span>
+                        <span><FilingChangeValue value={observedPercent(event.companyOwnershipPercent, event.numericKind, true)}
+                          direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null} metric="ownership" lang={lang} /></span>
                       </span>
                     </li>
                   );
@@ -1262,6 +1272,7 @@ function ReadyView({
           <ul className="foliotrace-events" id="foliotrace-latest-list">
             {visibleLatestEvents.map((event) => {
               const currentName = currentNameByCorpCode.get(event.corpCode);
+              const change = eventChanges.get(event);
               return (
                 <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}:${event.kind}:${event.basisDate ?? ""}`}>
                   <div className="foliotrace-event-heading">
@@ -1276,8 +1287,10 @@ function ReadyView({
                       t.eventIndirectReentry : EVENT_KIND[lang][event.kind]}</span>
                   </div>
                   <div className="foliotrace-event-values">
-                    <span>{t.eventQuantity}: <span className="foliotrace-num">{event.quantity === null ? t.eventUnknown : formatQty(event.quantity)}</span></span>
-                    <span>{t.eventOwnership}: <span className="foliotrace-num">{event.companyOwnershipPercent === null ? t.eventUnknown : observedPercent(event.companyOwnershipPercent, event.numericKind)}</span></span>
+                    <span>{t.eventQuantity}: <span className="foliotrace-num"><FilingChangeValue value={event.quantity === null ? t.eventUnknown : formatQty(event.quantity)}
+                      direction={change?.quantity ?? null} delta={change?.quantityDelta ?? null} metric="quantity" lang={lang} /></span></span>
+                    <span>{t.eventOwnership}: <span className="foliotrace-num"><FilingChangeValue value={event.companyOwnershipPercent === null ? t.eventUnknown : observedPercent(event.companyOwnershipPercent, event.numericKind)}
+                      direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null} metric="ownership" lang={lang} /></span></span>
                     {event.percentagePointChange != null && <span>{t.eventPointChange.replace("{amount}", String(event.percentagePointChange))}</span>}
                   </div>
                   <div className="foliotrace-event-source">
@@ -1369,7 +1382,8 @@ function ReadyView({
             <dl className="foliotrace-detail-list">
               <div>
                 <dt>{selected.quantityAdjustment ? t.adjustedQuantity : t.colQuantity}</dt>
-                <dd className="foliotrace-num">{formatQty(selected.quantity)}</dd>
+                <dd className="foliotrace-num"><FilingChangeValue value={formatQty(selected.quantity)}
+                  direction={filingChanges.get(selected)?.quantity ?? null} delta={filingChanges.get(selected)?.quantityDelta ?? null} metric="quantity" lang={lang} /></dd>
               </div>
               {selected.quantityAdjustment && (
                 <>
@@ -1415,7 +1429,8 @@ function ReadyView({
               </div>
               <div>
                 <dt>{t.colOwnership}</dt>
-                <dd className="foliotrace-num">{observedPercent(selected.companyOwnershipPercent, selected.ownershipNumericKind)}</dd>
+                <dd className="foliotrace-num"><FilingChangeValue value={observedPercent(selected.companyOwnershipPercent, selected.ownershipNumericKind)}
+                  direction={filingChanges.get(selected)?.ownership ?? null} delta={filingChanges.get(selected)?.ownershipDelta ?? null} metric="ownership" lang={lang} /></dd>
               </div>
               <div>
                 <dt>{t.detailHoldingDate}</dt>

@@ -175,6 +175,8 @@ export type FilingChangeDirection = "up" | "down" | null;
 export interface FilingValueChanges {
   quantity: FilingChangeDirection;
   ownership: FilingChangeDirection;
+  quantityDelta: string | null;
+  ownershipDelta: string | null;
 }
 
 const DIRECT_EVENT_SOURCES = new Set<FilingEvent["source"]>([
@@ -184,12 +186,67 @@ const DIRECT_HOLDING_EVIDENCE = new Set<Holding["evidence"]>([
   "legacy-import", "dart-structured", "dart-document",
 ]);
 
-function reportedDirection(current: string | null, previous: string | null): FilingChangeDirection {
+/** Exact decimal subtraction, including quantities above Number.MAX_SAFE_INTEGER. */
+export function reportedDelta(current: string | null, previous: string | null): string | null {
   const currentValue = parseDecimal(current);
   const previousValue = parseDecimal(previous);
   if (currentValue === null || previousValue === null) return null;
-  const order = compareParsed(currentValue, previousValue);
-  return order > 0 ? "up" : order < 0 ? "down" : null;
+  const scale = Math.max(currentValue.frac.length, previousValue.frac.length);
+  const scaled = (value: ParsedDecimal) => BigInt(value.int + value.frac.padEnd(scale, "0")) * (value.neg ? -1n : 1n);
+  const difference = scaled(currentValue) - scaled(previousValue);
+  const digits = (difference < 0n ? -difference : difference).toString().padStart(scale + 1, "0");
+  const fraction = scale ? digits.slice(-scale).replace(/0+$/, "") : "";
+  return `${difference < 0n ? "-" : ""}${scale ? digits.slice(0, -scale) : digits}${fraction ? `.${fraction}` : ""}`;
+}
+
+function deltaDirection(delta: string | null): FilingChangeDirection {
+  return delta === null || delta === "0" ? null : delta.startsWith("-") ? "down" : "up";
+}
+
+export function formatFilingDelta(delta: string, metric: "quantity" | "ownership", lang: Lang): string {
+  const sign = delta.startsWith("-") ? "−" : delta === "0" ? "" : "+";
+  const amount = formatQty(delta.replace(/^-/, ""));
+  return `${sign}${amount}${metric === "ownership" ? "%p" : lang === "ko" ? "주" : " shares"}`;
+}
+
+export function filingDeltaLabel(delta: string, metric: "quantity" | "ownership", lang: Lang): string {
+  const label = metric === "quantity" ? (lang === "ko" ? "수량" : "Quantity") : (lang === "ko" ? "지분율" : "Ownership");
+  return `${label} ${formatFilingDelta(delta, metric, lang)}`;
+}
+
+/** Pipeline observation order: basis date → receipt date → receipt number.
+ * Older snapshots without a basis date fall back to their receipt date. */
+export function compareFilingOrder(a: FilingEvent, b: FilingEvent): number {
+  return (a.basisDate ?? a.receiptDate).localeCompare(b.basisDate ?? b.receiptDate) ||
+    a.receiptDate.localeCompare(b.receiptDate) || a.receiptNo.localeCompare(b.receiptNo);
+}
+
+/** Raw reported events only; corrections, first reports and indirect estimates stay neutral. */
+export function filingChangesForEvents(events: FilingEvent[]): Map<FilingEvent, FilingValueChanges> {
+  const bySecurity = new Map<string, FilingEvent[]>();
+  for (const event of events) {
+    if (!event.stockCode || !DIRECT_EVENT_SOURCES.has(event.source)) continue;
+    const key = `${event.corpCode}:${event.stockCode}`;
+    const filings = bySecurity.get(key) ?? [];
+    filings.push(event);
+    bySecurity.set(key, filings);
+  }
+  const changes = new Map<FilingEvent, FilingValueChanges>();
+  for (const filings of bySecurity.values()) {
+    filings.sort(compareFilingOrder);
+    for (let index = 1; index < filings.length; index++) {
+      const current = filings[index], previous = filings[index - 1];
+      if (current.isCorrectionOrWithdrawal !== false || previous.isCorrectionOrWithdrawal !== false ||
+          current.correctionOf || previous.correctionOf ||
+          current.kind === "new-report" || current.kind === "tracking-reentry") continue;
+      const quantityDelta = reportedDelta(current.quantity, previous.quantity);
+      const exactOwnership = (current.numericKind == null || current.numericKind === "exact") &&
+        (previous.numericKind == null || previous.numericKind === "exact");
+      const ownershipDelta = exactOwnership ? reportedDelta(current.companyOwnershipPercent, previous.companyOwnershipPercent) : null;
+      changes.set(current, { quantity: deltaDirection(quantityDelta), ownership: deltaDirection(ownershipDelta), quantityDelta, ownershipDelta });
+    }
+  }
+  return changes;
 }
 
 function sameReportedValue(left: string | null, right: string | null): boolean {
@@ -206,40 +263,29 @@ function sameReportedValue(left: string | null, right: string | null): boolean {
 export function filingChangesForHoldings(
   holdings: Holding[], events: FilingEvent[],
 ): Map<Holding, FilingValueChanges> {
-  const bySecurity = new Map<string, FilingEvent[]>();
+  const latestBySecurity = new Map<string, FilingEvent>();
   for (const event of events) {
     if (!event.stockCode || !DIRECT_EVENT_SOURCES.has(event.source)) continue;
     const key = `${event.corpCode}:${event.stockCode}`;
-    const filings = bySecurity.get(key) ?? [];
-    filings.push(event);
-    bySecurity.set(key, filings);
+    const prior = latestBySecurity.get(key);
+    if (!prior || compareFilingOrder(event, prior) > 0) latestBySecurity.set(key, event);
   }
-  for (const filings of bySecurity.values()) filings.sort((a, b) => a.receiptNo.localeCompare(b.receiptNo));
-
+  const eventChanges = filingChangesForEvents(events);
   const changes = new Map<Holding, FilingValueChanges>();
   for (const holding of holdings) {
     if (!DIRECT_HOLDING_EVIDENCE.has(holding.evidence)) continue;
-    const filings = bySecurity.get(`${holding.corpCode}:${holding.stockCode}`);
-    if (!filings || filings.length < 2) continue;
-    const currentIndex = filings.findIndex((event) => event.receiptNo === holding.receiptNo);
-    if (currentIndex < 1 || currentIndex !== filings.length - 1) continue;
+    const current = latestBySecurity.get(`${holding.corpCode}:${holding.stockCode}`);
+    if (!current || current.receiptNo !== holding.receiptNo) continue;
     // Ratio-adjusted quantities are estimates, not reported figures: never colour them as a trade.
     if (holding.quantityAdjustment) continue;
-    const current = filings[currentIndex];
-    const previous = filings[currentIndex - 1];
-    // A first/re-entry report establishes a position. Missing receipt flags
-    // and corrections must stay neutral, including in older snapshots.
-    if (current.isCorrectionOrWithdrawal !== false || previous.isCorrectionOrWithdrawal !== false ||
-        current.correctionOf || previous.correctionOf ||
-        current.kind === "new-report" || current.kind === "tracking-reentry") continue;
-    const quantity = sameReportedValue(holding.quantity, current.quantity)
-      ? reportedDirection(holding.quantity, previous.quantity) : null;
+    const change = eventChanges.get(current);
+    if (!change) continue;
+    const quantityDelta = sameReportedValue(holding.quantity, current.quantity) ? change.quantityDelta : null;
     const exactOwnership = (holding.ownershipNumericKind == null || holding.ownershipNumericKind === "exact") &&
-      (current.numericKind == null || current.numericKind === "exact") &&
-      (previous.numericKind == null || previous.numericKind === "exact");
-    const ownership = exactOwnership && sameReportedValue(holding.companyOwnershipPercent, current.companyOwnershipPercent)
-      ? reportedDirection(holding.companyOwnershipPercent, previous.companyOwnershipPercent) : null;
-    if (quantity || ownership) changes.set(holding, { quantity, ownership });
+      sameReportedValue(holding.companyOwnershipPercent, current.companyOwnershipPercent);
+    const ownershipDelta = exactOwnership ? change.ownershipDelta : null;
+    const quantity = deltaDirection(quantityDelta), ownership = deltaDirection(ownershipDelta);
+    if (quantity || ownership) changes.set(holding, { quantity, ownership, quantityDelta, ownershipDelta });
   }
   return changes;
 }
@@ -455,9 +501,9 @@ export interface EventRange {
 }
 
 /**
- * A display-only projection: latest receipt date, then receipt number, per
- * security (company fallback only when its stock code is unknown). Corrections
- * and withdrawals participate normally, even if their holding date is older.
+ * A display-only projection in pipeline observation order (basis date,
+ * receipt date, receipt number), per security; company fallback for unknown codes.
+ * Corrections and withdrawals participate normally in the same order.
  * Keep the original objects/array for the complete disclosure history.
  */
 export function latestFilingsByStock(events: readonly FilingEvent[]): FilingEvent[] {
@@ -465,13 +511,11 @@ export function latestFilingsByStock(events: readonly FilingEvent[]): FilingEven
   for (const event of events) {
     const key = event.stockCode ? `stock:${event.stockCode}` : `corp:${event.corpCode}`;
     const prior = latest.get(key);
-    if (!prior || event.receiptDate > prior.receiptDate ||
-        (event.receiptDate === prior.receiptDate && event.receiptNo > prior.receiptNo)) {
+    if (!prior || compareFilingOrder(event, prior) > 0) {
       latest.set(key, event);
     }
   }
-  return [...latest.values()].sort((a, b) => b.receiptDate.localeCompare(a.receiptDate) ||
-    b.receiptNo.localeCompare(a.receiptNo));
+  return [...latest.values()].sort((a, b) => compareFilingOrder(b, a));
 }
 
 /** A later receipt can describe an earlier holding date; this does not change the selected filing. */

@@ -17,25 +17,25 @@ function event(overrides: Partial<FilingEvent> = {}): FilingEvent {
     companyOwnershipPercent: "5.1", source: "dart-structured", filingUrl: null, ...overrides };
 }
 
-test("latest filing uses receipt date then receipt number, never holding basis date", () => {
+test("latest filing follows basis date before receipt date and number", () => {
   const old = event({ receiptDate: "2026-10-30", receiptNo: "20261030999999", basisDate: "2026-10-29" });
   const sameDay = event({ receiptNo: "20261102000002", basisDate: "2026-10-31" });
   const latest = event({ receiptNo: "20261102000003", basisDate: "2026-01-01" });
   for (const input of [[old, latest, sameDay], [sameDay, latest, old]]) {
-    assert.deepEqual(latestFilingsByStock(input), [latest]);
+    assert.deepEqual(latestFilingsByStock(input), [sameDay]);
   }
 });
 
-test("common and preferred securities of one company remain separate and sort by receipt", () => {
+test("common and preferred securities remain separate and use receipt order for equal bases", () => {
   const common = event();
   const preferred = event({ stockCode: "100002", receiptNo: "20261102000002" });
   const older = event({ stockCode: "100003", corpCode: "00100003", receiptDate: "2026-11-01" });
   assert.deepEqual(latestFilingsByStock([older, common, preferred]), [preferred, common, older]);
 });
 
-test("corrections and withdrawals can be latest even with unknown quantities and an older basis", () => {
+test("corrections and withdrawals participate in basis order even with unknown quantities", () => {
   const original = event({ basisDate: "2026-10-31" });
-  const correction = event({ receiptNo: "20261102000002", basisDate: "2026-01-01",
+  const correction = event({ receiptNo: "20261102000002", basisDate: "2026-10-31",
     isCorrectionOrWithdrawal: true, correctionOf: original.receiptNo, quantity: null });
   assert.deepEqual(latestFilingsByStock([correction, original]), [correction]);
   assert.deepEqual(latestFilingsByStock([original, { ...correction, correctionOf: null }]),

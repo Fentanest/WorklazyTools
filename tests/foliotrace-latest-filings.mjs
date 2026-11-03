@@ -15,7 +15,7 @@ const snapshot = JSON.parse(payload);
 const manifest = { schemaVersion: 1, datasetVersion: snapshot.datasetVersion,
   snapshotPath: `snapshots/${snapshot.datasetVersion}.json`,
   snapshotSha256: createHash('sha256').update(payload).digest('hex') };
-const expected = ['20261102000005', '20261102000004', '20261102000003', '20261101000099', '20261101000001'];
+const expected = ['20261102000005', '20261101000099', '20261101000001', '20261102000002', '20261031000001'];
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
 const facts = [];
 try {
@@ -48,11 +48,11 @@ try {
         await full.screenshot({ path: path.join(out, `${id}-log.png`) });
         if (before) assert.equal(receipts.length, 10, 'baseline still displays every event');
         else {
-          assert.deepEqual(receipts, expected, 'one latest receipt per stock/company, in receipt order');
+          assert.deepEqual(receipts, expected, 'one latest basis per stock/company, then receipt date and number');
           assert.match(await full.locator('.foliotrace-block-hint').innerText(), lang === 'ko' ? /^공시 10건.*최신 5건/ : /^Showing 5 latest.*from 10 records/);
-          assert.match(await rows.nth(1).innerText(), /F5 Preferred/);
-          assert.match(await rows.nth(2).innerText(), /F5 Common/);
-          assert.match(await rows.nth(2).innerText(), lang === 'ko' ? /정정·철회/ : /Correction\/withdrawal/);
+          assert.match(await rows.nth(4).innerText(), /F5 Preferred/);
+          assert.match(await rows.nth(3).innerText(), /F5 Common/);
+          assert.doesNotMatch(await rows.nth(3).innerText(), lang === 'ko' ? /정정·철회/ : /Correction\/withdrawal/);
         }
         const holdings = page.locator('#foliotrace-holdings');
         const count = holdings.locator('.foliotrace-result-count .foliotrace-num');
@@ -81,6 +81,7 @@ try {
         assert.equal(await history.count(), 5, 'all company filings remain in the existing holding sheet');
         assert.match(await sheet.innerText(), /20261030999999/);
         assert.match(await sheet.innerText(), /20261102000002/);
+        assert.match(await sheet.innerText(), /20261102000003/, 'older-basis correction remains in full history');
         await page.keyboard.press('Escape'); await sheet.waitFor({ state: 'hidden' });
         if (!before) {
           for (const [receipt, older] of [['20261102000005', '20261001000001'], ['20261101000099', '20261031000099']]) {
