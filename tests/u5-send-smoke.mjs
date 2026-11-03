@@ -4,6 +4,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {chromium} from 'playwright';
 import {PDFDocument} from 'pdf-lib';
+import {warmupU5Routes} from './helpers/u5-send-warmup.mjs';
 const base=process.env.TEST_BASE_URL||'http://127.0.0.1:5480';
 const out=process.env.U5_SEND_OUTPUT||'/tmp/sol-u5send/browser';await fs.mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -28,6 +29,26 @@ async function consumed(page,receiver,pathName){
 }
 
 try{
+ await warmupU5Routes(browser, {base, reportPath:path.join(out,'warmup.json'), routes:[
+  // A script document has no Vite HMR client. Prepare the real lazy Worker
+  // here so ExifReader optimization cannot reload a case that owns a file.
+  {path:'/src/features/image-privacy/image-privacy.worker.ts?worker_file&type=module',selector:'body',prepare:async(page,timeout)=>{
+   await page.evaluate(({bytes,timeout})=>new Promise((resolve,reject)=>{
+    const worker=new Worker(location.href,{type:'module'});
+    const finish=(error)=>{clearTimeout(timer);worker.terminate();error?reject(error):resolve();};
+    const timer=setTimeout(()=>finish(new Error('Privacy worker warmup timeout')),timeout);
+    worker.onerror=()=>finish(new Error('Privacy worker warmup failed'));
+    worker.onmessage=({data})=>finish(data.type==='result'&&data.buffer?.byteLength>0?undefined:new Error('Privacy worker warmup returned no result'));
+    worker.postMessage({files:[{name:'warmup.png',type:'image/png',buffer:new Uint8Array(bytes).buffer}],language:'en'});
+   }),{bytes:[...png],timeout});
+  }},
+  // Each tool module is loaded once; the 17 cases still cover both languages.
+  ...['ko'].flatMap(lang=>[
+  {path:`/${lang}/tools/image-studio/`,selector:'[data-image-owner="editor"] input[type="file"]'},
+  {path:`/${lang}/tools/image-privacy/`,selector:'[data-tool-page="image-privacy"] input[type="file"]'},
+  {path:`/${lang}/tools/pdf-editor/`,selector:'.pdf-tool-page input[type="file"]'},
+  ...['image-to-pdf','pdf-to-document','pdf-to-image'].map(mode=>({path:`/${lang}/tools/pdf-converter/${mode}/`,selector:`[data-pdf-mode="${mode}"] input[type="file"]`}))
+ ])]});
  for(const lang of ['ko','en']){
   await test(`${lang} image editor -> privacy -> editor; generated results and WebP gate`,async()=>{
    const {context,page,errors}=await setup(lang);try{
