@@ -10,6 +10,10 @@
 
 - 안내 앵커 반복 중 hash 없는 최초 진입·reload의 redactor 준비 대기 실패를 별도로 관측했다. 추가 계측의 두 독립 브라우저는 동일 시점 로컬 bcmap 요청에 `net::ERR_NETWORK_CHANGED`를 기록했고 worker 시작 전 준비 실패 UI를 보였다. 제품의 앵커 위치 실패와 구분하며, 일반 반복 중 같은 준비 증상의 개별 원인 로그가 없는 건까지 네트워크 오류로 단정하지 않는다. 최종 비교는 제품·좌표 판정을 유지한 채 loopback 전용 네트워크 namespace에서 실행한다. 후속 하네스 작업 때 requestfailed/준비 상태 증거를 상시 보존할 것. 근거: anchorflaky worktree `scratch/anchorflaky/prep-diagnostic/`, `after/`, `after-isolated/`, 지정 `SOL-ANCHORFLAKY-REPORT.md`. — Codx
 
+- 11-04 FIX1에서 상시 진단 보존은 구현했다. `tests/shell-guide-offset-smoke.mjs`는 최초 준비·fragment reload 단계를 구분해 requestfailed·HTTP 오류·worker 시작과 실패 시 준비 UI·resource 상태를 남긴다. 실제 준비된 input과 활성 파일 선택 버튼을 기다리며 terminal 오류를 통과시키지 않는다. 위 namespace 비교는 과거 실행 조건이며 FIX1의 반복은 호스트 기본 네트워크에서 수행한다. Reviewer의 기존 1건에는 개별 네트워크 로그가 없어 같은 원인으로 확정하지 않는다. — Codx
+
+- FIX1의 첫 비격리 반복 2회차에서 준비 실패 2건을 재현했고, 두 건 모두 reload 중 로컬 자산의 `net::ERR_NETWORK_CHANGED`와 준비 실패 UI가 함께 기록됐다. 로컬 응답은 Playwright HTTP 클라이언트로 실제 서버에서 읽어 상태·헤더·본문 그대로 전달하도록 수리했다(재시도·대체 자산 없음). HTTP 404를 실제 서버에서 돌려준 음성 대조는 계속 준비 실패로 검출했다. 제품 runtime의 네트워크 오류 후 수동 새로고침 동작은 유지한다. 근거: `scratch/anchor-fix1/pre-transport/run-02/`, `preparation-http-negative/`, 지정 `SOL-ANCHOR-FIX1.md`. — Codx
+
 ## 사물·제품 배경 제거: iOS 경고·보고된 저메모리 제한 (2026-11-03)
 
 - **사용자 결정: iOS 전면 차단 → 선택 가능한 경고** — 확인된 크래시는 iPhone 11 4GB 한 대의 QA다. 이를 최신 iPhone·M칩 iPad 전체의 실행 불가로 일반화하지 않는다. iOS/iPadOS WebKit은 사물·제품 선택을 허용하고, 실행 때 탭 종료 위험과 인물 모드·수동 지우개 대안을 먼저 안내한다. 사용자가 ‘그래도 진행’을 골라야 기존 다운로드 동의로 넘어간다. 인물 기본 추천, HTTPS·GPU 기능 확인, 모델 무결성은 유지한다. 이전 `0b5bc129`의 기기군 전체 차단을 이 결정으로 대체한다. — Codx
