@@ -89,7 +89,7 @@ export function ToolsPage() {
         {normalizedQuery && <span className="tool-search-count" data-testid="tools-search-status" role="status" aria-atomic="true">{t("common:format.tools", { count: visibleToolCount })}</span>}
       </div>
 
-      <div className="tool-category-filter" aria-label={t("tools:index.categoryLabel")}>
+      <div className="tool-category-filter" role="group" aria-label={t("tools:index.categoryLabel")}>
         <button type="button" className={cn(activeCategory === "all" && "bg-foreground text-background shadow-lg [&_small]:bg-background/20 [&_small]:text-inherit")} aria-pressed={activeCategory === "all"} onClick={() => selectCategory("all")}>
           <LayoutGrid size={17} /><span>{t("tools:index.all")}</span><small>{tools.length}</small>
         </button>

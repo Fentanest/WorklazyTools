@@ -9,6 +9,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { chromium } from "playwright";
 import { PNG } from "pngjs";
 import { assertAccessibilityEvidence, createAccessibilityReceipt } from "./accessibility-evidence.mjs";
+import { applyAccessibilityProfile } from "./accessibility-profile.mjs";
+import { themeForProfile } from "./ui-theme-fixture.mjs";
 
 const testDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = path.resolve(testDirectory, "..");
@@ -128,7 +130,8 @@ export const pages = Object.freeze([
 ]);
 const selectedPageIds = (process.env.A11Y_PAGE_IDS || "").split(",").map((value) => value.trim()).filter(Boolean);
 const registeredPageSelection = selectedPageIds.length ? pages.filter(({ id }) => selectedPageIds.includes(id)) : pages;
-const auditedPages = selectAccessibilityPages(process.env.A11Y_ONLY, registeredPageSelection);
+const auditedPages = selectAccessibilityPages(process.env.A11Y_ONLY, registeredPageSelection)
+  .map((target) => applyAccessibilityProfile(target, process.env.A11Y_PROFILE));
 if (selectedPageIds.length && (new Set(selectedPageIds).size !== selectedPageIds.length || registeredPageSelection.length !== selectedPageIds.length)) {
   throw new Error(`A11Y_PAGE_IDS contains an unknown or duplicate page: ${selectedPageIds.join(",")}.`);
 }
@@ -355,20 +358,25 @@ export async function runAccessibilityAudit() {
         locale: resolveAuditLocale(target),
         timezoneId: "Asia/Seoul",
       });
-      await context.addInitScript(({ language, colorScheme }) => {
+      await context.route("**/*", (route) => {
+        const url = new URL(route.request().url());
+        return url.origin === new URL(baseUrl).origin || ["data:", "blob:"].includes(url.protocol)
+          ? route.continue() : route.abort();
+      });
+      await context.addInitScript(({ language, theme }) => {
         localStorage.setItem("worklazy_privacy_consent_v2", "denied");
         if (language) localStorage.setItem("worklazy_lang", language);
-        // W5 shared theme fixture: sparse colorScheme resolves to the default
-        // family (dark -> dark-coral, else light-coral). Only the theme key is
-        // seeded; locale and consent stay under this harness's control.
+        // Resolve sparse schemes and explicit recollection profiles through
+        // the same fixture used by the pre-capture assertion.
         try {
-          window.localStorage.setItem("worklazy-theme", colorScheme === "dark" ? "dark-coral" : "light-coral");
+          window.localStorage.setItem("worklazy-theme", theme);
         } catch {
           // Storage blocked: assertThemeFixture reports the mismatch.
         }
-      }, { language: target.language, colorScheme: target.colorScheme ?? "light" });
+      }, { language: target.language, theme: themeForProfile(target.theme ?? target.colorScheme ?? "light") });
 
       const page = await context.newPage();
+      const languageSwitcherContrast = [];
       let displayAssetRequests = 0;
       if (target.scenario === "pdf-watermark-display-load-failure") {
         await page.route("**/assets/pdf-*.mjs", async (route) => {
@@ -470,18 +478,64 @@ export async function runAccessibilityAudit() {
       if (target.id.startsWith("pdf-stamp")) stampContrast = await measureStampNoticeContrast(page);
       const { assertThemeFixture } = await import("./ui-theme-fixture.mjs");
       await assertThemeFixture(page, {
-        theme: target.colorScheme ?? "light",
+        theme: target.theme ?? target.colorScheme ?? "light",
         locale: resolveAuditLocale(target),
       });
+      if (process.env.A11Y_PROFILE && ["home", "tools"].includes(target.id)) {
+        const switches = page.locator("select[data-ui-component='language-switcher']:visible");
+        for (let index = 0; index < await switches.count(); index += 1) {
+          const select = switches.nth(index);
+          for (const state of ["normal", "hover", "focus"]) {
+            await select.evaluate((element) => element.blur());
+            await page.mouse.move(0, 0);
+            if (state === "hover") await select.hover();
+            if (state === "focus") {
+              await select.focus();
+              await page.keyboard.press("Tab");
+              await page.keyboard.press("Shift+Tab");
+            }
+            const stateApplied = await select.evaluate((element, state) => state === "focus"
+              ? element.matches(":focus-visible") : state === "hover" ? element.matches(":hover")
+                : !element.matches(":hover") && !element.matches(":focus"), state);
+            if (!stateApplied) throw new Error(`Language select ${state} state could not be applied.`);
+            const pixelPath = path.join(path.dirname(reportPath), `${target.id}-language-${index}-${state}.png`);
+            languageSwitcherContrast.push({ index, state, ...await measureLanguageSelectContrast(select, pixelPath) });
+          }
+          await select.evaluate((element) => element.blur());
+          await page.mouse.move(0, 0);
+        }
+      }
       const builder = new AxeBuilder({ page });
       if (target.ownedSelector) builder.include(target.ownedSelector);
-      const exceptions = accessibilityExceptions.filter(({ pageId }) => pageId === target.id);
+      const exceptions = accessibilityExceptions.filter(({ pageId }) => pageId === target.id)
+        .map((exception) => target.id === "hwp-editor" && process.env.A11Y_PROFILE
+          ? { ...exception, selector: target.readySelector } : exception);
       for (const exception of exceptions) {
         if (await page.locator(exception.selector).count() !== 1) throw new Error(`Accessibility exception must match exactly one iframe: ${exception.selector}`);
         builder.exclude(exception.selector);
       }
       const audit = await builder.analyze();
       const collectionReceipt = createAccessibilityReceipt(audit, target.id);
+      for (const rule of [...audit.violations, ...audit.incomplete]) {
+        const triage = await page.evaluate((targets) => targets.map((target) => {
+          const selector = target.flat(Infinity)[0];
+          let element;
+          try { element = document.querySelector(selector); } catch { /* Retain unresolved evidence. */ }
+          if (!element) return { owner: "unresolved", selector };
+          const shell = element.closest(".sidebar,.mobile-header,.wl-topbar,.global-footer,.bottom-tabs,.mobile-sheet");
+          const rect = element.getBoundingClientRect();
+          return { owner: shell ? "shared-shell" : "page", shell: shell?.className,
+            acceptedBrandDebt: Boolean(element.closest(".brand-card")),
+            rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+            foreground: getComputedStyle(element).color, background: getComputedStyle(element).backgroundColor };
+        }), rule.nodes.map(({ target }) => target));
+        rule.nodes.forEach((node, index) => { node.triage = triage[index]; });
+      }
+      // Preserve unprojected axe reasons, color ratios and selectors for triage.
+      // Kept separate from the receipt-checked public summary.
+      const evidencePath = path.join(path.dirname(reportPath), "raw", `${target.id}.json`);
+      await fs.mkdir(path.dirname(evidencePath), { recursive: true });
+      await fs.writeFile(evidencePath, `${JSON.stringify(audit, null, 2)}\n`);
       const duplicateContrast = target.setup === "excel-duplicates" ? await measureDuplicateResultContrast(page) : undefined;
       if (duplicateContrast && duplicateContrast.minimum < 4.5) {
         throw new Error(`Excel duplicate result text contrast fell below 4.5:1: ${JSON.stringify(duplicateContrast)}`);
@@ -583,6 +637,10 @@ export async function runAccessibilityAudit() {
         id: target.id,
         path: target.path,
         viewport: page.viewportSize(),
+        theme: themeForProfile(target.theme ?? target.colorScheme ?? "light"),
+        language: resolveAuditLanguage(target),
+        evidencePath,
+        ...(languageSwitcherContrast.length ? { languageSwitcherContrast } : {}),
         exceptions,
         passes: audit.passes.length,
         collectionReceipt,
@@ -603,7 +661,11 @@ export async function runAccessibilityAudit() {
         ...(stampContrast ? { stampContrast } : {}),
         ...(inclusionContrast.length ? { inclusionContrast } : {}),
       });
+      const collectedDirectory = path.join(path.dirname(reportPath), "collected-results");
+      await fs.mkdir(collectedDirectory, { recursive: true });
+      await fs.writeFile(path.join(collectedDirectory, `${target.id}.json`), `${JSON.stringify(results.at(-1), null, 2)}\n`);
       await context.close();
+      console.log(`Collected ${target.id} (${results.length}/${auditedPages.length})`);
     }
 
     const aggregation = summarizeAccessibility(results, auditedPages);
@@ -665,24 +727,18 @@ async function prepareDocumentResult(page, target) {
 
 async function prepareExcelDuplicateResult(page) {
   const input = page.locator('[data-testid="excel-compare-page"] input[type="file"]');
-  await input.setInputFiles({
+  // Select both fixtures in one event: the shared drop zone stays disabled
+  // while its async consumer inspects this batch, so a second selection can
+  // otherwise be silently dropped. Verify both inspected sides below.
+  await input.setInputFiles([{
     name: "a11y-duplicate-left.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(`Key,Value\nA,${"accessible-long-value-".repeat(16)}\nA,left-tail`, "utf8"),
-  });
-  // Since 5e4aa258 the shared drop zone blocks further selections while its
-  // async consumer inspects the first file. setInputFiles does not wait for
-  // enabled state; sending the right file early silently loses that selection.
-  await page.waitForFunction(() => {
-    const input = document.querySelector('[data-testid="excel-compare-page"] input[type="file"]');
-    return input instanceof HTMLInputElement && !input.disabled
-      && document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 1;
-  });
-  await input.setInputFiles({
+  }, {
     name: "a11y-duplicate-right.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("Key,Value\nA,right-only", "utf8"),
-  });
+  }]);
   await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
   assert.deepEqual(await page.locator('[data-testid="excel-selected-file"] strong').allTextContents(), [
     "a11y-duplicate-left.csv", "a11y-duplicate-right.csv",
@@ -761,6 +817,42 @@ async function measureStampNoticeContrast(page) {
     measureTextPixelContrast(page.locator("[data-testid='pdf-stamp-notice-description']"), "notice-body"),
     measureTextPixelContrast(page.locator("[data-testid='pdf-stamp-notice-title']"), "notice-title"),
   ]);
+}
+
+async function measureLanguageSelectContrast(locator, backgroundPath) {
+  const style = await locator.evaluate((element) => {
+    const computed = getComputedStyle(element);
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("2d");
+    context.fillStyle = computed.color;
+    context.fillRect(0, 0, 1, 1);
+    return { foreground: computed.color, rgba: [...context.getImageData(0, 0, 1, 1).data],
+      background: computed.backgroundColor, focused: element.matches(":focus"),
+      focusVisible: element.matches(":focus-visible"), hovered: element.matches(":hover"),
+      textLeft: Math.ceil(parseFloat(computed.borderLeftWidth) + parseFloat(computed.paddingLeft)),
+      fontSize: computed.fontSize, fontWeight: computed.fontWeight };
+  });
+  await locator.evaluate((element) => element.style.setProperty("color", "transparent", "important"));
+  let screenshot;
+  try { screenshot = await locator.screenshot({ animations: "disabled" }); }
+  finally { await locator.evaluate((element) => element.style.removeProperty("color")); }
+  await fs.writeFile(backgroundPath, screenshot);
+  const pixels = PNG.sync.read(screenshot);
+  const ratios = [];
+  // Sample the rendered background under the two-letter language value. Keep
+  // the native arrow, rounded border and focus outline outside this rectangle.
+  for (let y = Math.floor(pixels.height / 2) - 5; y <= Math.floor(pixels.height / 2) + 5; y += 1) {
+    for (let x = style.textLeft; x < Math.min(style.textLeft + 18, pixels.width - 18); x += 1) {
+      const offset = (y * pixels.width + x) * 4;
+      const bg = luminance(pixels.data.subarray(offset, offset + 4));
+      const fg = luminance(style.rgba);
+      ratios.push((Math.max(bg, fg) + .05) / (Math.min(bg, fg) + .05));
+    }
+  }
+  if (!ratios.length) throw new Error("Language select pixel sample is empty.");
+  return { ...style, ratio: Math.min(...ratios), maximumRatio: Math.max(...ratios), samples: ratios.length,
+    backgroundPath, backgroundSHA: createHash("sha256").update(screenshot).digest("hex"),
+    method: "Computed foreground against rendered pixels under the language value with its foreground transparent; native arrow/border/outline excluded." };
 }
 
 export async function measureTextPixelContrast(locator, target, backgroundPath) {
