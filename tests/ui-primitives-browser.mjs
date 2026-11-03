@@ -1,10 +1,10 @@
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 // W1a primitive contract verification against the real public components.
 // Dev-only fixture (tests/ui-primitives-fixture.html) served by vite dev;
 // never ships to dist. Matrix: 4 themes x ko/en x desktop/mobile.
 // Usage: node tests/ui-primitives-browser.mjs [--out out.json]
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -158,31 +158,9 @@ try {
 }
 
 async function startDevServer() {
-  const viteBin = path.join(repositoryRoot, "node_modules/vite/bin/vite.js");
-  const child = spawn(process.execPath, [viteBin, "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-    cwd: repositoryRoot,
-    env: { ...process.env, BROWSER: "none" },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const output = [];
-  child.stdout.on("data", (chunk) => output.push(chunk.toString()));
-  child.stderr.on("data", (chunk) => output.push(chunk.toString()));
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`Vite dev exited early (${child.exitCode}): ${output.join("")}`);
-    try { if ((await fetch(`${baseUrl}/tests/ui-primitives-fixture.html`)).ok) return child; } catch { /* Dev server is still starting. */ }
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  child.kill("SIGTERM");
-  throw new Error(`Timed out waiting for ${baseUrl}: ${output.join("")}`);
+  return startOwnedPreview({ repositoryRoot, port, mode: "dev", timeoutMs: 60_000, readinessPath: "/tests/ui-primitives-fixture.html" });
 }
 
 async function stopServer(child) {
-  if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5_000)),
-  ]);
-  if (child.exitCode === null) child.kill("SIGKILL");
+  await stopOwnedPreview(child);
 }

@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -761,51 +761,10 @@ async function assertBaselineSet(expected) {
 }
 
 async function startPreviewServer() {
-  const viteBin = path.join(repositoryRoot, "node_modules", "vite", "bin", "vite.js");
-  const child = spawn(process.execPath, [viteBin, "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-    cwd: repositoryRoot,
-    env: { ...process.env, BROWSER: "none", TZ: config.environment.timezone },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
   serverOutput = [];
-  child.stdout.on("data", (chunk) => serverOutput.push(chunk.toString()));
-  child.stderr.on("data", (chunk) => serverOutput.push(chunk.toString()));
-  child.unref();
-  try {
-    await waitForServer(child);
-    return child;
-  } catch (error) {
-    await stopServer(child);
-    throw new Error(`${error.message}\n${serverOutput.join("").trim()}`);
-  }
-}
-
-async function waitForServer(child) {
-  const deadline = Date.now() + 30_000;
-  const expectedServerAddress = `http://127.0.0.1:${port}/`;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`Vite exited with code ${child.exitCode} before becoming ready.`);
-    if (!serverOutput.join("").includes(expectedServerAddress)) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      continue;
-    }
-    try {
-      const response = await fetch(baseUrl);
-      if (response.ok && child.exitCode === null) return;
-    } catch {
-      // The fixed local server is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`Timed out waiting for ${baseUrl}.`);
+  return startOwnedPreview({ repositoryRoot, port, env: { TZ: config.environment.timezone }, onOutput: (chunk) => serverOutput.push(String(chunk)) });
 }
 
 async function stopServer(child) {
-  if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5_000)),
-  ]);
-  if (child.exitCode === null) child.kill("SIGKILL");
+  await stopOwnedPreview(child);
 }

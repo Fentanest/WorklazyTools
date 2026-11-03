@@ -1,12 +1,13 @@
-import { preview } from "vite";
+import { createServer, preview } from "vite";
 
-const { repositoryRoot, port, outDir, token } = JSON.parse(process.argv[2]);
+const { repositoryRoot, port, outDir, token, mode = "preview" } = JSON.parse(process.argv[2]);
 const host = "127.0.0.1";
 let server;
 let stopping = false;
 async function stop() {
   stopping = true;
-  if (server) await new Promise((resolve) => {
+  if (server && mode === "dev") await server.close();
+  else if (server) await new Promise((resolve) => {
     server.httpServer.close(resolve);
     server.httpServer.closeAllConnections();
   });
@@ -16,23 +17,28 @@ process.once("SIGTERM", stop);
 process.once("disconnect", stop);
 
 try {
-  server = await preview({
+  const installIdentity = (viteServer) => {
+    viteServer.middlewares.use((request, response, next) => {
+      if (request.url !== `/__harness_preview_identity/${token}`) return next();
+      response.setHeader("Content-Type", "application/json");
+      response.setHeader("Cache-Control", "no-store");
+      response.end(JSON.stringify({ token, pid: process.pid, port }));
+    });
+  };
+  const options = {
     root: repositoryRoot,
     envFile: false,
     build: { outDir },
     preview: { host, port, strictPort: true, open: false },
+    server: { host, port, strictPort: true, open: false },
     plugins: [{
       name: "harness-preview-identity",
-      configurePreviewServer(previewServer) {
-        previewServer.middlewares.use((request, response, next) => {
-          if (request.url !== `/__harness_preview_identity/${token}`) return next();
-          response.setHeader("Content-Type", "application/json");
-          response.setHeader("Cache-Control", "no-store");
-          response.end(JSON.stringify({ token, pid: process.pid, port }));
-        });
-      },
+      configurePreviewServer: installIdentity,
+      configureServer: installIdentity,
     }],
-  });
+  };
+  server = mode === "dev" ? await createServer(options) : await preview(options);
+  if (mode === "dev") await server.listen();
   if (stopping) await stop();
   const address = server.httpServer.address();
   if (!address || typeof address === "string" || address.port !== port || address.address !== host) {

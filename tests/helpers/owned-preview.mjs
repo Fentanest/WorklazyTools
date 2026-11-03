@@ -7,7 +7,11 @@ import { fileURLToPath } from "node:url";
 const host = "127.0.0.1";
 const worker = fileURLToPath(new URL("./owned-preview-worker.mjs", import.meta.url));
 
-export async function startOwnedPreview({ repositoryRoot, port, outDir = path.join(repositoryRoot, "dist"), timeoutMs = 30_000 }) {
+// Both Vite modes use the same child/HTTP identity protocol. Keep the historical
+// name for preview consumers; dev consumers opt in explicitly.
+export async function startOwnedPreview({ repositoryRoot, port, outDir = path.join(repositoryRoot, "dist"), timeoutMs = 30_000, mode = "preview", readinessPath = "/", env = {}, onOutput = () => {} }) {
+  if (!["preview", "dev"].includes(mode)) throw new Error(`Invalid Vite server mode: ${mode}`);
+  if (!readinessPath.startsWith("/") || readinessPath.startsWith("//")) throw new Error("Readiness path must be local");
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`Invalid preview port: ${port}`);
   // Fail before spawning even when an unrelated server returns HTTP 200.
   const probe = net.createServer();
@@ -18,14 +22,15 @@ export async function startOwnedPreview({ repositoryRoot, port, outDir = path.jo
   await new Promise((resolve, reject) => probe.close((error) => error ? reject(error) : resolve()));
 
   const token = randomUUID();
-  const child = spawn(process.execPath, [worker, JSON.stringify({ repositoryRoot, port, outDir, token })], {
+  const child = spawn(process.execPath, [worker, JSON.stringify({ repositoryRoot, port, outDir, token, mode })], {
     cwd: repositoryRoot,
-    env: { ...process.env, BROWSER: "none" },
+    env: { ...process.env, ...env, BROWSER: "none" },
     stdio: ["ignore", "pipe", "pipe", "ipc"],
   });
   let output = "";
-  child.stdout.on("data", (chunk) => { output = (output + chunk).slice(-16_384); });
-  child.stderr.on("data", (chunk) => { output = (output + chunk).slice(-16_384); });
+  const append = (chunk) => { output = (output + chunk).slice(-16_384); onOutput(chunk); };
+  child.stdout.on("data", append);
+  child.stderr.on("data", append);
   const controller = new AbortController();
   let timer;
   let onMessage;
@@ -52,7 +57,7 @@ export async function startOwnedPreview({ repositoryRoot, port, outDir = path.jo
           if (!response.ok || identity.token !== token || identity.pid !== child.pid || identity.port !== port) {
             throw new Error("Vite preview HTTP identity mismatch");
           }
-          const page = await fetch(baseUrl, { signal: controller.signal, redirect: "error" });
+          const page = await fetch(`${baseUrl}${readinessPath}`, { signal: controller.signal, redirect: "error" });
           await page.body?.cancel();
           if (!page.ok) throw new Error(`Vite preview returned HTTP ${page.status}`);
           if (child.exitCode !== null || child.signalCode !== null) throw new Error("Vite preview exited during readiness check");
@@ -81,10 +86,10 @@ export async function startOwnedPreview({ repositoryRoot, port, outDir = path.jo
 }
 
 export async function stopOwnedPreview(child) {
-  if (!child.pid || child.exitCode !== null || child.signalCode !== null) return;
+  if (!child?.pid || child.exitCode !== null || child.signalCode !== null) return;
   await new Promise((resolve) => {
     const timer = setTimeout(() => child.kill("SIGKILL"), 5_000);
-    child.once("exit", () => { clearTimeout(timer); resolve(); });
+    child.once("close", () => { clearTimeout(timer); resolve(); });
     child.kill("SIGTERM");
   });
 }

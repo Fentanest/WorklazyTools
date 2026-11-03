@@ -1,3 +1,4 @@
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 // U6 shared document-result entry helper: synthesize two DOCX pairs in memory
 // (pair 1: 34 body paragraphs with 12 word-level changes, a 2x2 table with one
 // changed cell, a changed header, no footnotes/endnotes/comments; pair 2 is
@@ -12,7 +13,6 @@
 //   const { pairUrls } = await enterDocumentResult(page, "ko", { before, after });
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { crc32 } from "node:zlib";
@@ -221,20 +221,8 @@ export async function enterDocumentResult(page, language, files, options = {}) {
 }
 
 async function startDevServer(port) {
-  const viteBin = path.join(repositoryRoot, "node_modules/vite/bin/vite.js");
-  const child = spawn(process.execPath, [viteBin, "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-    cwd: repositoryRoot,
-    env: { ...process.env, BROWSER: "none" },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  const baseUrl = `http://127.0.0.1:${port}`;
-  const deadline = Date.now() + 90_000;
-  for (;;) {
-    if (child.exitCode !== null) throw new Error("Vite dev exited early.");
-    try { const response = await fetch(baseUrl); if (response.ok) return { child, baseUrl }; } catch { /* starting */ }
-    if (Date.now() > deadline) { child.kill("SIGTERM"); throw new Error(`Timed out waiting for ${baseUrl}.`); }
-    await new Promise((resolve) => setTimeout(resolve, 300));
-  }
+  const child = await startOwnedPreview({ repositoryRoot, port, mode: "dev", timeoutMs: 90_000 });
+  return { child, baseUrl: `http://127.0.0.1:${port}` };
 }
 
 function toPlaywrightFiles(entries) {
@@ -306,6 +294,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       await browser.close();
     }
   } finally {
-    if (server) server.kill("SIGTERM");
+    if (server) await stopOwnedPreview(server);
   }
 }

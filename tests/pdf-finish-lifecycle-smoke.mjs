@@ -1,5 +1,5 @@
+import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -231,35 +231,9 @@ async function inspectPage(page) {
 }
 
 async function startDevServer() {
-  const viteBin = path.join(repositoryRoot, "node_modules/vite/bin/vite.js");
-  const child = spawn(process.execPath, [viteBin, "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
-    cwd: repositoryRoot,
-    env: { ...process.env, BROWSER: "none", VITE_LOCAL_QA: "1" },
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let output = "";
-  const append = (chunk) => { output += chunk.toString(); };
-  child.stdout.on("data", append);
-  child.stderr.on("data", append);
-  const deadline = Date.now() + 30_000;
-  while (Date.now() < deadline) {
-    if (child.exitCode !== null) throw new Error(`Vite dev server exited early (${child.exitCode}): ${output}`);
-    if (/Local:/u.test(output)) {
-      const response = await fetch(baseUrl);
-      if (response.ok) return child;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  await stopServer(child);
-  throw new Error(`Timed out waiting for the owned Vite dev server: ${output}`);
+  return startOwnedPreview({ repositoryRoot, port, mode: "dev", timeoutMs: 30_000, env: { VITE_LOCAL_QA: "1" } });
 }
 
 async function stopServer(child) {
-  if (!child || child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 5_000)),
-  ]);
-  if (child.exitCode === null) child.kill("SIGKILL");
+  await stopOwnedPreview(child);
 }

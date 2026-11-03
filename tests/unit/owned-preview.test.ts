@@ -156,3 +156,79 @@ test("browser smoke executes and reports only completed scopes, including PDF on
     assert.deepEqual(logs, []);
   }
 });
+
+test("owned dev preserves fixture URLs, config headers, child env and the HMR client; close releases the listener", async (t) => {
+  const options = await fixture(t, 'export default { server: { headers: { "X-Harness-Fixture": "dev-preserved", "X-Child-Env": process.env.HARNESS_DEV_MARKER } } };');
+  await fs.mkdir(path.join(options.repositoryRoot, "tests"));
+  await fs.writeFile(path.join(options.repositoryRoot, "index.html"), "<html>dev root</html>");
+  await fs.writeFile(path.join(options.repositoryRoot, "tests/fixture.html"), "<html>dev fixture</html>");
+  const child = await startOwnedPreview({ ...options, mode: "dev", readinessPath: "/tests/fixture.html", env: { HARNESS_DEV_MARKER: "preserved" } });
+  try {
+    const base = `http://127.0.0.1:${options.port}`;
+    const response = await fetch(`${base}/tests/fixture.html`);
+    assert.equal(response.headers.get("x-harness-fixture"), "dev-preserved");
+    assert.equal(response.headers.get("x-child-env"), "preserved");
+    assert.match(await response.text(), /dev fixture/);
+    const client = await fetch(`${base}/@vite/client`);
+    assert.equal(client.status, 200);
+    assert.match(await client.text(), /WebSocket/);
+    const socket = new WebSocket(base.replace("http:", "ws:"), "vite-hmr");
+    try {
+      const connected = await new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("HMR WebSocket did not connect")), 5_000);
+        socket.addEventListener("message", (event) => { clearTimeout(timer); resolve(JSON.parse(String(event.data))); }, { once: true });
+        socket.addEventListener("error", (error) => { clearTimeout(timer); reject(error); }, { once: true });
+      });
+      assert.deepEqual(connected, { type: "connected" });
+    } finally { socket.close(); }
+
+    const { token } = JSON.parse(child.spawnargs.at(-1));
+    assert.deepEqual(await (await fetch(`${base}/__harness_preview_identity/${token}`)).json(), { token, pid: child.pid, port: options.port });
+  } finally { await stopOwnedPreview(child); }
+  const next = http.createServer();
+  await new Promise<void>((resolve, reject) => { next.once("error", reject); next.listen(options.port, "127.0.0.1", resolve); });
+  await new Promise<void>((resolve) => next.close(() => resolve()));
+});
+
+test("owned dev rejects foreign listeners, wrong identities, missing fixtures and post-preflight port theft", async (t) => {
+  const foreign = http.createServer((_req, res) => res.end("foreign"));
+  const port = await listen(foreign);
+  try {
+    await assert.rejects(startOwnedPreview({ repositoryRoot: process.cwd(), port, mode: "dev" }), /EADDRINUSE/);
+    assert.equal(await (await fetch(`http://127.0.0.1:${port}`)).text(), "foreign");
+  } finally { await new Promise<void>((resolve) => foreign.close(() => resolve())); }
+  const options = await fixture(t, `export default { plugins: [{ name: "wrong-dev-identity", enforce: "pre",
+    configureServer(server) { server.middlewares.use((req, res, next) => {
+      if (!req.url.startsWith("/__harness_preview_identity/")) return next();
+      res.setHeader("Content-Type", "application/json"); res.end('{"token":"wrong"}');
+    }); }
+  }] };`);
+  await assert.rejects(startOwnedPreview({ ...options, mode: "dev" }), /HTTP identity mismatch/);
+  await fs.writeFile(path.join(options.repositoryRoot, "vite.config.mjs"), 'export default { appType: "mpa" };');
+  await assert.rejects(startOwnedPreview({ ...options, mode: "dev", readinessPath: "/missing-fixture.html" }), /HTTP 404/);
+  await fs.writeFile(path.join(options.repositoryRoot, "vite.config.mjs"), `
+    import http from "node:http";
+    const other = http.createServer((_req, res) => res.end("racing foreign"));
+    await new Promise(resolve => other.listen(${options.port}, "127.0.0.1", resolve));
+    export default {};
+  `);
+  await assert.rejects(startOwnedPreview({ ...options, mode: "dev" }), /exited early.*Port .* is already in use/s);
+});
+
+test("all 22 consumers start their real lifecycle functions with owned preview/dev identity and await cleanup", async (t) => {
+  const { consumerLifecycle, ownedServerConsumers } = await import("../helpers/owned-server-consumers.mjs");
+  const options = await fixture(t);
+  await fs.writeFile(path.join(options.repositoryRoot, "index.html"), "<html>dev fixture</html>");
+  await fs.mkdir(path.join(options.repositoryRoot, "tests"));
+  await fs.writeFile(path.join(options.repositoryRoot, "tests/ui-primitives-fixture.html"), "<html>UI fixture</html>");
+  await fs.cp(options.outDir, path.join(options.repositoryRoot, "dist"), { recursive: true });
+  assert.equal(ownedServerConsumers.length, 22);
+  assert.equal(ownedServerConsumers.filter((row) => row[2] === "dev").length, 7);
+  for (const consumer of ownedServerConsumers) {
+    // Only the benchmark log sink is controlled; the actual start/stop bodies run.
+    const lifecycle = await consumerLifecycle(consumer, { ...options, fileURLToPath: () => options.repositoryRoot, fs: { writeSync() {} }, viteLog: 1 });
+    const child = await lifecycle.start();
+    try { assert.ok(child.pid); } finally { await lifecycle.stop(child); }
+    assert.notEqual(child.exitCode ?? child.signalCode, null, `${consumer[0]}: child not reaped`);
+  }
+});
