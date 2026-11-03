@@ -1,5 +1,17 @@
 # 검토 기록 (Review Notes)
 
+## 2026-11-04 — 안내 fragment 재진입 안정화 (Codx, 정식 검수 대기·미배포)
+
+기준 `88a15656`, 전용 `fix-guide-anchor-flaky-20261104` 브랜치에서 조사했다. 단발 `useLayoutEffect` 정렬 뒤에도 셸의 smooth top 초기화와 브라우저 복원이 스크롤을 바꾸며, redactor 준비 완료가 안내 위 레이아웃을 120px(320px 한글 163.42px) 늘리는 경로를 실제 프레임 기록으로 확인했다. 실패 좌표는 추가 대기 후에도 같고 focus 이벤트가 없어 shellFocus 보정과 분리했다. 셸 초기화만 차단한 대조 실험도 18건 중 8건 실패했다.
+
+초기 guide fragment에만 containing main의 크기·폰트 완료·조상 진입 애니메이션·문서 load에 따라 프레임 정렬한다. 타이머·포커스 이동·URL 변경은 없으며 첫 pointerdown/keydown/wheel/touchstart, hash 변경, unmount에서 observer·이벤트·대기 프레임을 해제한다. 일반 진입과 사용자 작업 뒤의 레이아웃 변화는 앵커로 다시 끌어오지 않는다. 셸의 경로 top 초기화는 fragment 없는 진입에 적용한다. scroll-padding 80px·guide scroll-margin 16px·gap 상한 48px를 바꾸지 않았다.
+
+회귀는 지연 레이아웃/폰트·사용자 개입과 cleanup 단위 검사, 실제 redactor 320px의 늦은 200px 삽입 뒤 정렬 및 Control+Home 뒤 추가 200px 변화에서 viewport 미탈취를 포함한다. 기존 18조합의 한영·데스크톱/320px/실제 200% 확대와 클릭/재진입 좌표 단언을 유지한다. 반복별 실패율·대상 분포·실제 검사 종료와 최종 커밋은 지정 `SOL-ANCHORFLAKY-REPORT.md`, 원문은 worktree의 `scratch/anchorflaky/`에 기록한다.
+
+기준 10회 180조합에서 클릭 실패 0·재진입 실패 30(16.7%)을 관측했다. 수정본의 최종 loopback 전용 network namespace 10회는 180/180 통과했고 늦은 레이아웃/사용자 이동 회귀도 10/10이다. 같은 격리 환경의 기준 빌드 음성 대조는 여전히 제목 viewport 이탈을 검출했다. build·unit 1,526건·static·국소 browser 영수증 4개는 입력 불변이며 선언 입력 1,860개 현재 바이트 불일치 0개다.
+
+격리 전 별도 준비 실패는 실패 그대로 보존했다. 추가 계측의 두 독립 브라우저는 로컬 bcmap 요청에 동시 `net::ERR_NETWORK_CHANGED`를 기록했고 worker 준비 전 실패 UI를 보였다. 제품·판정·timeout을 바꾸지 않고 QA 호스트 네트워크 간섭만 격리했다. 기존 준비 실패의 개별 원인 로그가 없는 건까지 같은 원인으로 단정하지 않으며, 향후 requestfailed·준비 상태 증거 보존은 backlog에 남긴다.
+
 ## 2026-11-04 — U06 브랜치에 로컬 main 병합 (Codx, 병합 후보 정식 검수 대기)
 
 - U06 `65409720`에 로컬 main `3fd1fa63`을 병합했다. 실제 내용 충돌은 `tests/accessibility-audit.mjs`의 Excel 준비 한 곳이며 CHANGELOG·기존 review-notes 항목에는 충돌이 없었다. 기존 항목은 보존하고 이번 판단을 추가한다. U06의 16환경 프로필·화면별 즉시 저장과 main의 자기 preview PID/포트/token 검증·점유 포트 실패·종료 회수는 함께 유지한다.

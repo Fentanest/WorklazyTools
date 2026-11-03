@@ -385,7 +385,8 @@ export function AppShell() {
 
   useEffect(() => {
     setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Fragment entry owns the destination, including lazy tool hydration.
+    if (!window.location.hash) window.scrollTo({ top: 0, behavior: "smooth" });
   }, [location.pathname]);
 
   useEffect(() => {

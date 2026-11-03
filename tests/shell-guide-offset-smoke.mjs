@@ -47,15 +47,16 @@ async function ready(page, tool) {
   });
 }
 async function position(page) {
-  await page.waitForTimeout(600);
-  // Native smooth scrolling can still be moving at 600ms on tall 200% pages.
-  // Measure its settled endpoint without changing the geometry assertions.
+  // Wait for painted geometry, not a fixed sleep or the desired destination.
+  // A wrong but settled endpoint must still fail checkHeading below.
   await page.evaluate(async () => {
-    let previous = scrollY, stable = 0;
+    let previous, stable = 0;
     for (let frame = 0; frame < 150; frame++) {
       await new Promise(requestAnimationFrame);
-      stable = Math.abs(scrollY - previous) < 0.1 ? stable + 1 : 0;
-      previous = scrollY;
+      const rect = document.querySelector('#tool-guide-title').getBoundingClientRect();
+      const geometry = [scrollY, rect.top, rect.bottom, document.documentElement.scrollHeight, innerHeight];
+      stable = document.fonts.status === 'loaded' && previous && geometry.every((n, i) => Math.abs(n - previous[i]) < 0.1) ? stable + 1 : 0;
+      previous = geometry;
       if (stable >= 5) return;
     }
     throw new Error('Anchor scroll did not settle');
@@ -102,8 +103,30 @@ for (const lang of ['ko', 'en']) for (const tool of ['text-tools', 'payroll-calc
       await page.reload({ waitUntil: 'domcontentloaded' }); await ready(page, tool);
       record.directFragment = await position(page);
       checkHeading(record.click); checkHeading(record.directFragment);
+      if (lang === 'ko' && tool === 'document-redactor' && view.name === 'mobile-320') {
+        // Force a late layout change after entry has already settled. Then
+        // verify that keyboard navigation releases alignment, even with the
+        // guide hash still present and another layout change afterwards.
+        await page.evaluate(() => {
+          const block = document.createElement('div');
+          block.id = 'guide-layout-regression'; block.style.height = '200px';
+          document.querySelector('.main-content').prepend(block);
+        });
+        record.lateLayout = await position(page); checkHeading(record.lateLayout);
+        await page.keyboard.press('Control+Home');
+        record.userScroll = await position(page);
+        assert.ok(record.userScroll.top > record.userScroll.viewport.height, 'keyboard navigation must leave the guide');
+        await page.evaluate(() => { document.getElementById('guide-layout-regression').style.height = '400px'; });
+        record.releasedLayout = await position(page);
+        assert.equal(record.releasedLayout.hash, '#tool-guide-title');
+        assert.ok(record.releasedLayout.top > record.releasedLayout.viewport.height, 'later layout must not steal the viewport from the user');
+      }
       record.passed = true;
     } catch (error) { record.passed = false; record.error = error.message; throw error; }
-    finally { records.push(record); await page.close(); if (!view.zoom) await context.close(); }
+    finally {
+      records.push(record);
+      await fs.writeFile(path.join(output, 'results.json'), JSON.stringify(records, null, 2));
+      await page.close(); if (!view.zoom) await context.close();
+    }
   });
 }

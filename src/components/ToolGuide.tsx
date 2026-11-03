@@ -1,7 +1,8 @@
-import { useLayoutEffect } from "react";
+import { useLayoutEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 
 import { Card } from "./ui/card";
+import { restoreGuideFragment } from "../app/guideFragment";
 
 export interface GuideBlock {
   title: string;
@@ -23,17 +24,12 @@ export function ToolGuide({ title, description, blocks, faq, children }: {
 
 }) {
   const { t } = useTranslation("common");
-  useLayoutEffect(() => {
-    // A late loading/failure transition can replace the fragment target after
-    // the browser has already scrolled to the old layout.
-    if (window.location.hash === "#tool-guide-title") {
-      document.getElementById("tool-guide-title")?.scrollIntoView({ block: "start", behavior: "instant" });
-    }
-  }, []);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useLayoutEffect(() => restoreGuideFragment(heading.current), []);
   return (
     <Card as="section" data-ui-component="tool-guide" className="ui-tool-guide gap-0 overflow-visible rounded-none bg-transparent py-0 shadow-none ring-0" aria-labelledby="tool-guide-title">
       <div className="ui-tool-guide-heading">
-        <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{t("guide.eyebrow")}</p><h2 id="tool-guide-title">{title}</h2><p>{description}</p></div>
+        <div><p className="mb-2 text-sm font-extrabold tracking-[.14em] text-muted-foreground">{t("guide.eyebrow")}</p><h2 id="tool-guide-title" ref={heading}>{title}</h2><p>{description}</p></div>
       </div>
       <div className="ui-tool-guide-grid">
         {blocks.map((block) => (

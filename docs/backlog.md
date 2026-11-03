@@ -6,6 +6,10 @@
 
 과거 제외 경로·AdSense 콘솔 설정과 GA4 자동 History 측정, 지역별 CMP는 `docs/PUBLISHING_CHECKLIST.md`의 운영 확인 대상이다.
 
+## 로컬 브라우저 시험 네트워크 오류 진단 (2026-11-04)
+
+- 안내 앵커 반복 중 hash 없는 최초 진입·reload의 redactor 준비 대기 실패를 별도로 관측했다. 추가 계측의 두 독립 브라우저는 동일 시점 로컬 bcmap 요청에 `net::ERR_NETWORK_CHANGED`를 기록했고 worker 시작 전 준비 실패 UI를 보였다. 제품의 앵커 위치 실패와 구분하며, 일반 반복 중 같은 준비 증상의 개별 원인 로그가 없는 건까지 네트워크 오류로 단정하지 않는다. 최종 비교는 제품·좌표 판정을 유지한 채 loopback 전용 네트워크 namespace에서 실행한다. 후속 하네스 작업 때 requestfailed/준비 상태 증거를 상시 보존할 것. 근거: anchorflaky worktree `scratch/anchorflaky/prep-diagnostic/`, `after/`, `after-isolated/`, 지정 `SOL-ANCHORFLAKY-REPORT.md`. — Codx
+
 ## 사물·제품 배경 제거: iOS 경고·보고된 저메모리 제한 (2026-11-03)
 
 - **사용자 결정: iOS 전면 차단 → 선택 가능한 경고** — 확인된 크래시는 iPhone 11 4GB 한 대의 QA다. 이를 최신 iPhone·M칩 iPad 전체의 실행 불가로 일반화하지 않는다. iOS/iPadOS WebKit은 사물·제품 선택을 허용하고, 실행 때 탭 종료 위험과 인물 모드·수동 지우개 대안을 먼저 안내한다. 사용자가 ‘그래도 진행’을 골라야 기존 다운로드 동의로 넘어간다. 인물 기본 추천, HTTPS·GPU 기능 확인, 모델 무결성은 유지한다. 이전 `0b5bc129`의 기기군 전체 차단을 이 결정으로 대체한다. — Codx
