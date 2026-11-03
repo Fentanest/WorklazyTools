@@ -1,3 +1,4 @@
+import { ToolGuideLink } from "../../components/ToolGuideLink";
 import { Check, Clock3, Globe2, LocateFixed, Moon, Search, Sun, X } from "lucide-react";
 import type { TFunction } from "i18next";
 import { DateTime } from "luxon";
@@ -111,7 +112,7 @@ export function TimezoneCalculatorPage() {
             {searchResults.length ? searchResults.map((city) => {
               const isSelected = selectedIds.includes(city.id);
               return <Button className="h-auto min-w-0 justify-start rounded-xl border border-transparent px-2.5 py-[9px] text-left text-sky-700 hover:border-sky-600/30 dark:text-sky-400" variant="secondary" type="button" role="option" aria-selected={isSelected} key={city.id} onClick={() => { toggleCity(city.id); setQuery(""); }}><Globe2 size={16} /><span className="min-w-0 flex-1"><strong className="block min-w-0 text-sm text-foreground">{cityName(city, language)}</strong><small className="mt-0.5 block min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-xs text-muted-foreground">{countryName(city, language)} · {city.zone}</small></span>{isSelected && <Check size={16} />}</Button>;
-            }) : <p className="col-span-full m-0 p-3.5 text-center text-[13px] text-muted-foreground">{t("timezone.none")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p>}
+            }) : <p className="col-span-full m-0 p-3.5 text-center text-[13px] text-muted-foreground">{t("timezone.none")} <ToolGuideLink /></p>}
           </div>
         )}
 

@@ -35,7 +35,7 @@ before(async()=>{
  });
 });
 after(async()=>{await fs.writeFile(out+'/network.json',JSON.stringify({external,errors},null,2));await browser?.close();});
-async function page(){const p=await context.newPage();p.setDefaultTimeout(60000);p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());return p;}
+async function page(target=context){const p=await target.newPage();p.setDefaultTimeout(60000);p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());return p;}
 async function home(p,files,id,lang='en',expire=false){
  await p.goto(`${base}/${lang}/`);await p.getByTestId('home-dropzone').waitFor();
  await p.getByTestId('home-dropzone').locator('input[type=file]').setInputFiles(files.map(({name,buffer})=>({name,buffer,mimeType:'application/octet-stream'})));
@@ -152,4 +152,71 @@ for (const fault of ['add', 'token', 'commit', 'none']) test(`P3E pending replac
   const remaining=await records(p);assert.equal(remaining.length,19);assert.ok(remaining.every(row=>row.id.startsWith('unrelated-')));
   assert.deepEqual(errors,[]);
  } finally {await p.close();}
+});
+
+// P3E review follow-up: two tabs replace their own pending case concurrently.
+test('P3F two tabs replace the same receiver at capacity without stealing files or quota', async () => {
+ // Navigation interception is part of this IDB-only fixture. A controlling
+ // production service worker can handle the request before page.route sees it.
+ const isolated=await browser.newContext({viewport:{width:1280,height:900},serviceWorkers:'block',reducedMotion:'reduce'});
+ await isolated.addInitScript(()=>{window.__WORKLAZY_MOCK_PROVIDERS__=true;});
+ await isolated.route('**/*',route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.origin===base||['blob:','data:'].includes(url.protocol))return route.continue();
+  external.push({url:url.href,body:request.postData()||''});
+  const headers={'access-control-allow-origin':'*','cross-origin-resource-policy':'cross-origin'};
+  let body='';if(url.hostname==='wcs.pstatic.net')body='window.wcs={event(){}};window.wcs_do=function(){}';if(url.hostname==='ads-partners.coupang.com')body='window.PartnersCoupang={G:function(){}}';
+  if(/googletagmanager|pstatic|googlesyndication|coupang/.test(url.hostname))return route.fulfill({status:200,contentType:'text/javascript',headers,body});
+  return route.abort();
+ });
+ const tabs = [await page(isolated), await page(isolated)];
+ const observer = await page(isolated);
+ const held = []; let bothStaged; const staged = new Promise(resolve=>{bothStaged=resolve;});
+ const payloads = [doc, await fs.readFile('tests/fixtures/document-converters/rich.docx')];
+ try {
+  await observer.goto(base+'/en/');
+  for (const [i,p] of tabs.entries()) {
+   await p.goto(base+'/en/');
+   await p.getByTestId('home-dropzone').locator('input[type=file]').setInputFiles({name:`concurrent-${i}.docx`,buffer:payloads[i],mimeType:'application/octet-stream'});
+   await p.locator('[data-receiver="document-to-pdf"]').waitFor();
+  }
+  await tabs[0].evaluate(async bytes=>{
+   const db=await new Promise((resolve,reject)=>{const r=indexedDB.open('worklazy-office-handoff',3);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains('records'))r.result.createObjectStore('records',{keyPath:'id'});};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);});
+   await new Promise((resolve,reject)=>{const tx=db.transaction('records','readwrite'),store=tx.objectStore('records');store.clear();
+    for(let i=0;i<20;i++){const now=Date.now();store.add({id:i<2?'owned-'+i:'unrelated-'+i,nonce:i<2?'nonce-'+i:'other-'+i,receiverId:'document-to-pdf',entryPath:'/tools/pdf-converter/document-to-pdf',schema:1,files:[new File([new Uint8Array(bytes)],'old.docx')],createdAt:now,expiresAt:now+900000});}
+    tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);
+   });db.close();
+  },[...doc]);
+  for (const [i,p] of tabs.entries()) await p.evaluate(i=>sessionStorage.setItem('worklazy-handoff-token:document-to-pdf',JSON.stringify({id:'owned-'+i,nonce:'nonce-'+i})),i);
+  // Hold both receiving navigations so neither new record can be consumed
+  // before both replacement transactions have committed at the 20-record cap.
+  for (const p of tabs) {
+   let heldFirst=false;
+   await p.route('**/en/tools/pdf-converter/document-to-pdf*',route=>{
+    if(heldFirst||!route.request().isNavigationRequest())return route.continue();
+    heldFirst=true;held.push(route);if(held.length===2)bothStaged();
+   });
+  }
+  const sending=Promise.all(tabs.map(p=>p.locator('[data-receiver="document-to-pdf"]').click()));
+  void sending.catch(()=>{});
+  let timer;
+  try {await Promise.race([staged,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Both tabs must stage before receiving')),60000);})]);}
+  finally {clearTimeout(timer);}
+  const stagedRecords=await records(observer);
+  assert.equal(stagedRecords.length,20);
+  assert.equal(stagedRecords.filter(row=>row.id.startsWith('unrelated-')).length,18);
+  assert.ok(stagedRecords.every(row=>!row.id.startsWith('owned-')));
+  await Promise.all(held.map(route=>route.continue()));
+  await sending;
+  await Promise.all(tabs.map(async(p,i)=>{
+   await p.waitForURL(url=>url.pathname.includes('document-to-pdf'));
+   await ready(p,'document-to-pdf',`concurrent-${i}.docx`);
+   assert.equal(await p.getByText(`concurrent-${1-i}.docx`,{exact:true}).count(),0);
+   assert.equal(await p.evaluate(()=>sessionStorage.getItem('worklazy-handoff-token:document-to-pdf')),null);
+  }));
+  const remaining=await records(observer);
+  assert.equal(remaining.length,18);
+  assert.ok(remaining.every(row=>row.id.startsWith('unrelated-')),'both owned cases are consumed and unrelated quota is preserved');
+  assert.deepEqual(errors,[]);
+ } finally {await Promise.all(held.map(route=>route.abort().catch(()=>{})));await Promise.all([...tabs,observer].map(p=>p.close()));await isolated.close();}
 });

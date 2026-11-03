@@ -1,3 +1,4 @@
+import { ToolGuideLink } from "../../components/ToolGuideLink";
 import type { HandoffInput } from "../../app/memoryHandoff";
 import { useImageSend } from "./editor/useImageSend";
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
@@ -1909,7 +1910,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
             >{t("image.editor.regionSize", { width: Math.round(floatingRegionSelection.width), height: Math.round(floatingRegionSelection.height) })}</span>}
             {stageDragging && <span className="image-preview-drop-hint absolute inset-2 z-20 grid place-items-center rounded-xl border-2 border-dashed border-sky-600/50 bg-sky-50/95 p-4 text-sm font-extrabold text-sky-700 backdrop-blur-sm dark:bg-sky-950/95 dark:text-sky-300">{t("image.editor.drop")}</span>}
           </div>
-          <p id="image-editor-canvas-keyboard-help" className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("image.editor.canvasKeyboardHelp")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p>
+          <p id="image-editor-canvas-keyboard-help" className="mt-2 text-xs leading-relaxed text-muted-foreground">{t("image.editor.canvasKeyboardHelp")} <ToolGuideLink /></p>
         </div>
         <ImageEditorPanel
           activePanel={activePanel}

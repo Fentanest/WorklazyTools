@@ -13,7 +13,7 @@ const toolAccents = ["green", "blue", "violet", "orange", "pink", "sky", "coral"
 
 test("ToolGuide keeps its public structure and localized eyebrow through shadcn cards", () => {
   const source = read("src/components/ToolGuide.tsx");
-  const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).includes("<ToolGuide"));
+  const consumers = componentFiles.filter((entry) => read(path.join("src/features", entry)).match(/<ToolGuide(?:Wrapper)?(?=[\s/>])/));
   const expectedConsumers = [
     "audio-studio/AudioStudioPage.tsx",
     "data-converter/DataConverterPage.tsx",

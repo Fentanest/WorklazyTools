@@ -1,3 +1,4 @@
+import { ToolGuideLink } from "../../components/ToolGuideLink";
 import { acceptsFile } from "../../app/fileAccepts";
 import { useHandoffReceiver, usePersistentHandoffReceiver } from "../../app/useHandoffReceiver";
 import { grantOneShotSafeTarget, setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
@@ -797,7 +798,7 @@ export function ExcelMergerPage() {
                 <PasswordField label={t("excel.protect.password")} value={outputPassword} onChange={setOutputPassword} visible={showOutputPassword} onVisibilityChange={setShowOutputPassword} toggleLabel={t("excel.protect.toggle")} />
                 <PasswordField label={t("excel.protect.confirm")} value={outputPasswordConfirm} onChange={setOutputPasswordConfirm} visible={showOutputPassword} toggleLabel={t("excel.protect.toggle")} />
                 {outputPasswordConfirm && outputPasswordMismatch && <p className="col-span-full text-sm font-bold text-destructive">{t("excel.protect.mismatch")}</p>}
-                <p className="col-span-full flex items-start gap-1.5 text-xs text-muted-foreground"><LockKeyhole className="mt-0.5 shrink-0" size={13} /> {t("excel.protect.warning")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p>
+                <p className="col-span-full flex items-start gap-1.5 text-xs text-muted-foreground"><LockKeyhole className="mt-0.5 shrink-0" size={13} /> {t("excel.protect.warning")} <ToolGuideLink /></p>
               </div>
             )}
           </UtilitySectionCard>

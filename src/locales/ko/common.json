@@ -195,7 +195,8 @@
     "close": "닫기",
     "retry": "다시 시도",
     "share": "공유·기기에 저장",
-    "viewAll": "전체 보기"
+    "viewAll": "전체 보기",
+    "guideLink": "처음 사용하시나요? 사용 안내 보기"
   },
   "install": {
     "action": "웹앱 설치",
@@ -214,7 +215,8 @@
     "unsavedWorkDescriptionFiles": "저장하지 않은 작업이 있습니다. 다른 도구로 이동하면 현재 선택한 파일과 작업 내용이 사라질 수 있습니다. 필요한 결과를 먼저 저장해 주세요.",
     "unsavedWorkDescriptionEdits": "저장하지 않은 편집 내용이 있습니다. 다른 도구로 이동하면 현재 작업 내용이 사라질 수 있습니다. 필요한 결과를 먼저 저장해 주세요.",
     "unsavedStay": "이 화면에 머무르기",
-    "unsavedLeave": "이동하기"
+    "unsavedLeave": "이동하기",
+    "guideFailed": "가이드 정보를 불러올 수 없습니다. 작업을 중단합니다."
   },
   "status": {
     "preparing": "준비하는 중…",

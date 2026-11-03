@@ -1,0 +1,85 @@
+export interface MapPoint { id: string; x: number; y: number }
+export interface MapRect { x: number; y: number; width: number; height: number }
+export interface MapLabel extends MapPoint { width: number; height: number }
+
+export function rectanglesOverlap(a: MapRect, b: MapRect, gap = 0) {
+  return a.x < b.x + b.width + gap && b.x < a.x + a.width + gap
+    && a.y < b.y + b.height + gap && b.y < a.y + a.height + gap;
+}
+
+export function mapLeaderEnd(anchor: MapPoint, rect: MapRect) {
+  return { x: Math.max(rect.x, Math.min(rect.x + rect.width, anchor.x)), y: Math.max(rect.y, Math.min(rect.y + rect.height, anchor.y - 10)) };
+}
+
+export function mapLeaderIntersectsPin(anchor: MapPoint, rect: MapRect, pin: MapPoint, radius = 9) {
+  const start = { x: anchor.x, y: anchor.y - 10 }, end = mapLeaderEnd(anchor, rect);
+  const dx = end.x - start.x, dy = end.y - start.y;
+  const fraction = dx || dy ? Math.max(0, Math.min(1, ((pin.x - start.x) * dx + (pin.y - 10 - start.y) * dy) / (dx * dx + dy * dy))) : 0;
+  return (start.x + fraction * dx - pin.x) ** 2 + (start.y + fraction * dy - (pin.y - 10)) ** 2 < radius ** 2;
+}
+
+/** Labels occupy their measured SVG boxes, independently of pin paint order. */
+export function layoutMapLabels(labels: readonly MapLabel[], pins: readonly MapPoint[], width: number, height: number) {
+  const placed: Array<MapLabel & MapRect> = [];
+  const obstacles = pins.filter(p => p.x >= 0 && p.x <= width && p.y >= 0 && p.y <= height)
+    .map(p => ({ x: p.x - 9, y: p.y - 20, width: 18, height: 24 }));
+  const margin = 6;
+  for (const label of labels) {
+    const bounded = (x: number, y: number): MapRect => ({
+      x: Math.max(margin, Math.min(width - label.width - margin, x)),
+      y: Math.max(margin, Math.min(height - label.height - margin, y)),
+      width: label.width, height: label.height,
+    });
+    const free = (rect: MapRect, avoidPins: boolean) => !placed.some(p => rectanglesOverlap(p, rect, 6))
+      && (!avoidPins || !obstacles.some(p => rectanglesOverlap(p, rect, 3)));
+    let chosen: MapRect | undefined;
+    let nearFallback: MapRect | undefined;
+    // If the leader already starts inside a neighbour's radius, a straight
+    // segment cannot avoid it. Still avoid the other pins where feasible.
+    const clearLeader = (rect: MapRect) => !pins.some(pin => pin.id !== label.id
+      && (pin.x - label.x) ** 2 + (pin.y - label.y) ** 2 >= 81
+      && mapLeaderIntersectsPin(label, rect, pin));
+    // Prefer nearby positions before searching farther from a dense cluster.
+    for (let distance = 8; distance <= 200 && !chosen; distance += 12) {
+      const x = label.x, y = label.y;
+      const candidates = [
+        bounded(x - label.width / 2, y - 20 - distance - label.height),
+        bounded(x - label.width / 2, y + 4 + distance),
+        bounded(x + 10 + distance, y - 8 - label.height / 2),
+        bounded(x - 10 - distance - label.width, y - 8 - label.height / 2),
+        bounded(x + distance, y - 20 - distance - label.height),
+        bounded(x - distance - label.width, y - 20 - distance - label.height),
+        bounded(x + distance, y + distance),
+        bounded(x - distance - label.width, y + distance),
+      ];
+      nearFallback ??= candidates.find(rect => free(rect, true));
+      chosen = candidates.find(rect => free(rect, true) && clearLeader(rect));
+    }
+    chosen ??= nearFallback;
+    // A zoomed/panned-offscreen anchor can still keep its selected label visible.
+    for (const avoidPins of [true, false]) {
+      if (chosen) break;
+      let bestDistance = Infinity;
+      for (let y = margin; y + label.height <= height - margin; y += 8) for (let x = margin; x + label.width <= width - margin; x += 8) {
+        const rect = bounded(x, y);
+        if (!free(rect, avoidPins)) continue;
+        const distance = (x + label.width / 2 - label.x) ** 2 + (y + label.height / 2 - label.y) ** 2;
+        if (distance < bestDistance) { chosen = rect; bestDistance = distance; }
+      }
+    }
+    // The map has at most six selected labels plus focus/hover; its 960×500
+    // viewport leaves ample room. Keep the last-resort box bounded as well.
+    placed.push({ ...label, ...(chosen ?? bounded(label.x - label.width / 2, label.y - label.height - 28)) });
+  }
+  return placed;
+}
+
+/** Resolve overlapping hit areas by geographic distance, never DOM paint order. */
+export function nearestMapPin(pins: readonly MapPoint[], x: number, y: number) {
+  let nearest: MapPoint | undefined, distance = Infinity;
+  for (const pin of pins) {
+    const next = (pin.x - x) ** 2 + (pin.y - 8 - y) ** 2;
+    if (next < distance) { nearest = pin; distance = next; }
+  }
+  return nearest;
+}

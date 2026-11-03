@@ -1,0 +1,8 @@
+[
+  {"file":"src/app/App.tsx","symbol":"koreanToolNames","reason":"Korean route-loading names are selected only by the Korean-language branch."},
+  {"file":"src/components/CoupangBanner.tsx","symbol":"DISCLOSURE_KO","reason":"Affiliate disclosure has a separate DISCLOSURE_EN and a language-selected render."},
+  {"file":"src/features/document-compare/DocumentFieldNotes.tsx","symbol":"labels","reason":"Explicit [Korean, English] field-label tuples are selected by the language index."},
+  {"file":"src/features/document-compare/documentCompareSession.tsx","symbol":"useDocumentCompareSession","text":"문서 비교 화면을 준비하지 못했습니다.","reason":"Internal missing-context invariant. RouteErrorBoundary displays localized recovery copy, never this exception text."},
+  {"file":"src/features/word-compare/WordCompareResultPage.tsx","symbol":"changeKindLabel","reason":"English returns before the Korean-only return branch."},
+  {"file":"src/pages/LicensesPage.tsx","symbol":"libraries","reason":"Korean purpose metadata is rendered only under language === ko; English shows the license identifier."}
+]
