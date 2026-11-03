@@ -213,7 +213,7 @@ test("M03 multi-file/sheet UI: selection, displayed order, file reorder, partial
   const sheetB = page.getByText("2. Sheet B", { exact: true });
   await sheetB.locator("input").uncheck(); await sheetB.locator("input").check();
   await page.getByLabel("Import files", { exact: true }).selectOption("replace");
-  page.once("dialog", (dialog) => dialog.dismiss()); await importButton(page).click();
+  await importButton(page).click(); await page.getByTestId("confirmation-cancel").click();
   await page.waitForFunction(() => !document.querySelector('input[accept=".xls,.xlsx,.csv"]')?.hasAttribute("disabled"));
   assert.equal(await page.getByText("1. Last.csv", { exact: true }).count(), 1);
   assert.deepEqual(await names(page), ["Retained edit"]);
@@ -348,16 +348,16 @@ test("M03 forced clipboard failure, standalone download and editing JSON restore
   const saved = await download(page, "Save editing file"); assert.deepEqual(JSON.parse(saved), project);
   await page.getByLabel("Product name", { exact: true }).first().fill("Unsaved edit");
   const payload = { name: "restore.json", mimeType: "application/json", buffer: Buffer.from(saved) };
-  page.once("dialog", (dialog) => dialog.dismiss()); await page.locator('input[accept=".json"]').setInputFiles(payload);
+  await page.locator('input[accept=".json"]').setInputFiles(payload); await page.getByTestId("confirmation-cancel").click();
   assert.equal((await names(page))[0], "Unsaved edit");
-  page.once("dialog", (dialog) => dialog.accept()); await page.locator('input[accept=".json"]').setInputFiles(payload);
+  await page.locator('input[accept=".json"]').setInputFiles(payload); await page.getByTestId("confirmation-accept").click();
   await page.waitForFunction(() => (document.querySelector('[data-testid="banner-product"] input[type="text"]') as HTMLInputElement)?.value !== "Unsaved edit");
   assert.deepEqual(JSON.parse(await download(page, "Save editing file")), project);
-  page.once("dialog", (dialog) => dialog.accept()); await page.locator('input[accept=".json"]').setInputFiles({ ...payload, buffer: Buffer.from('{"schemaVersion":999}') });
+  await page.locator('input[accept=".json"]').setInputFiles({ ...payload, buffer: Buffer.from('{"schemaVersion":999}') }); await page.getByTestId("confirmation-accept").click();
   await page.getByText(uiMessages.en.jsonError, { exact: true }).waitFor();
   assert.deepEqual(JSON.parse(await download(page, "Save editing file")), project);
   for (const buffer of [Buffer.from("{"), Buffer.alloc(PROJECT_LIMITS.bytes + 1)]) {
-    page.once("dialog", (dialog) => dialog.accept()); await page.locator('input[accept=".json"]').setInputFiles({ ...payload, buffer });
+    await page.locator('input[accept=".json"]').setInputFiles({ ...payload, buffer }); await page.getByTestId("confirmation-accept").click();
     await page.getByText(buffer.length > PROJECT_LIMITS.bytes ? uiMessages.en.limitError : uiMessages.en.jsonError, { exact: true }).waitFor();
     assert.deepEqual(JSON.parse(await download(page, "Save editing file")), project);
   }
@@ -423,6 +423,7 @@ test("T6afix copy success, save and JSON error survive observations and expire o
     } else {
       expected = uiMessages.en.jsonError;
       await page.locator('input[accept=".json"]').setInputFiles({ name: "synthetic-invalid.json", mimeType: "application/json", buffer: Buffer.from("{") });
+      await page.getByTestId("confirmation-accept").click();
     }
     const notice = page.getByText(expected, { exact: true }); await notice.waitFor();
     gate.release(); await row.getByText(uiMessages.en.imageStates.failure, { exact: true }).waitFor();

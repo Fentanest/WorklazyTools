@@ -6,11 +6,13 @@ import { createHash } from 'node:crypto';
 import { chromium } from 'playwright';
 import JSZip from 'jszip';
 import { PNG } from 'pngjs';
-const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:4198';
+import { startRecoveryServer } from './recovery-server.mjs';
+const server = process.env.TEST_BASE_URL ? undefined : await startRecoveryServer({ root: 'dist', port: 0 });
+const base = process.env.TEST_BASE_URL || server.url;
 const output = process.env.W6_OUTPUT || 'artifacts/w6/browser';
 await fs.mkdir(output, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
-after(() => browser.close());
+after(async () => { await browser.close(); await server?.close(); });
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const png = new PNG({ width: 1777, height: 1031 });
 for (let y = 0; y < png.height; y++) for (let x = 0; x < png.width; x++) {
@@ -49,7 +51,7 @@ async function setup({ language = 'en', theme = 'light-coral', width = 1440 } = 
     URL.createObjectURL = function(blob) { const url = create.call(this, blob); window.__w6.urls.push({ url, type: blob.type }); return url; };
     URL.revokeObjectURL = function(url) { window.__w6.revoked.push(url); return revoke.call(this, url); };
   });
-  const p = await context.newPage(); p.setDefaultTimeout(60_000); p.on('pageerror', error => errors.push(error.message));
+  const p = await context.newPage(); p.on('dialog', dialog => { errors.push('Unexpected native dialog'); void dialog.dismiss(); }); p.setDefaultTimeout(60_000); p.on('pageerror', error => errors.push(error.message));
   await p.goto(`${base}/${language}/tools/image-studio/`);
   await p.locator('[data-testid=library-image-editor] .lower-canvas').waitFor();
   await p.evaluate(theme => document.documentElement.setAttribute('data-theme', theme), theme);
@@ -126,22 +128,42 @@ test('replacement cancel preserves the old document; accept replaces it; no extr
     const editor = p.locator('[data-testid=library-image-editor]'); await editor.locator('.asp-commit').click(); await p.locator('[data-testid=image-editor-result] img').waitFor();
     const before = await p.locator('[data-testid=image-editor-result] img').getAttribute('src');
     await tab(1); const importsBefore = (await snapshot('imports')).length;
-    const dismissed = p.waitForEvent('dialog').then(dialog => dialog.dismiss());
-    await p.locator('[data-testid=image-batch-result] button').nth(1).click(); await dismissed;
+    const trigger = p.locator('[data-testid=image-batch-result] button').nth(1);
+    const imports = importsBefore;
+    await trigger.click();
+    const dialog = p.getByTestId('confirmation-dialog'); await dialog.waitFor({ state: 'visible' });
+    assert.equal(await p.getByTestId('confirmation-cancel').evaluate(el => el === document.activeElement), true);
+    // A second queued activation must not replace the pending decision or import twice.
+    await trigger.evaluate(button => { button.click(); button.click(); });
+    assert.equal(await p.locator('dialog[open][data-testid=confirmation-dialog]').count(), 1);
+    await p.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'hidden' });
+    assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
+    assert.equal((await snapshot('imports')).length, imports);
     assert.equal(await p.locator('[data-image-owner=batch]').isVisible(), true);
     assert.equal((await snapshot('imports')).length, importsBefore);
     await tab(0); assert.equal(await p.locator('[data-testid=image-editor-result] img').getAttribute('src'), before);
-    await tab(1); const accepted = p.waitForEvent('dialog').then(dialog => dialog.accept());
-    await p.locator('[data-testid=image-batch-result] button').nth(1).click(); await accepted;
+    await tab(1); await trigger.click();
+    await p.getByTestId('confirmation-cancel').click();
+    assert.equal((await snapshot('imports')).length, importsBefore);
+    await trigger.click(); await dialog.waitFor({ state: 'visible' });
+    await dialog.screenshot({ path: path.join(output, 'replacement-confirm-en.png') });
+    await p.getByTestId('confirmation-accept').click();
     await p.waitForFunction(() => document.querySelector('[data-image-owner=editor]') === document.activeElement && !document.querySelector('[data-testid=image-editor-add-to-batch]').disabled);
     assert.equal(await p.locator('[data-testid=image-editor-result]').count(), 0);
+    // The library decodes a File for its source and preview. Compare with the
+    // first successful intake rather than mistaking each decode for an intake.
+    const initialResult = (await snapshot('results')).at(-1)[0];
+    const firstDecodeCount = (await snapshot('imports')).slice(0, importsBefore).filter(item => item.name === initialResult.name).length;
+    assert.ok(firstDecodeCount > 0);
+    assert.equal((await snapshot('imports')).length, importsBefore + firstDecodeCount);
     const result = (await snapshot('results')).at(-1)[1]; assert.equal((await snapshot('imports')).find(item => item.name === result.name)?.sha, result.sha);
     assert.equal(extraDownloads, 0);
     assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
 for (const width of [390, 1440]) for (const [language, theme] of [['ko', 'light-coral'], ['en', 'dark-mint']]) test(`results and editor ${width}px ${language} ${theme}: resized watermark + keyboard + screenshot`, async () => {
-  const { p, context, batch, run, errors } = await setup({ width, language, theme });
+  const { p, context, batch, run, tab, errors } = await setup({ width, language, theme });
   try {
     await batch.locator('input[type=file]').first().setInputFiles(input);
     await batch.locator('input[type=number]').first().fill('640');
@@ -156,7 +178,14 @@ for (const width of [390, 1440]) for (const [language, theme] of [['ko', 'light-
     await p.waitForFunction(() => document.querySelector('[data-image-owner=editor]') === document.activeElement && !document.querySelector('[data-testid=image-editor-add-to-batch]').disabled);
     await p.locator('[data-testid=library-image-editor] .asp-commit').click(); await p.locator('[data-testid=image-editor-result] img').waitFor();
     assert.deepEqual(await p.locator('[data-testid=image-editor-result] img').evaluate(async img => { await img.decode(); return [img.naturalWidth, img.naturalHeight]; }), [640, 371]);
-    await p.screenshot({ path: path.join(output, `editor-${width}-${language}.png`), fullPage: true }); assert.deepEqual(errors, []);
+    await p.screenshot({ path: path.join(output, `editor-${width}-${language}.png`), fullPage: true });
+    await tab(1); await open.click();
+    const dialog = p.getByTestId('confirmation-dialog'); await dialog.waitFor({ state: 'visible' });
+    assert.equal(await p.getByTestId('confirmation-cancel').innerText(), language === 'ko' ? '취소' : 'Cancel');
+    await dialog.screenshot({ path: path.join(output, `confirm-${width}-${language}.png`) });
+    await p.getByTestId('confirmation-cancel').click();
+    assert.equal(await p.locator('[data-image-owner=batch]').isVisible(), true);
+    assert.deepEqual(errors, []);
   } finally { await context.close(); }
 });
 test('50 results allocate only the existing ZIP download URL; rerun failure removes stale results and URL is revoked', async () => {

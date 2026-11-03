@@ -155,9 +155,9 @@ for (const language of ["ko", "en"] as const) test(`R3a-F02 ${language}: release
   await page.locator('[data-testid="banner-product"]').waitFor();
   assert.equal(await page.getByLabel(text.name, { exact: true }).inputValue(), "");
   assert.ok(!(await page.getByLabel(text.export, { exact: true }).inputValue()).includes("Synthetic name"));
-  page.on("dialog", (dialog) => dialog.accept());
   for (const content of ["{", '{"version":999}', '{"version":1,"products":"invalid"}']) {
     await page.locator('input[accept=".json"]').setInputFiles({ name: "invalid.json", mimeType: "application/json", buffer: Buffer.from(content) });
+    await page.getByTestId("confirmation-accept").click();
     await page.getByText(text.jsonError, { exact: true }).waitFor();
     assert.equal(await page.getByText(text.inputError, { exact: true }).count(), 0);
   }

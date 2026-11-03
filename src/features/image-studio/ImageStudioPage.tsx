@@ -1,3 +1,4 @@
+import { useConfirmation } from "../../hooks/useConfirmation";
 import { getSeoDefinition } from "../../app/seo";
 import { ToolGuideLink } from "../../components/ToolGuideLink";
 import type { HandoffInput } from "../../app/memoryHandoff";
@@ -83,6 +84,7 @@ function protectImageInput() {
 export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
   const { t, i18n } = useTranslation("features");
   const { t: commonT } = useTranslation("common");
+  const { confirm, confirmation } = useConfirmation();
   const pageElement = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<StudioTab>("editor");
   const progress = useOperationProgress();
@@ -130,12 +132,13 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
   const batchEditorIntake = useRef<AbortController | undefined>(undefined);
   const openBatchResult = async (file: File) => {
     if (batchEditorIntake.current) return;
-    if (editorDirty && !window.confirm(t("image.editor.confirm"))) return;
     const controller = new AbortController();
     batchEditorIntake.current = controller;
-    setTab("editor");
-    progress.reset();
     try {
+      if (editorDirty && !await confirm(t("image.editor.confirm"), commonT("actions.reset"))) return;
+      if (controller.signal.aborted) return;
+      setTab("editor");
+      progress.reset();
       // Commit the visible editor before its intake checks the active flag.
       do { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); }
       while (!editorHandle.current && !controller.signal.aborted);
@@ -202,6 +205,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
 
   return (
     <UtilityPage toolId="image-studio" className="image-studio-page">
+      {confirmation}
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
       {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? ({ resize: "이미지 크기 조정", mosaic: "이미지 모자이크", watermark: "이미지 워터마크" })[direct.acceptedPreset.purpose] : ({ resize: "Resize an image", mosaic: "Mosaic an image", watermark: "Watermark an image" })[direct.acceptedPreset.purpose]} description={language === "ko" ? ({ resize: "이미지를 넣고 크기 패널에서 치수를 조정하세요.", mosaic: "이미지를 넣고 효과를 적용할 영역을 지정하세요.", watermark: "이미지를 넣고 텍스트를 입력한 뒤 직접 추가하세요. 자동으로 삽입하지 않습니다." })[direct.acceptedPreset.purpose] : ({ resize: "Add an image and adjust its dimensions in the size panel.", mosaic: "Add an image and select the area for the mosaic effect.", watermark: "Add an image, enter text, and add it when ready. Text is not inserted automatically." })[direct.acceptedPreset.purpose]} />}
       <PageHeader eyebrow="IMAGE EDITOR" title={direct.acceptedPreset ? getSeoDefinition(language, `/tools/image-studio/${direct.acceptedPreset.purpose}`).title.split(/\s(?:\||—|-)\s/)[0] : t("image.title")} description={t("image.description")}>
@@ -296,6 +300,7 @@ interface EditorHistorySnapshot {
 
 function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: { onEditedResult: (file: File) => void; batchCount: number; batchNotice?: "added" | "limit"; active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>; onDirty: (dirty: boolean) => void }) {
   const { t: sendT } = useTranslation("common");
+  const { confirm: confirmEdit, confirmation: editConfirmation } = useConfirmation();
   const { preparedSend, reason: sendReason, prepareAndSend, retryPrepared, downloadPrepared, invalidatePrepared } = useImageSend();
   const batchAddLock = useRef(false);
   const batchAddTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -1082,10 +1087,12 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const loadFile = (file?: File) => { const task = acquireImage(file); loadImageTask.current = task; return task; };
   loadImageHandler.current = loadFile;
 
-  const newBlankCanvas = (confirm = true) => {
+  const newBlankCanvas = async (ask = true) => {
     const instance = canvas.current;
     if (!instance) return;
-    if (confirm && instance.getObjects().length && !window.confirm(t("image.editor.confirm"))) return;
+    const generation = intakeGeneration.current;
+    if (ask && instance.getObjects().length && !await confirmEdit(t("image.editor.confirm"), sendT("actions.reset"))) return;
+    if (instance !== canvas.current || generation !== intakeGeneration.current) return;
     restoringRef.current = true;
     clearRegionSelection();
     instance.clear();
@@ -1126,10 +1133,12 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     },
   };
 
-  useClipboardImages((images) => {
-    if (canvas.current?.getObjects().length && !window.confirm(t("image.editor.confirm"))) return;
-    if (activeRef.current) void loadFile(images.at(-1));
-  });
+  useClipboardImages(async (images) => {
+    if (!activeRef.current) return;
+    const generation = intakeGeneration.current;
+    if (canvas.current?.getObjects().length && !await confirmEdit(t("image.editor.confirm"), sendT("actions.reset"))) return;
+    if (activeRef.current && generation === intakeGeneration.current) void loadFile(images.at(-1));
+  }, active);
 
   const dropOnPreview = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -1845,6 +1854,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
 
   return (
     <UtilitySectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
+      {editConfirmation}
       <FileDropZone disabled={loadingImage || regionEffectBusy || stickerBusy} files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
       {editorError && <div className="mt-3"><h3 tabIndex={-1} data-testid="image-editor-error" className="mb-1 text-sm font-medium">{t("image.library.operationErrorTitle")}</h3><UtilityNotice kind="error" role="alert">{editorError}</UtilityNotice></div>}
       <ClipboardHint mode="replace" />

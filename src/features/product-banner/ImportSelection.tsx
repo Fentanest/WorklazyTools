@@ -8,7 +8,7 @@ import type { BannerUiText } from "./uiMessages";
 
 type PendingFile = { file: File; sheets: SheetSummary[]; selections: SheetSelection[] };
 const fields: ProductField[] = ["imageUrl", "promotionUrl", "name", "productId", "originPrice", "discountPrice", "discount", "currency", "videoUrl"];
-export function ImportSelection({ text, onImport, errorText, onBusy, onPending }: { text: BannerUiText; onImport: (products: BannerInputProduct[]) => boolean; errorText: (code: InputErrorCode) => string; onBusy: (busy: boolean) => void; onPending: (pending: boolean) => void }) {
+export function ImportSelection({ text, onImport, errorText, onBusy, onPending }: { text: BannerUiText; onImport: (products: BannerInputProduct[], signal: AbortSignal) => boolean | Promise<boolean>; errorText: (code: InputErrorCode) => string; onBusy: (busy: boolean) => void; onPending: (pending: boolean) => void }) {
   const [files, setFiles] = useState<PendingFile[]>([]), [busy, setBusy] = useState(false), [status, setStatus] = useState("");
   const controller = useRef<AbortController | null>(null), importRef = useRef(onImport); importRef.current = onImport;
   useEffect(() => () => controller.current?.abort(), []);
@@ -42,7 +42,7 @@ export function ImportSelection({ text, onImport, errorText, onBusy, onPending }
       if (abort.signal.aborted) { setStatus(text.cancel); return; }
       const errors = [...result.failures.map((f) => f.code), ...result.files.flatMap((f) => f.issues.map((i) => i.code))];
       setStatus(errors.map(errorText).join(" · "));
-      if (result.products.length) { if (importRef.current(result.products)) setFiles([]); }
+      if (result.products.length) { if (await importRef.current(result.products, abort.signal) && !abort.signal.aborted) setFiles([]); }
     } catch (error) { setStatus(errorText(clientErrorCode(error))); }
     finally { controller.current = null; running(false); }
   }

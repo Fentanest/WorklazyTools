@@ -141,8 +141,8 @@ test("new defaults, saved false and mixed display choices survive design switche
   const saved = await editingFile(page, "en"); assert.equal(saved.settings.showName, true); assert.equal(saved.settings.showPrice, false); assert.equal(saved.settings.showButton, true);
   assert.deepEqual(saved.products.map((p) => p.promotionUrl), stateWith(3).project.products.map((p) => p.promotionUrl));
   await page.getByLabel(text.controls.showPrice, { exact: true }).check();
-  page.once("dialog", (dialog) => dialog.accept());
   await page.locator('input[accept=".json"]').setInputFiles({ name: "saved.json", mimeType: "application/json", buffer: Buffer.from(saveProjectJson(saved)) });
+  await page.getByTestId("confirmation-accept").click();
   await page.waitForFunction((label) => [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find((input) => input.closest("label")?.textContent?.trim() === label)?.checked === false, text.controls.showPrice);
   assert.equal(await page.getByLabel(text.controls.showPrice, { exact: true }).isChecked(), false);
   evidence.push({ test: "defaults-and-saved-choices", designs: 5, mixed: saved.settings }); await page.close();

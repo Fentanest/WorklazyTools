@@ -1,3 +1,4 @@
+import { useConfirmation } from "../../hooks/useConfirmation";
 import { BannerUrlPanel } from "./BannerUrlPanel";
 import { bannerUrlMessages } from "./bannerUrl";
 import { FileInput } from "../../components/FileDropProvider";
@@ -24,6 +25,7 @@ import { samplePreview } from "./samplePreview";
 import { createDefaultSettings, updateSettings } from "./settings";
 
 export function ProductBannerPage() {
+  const { confirm, confirmation } = useConfirmation();
   const { i18n } = useTranslation();
   const language = i18n.resolvedLanguage?.startsWith("en") ? "en" : "ko", text = uiMessages[language];
   const help = exportHelp[language];
@@ -71,7 +73,8 @@ export function ProductBannerPage() {
     if (!file || busy) return;
     const request = ++jsonRequest.current;
     setJsonReading(false);
-    if (hasBannerWork(editorRef.current) && !window.confirm(text.confirm)) return;
+    if (hasBannerWork(editorRef.current) && !await confirm(text.confirm, text.replace)) return;
+    if (request !== jsonRequest.current) return;
     if (file.size > PROJECT_LIMITS.bytes) { setMessage(text.limitError); return; }
     setJsonReading(true);
     try {
@@ -92,6 +95,7 @@ export function ProductBannerPage() {
     anchor.href = url; anchor.download = name; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 0); setMessage(text.saved);
   }
   return <UtilityPage toolId="product-banner">
+    {confirmation}
     <PageHeader eyebrow={text.title} title={text.title} description={text.description} />
     <p className="mb-5 max-w-3xl text-sm text-muted-foreground">{text.privacy}</p>
     <div role="status" aria-live="polite" className="mb-4">{message === text.copyFailed ? "" : message}</div>
@@ -105,8 +109,10 @@ export function ProductBannerPage() {
           {/* Keep the importer mounted so pending sheet selections and mappings survive mode changes. */}
           <div hidden={inputMode !== "file"}>
           <UtilitySelect aria-label={text.import} value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="append">{text.add}</option><option value="replace">{text.replace}</option></UtilitySelect>
-          <ImportSelection text={text} errorText={errorText} onBusy={setBusy} onPending={setPending} onImport={(products) => {
-            if (mode === "replace" && hasBannerWork(state) && !window.confirm(text.confirm)) return false;
+          <ImportSelection text={text} errorText={errorText} onBusy={setBusy} onPending={setPending} onImport={async (products, signal) => {
+            const project = editorRef.current.project;
+            if (mode === "replace" && hasBannerWork(editorRef.current) && !await confirm(text.confirm, text.replace)) return false;
+            if (signal.aborted || editorRef.current.project !== project) return false;
             return dispatch({ type: mode, products, importedAt: new Date().toISOString(), confirmDiscard: true });
           }} />
           </div>

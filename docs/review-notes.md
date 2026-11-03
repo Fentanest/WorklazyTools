@@ -1,5 +1,13 @@
 # 검토 기록 (Review Notes)
 
+## 2026-11-04 — 작업 교체 확인창 공용화 (Codx, 정식 검수 대기·미배포)
+
+기준 `5538881b`, 브랜치 `ux-custom-confirm-20261104`. 기존 `UnsavedWorkDialog`의 디자인·native dialog 동작을 `ConfirmationDialog`로 추출하고 라우트 이탈 API를 유지했다. W6 결과 열기, 레거시 편집기의 캔버스 초기화·붙여넣기, 배너 JSON 불러오기·목록 교체의 총 5곳에서 `window.confirm`을 제거했다. 본문은 기존 한영 키를 사용하며 확인 버튼은 기존 초기화/목록 교체, 취소는 공통 취소 키를 사용한다. 확인 대기부터 W6 intake 잠금을 유지하고, 편집기 generation·배너 요청/프로젝트/AbortSignal 확인으로 오래된 작업 적용을 막는다.
+
+빌드(정적페이지112개), 단위1,481+36=1,517건, i18n·static, W6 9건, 신규 확인창4건, 기존 배너12건이 모두 통과했다. 취소/Esc의 상태·픽셀 보존, 확인 후 교체, 포커스와 중복 요청·지연 읽기·동일 파일 재입력을 확인했다. 한영·390/1440px·라이트 코랄/다크 민트 대화상자를 실제 열람했다. 초기 의존성 누락과 시험 선택자/브라우저 탭 순환 가정/디코드 계수/렌더 시점 오류는 로그를 보존하고 검증 준비를 수정했다. 제품 기능 검사를 약화하지 않았으며 macOS Safari(AMD) 실기는 이번 실행 대상이 아니다.
+
+배경 제거는 조사만 했다. worker의 `mask-fallback` 및 `session.executionProvider` audit는 존재하지만 제품 편집기는 diagnostic 구독을 연결하지 않아 화면에 재시도 경로가 표시되지 않는다. 60.7초만으로 CPU 재시도를 확정할 수 없다. 후속 구현 의견은 실제 fallback 이벤트 때만 “정확도를 위해 다시 계산 중”을 표시하는 것이며 이번 변경에는 포함하지 않았다. 증거·명령·해시는 이 worktree의 `artifacts/confirm/`, W6 캡처는 `artifacts/w6/browser/`, 상세 결과는 발주 지정 `SOL-CONFIRM-REPORT.md`에 남긴다.
+
 ## 2026-11-04 — U06 브랜치에 로컬 main 병합 (Codx, 병합 후보 정식 검수 대기)
 
 - U06 `65409720`에 로컬 main `3fd1fa63`을 병합했다. 실제 내용 충돌은 `tests/accessibility-audit.mjs`의 Excel 준비 한 곳이며 CHANGELOG·기존 review-notes 항목에는 충돌이 없었다. 기존 항목은 보존하고 이번 판단을 추가한다. U06의 16환경 프로필·화면별 즉시 저장과 main의 자기 preview PID/포트/token 검증·점유 포트 실패·종료 회수는 함께 유지한다.
