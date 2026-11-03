@@ -69,7 +69,7 @@ try {
                 await alert.waitFor();
                 await page.waitForFunction(() => document.activeElement?.dataset.testid === 'image-editor-operation-error');
                 await page.waitForTimeout(100);
-                assert.equal(await alert.evaluate(n => document.activeElement === n), true);
+                assert.deepEqual(await alert.evaluate(n => ({focused:document.activeElement === n, tag:n.tagName, live:!!n.closest('[role=alert],[role=status],[aria-live]')})), {focused:true, tag:'H3', live:false});
                 assert.deepEqual(heavy, []);
                 assert.equal(await page.locator('dialog[open]').count(), 0);
                 assert.equal(await page.evaluate(() => window.__p3Workers), 0);
@@ -117,9 +117,19 @@ try {
                 assert.equal(await page.getByText(lib.modelsCleared, { exact: true }).count(), 0);
                 await clear.click();
                 await page.getByText(lib.modelsCleared, { exact: true }).waitFor();
+                await page.locator('.upper-canvas').click();
+                assert.equal(await page.getByText(lib.modelsCleared, { exact: true }).count(), 1, 'ordinary canvas clicks retain the completed notice');
                 await page.getByRole('button', { name: label('Export'), exact: true }).click();
-                assert.equal(await page.getByText(lib.modelsCleared, { exact: true }).count(), 0);
+                assert.equal(await page.getByText(lib.modelsCleared, { exact: true }).count(), 1, 'opening a tool retains the completed notice');
                 await page.locator('.asp-menu--export').getByRole('button', { name: 'JPEG', exact: true }).click();
+                assert.equal(await page.getByText(lib.modelsCleared, { exact: true }).count(), 0, 'choosing a format starts new work');
+                const exportScrim = page.locator('.asp-pop__scrim');
+                if (await exportScrim.isVisible()) await page.locator('.asp-menu--export').getByRole('button', {name:'JPEG',exact:true}).press('Escape');
+                await page.locator('.asp-rail__slot > button').filter({hasText:label('Crop & rotate')}).first().click();
+                await clear.click();
+                await page.getByText(lib.modelsCleared, {exact:true}).waitFor();
+                await panel.getByRole('button', {name:label('Rotate right'),exact:true}).click();
+                await page.getByText(lib.modelsCleared, {exact:true}).waitFor({state:'hidden'});
                 assert.deepEqual(errors, []);
                 records.push({ name: lang + '-cancel', workerStops: await page.evaluate(() => window.__p3Terminated), status: lib.cancelled });
             }
@@ -127,6 +137,20 @@ try {
                 await context.close();
             }
         });
+    await test('real edits invalidate a pending model-deletion notice', async () => {
+        const {context, page, panel, controls, lib, label} = await setup();
+        try {
+            await page.locator('.asp-rail__slot > button').filter({hasText:label('Crop & rotate')}).first().click();
+            await page.evaluate(() => window.__p3HoldDelete = true);
+            await controls.getByRole('button', {name:lib.clearModels,exact:true}).click();
+            await page.waitForFunction(() => typeof window.__p3ReleaseDelete === 'function');
+            await panel.getByRole('button', {name:label('Rotate right'),exact:true}).click();
+            await page.evaluate(() => window.__p3ReleaseDelete());
+            await page.waitForFunction(() => window.__p3DeleteResolved);
+            await page.waitForTimeout(100);
+            assert.equal(await page.getByText(lib.modelsCleared, {exact:true}).count(), 0);
+        } finally { await context.close(); }
+    });
     await test('late model-deletion completion cannot restore a stale notice', async () => {
         const { context, page, controls, lib } = await setup();
         try {

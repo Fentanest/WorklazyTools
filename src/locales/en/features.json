@@ -1623,6 +1623,7 @@
       "downloadProgress": "Downloading model/runtime · {{progress}}%",
       "unsupportedFormat": "This browser cannot encode this image format. Choose PNG or JPG.",
       "templateHelp": "To continue editing later, use Save template and Load template in the Image menu above.",
+      "operationErrorTitle": "The operation could not be completed.",
       "cancelled": "Cancelled.",
       "httpsHint": "Background removal requires a secure HTTPS connection. Open the HTTPS address before running it."
     }

@@ -59,10 +59,12 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [errorPresentation, setErrorPresentation] = useState(0);
   const setError = useCallback((message: string) => { setErrorText(message); if (message) setErrorPresentation(value => value + 1); }, []);
   const [errorCode, setErrorCode] = useState<string>();
-  const [notice, setNotice] = useState('');
+  const [notice, setNoticeText] = useState('');
+  const transientFeedback = useRef(false);
+  const setNotice = useCallback((message: string) => { transientFeedback.current = false; setNoticeText(message); }, []);
   const [backgroundCancelled, setBackgroundCancelled] = useState(false);
   const noticeRevision = useRef(0);
-  const clearFeedback = useCallback(() => { noticeRevision.current++; setNotice(''); setBackgroundCancelled(false); }, []);
+  const clearFeedback = useCallback(() => { noticeRevision.current++; transientFeedback.current = false; setNoticeText(''); setBackgroundCancelled(false); }, []);
   const [mode, setMode] = useState<BgMode>('person');
   const modeRef = useRef(mode); modeRef.current = mode;
   const modeChosen = useRef(false);
@@ -87,9 +89,9 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   useEffect(() => {
     if (!error) return;
     const frame = requestAnimationFrame(() => {
-      const alert = root.current?.querySelector<HTMLElement>('[data-testid="image-editor-operation-error"]');
-      alert?.focus({ preventScroll: true });
-      alert?.scrollIntoView({ block: 'center' });
+      const heading = root.current?.querySelector<HTMLElement>('[data-testid="image-editor-operation-error"]');
+      heading?.focus({ preventScroll: true });
+      heading?.scrollIntoView({ block: 'center' });
     });
     return () => cancelAnimationFrame(frame);
   }, [error, errorPresentation]);
@@ -124,7 +126,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     saving.current = false; destination.current = 'result'; pendingCommits.current = [];
     setBgBusy(false); setLoading(false);
   }, [dismissPending]);
-  const cancelBackgroundRemoval = useCallback(() => { cancel(); clearFeedback(); setBackgroundCancelled(true); }, [cancel, clearFeedback]);
+  const cancelBackgroundRemoval = useCallback(() => { cancel(); clearFeedback(); transientFeedback.current = true; setBackgroundCancelled(true); }, [cancel, clearFeedback]);
   useEffect(() => {
     const controller = new BackgroundRemovalController({ language,
       confirm: info => new Promise<boolean>(resolve => {
@@ -134,7 +136,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     bg.current = controller;
     void controller.defaultMode().then(value => { if (bg.current === controller && !modeChosen.current) setMode(value); });
     return () => { controller.dispose(); dismissPending(); if (bg.current === controller) bg.current = undefined; };
-  }, [language, dismissPending]);
+  }, [language, dismissPending, setNotice]);
   useEffect(() => { if (!active) { cancel(); clearFeedback(); } }, [active, cancel, clearFeedback]);
   useEffect(() => {
     onDirtyRef.current(!!source || hasTemplateInput || hasHistoryInput || dirty || loading || bgBusy || !!result || !!preparedSend);
@@ -240,7 +242,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const finishExport = (value: ExportDecision) => { exportPending.current?.resolve(value); exportPending.current = undefined; setExportPrompt(undefined); };
   const finishConsent = (value: boolean) => {
     consentPending.current?.resolve(value); consentPending.current = undefined; setConsent(undefined);
-    if (!value) { clearFeedback(); setBackgroundCancelled(true); }
+    if (!value) { clearFeedback(); transientFeedback.current = true; setBackgroundCancelled(true); }
   };
   const backgroundRemovalLoader = async () => ({ removeBackground: async (input: Blob | string, options?: { progress?: (key: string, current: number, total: number) => void }) => {
     const request = version.current; clearFeedback(); setBgBusy(true); setProgress(0); setBgPhase('preparing'); setError(''); setErrorCode(undefined);
@@ -320,9 +322,9 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       <FileDropZone files={source ? [source.file] : []} disabled={loading || bgBusy} accept={RASTER_IMAGE_ACCEPT} hint={t('image.editor.hint')} onFiles={files => { const next = filterRasterImages(files).at(-1); if (next) void receiveRef.current(next); }} accent="sky" />
       <ClipboardHint mode="replace" />
       {shrink && <UtilityNotice role="status" className="mt-2" data-testid="image-editor-shrink">{shrink}</UtilityNotice>}
-      {displayedError && <UtilityNotice kind="error" role="alert" tabIndex={-1} data-testid="image-editor-operation-error" className="mt-2">{displayedError}{mode === 'product' && (errorCode === 'bg-inference-failed' || errorCode === 'bg-unsupported') && <Button className="ml-2" type="button" variant="outline" onClick={() => {
+      {displayedError && <div className="mt-2"><h3 tabIndex={-1} data-testid="image-editor-operation-error" className="mb-1 text-sm font-medium">{t('image.library.operationErrorTitle')}</h3><UtilityNotice kind="error" role="alert">{displayedError}{mode === 'product' && (errorCode === 'bg-inference-failed' || errorCode === 'bg-unsupported') && <Button className="ml-2" type="button" variant="outline" onClick={() => {
         modeChosen.current = true; modeRef.current = 'person'; setMode('person'); setError(''); setErrorCode(undefined); setNotice(t('image.library.retryReady'));
-      }}>{t('image.library.retryPerson')}</Button>}</UtilityNotice>}
+      }}>{t('image.library.retryPerson')}</Button>}</UtilityNotice></div>}
       {notice && <UtilityNotice role="status" className="mt-2">{notice}</UtilityNotice>}
       <UtilityNotice className="mt-2">{t('image.library.redactionHint')}</UtilityNotice>
       <div className="my-3 flex flex-wrap items-center gap-2" data-testid="image-background-controls">
@@ -331,7 +333,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         </select></label>
         <Button type="button" variant="outline" onClick={() => {
           cancel(); clearFeedback(); const revision = noticeRevision.current; const controller = bg.current;
-          void controller?.clearStoredModels().then(ok => { if (ok && activeRef.current && controller === bg.current && revision === noticeRevision.current) setNotice(t('image.library.modelsCleared')); });
+          void controller?.clearStoredModels().then(ok => { if (ok && activeRef.current && controller === bg.current && revision === noticeRevision.current) { setNotice(t('image.library.modelsCleared')); transientFeedback.current = true; } });
         }}>{t('image.library.clearModels')}</Button>
         {bgBusy && <><span role="status">{t(bgPhase === 'download' ? 'image.library.downloadProgress' : bgPhase === 'preparing' ? 'image.library.backgroundPreparing' : 'image.library.backgroundProcessing', { progress })}</span><Button type="button" variant="secondary" onClick={cancelBackgroundRemoval}>{t('image.cancel')}</Button></>}
       </div>
@@ -346,13 +348,17 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           {outputSize && <Button type="button" variant="ghost" onClick={() => { setOutputSize(undefined); }}>{t('image.library.autoSize')}</Button>}
         </div>
       </fieldset>
-      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onClickCapture={clearFeedback} onChangeCapture={event => {
+      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onClickCapture={event => {
+        // Opening tools or touching the canvas is not a new operation. Native
+        // format selection is; actual edits are observed below and in history.
+        if (event.target instanceof Element && event.target.closest('.asp-fmt')) clearFeedback();
+      }} onInputCapture={clearFeedback} onChangeCapture={event => {
         const input = event.target;
         // Template loading establishes a clean library baseline, but still owns a
         // user file. Protect it and cancel any operation on the previous scene.
         if (input instanceof HTMLInputElement && input.type === 'file' && input.accept.includes('.json') && input.files?.length) {
           if (loading) { event.stopPropagation(); input.value = ''; setNotice(t('image.library.loading')); return; }
-          cancel(); invalidatePrepared(); setHasTemplateInput(true); setResult(undefined);
+          cancel(); clearFeedback(); invalidatePrepared(); setHasTemplateInput(true); setResult(undefined);
           setUnsavedWork('image-studio', { hasWork: true, kind: 'files', scopePath: '/tools/image-studio' });
         }
         // Route source replacement through the host's measured File-only import.
@@ -377,7 +383,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
             if (selectedPreset?.purpose === 'watermark') requestAnimationFrame(ready); else ready();
           }}
           onDirtyChange={value => { if (generation !== latestGeneration.current) return; setDirty(value); if (value) setResult(undefined); }}
-          onHistoryChange={state => { if (generation === latestGeneration.current) { documentRevision.current++; setHasHistoryInput(state.length > 1); invalidatePrepared(); setResult(undefined); } }}
+          onHistoryChange={state => { if (generation === latestGeneration.current) { if (transientFeedback.current) clearFeedback(); else noticeRevision.current++; documentRevision.current++; setHasHistoryInput(state.length > 1); invalidatePrepared(); setResult(undefined); } }}
           onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
             if (generation !== latestGeneration.current) return true;
             saving.current = false; destination.current = 'result'; pendingCommits.current = []; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);

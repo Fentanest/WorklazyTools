@@ -152,9 +152,9 @@ try {
                     await page.getByTestId('image-editor-export-action').locator('button').click();
                 }
                 await page.getByRole('alert').filter({ hasText: /cannot encode/ }).waitFor();
-            await page.waitForFunction(() => document.activeElement?.closest('[role=alert]'));
-            await page.waitForTimeout(100);
-            assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('role')), 'alert', 'failure focus remains at the operation alert');
+                const focusId = library ? 'image-editor-operation-error' : 'image-editor-error';
+                await page.waitForFunction(id => document.activeElement?.dataset.testid === id, focusId);
+                assert.deepEqual(await page.evaluate(() => ({tag:document.activeElement?.tagName, live:!!document.activeElement?.closest('[role=alert],[role=status],[aria-live]')})), {tag:'H3', live:false}, 'focus uses a distinct heading outside live regions');
                 await page.waitForTimeout(100);
                 assert.equal(downloads, 0, 'unsupported encoder must not produce a disguised PNG download');
             }

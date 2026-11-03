@@ -350,8 +350,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   useEffect(() => {
     if (!editorError) return;
     const frame = requestAnimationFrame(() => {
-      const alert = canvasElement.current?.closest('[data-image-owner="editor"]')?.querySelector<HTMLElement>('[data-testid="image-editor-error"]');
-      alert?.focus({ preventScroll: true }); alert?.scrollIntoView({ block: 'center' });
+      const heading = canvasElement.current?.closest('[data-image-owner="editor"]')?.querySelector<HTMLElement>('[data-testid="image-editor-error"]');
+      heading?.focus({ preventScroll: true }); heading?.scrollIntoView({ block: 'center' });
     });
     return () => cancelAnimationFrame(frame);
   }, [editorError]);
@@ -1822,7 +1822,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   return (
     <UtilitySectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
       <FileDropZone disabled={loadingImage || regionEffectBusy || stickerBusy} files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
-      {editorError && <UtilityNotice kind="error" role="alert" tabIndex={-1} data-testid="image-editor-error" className="mt-3">{editorError}</UtilityNotice>}
+      {editorError && <div className="mt-3"><h3 tabIndex={-1} data-testid="image-editor-error" className="mb-1 text-sm font-medium">{t("image.library.operationErrorTitle")}</h3><UtilityNotice kind="error" role="alert">{editorError}</UtilityNotice></div>}
       <ClipboardHint mode="replace" />
       <div className="editor-source-actions mt-2 flex items-center justify-between gap-2.5"><Button type="button" className="rounded-xl" variant="secondary" onClick={() => newBlankCanvas()}><ImageIcon size={16} /> {t("image.editor.blank")}</Button>{file && <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground">{t("image.editor.editing", { name: file.name })}</span>}</div>
       <ImageEditorToolbar

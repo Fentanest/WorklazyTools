@@ -41,9 +41,10 @@ try {
                         await page.getByRole('button', { name: 'WebP', exact: true }).click();
                         await page.getByTestId('image-editor-export-action').locator('button').click();
                     }
-                    const alert = page.getByTestId('image-editor-operation-error');
+                    const alert = page.getByRole('alert');
                     await alert.waitFor();
                     await page.waitForFunction(() => document.activeElement?.dataset.testid === 'image-editor-operation-error');
+                    assert.deepEqual(await page.getByTestId('image-editor-operation-error').evaluate(n => ({tag:n.tagName, live:!!n.closest('[role=alert],[role=status],[aria-live]'), text:n.textContent})), {tag:'H3', live:false, text:lib.operationErrorTitle});
                     assert.equal(await alert.innerText(), lib.unsupportedFormat);
                     assert.match(await alert.innerText(), /JPG/);
                     assert.doesNotMatch(await alert.innerText(), /JPEG/);
