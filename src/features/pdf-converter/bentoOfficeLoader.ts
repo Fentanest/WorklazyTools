@@ -51,7 +51,8 @@ export class BentoOfficeLoader {
       sofficeWasm: wasmUrl,
       sofficeData: dataUrl,
       sofficeWorkerJs: new URL("soffice.worker.js", base).href,
-      browserWorkerJs: new URL("browser.worker.global.js", base).href,
+      // Invalidate previously cached workers that can exhaust the ready pthread pool.
+      browserWorkerJs: new URL("browser.worker.global.js?worklazy=native-threads-1", base).href,
       onProgress: info => this.emit(info.phase === "converting" && this.converter?.isReady()
         ? Math.min(99, 91 + Math.round(info.percent * .08))
         : Math.min(89, 60 + Math.round(info.percent * .29))),

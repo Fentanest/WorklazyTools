@@ -27,7 +27,7 @@ async function prepare(language, mode) {
     external.push(url.href); return route.abort();
   });
   await context.route('**/vendor/libreoffice-converter/2.3.1/*.gz', route => route.fulfill({ body: Buffer.from([0, 0]) }));
-  await context.route('**/vendor/libreoffice-converter/2.3.1/browser.worker.global.js', route => route.fulfill({
+  await context.route(url => url.pathname.endsWith('/vendor/libreoffice-converter/2.3.1/browser.worker.global.js'), route => route.fulfill({
     contentType: 'text/javascript', headers: { 'Cross-Origin-Embedder-Policy': 'require-corp' },
     body: `let converts=0;self.postMessage({type:'loaded'});self.onmessage=({data:m})=>{
       if(m.type==='init')self.postMessage({type:'ready',id:m.id});
