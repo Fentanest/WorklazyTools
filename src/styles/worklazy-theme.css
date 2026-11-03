@@ -625,6 +625,12 @@ input:focus-visible {
 /* Restored mobile chrome for the shell AppShell (removed upstream by the
    W-stream redesign; only these component-scoped rules are restored.
    bottom-tabs / bottom-tab / sidebar rules are left to the base stylesheet). */
+.app-shell {
+  --wl-mobile-header-inset: max(9px, env(safe-area-inset-top));
+  --wl-mobile-header-height: 54px;
+  --wl-sticky-top: 80px;
+}
+.app-shell.editor-mode { --wl-sticky-top: 0px; }
 .mobile-header {
   display: none;
 }
@@ -640,13 +646,14 @@ input:focus-visible {
   border-radius: 11px;
 }
 @media (max-width: 820px) {
+  .app-shell { --wl-sticky-top: calc(var(--wl-mobile-header-inset) + var(--wl-mobile-header-height) + 8px); }
   .mobile-header {
     position: fixed;
     z-index: 50;
-    top: max(9px, env(safe-area-inset-top));
+    top: var(--wl-mobile-header-inset);
     left: 10px;
     right: 10px;
-    height: 54px;
+    height: var(--wl-mobile-header-height);
     padding: 0 8px 0 10px;
     display: flex;
     align-items: center;

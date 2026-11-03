@@ -392,7 +392,7 @@ export function OfficeEditorAppPage() {
     >
       <div
         className={cn(
-          "sticky top-2.5 z-[8] mb-[13px] flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card/95 p-[11px] shadow-lg backdrop-blur-lg max-[620px]:static max-[620px]:grid max-[620px]:grid-cols-2 max-[620px]:[&>*]:w-full max-[620px]:[&>*]:justify-center",
+          "sticky top-[var(--wl-sticky-top,80px)] z-[8] mb-[13px] flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card/95 p-[11px] shadow-lg backdrop-blur-lg max-[620px]:static max-[620px]:grid max-[620px]:grid-cols-2 max-[620px]:[&>*]:w-full max-[620px]:[&>*]:justify-center",
           focusMode &&
             "static mb-2 min-h-[54px] shrink-0 rounded-[14px] px-[9px] py-[7px] max-[820px]:rounded-none max-[820px]:border-x-0 max-[820px]:border-t-0",
         )}

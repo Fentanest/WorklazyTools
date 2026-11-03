@@ -23,3 +23,7 @@
   .library-image-editor .asp-image-editor { height: auto !important; min-height: 0; }
 }
 .library-image-editor .asp-options-panel .asp-ai-cancel { min-height: 44px; width: 100%; }
+
+/* Page-level sticky rail shares the shell header's clearance. The package
+   determines when the rail becomes sticky; desktop static rails keep layout. */
+.library-image-editor .asp-workspace__rail { top: var(--wl-sticky-top, 80px); }

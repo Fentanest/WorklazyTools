@@ -3436,3 +3436,12 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - P3-1 최종 위치 검사 18/18 및 기존 guide-link-smoke 26/26 통과. 320×640·실제 200%에서 클릭 후 제목은 헤더 아래 약 33px, 재진입은 약 25px이다. 고정 600ms 측정의 초기 17/18(이동 중 redactor 200% 1건)을 숨기지 않고 새 하네스에 5프레임 스크롤 안정화 대기만 보완했다. 상한·헤더 아래 단언과 제품 CSS는 그대로 유지했다. unit 1,288+17=1,305건, i18n·build·static은 종료 0이다.
 
 - 200% 회귀의 실제 Node 종료 0/TAP 24/24, Tab 정지점 2,184·입력 관측 584·완전 가림/누락 0을 확인했다(부분 겹침 62회 별도). 독립 offset 하네스 수정 때문에 넓은 선언 입력을 가진 focus 영수증 래퍼는 source_unchanged=false/종료 2였으며 이를 통과로 조작하지 않았다. 원래 제품·focus/guide 직접 입력 등 1,206개 해시가 같고 독립 offset 파일 1개만 다른 것을 대조해 영향 없는 실제 결과를 재사용했다. 상세 `SOL-SHELL-A11Y-FIX1.md`·`input-reuse-proof.json`.
+
+
+## 2026-11-03 — 모바일 sticky 헤더 가림 (Codx, 검수 대기)
+
+- 기준 origin/main b8e51f0c에서 이미지 레일 sticky top 0과 mobile-header top9/bottom63의 겹침을 재현했다. 첫 5개 도구는 sticky 상태에서 헤더에 hit target을 빼앗겼고 신규 회귀는 95점 가림으로 실패했다. scroll-padding은 sticky의 top을 이동시키지 않으므로 기존 키보드 여백은 유지하고 sticky clearance를 별도로 공통화했다.
+- app-shell에 header inset(max9/safe-area)·height54·sticky top을 정의하고 모바일 sticky top=header bottom+8, desktop80, editor-mode0으로 연결했다. 이미지 레일은 패키지의 기존 sticky 조건을 유지한다. FolioTrace 시장 탭과, 전수 점검에서 추가 재현한 Office 작업 toolbar(621~820 및 desktop의 standard/error 상태)도 같은 값을 사용한다. Office의 <=620 static 및 editing-mode static은 유지했다.
+- UtilityPage의 예전 fixed104px 헤더용 모바일 padding이 static 검색줄 뒤에서 중복됐다. 모바일만 16px로 줄여 Chrome 414/390/320에서 검색줄-제목 간격을 114→26px로 맞췄으며 desktop61px은 유지했다.
+- 이미지/Folio 18조합(모바일 3폭×한영×라이트/다크, inset47, desktop1440 네 조합과 1024 추가), Office768/1440 4조합의 총3,885 hit 지점이 모두 대상 컨트롤이었다. source sticky 선언 전수와 공개30도구+Office 작업 route의 안정 초기 화면을 확인했다. 표/모달 내부 sticky와 모바일 static은 구분하고 범용 top override는 하지 않았다.
+- unit1,357·i18n·build·static 통과. WebKit은 ICU74/xml2 호스트 라이브러리 부재로 실행 불가였으며, 실제 iPhone Safari/터치 재검증을 했다고 주장하지 않는다. 로그·전후 좌표·화면·전수 분류는 SOL-MOBILE-STICKY-REPORT.md에 둔다. push·merge·배포는 수행하지 않았다.

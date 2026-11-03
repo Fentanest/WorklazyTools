@@ -195,7 +195,7 @@
 
 .foliotrace-market-tabs {
   position: sticky;
-  top: 80px;
+  top: var(--wl-sticky-top, 80px);
   z-index: 3;
   display: flex;
   gap: 0.4rem;
