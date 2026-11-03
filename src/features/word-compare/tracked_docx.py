@@ -939,6 +939,10 @@ def _styled_tokens(paragraph, collect_events=False):
                     else:add_event(node)
                 return
             run_properties = node.find(W + "rPr")
+            # Tokens only read this snapshot. Copy per run, rather than once per
+            # character; emission/projection helpers still copy before mutation.
+            # Keep it detached from the source and local to this tokenization.
+            properties_snapshot = copy.deepcopy(run_properties) if run_properties is not None else None
             # Word may split one visible word across several runs for reasons
             # unrelated to the document text (proofing, fields, formatting, or
             # prior revisions). Character tokens keep the text alignment
@@ -947,7 +951,7 @@ def _styled_tokens(paragraph, collect_events=False):
             for child in node:
                 value = child.text or "" if child.tag == W + "t" else "\t" if child.tag == W + "tab" else "\n" if child.tag in (W + "br", W + "cr") else ""
                 if (_is_drawing_event(child) or _is_note_event(child)) and collect_events and not inside_preserved_wrapper: events.setdefault(len(tokens),[]).append(child)
-                for token in value:tokens.append({"text":token,"properties":copy.deepcopy(run_properties) if run_properties is not None else None,"wrapper":wrapper,"link":link,"sourceOffset":len(tokens)})
+                for token in value:tokens.append({"text":token,"properties":properties_snapshot,"wrapper":wrapper,"link":link,"sourceOffset":len(tokens)})
             return
         for child in node:
             if child.tag != W + "pPr":

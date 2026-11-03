@@ -48,6 +48,8 @@ async function mount(recovery = false) {
     if (id === './resizeResult') return { resizeResult: noop };
     if (id === './encodeSendImage') return { encodeSendImage: noop };
     if (id === './useImageSend') return { useImageSend: () => ({ invalidatePrepared: noop, captureSendRevision: () => 0 }) };
+    // The vendor editor above has no rail DOM; rail behavior is covered by mobile-editor-rail-smoke.
+    if (id === './useMobileImageRail') return { useMobileImageRail: noop };
     throw Error('Unexpected fixture dependency: ' + id);
   };
   const file = process.env.BG_NOTICE_COMPONENT_SOURCE || 'src/features/image-studio/editor/LibraryImageEditor.tsx';

@@ -27,7 +27,10 @@ async function measure(page,selector,buttonSelector){return page.locator(selecto
  const all=[...rail.querySelectorAll(buttonSelector)].filter(el=>el.getClientRects().length&&!el.disabled);const controls=innerWidth>820?all.slice(0,5):all;
  const points=[];
  for(const [index,button]of controls.entries()){
-  const b=button.getBoundingClientRect(),cx=b.left+b.width/2,cy=b.top+b.height/2;
+  // The compact rail intentionally scrolls horizontally. mobile-editor-rail-smoke
+  // separately checks all 10 tools via Tab, clipped entry/exit, and shell hit targets;
+  // this shared sticky smoke samples only fully visible horizontal tool rectangles.
+  const b=button.getBoundingClientRect();if(b.left<r.left+1||b.right>r.right-1)continue;const cx=b.left+b.width/2,cy=b.top+b.height/2;
   for(const [part,x,y]of [['center',cx,cy],['top',cx,b.top+2],['bottom',cx,b.bottom-2],['left',b.left+2,cy],['right',b.right-2,cy]]){
    const hit=document.elementFromPoint(x,y);points.push({index,part,x,y,hit:hit===button||button.contains(hit),blockedBy:hit?.closest('header')?.className||hit?.tagName||null});
   }

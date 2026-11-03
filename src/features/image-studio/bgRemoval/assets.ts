@@ -46,24 +46,29 @@ export async function acquireAssets(plan: AssetPlan, signal: AbortSignal, onProg
     try {
       const response = await fetcher(asset.url, { signal, credentials: 'omit', cache: 'no-store', redirect: 'error' });
       if (!response.ok || !response.body) throw new BgRemovalError('bg-model-fetch-failed');
-      const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let length = 0;
+      // The manifest pins the exact length. Copy each chunk into its final
+      // allocation immediately instead of retaining a second model-sized list.
+      const bytes = new Uint8Array(asset.bytes);
+      const reader = response.body.getReader(); let length = 0;
       try {
         while (true) {
           cancelled(signal); const { done, value } = await reader.read(); if (done) break;
-          length += value.byteLength;
-          if (length > asset.bytes) throw new BgRemovalError('bg-model-integrity');
-          chunks.push(value); onProgress(asset.id, length, asset.bytes);
+          if (value.byteLength > bytes.byteLength - length) throw new BgRemovalError('bg-model-integrity');
+          bytes.set(value, length); length += value.byteLength;
+          onProgress(asset.id, length, asset.bytes);
         }
       } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
-      const bytes = new Uint8Array(length); let offset = 0;
-      for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+      // A zero-filled tail must never make a short response look complete.
+      if (length !== asset.bytes) throw new BgRemovalError('bg-model-integrity');
       buffer = bytes.buffer;
     } catch (error) {
       cancelled(signal);
       throw error instanceof BgRemovalError ? error : new BgRemovalError('bg-model-fetch-failed');
     }
     cancelled(signal); await verifyAsset(buffer, asset); cancelled(signal);
-    try { await plan.cache?.put(asset.url, new Response(buffer.slice(0), { headers: { 'Content-Type': 'application/octet-stream' } })); }
+    // Response snapshots its BufferSource body. Its owned bytes survive the
+    // later transfer to the worker; an explicit slice adds another whole copy.
+    try { await plan.cache?.put(asset.url, new Response(buffer, { headers: { 'Content-Type': 'application/octet-stream' } })); }
     catch { onCacheFailure(); }
     cancelled(signal); verified.push({ asset, buffer, source: 'network' });
   }

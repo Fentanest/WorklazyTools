@@ -127,3 +127,46 @@ test('clearStoredModels reports blocked deletion instead of false success', asyn
   const controller = new BackgroundRemovalController({ confirm: () => false, cacheStorage: { delete: async () => true } as unknown as CacheStorage });
   assert.equal(await controller.clearStoredModels(), true);
 });
+
+test('streamed assets consume reusable reader buffers before the next read', async () => {
+  const expected = new Uint8Array([1, 2]).buffer;
+  const asset: Asset = { id: 'model', url: 'https://local.test/model', bytes: 2, sha256: await sha256(expected) };
+  const shared = new Uint8Array(1); let reads = 0, cancelled = 0, released = 0;
+  const fetcher = (async () => ({ ok: true, body: { getReader: () => ({
+    read: async () => ++reads <= 2 ? (shared[0] = reads, { done: false, value: shared }) : { done: true },
+    cancel: async () => { cancelled++; }, releaseLock: () => { released++; },
+  }) } })) as unknown as typeof fetch;
+  const result = await acquireAssets(await prepareAssets([asset], null), new AbortController().signal, () => undefined, () => undefined, fetcher);
+  assert.deepEqual(new Uint8Array(result[0].buffer), new Uint8Array([1, 2]));
+  assert.equal(cancelled, 1); assert.equal(released, 1);
+});
+
+test('a short stream with a matching zero-filled tail is still rejected', async () => {
+  const asset: Asset = { id: 'model', url: 'https://local.test/model', bytes: 3, sha256: await sha256(new Uint8Array([1, 2, 0]).buffer) };
+  const cache = new MemoryCache();
+  await assert.rejects(acquireAssets(await prepareAssets([asset], cache.storage()), new AbortController().signal,
+    () => undefined, () => undefined, (async () => new Response(new Uint8Array([1, 2]))) as typeof fetch), { code: 'bg-model-integrity' });
+  assert.equal(cache.items.size, 0);
+});
+
+test('overflowing streamed bytes cancel the reader and never populate cache', async () => {
+  const { assets } = await fixtures(), cache = new MemoryCache(); let cancelled = 0, released = 0;
+  const fetcher = (async () => ({ ok: true, body: { getReader: () => ({
+    read: async () => ({ done: false, value: new Uint8Array([1, 2, 3, 4]) }),
+    cancel: async () => { cancelled++; }, releaseLock: () => { released++; },
+  }) } })) as unknown as typeof fetch;
+  await assert.rejects(acquireAssets(await prepareAssets([assets[0]], cache.storage()), new AbortController().signal,
+    () => undefined, () => undefined, fetcher), { code: 'bg-model-integrity' });
+  assert.equal(cancelled, 1); assert.equal(released, 1); assert.equal(cache.items.size, 0);
+});
+
+test('cache owns verified bytes after the acquired buffers are transferred', async () => {
+  const { a, b, assets } = await fixtures(), cache = new MemoryCache();
+  const result = await acquireAssets(await prepareAssets(assets, cache.storage()), new AbortController().signal,
+    () => undefined, () => undefined, (async url => new Response(String(url).endsWith('model') ? a : b)) as typeof fetch);
+  const received = structuredClone(result, { transfer: result.map(item => item.buffer) });
+  assert.ok(result.every(item => item.buffer.byteLength === 0));
+  for (const item of received) await verifyAsset(item.buffer, item.asset);
+  const warm = await prepareAssets(assets, cache.storage()); assert.equal(warm.missingBytes, 0);
+  for (const item of warm.cached.values()) await verifyAsset(item.buffer, item.asset);
+});

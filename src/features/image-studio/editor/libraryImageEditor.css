@@ -28,5 +28,29 @@
    determines when the rail becomes sticky; desktop static rails keep layout. */
 .library-image-editor .asp-workspace__rail { top: var(--wl-sticky-top, 80px); }
 
+.mobile-image-rail-hint { display: none; }
+@media (max-width: 820px) {
+  .mobile-image-rail-hint { display: block; margin: 0 0 6px; }
+  /* Keep the tablet canvas/options columns, with the rail spanning their top row.
+     The SDK's narrower flex-column workspace ignores these grid properties. */
+  .library-image-editor .asp-workspace { grid-template-columns: minmax(0, 1fr) 232px; grid-template-rows: auto minmax(0, 1fr); }
+  .library-image-editor .asp-workspace__rail {
+    grid-column: 1 / -1; align-self: start; width: 100%; position: sticky; z-index: 6;
+    flex: none; flex-direction: row; gap: 4px; padding: 6px 8px;
+    clip-path: inset(var(--wl-rail-clip-top, 0px) 0 var(--wl-rail-clip-bottom, 0px) 0);
+    flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: thin; overscroll-behavior-x: contain;
+  }
+  .library-image-editor .asp-workspace__rail .asp-rail__slot { flex: 0 0 80px; min-width: 80px; max-width: 80px; }
+  .library-image-editor .asp-workspace__rail .asp-rail__tool { padding: 7px 4px; }
+  .library-image-editor .asp-workspace__rail .asp-rail__label { white-space: nowrap; }
+  .library-image-editor .asp-workspace__rail [data-shell-clipped] { pointer-events: none; }
+  .library-image-editor .asp-rail__flyout[popover] {
+    margin: 0; right: auto; bottom: auto;
+    max-height: calc(100dvh - var(--wl-rail-menu-top, 80px) - var(--wl-rail-bottom-clearance, 89px));
+    overflow-y: auto;
+  }
+}
+
 /* The host starts model help on its own line after the fork's action label. */
 .library-image-editor .asp-options-panel .asp-hint:has(+ .asp-redact-apply) { white-space: pre-line; }
