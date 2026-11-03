@@ -205,6 +205,7 @@ try {
             const { context, page, library } = await setup();
             try {
                 await put(page, library, fixture(320, 200));
+                await page.getByTestId('image-editor-png-size').locator('input[type=number]').first().fill('200');
                 await page.evaluate(() => {
                     const original = HTMLCanvasElement.prototype.toBlob;
                     window.__pixelHold = true;
