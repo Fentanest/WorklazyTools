@@ -1,6 +1,6 @@
-import test, { before, after } from "node:test";
+import test, { beforeEach, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PNG } from "pngjs";
@@ -14,7 +14,11 @@ import { BANNER_SANDBOX } from "../../src/features/product-banner/exporter.ts";
 
 let base = process.env.TEST_BASE_URL || "";
 let server: Awaited<ReturnType<typeof startRecoveryServer>> | undefined;
-const shots = process.env.PB_T5_SHOT_DIR || await mkdtemp(join(tmpdir(), "worklazy-product-banner-ui-"));
+const specifiedShots = process.env.PB_T5_SHOT_DIR;
+let shots = specifiedShots || "";
+// Preserve diagnostics if setup or any case fails; remove only our successful
+// default directory, never a caller-owned path or another run's directory.
+let preserveDefaultShots = true;
 const captures: string[] = [];
 const bitmap = new PNG({ width: 200, height: 140 });
 for (let y = 0; y < 140; y++) for (let x = 0; x < 200; x++) {
@@ -24,19 +28,43 @@ for (let y = 0; y < 140; y++) for (let x = 0; x < 200; x++) {
 const image = PNG.sync.write(bitmap);
 let browser: Browser;
 let externalAttempts = 0;
-before(async () => {
-  await mkdir(shots, { recursive: true });
-  console.log(`UI screenshots: ${shots}`);
-  if (!base) { server = await startRecoveryServer({ root: process.env.PB_DIST || "dist", port: 0 }); base = server.url; }
-  browser = await chromium.launch({ executablePath: process.env.PB_UI_CHROMIUM_PATH, args: ["--no-sandbox"] });
-  console.log(`Browser ${browser.version()}`);
+let initialization: Promise<void> | undefined;
+beforeEach(async () => {
+  initialization ??= (async () => {
+    if (!shots) shots = await mkdtemp(join(tmpdir(), "worklazy-product-banner-ui-"));
+    await mkdir(shots, { recursive: true });
+    console.log(`UI screenshots: ${shots}`);
+    if (!base) { server = await startRecoveryServer({ root: process.env.PB_DIST || "dist", port: 0 }); base = server.url; }
+    browser = await chromium.launch({ executablePath: process.env.PB_UI_CHROMIUM_PATH, args: ["--no-sandbox"] });
+    console.log(`Browser ${browser.version()}`);
+    preserveDefaultShots = false;
+  })();
+  await initialization;
 });
+afterEach((context) => { if (context.error) preserveDefaultShots = true; });
 after(async () => {
-  await browser?.close();
-  await server?.close();
-  await writeFile(`${shots}/MANIFEST.sha256`, (await Promise.all(captures.map(async (name) => `${createHash("sha256").update(await readFile(`${shots}/${name}`)).digest("hex")}  ${name}\n`))).join(""));
-  console.log(`Captured ${captures.length} synthetic screens; external HTTP requests sent: 0; intercepted: ${externalAttempts}`);
+  if (!initialization) return;
+  try {
+    await browser?.close();
+    await server?.close();
+    if (shots) {
+      await writeFile(`${shots}/MANIFEST.sha256`, (await Promise.all(captures.map(async (name) => `${createHash("sha256").update(await readFile(`${shots}/${name}`)).digest("hex")}  ${name}\n`))).join(""));
+      console.log(`Captured ${captures.length} synthetic screens; external HTTP requests sent: 0; intercepted: ${externalAttempts}`);
+    }
+  } catch (error) {
+    preserveDefaultShots = true;
+    throw error;
+  } finally {
+    if (!specifiedShots && shots) {
+      if (preserveDefaultShots) console.log(`Preserved failed-run UI screenshots: ${shots}`);
+      else {
+        await rm(shots, { recursive: true, force: true });
+        console.log(`Removed temporary UI screenshots: ${shots}`);
+      }
+    }
+  }
 });
+
 async function pageFor(language: string, width = 1440, theme = "light-coral") {
   const page = await browser.newPage({ viewport: { width, height: 1000 } });
   await page.addInitScript((theme) => { localStorage.setItem("worklazy-theme", theme); (window as any).__WORKLAZY_MOCK_PROVIDERS__ = true; }, theme);
