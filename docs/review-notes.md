@@ -3490,3 +3490,14 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - 전 입력에 보편적인 이득은 아니다. 작은 저장소 fixture는 Worker 완료 비율 1.005~1.162, 전체 10쌍 중앙 비율은 1.023이었다. 같은 런타임의 작은 생성 대조도 일부 1~4ms 증가를 보였다. 큰 입력 개선과 작은 입력의 미개선을 함께 보고하며 원 코퍼스 개선으로 일반화하지 않는다. 호스트 load1 36.57~50.55를 기록했고 부하를 기다리거나 표본을 제거하지 않았다.
 - 메모리 감소는 확인하지 못했다. large 작업 RSS 관측 최고 중앙값 604.2→614.2MiB, WASM 힙은 약 180MiB로 같았다. 20ms 관측치와 초기화 포함 최고를 구분하며 순간 최고/실기기 보장을 하지 않는다. R30 추출 구조·메모리 후속은 남는다.
 - Word 단위 10파일 24건·출력 회귀 7모듈, i18n·build·static을 통과했다. dist 817,651,850B로 1GiB 미만이다. 실제 Chrome156의 medium 표본은 화면 15.881s·DOCX 준비 18.230s·상세 진입 0.991s, 측정 구간 새 폰트 요청 0건·main Layout 263ms·RecalcStyle 164ms였다. Node 수치와 브라우저 냉간 수치는 직접 비교하지 않는다. 브라우저 ZIP CRC·한글·추적 삽입을 확인했고 자세한 로그/환경/한계는 SOL-DOCX-SPEED-REPORT.md에 둔다. push·merge·배포 없음.
+
+## 2026-11-04 — U06 현재 접근성 재수집 (Codx, 정식 검수 대기)
+
+- 기준 654ebd16(U08 수집 receipt 수리 포함)에서 지정 작업 브랜치 a11y-recollect-20261104를 만들었다. 기본 감사 46등록의 중복을 제거한 16상태를 4테마×ko/en×1280×800/412×839로 전후 각256회 수집했다. 과거 1,973·183 수치를 재사용하지 않았다. stamp/structure/raster 편집의 기존 owned scope와 단일 HWP vendor iframe 제외를 유지하며 EN은 같은 frame의 번역된 title만 사용했다.
+- ToolsPage.tsx:92의 분류 버튼 묶음과 HwpEditorPage.tsx:313의 host 묶음에 role=group을 추가했다. 두 aria-prohibited-attr incomplete는 16환경×2대상 32→0이다. 제품 변경은 이 두 속성뿐이며 CSS·팔레트·브랜드 카드 색·LanguageSwitcher 소스는 변경하지 않았다.
+- 현재 axe 규칙 위반123→125, 위반 노드272→278, 미확정10,824→10,794, 기존 픽셀 해소248→248이다. 도구 영역의 대비 위반250·대비 미확정6,624는 전후 같고, 셸의 하단 탭에서 위반6→12·미확정3,744→3,746 관측 차이가 있다. 추가6위반은 dark-coral/dark-mint EN 문서 결과 상태의 3개 탭이다. 이를 본 작업의 색 회귀로 확정하지 않고 상태·배경 고정 재현 후속으로 남겼다. 전32프로필의 0위반 gate는 계속 실패하며 limits를 높이지 않았다.
+- 실제 셸/페이지/B108 소유 분류를 raw DOM 조상으로 별도 수집했다. 기존 shared-existing/inherited는 페이지의 기존 영역도 포함하므로 이를 모두 셸 소유로 오인하지 않는다. 수정 후 incomplete는 셸3,746·페이지6,632·B108 수용 부채416이다. B108은 신규 후보에서 제외했다. target·실제 감사 URL·HTML·이유·대비값·크기는 evidence/u06/after/nodes.csv에 있다. axe의 미확정 contrastRatio=0을 실제0:1로 세지 않았다.
+- LanguageSwitcher는 홈/도구 목록의 normal/hover/keyboard focus-visible를 전후192회 픽셀 측정해 4테마 모두16.4359:1 이상이었다. 미달이 아니므로 수정하지 않았다. native option 팝업·focus outline 자체·모든 스크롤 상태의 보장으로 확대하지 않는다.
+- 나머지는 수정하지 않았다. Excel 날짜 해석 select-name critical16노드, PDF/Excel/문서 비교의 국소 대비, 모바일 PDF aside role=dialog의 aria-allowed-role incomplete8노드, 셸 하단 탭을 후속 후보로 분리했다. incomplete 보조 스캔48화면3,408target 중179저비율은 후보 수로만 남겼고, 대표64개를 요소별로 다시 측정해38미달 표본을 확인했다(공유 번호 배지·홈 CTA/카드·선택 목록/안내·셸 안내). 이 보조 결과로 core incomplete를 임의 차감하지 않았다.
+- build·unit(1,452+36=1,488, fail/skip0)·i18n·static(독립 진입18행 포함) 종료0/입력 불변. 관련 감사 unit20/20, 원본 receipt/등록/프로필 검증32프로필·512화면을 통과했다. 원자료와 명령·입력 hash·로그는 worktree의 evidence/u06/, 승인 입력표는 docs/jobs/todo/u06-20261104/task.json에 보존한다.
+- 실패도 보존했다. 초기 MOCK opt-in에 의한 동적 광고 target 제거와 기존 연속 CSV 입력 경쟁을 감사 준비 코드에서 수리했다. 준비 중 소스 변경으로 무효화된 unit2회는 통과로 쓰지 않았다. 수정 후 1프로필은 로딩 DOM 교체를 U08이 거부해 동일 source/dist로 해당 조합만 재수집했다. 실패 로그·원 controller 종료2·재수집 manifest와 gate 실패를 모두 남겼다. 다른 서비스 종료·push·merge·배포는 수행하지 않았다. 상세 한국어 보고서는 지정 scratchpad의 SOL-U06-REPORT.md다.
