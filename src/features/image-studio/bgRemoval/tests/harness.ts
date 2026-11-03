@@ -103,3 +103,17 @@ w.productCachePlan = async (stage: 'empty' | 'model-and-obsolete' | 'warm' | 'co
   const plan = await prepareAssets(assets, caches);
   return { stage, missingBytes: plan.missingBytes, cached: [...plan.cached.keys()], runtimeUrl: assets[1].url, cacheKeys: (await cache.keys()).map(r => r.url) };
 };
+
+// QA only: provider comparison bypasses the product capability gate.
+w.qualityProbe = async (mode: BgMode, ep: 'wasm' | 'webgpu', input: Blob, scenario?: 'constant-gpu') => {
+  const assets = w.assets(mode);
+  const model = { asset: assets[0], buffer: await (await fetch(assets[0].url)).arrayBuffer() };
+  const runtime = { asset: assets[1], buffer: await (await fetch(assets[1].url)).arrayBuffer() };
+  const probe = new Worker(new URL('./quality-probe.worker.ts', import.meta.url), { type: 'module' });
+  try { return await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Quality probe timeout')), 240000);
+    probe.onmessage = ({ data }) => { clearTimeout(timer); resolve(data); };
+    probe.onerror = e => { clearTimeout(timer); reject(new Error(e.message)); };
+    probe.postMessage({ mode, ep, input, model, runtime, scenario }, [model.buffer, runtime.buffer]);
+  }); } finally { probe.terminate(); }
+};
