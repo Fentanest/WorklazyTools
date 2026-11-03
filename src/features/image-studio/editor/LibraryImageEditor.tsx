@@ -10,7 +10,7 @@ import { setUnsavedWork } from '../../../app/toolState';
 import type { ImageEditorDirectHandle } from '../ImageStudioPage';
 import type { ImageDirectPreset } from '../imageDirect';
 import { ClipboardHint, filterRasterImages, RASTER_IMAGE_ACCEPT } from '../imageStudioShared';
-import { BackgroundRemovalController, BgRemovalError, messages, productRiskMessages, productDeviceRestriction, type BgMode, type ConsentInfo } from '../bgRemoval';
+import { BackgroundRemovalController, BgRemovalError, messages, productRiskMessages, productRecoveryMarker, productRecoveryMessages, productDeviceRestriction, type BgMode, type ConsentInfo } from '../bgRemoval';
 import { actualShrinkNotice, classifyD6, draftD6Props } from './d6Policy';
 import { prepareImage, type PreparedImage } from './prepareImage';
 import { resizeResult } from './resizeResult';
@@ -71,6 +71,8 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     setErrorCode(current => current === 'bg-product-device-restricted' ? undefined : current);
   }, []);
   const [notice, setNoticeText] = useState('');
+  const [recoveryNotice, setRecoveryNotice] = useState(() => productRecoveryMarker.hasInterrupted());
+  useEffect(() => { if (recoveryNotice) productRecoveryMarker.consume(); }, [recoveryNotice]);
   const [jpegTransparencyNotice, setJpegTransparencyNotice] = useState(false);
   const transientFeedback = useRef(false);
   const setNotice = useCallback((message: string) => { transientFeedback.current = false; setNoticeText(message); }, []);
@@ -124,7 +126,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     ...t('image.library.labels', { returnObjects: true }) as Record<string, string>,
     ...(touchInput ? { 'Click an object on the canvas to select it. Use the Layers panel to lock, reorder, group, align, or change opacity. Shift-click to multi-select.': t('image.library.touchSelectionHelp') } : {}),
     'This browser cannot encode this image format. Choose PNG or JPEG.': t('image.library.unsupportedFormat'),
-    'runs an AI model entirely in your browser — no upload. The model (~tens of MB) downloads once on first use, then is cached.': !secureBackgroundContext ? t('image.library.httpsHint') : mode === 'product' && productRestricted ? messages[language]['bg-product-device-restricted'] : t(mode === 'person' ? 'image.library.personModelHelp' : 'image.library.productModelHelp'),
+    'runs an AI model entirely in your browser — no upload. The model (~tens of MB) downloads once on first use, then is cached.': '\n' + (!secureBackgroundContext ? t('image.library.httpsHint') : mode === 'product' && productRestricted ? messages[language]['bg-product-device-restricted'] : t(mode === 'person' ? 'image.library.personModelHelp' : 'image.library.productModelHelp')),
   }), [t, mode, secureBackgroundContext, productRestricted, language, touchInput]);
   const exportFileName = `${(source?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited`;
   const labelsRef = useRef(labels); labelsRef.current = labels;
@@ -175,7 +177,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
 
   const receive = async (file: File, context?: IntakeContext) => {
     if (!filterRasterImages([file]).length || context?.signal.aborted) return false;
-    cancel(); const request = version.current;
+    setRecoveryNotice(false); cancel(); const request = version.current;
     invalidatePrepared(); setLoading(true); setError(''); setErrorCode(undefined); clearFeedback(); setResult(undefined); setOutputSize(undefined); setNativeOutputSize(undefined);
     const abort = () => { if (request === version.current) cancel(); };
     context?.signal.addEventListener('abort', abort, { once: true });
@@ -268,7 +270,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     if (!value) { clearFeedback(); transientFeedback.current = true; setBackgroundCancelled(true); }
   };
   const backgroundRemovalLoader = async () => ({ removeBackground: async (input: Blob | string, options?: { progress?: (key: string, current: number, total: number) => void }) => {
-    const request = version.current; clearFeedback(); setBgBusy(true); setProgress(0); setBgPhase('preparing'); setError(''); setErrorCode(undefined);
+    const request = version.current; setRecoveryNotice(false); clearFeedback(); setBgBusy(true); setProgress(0); setBgPhase('preparing'); setError(''); setErrorCode(undefined);
     try {
       const controller = bg.current;
       if (!controller || !activeRef.current) throw new BgRemovalError('ai-cancelled');
@@ -346,6 +348,9 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const shrink = source && actualShrinkNotice(source.original, source.decoded, language);
   return <UtilitySectionCard title={t('image.editor.title')} description={t('image.library.description')}>
     <div ref={root} data-testid="library-image-editor">
+      {recoveryNotice && <UtilityNotice role="status" className="mb-3" data-testid="image-background-recovery">
+        <p>{productRecoveryMessages[language].body}</p><Button type="button" variant="ghost" onClick={() => setRecoveryNotice(false)}>{productRecoveryMessages[language].dismiss}</Button>
+      </UtilityNotice>}
       <FileDropZone files={source ? [source.file] : []} disabled={loading || bgBusy} accept={RASTER_IMAGE_ACCEPT} hint={t('image.editor.hint')} onFiles={files => { const next = filterRasterImages(files).at(-1); if (next) void receiveRef.current(next); }} accent="sky" />
       <ClipboardHint mode="replace" />
       {shrink && <UtilityNotice role="status" className="mt-2" data-testid="image-editor-shrink">{shrink}</UtilityNotice>}
@@ -355,7 +360,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       {notice && <UtilityNotice role="status" className="mt-2">{notice}</UtilityNotice>}
       <UtilityNotice className="mt-2">{t('image.library.redactionHint')}</UtilityNotice>
       <div className="my-3 flex flex-wrap items-center gap-2" data-testid="image-background-controls">
-        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select aria-describedby={productRestricted ? 'image-background-product-restriction' : undefined} className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { clearFeedback(); clearProductRestrictionError(); modeChosen.current = true; modeRef.current = event.target.value as BgMode; setMode(modeRef.current); }}>
+        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select aria-describedby={productRestricted ? 'image-background-product-restriction' : undefined} className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { setRecoveryNotice(false); clearFeedback(); clearProductRestrictionError(); modeChosen.current = true; modeRef.current = event.target.value as BgMode; setMode(modeRef.current); }}>
           <option value="person">{t('image.library.person')}</option><option value="product" disabled={productRestricted}>{t('image.library.product')}</option>
         </select></label>
         <Button type="button" variant="outline" onClick={() => {

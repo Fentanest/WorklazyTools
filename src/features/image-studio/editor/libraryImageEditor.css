@@ -27,3 +27,6 @@
 /* Page-level sticky rail shares the shell header's clearance. The package
    determines when the rail becomes sticky; desktop static rails keep layout. */
 .library-image-editor .asp-workspace__rail { top: var(--wl-sticky-top, 80px); }
+
+/* The host starts model help on its own line after the fork's action label. */
+.library-image-editor .asp-options-panel .asp-hint:has(+ .asp-redact-apply) { white-space: pre-line; }

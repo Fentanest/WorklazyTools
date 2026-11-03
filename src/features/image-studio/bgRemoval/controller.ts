@@ -1,3 +1,4 @@
+import { productRecoveryMarker } from './recovery.ts';
 import { acquireAssets, assetsFor, CACHE_NAME, manifest, prepareAssets, type BgMode } from './assets.ts';
 import { BgRemovalError, cancelled, normalizeError, messages, productRiskMessages } from './errors.ts';
 import type { Diagnostic, WorkerRequest, WorkerResponse } from './protocol.ts';
@@ -29,10 +30,11 @@ export class BackgroundRemovalController {
   private generation = 0;
   private active?: AbortController;
   private worker?: Worker;
+  private finishRecovery?: () => void;
   private readonly options: ControllerOptions;
   constructor(options: ControllerOptions) { this.options = options; }
   async defaultMode(): Promise<BgMode> { return !productDeviceRestriction() && !productDeviceWarning() && await (this.options.productSupported ?? productSupported)() ? 'product' : 'person'; }
-  cancel(): void { this.generation++; this.active?.abort(); this.worker?.terminate(); this.worker = undefined; }
+  cancel(): void { this.finishRecovery?.(); this.finishRecovery = undefined; this.generation++; this.active?.abort(); this.worker?.terminate(); this.worker = undefined; }
   onImageReplaced(): void { this.cancel(); }
   dispose(): void { this.cancel(); }
   async clearStoredModels(): Promise<boolean> {
@@ -51,6 +53,7 @@ export class BackgroundRemovalController {
     if (settings.signal?.aborted) abort.abort();
     const ensureCurrent = () => { cancelled(abort.signal); if (runId !== this.generation) throw new BgRemovalError('ai-cancelled'); };
     let worker: Worker | undefined;
+    let finishRecovery: (() => void) | undefined;
     try {
       // Reject insecure LAN HTTP before cache planning, consent, fetch or worker creation.
       if (!globalThis.isSecureContext || !globalThis.crypto?.subtle) throw new BgRemovalError('bg-secure-context-required');
@@ -65,6 +68,8 @@ export class BackgroundRemovalController {
           const choice = this.options.confirmProductRisk ?? (() => requestProductRiskConsent(this.options.language ?? 'ko'));
           if (!(await withAbort(Promise.resolve(choice()), abort.signal))) throw new BgRemovalError('ai-cancelled');
           ensureCurrent();
+          finishRecovery = productRecoveryMarker.begin();
+          this.finishRecovery = finishRecovery;
         }
       }
       let blob = input;
@@ -103,6 +108,8 @@ export class BackgroundRemovalController {
       ensureCurrent(); return result;
     } catch (error) { throw normalizeError(error); }
     finally {
+      finishRecovery?.();
+      if (this.finishRecovery === finishRecovery) this.finishRecovery = undefined;
       settings.signal?.removeEventListener('abort', parentAbort); worker?.terminate();
       if (this.generation === runId) { this.worker = undefined; this.active = undefined; }
     }

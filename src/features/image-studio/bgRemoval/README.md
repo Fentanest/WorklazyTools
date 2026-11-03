@@ -102,3 +102,15 @@ signal is unknown, not a low-memory measurement. No warning acknowledgement is s
 
 `tests/ie1/bg-restrict-notice.mjs` verifies simulated device signals and modal/alert
 lifecycle with a controlled person worker, not actual iOS inference or crash safety.
+
+## Interrupted iOS product runs
+
+After explicit iOS risk approval the controller writes only `1` to the dedicated
+per-tab sessionStorage key. It clears the flag on result return, handled failure,
+cancellation/replacement/disposal and uses an in-memory owner so older finally
+callbacks cannot erase a newer flag. A reopened document may consume a leftover
+flag and suggest portrait mode once; it does not claim a confirmed crash or
+restore an image. No filename, receipt, image, timestamp or run ID is stored.
+Storage denial is best effort and does not prevent an otherwise permitted run.
+SessionStorage survival depends on browser tab restoration; a completely new tab
+or discarded session cannot be guaranteed to retain the hint.

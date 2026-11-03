@@ -3,3 +3,4 @@ export type { ControllerOptions, ConsentInfo, RemovalOptions } from './controlle
 export type { BgMode } from './assets.ts';
 export { messages, productRiskMessages, BgRemovalError } from './errors.ts';
 export { productDeviceRestriction, productDeviceWarning } from './devicePolicy.ts';
+export { productRecoveryMarker, productRecoveryMessages } from './recovery.ts';
