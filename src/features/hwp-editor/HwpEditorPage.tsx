@@ -7,6 +7,7 @@ import { Download, FileCheck2, FileText, FolderOpen, RefreshCw, X } from "lucide
 import { createEditor, type HmlSaveState, type RhwpEditor } from "@rhwp/editor";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useAppLanguage } from "../../i18n/routing";
 import type { TranslationResources } from "../../i18n/resources";
 
 import { OperationProgress } from "../../components/OperationProgress";
@@ -27,6 +28,7 @@ type ProgressTranslate = (key: ProgressMessageKey, options?: Record<string, stri
 
 export function HwpEditorPage() {
   const { t, i18n } = useTranslation("features");
+  const language = useAppLanguage();
   const { t: ht } = useTranslation("common");
   const [files, setFiles] = useState<File[]>([]);
   const [editorReady, setEditorReady] = useState(false);
@@ -60,8 +62,8 @@ export function HwpEditorPage() {
     return t(copy.key, options);
   };
   // Locale changes update labels without destroying the open document.
-  const initializationRef = useRef({ t, i18n, progress, progressT });
-  initializationRef.current = { t, i18n, progress, progressT };
+  const initializationRef = useRef({ t, i18n, progress, progressT, language });
+  initializationRef.current = { t, i18n, progress, progressT, language };
 
   const setFocusMode = useFocusMode();
   useEffect(() => {
@@ -85,7 +87,7 @@ export function HwpEditorPage() {
       const initialize = async () => {
         if (!containerRef.current) throw new Error(initializationRef.current.t("hwpEditor.missingContainer"));
         const editor = await createEditor(containerRef.current, {
-          studioUrl: getRhwpStudioUrl(), renderer: "canvas2d", width: "100%", height: "100%",
+          studioUrl: getRhwpStudioUrl(initializationRef.current.language), renderer: "canvas2d", width: "100%", height: "100%",
           requestTimeoutMs: 120_000, handshakeTimeoutMs: 4_000,
         });
         if (disposed || attempt !== instance) {
