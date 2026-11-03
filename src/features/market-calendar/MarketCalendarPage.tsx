@@ -7,14 +7,17 @@ import { UtilityPage } from '../../components/UtilitySurface'
 import { ToolGuideWrapper } from '../../components/ToolGuideWrapper'
 import type { TranslationResources } from '../../i18n/resources'
 import { loadCalendar, isOld, venues, type Venue, type CalendarView } from './loadCalendar'
-import { dateCopyKeys, dateDescriptions, displayClock, formatLastUpdated, koreaSessionRange, officialSources, sessionNameKey, sortSessions } from './calendarDisplay'
+import { dateCopyKeys, dateDescriptions, displayClock, formatLastUpdated, koreaSessionRange, sessionNameKey, sortSessions } from './calendarDisplay'
 import { calendarSelectionSearch, moveCalendarSelection, readCalendarSelection, type CalendarSelection } from './calendarSelection'
 import './market-calendar.css'
+import { CalendarSources } from './CalendarSources'
+import { loadSourceExcerpts, type SourceCatalog } from './sourceExcerpts'
 
 export function MarketCalendarPage() {
   const { t, i18n } = useTranslation('features')
   const text = (key: keyof TranslationResources['features']['marketCalendar'], values?: Record<string, string | number>) => t(`marketCalendar.${key}`, values)
   const [view, setView] = useState<CalendarView>({ status: 'loading' })
+  const [catalog, setCatalog] = useState<SourceCatalog | null>(null)
   const [defaultDate] = useState(() => new Date())
   const [parameters, setParameters] = useSearchParams()
   const selection = readCalendarSelection(parameters, defaultDate)
@@ -35,6 +38,16 @@ export function MarketCalendarPage() {
     return () => controller.abort()
   }, [reload])
 
+  useEffect(() => {
+    setCatalog(null)
+    if (view.status !== 'ready') return
+    const controller = new AbortController()
+    void loadSourceExcerpts(`${import.meta.env.BASE_URL}data/market-calendar/v1/`, view.manifest.generation_id, controller.signal)
+      .then(value => { if (!controller.signal.aborted) setCatalog(value) })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [view])
+
   const manifest = view.status === 'ready' ? view.manifest : null
   const years = manifest?.files.map(file => file.year) ?? []
   const year = years.includes(yearChoice) ? yearChoice : years[0] ?? yearChoice
@@ -51,7 +64,6 @@ export function MarketCalendarPage() {
   const byDay = new Map(rows.map(row => [Number(row.date.slice(6)), row]))
   const selected = byDay.get(day)
   const descriptions = dateDescriptions(selected, text)
-  const sources = officialSources(selected?.sources ?? [])
   const updated = manifest ? formatLastUpdated(manifest.created_at, i18n.language) : null
   const warnings = [...new Set([
     (!scope || !scope.included || scope.validity === 'held') ? text('pendingScope') : scope.validity === 'stale' ? text('stale') : null,
@@ -120,11 +132,7 @@ export function MarketCalendarPage() {
                 {korea && <span className="block text-sm text-muted-foreground">{text('koreaTime')} · {korea}</span>}
               </li>
             })}</ul></>}
-            {sources.length > 0 && <div className="space-y-2">
-              <a href={sources[0].url} target="_blank" rel="noopener noreferrer">{text('sources')} ↗</a>
-              <details><summary>{text('quote')}</summary><blockquote>{sources[0].quotes[0]}</blockquote></details>
-              {sources.length > 1 && <details><summary>{text('moreSources')}</summary><ul>{sources.slice(1).map((source, i) => <li key={source.url}><a href={source.url} target="_blank" rel="noopener noreferrer">{text('sourceNumber', { number: i + 2 })} ↗</a></li>)}</ul></details>}
-            </div>}
+            <CalendarSources sources={selected.sources} catalog={catalog} />
           </>}
         </div>
       </SectionCard>

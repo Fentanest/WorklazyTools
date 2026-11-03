@@ -2589,7 +2589,8 @@
         "title": "Where can I check the sources?",
         "paragraphs": [
           "The date details link the official notice for that schedule together with its quote.",
-          "Check the refresh time and guidance on the screen before trading."
+          "Check the refresh time and guidance on the screen before trading.",
+          "For KRX regulations, copy the official Korean rule name and article to search the KRX Rules Service. Available saved excerpts include the collection time and saved-source hash."
         ]
       }
     ],

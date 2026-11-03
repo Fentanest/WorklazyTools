@@ -3373,7 +3373,21 @@
     "chuseokHoliday": "추석",
     "hangulHoliday": "한글날",
     "hangulObserved": "한글날 대체휴일",
-    "weekend": "주말"
+    "weekend": "주말",
+    "krxService": "KRX 법규서비스",
+    "krxFind": "법규서비스에서 아래 규정명과 조문을 검색하세요.",
+    "copyReference": "규정명·조문 복사",
+    "copyReferenceLabel": "{{reference}} 복사",
+    "referenceCopied": "규정명과 조문을 복사했습니다.",
+    "referenceCopyFailed": "복사하지 못했습니다. 위 규정명과 조문을 직접 선택해 복사하세요.",
+    "savedCopy": "보관 사본 보기",
+    "collectedAt": "수집 시각",
+    "savedHash": "보관 원문 SHA-256",
+    "redactedCopy": "세션 정보를 제거한 보관 표현본의 해시입니다.",
+    "originalText": "원문의 한국어 발췌입니다. 현재 규정은 KRX 법규서비스에서 확인하세요.",
+    "revisionReference": "개정·시행일 표기",
+    "unknownRuleName": "KRX 규정",
+    "bookId": "KRX 문서 번호"
   },
   "textCompare": {
     "movedTo": "{{line}}행으로 이동",

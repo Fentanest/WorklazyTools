@@ -28,11 +28,22 @@ try {
         await page.waitForFunction(() => document.querySelector('.mcal-metadata time')?.getAttribute('datetime') === '2026-10-18T21:32:33Z');
       }
       await selectCalendarValue(page, 0, us ? 'nyse' : 'krx'); await selectCalendarValue(page, 2, month); await selectCalendarDay(page, day);
-      const detail = await page.locator('.mcal-detail').innerText();
+      // Calendar explanations remain free of internal notes. Official names and
+      // excerpts are source data; every other visible EN UI string stays checked.
+      const { detail, visibleUI } = await page.locator('.mcal-detail').evaluate(element => {
+        const detail = [...element.children].filter(child => !child.classList.contains('mcal-sources')).map(child => child.innerText).join('\n');
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+        const visible = []; let node;
+        while ((node = walker.nextNode())) {
+          const parent = node.parentElement;
+          if (parent?.getClientRects().length && !parent.closest('[data-mcal-original]')) visible.push(node.textContent);
+        }
+        return { detail, visibleUI: visible.join(' ') };
+      });
       const expected = scenario === 'new-year' ? (lang === 'ko' ? /신정 휴장/ : /Closed for New Year/) : scenario === 'year-end-closed' ? (lang === 'ko' ? /연말 휴장/ : /Closed for the year-end holiday/) : scenario === 'year-end-pending' ? (lang === 'ko' ? /아직 확정되지 않은 일정/ : /Schedule not confirmed/) : (lang === 'ko' ? /조기폐장.*13:00.*마감/ : /Early close at 13:00/);
       assert.match(detail, expected);
       assert.doesNotMatch(detail, /발행본|현행판|조문|전용|고정 입력|추가 거래 일정 조건|special_expected|forced_unknown|registry|continuity|Publication notes|translation.*not.*available/i);
-      if (lang === 'en') assert.doesNotMatch(detail, /[가-힣]/);
+      if (lang === 'en') assert.doesNotMatch(visibleUI, /[가-힣]/);
       const paragraphs = await page.locator('.mcal-detail > p').allTextContents(); assert.equal(paragraphs.length, new Set(paragraphs).size, 'no repeated date explanations');
       const metadata = await page.locator('.mcal-metadata').innerText();
       assert.equal(await page.locator('.mcal-metadata time').count(), 1);assert.match(metadata, lang === 'ko' ? /마지막 업데이트:.*한국 시간/ : /Last updated.*KST/);
