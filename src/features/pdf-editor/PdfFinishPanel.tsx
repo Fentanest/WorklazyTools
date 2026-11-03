@@ -1043,7 +1043,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
         {(["page-numbers", "header-footer", "watermark", "stamp"] as const).map((tab) => {
           const selected = activeTab === tab;
           const Icon = tab === "page-numbers" ? Hash : tab === "header-footer" ? PanelTop : tab === "watermark" ? Stamp : PenLine;
-          return <Button key={tab} id={`${tabPanelId}-${tab}`} className={cn("h-auto min-h-14 min-w-0 rounded-xl bg-card px-1 text-foreground sm:min-h-11 sm:px-3", selected && "text-primary shadow-sm ")} variant="ghost" type="button" role="tab" aria-selected={selected} aria-controls={tabPanelId} data-finish-tab={tab} data-pdf-watermark-owned={tab === "watermark" || undefined} data-pdf-stamp-owned={tab === "stamp" || undefined} onClick={() => selectTab(tab)}><span className="flex min-w-0 flex-col items-center justify-center gap-1 sm:flex-row sm:gap-1.5" data-finish-tab-content><Icon size={17} /><span className="min-w-0 whitespace-normal text-center text-[11px] leading-tight sm:text-sm">{copy.tabs[tab]}</span></span></Button>;
+          return <Button key={tab} id={`${tabPanelId}-${tab}`} className={cn("h-auto min-h-14 min-w-0 rounded-xl bg-card px-1 text-foreground sm:min-h-11 sm:px-3", selected && "text-[var(--brand-strong)] shadow-sm ")} variant="ghost" type="button" role="tab" aria-selected={selected} aria-controls={tabPanelId} data-finish-tab={tab} data-pdf-watermark-owned={tab === "watermark" || undefined} data-pdf-stamp-owned={tab === "stamp" || undefined} onClick={() => selectTab(tab)}><span className="flex min-w-0 flex-col items-center justify-center gap-1 sm:flex-row sm:gap-1.5" data-finish-tab-content><Icon size={17} /><span className="min-w-0 whitespace-normal text-center text-[11px] leading-tight sm:text-sm">{copy.tabs[tab]}</span></span></Button>;
         })}
       </div>
 
@@ -1060,7 +1060,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
         <SectionCard step={1} title={copy.uploadTitle} description={copy.uploadDescription} className="">
           <div ref={intakeElementRef}><FileDropZone accept=".pdf,application/pdf" multiple files={sources.map(({ file: sourceFile }) => sourceFile)} onFiles={(files) => { void replaceFile(files); }} disabled={locked} accent="violet" hint={inspecting ? copy.inspecting : copy.uploadHint} /></div>
           <FileList files={sources.map(({ file: sourceFile }) => sourceFile)} onRemove={removeFile} accent="violet" />
-          <Button type="button" variant="ghost" className="mt-2 min-h-10 w-fit rounded-xl px-3 text-xs font-bold text-primary" data-testid="pdf-finish-back-to-organize" onClick={backToOrganize} disabled={locked}>
+          <Button type="button" variant="ghost" className="mt-2 min-h-10 w-fit rounded-xl px-3 text-xs font-bold text-[var(--brand-strong)]" data-testid="pdf-finish-back-to-organize" onClick={backToOrganize} disabled={locked}>
             {copy.backToOrganize}
           </Button>
           {(inspecting || previewing) && operation.status !== "running" && <Button type="button" variant="outline" className="mt-2 min-h-11 w-full rounded-xl text-destructive" data-testid="pdf-finish-file-cancel" onClick={() => removeFile()}><X size={17} />{copy.cancel}</Button>}
