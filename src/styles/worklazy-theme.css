@@ -803,7 +803,6 @@ html:has(.app-shell) {
 }
 /* A focused textarea must fit between both bars, including room for its ring. */
 .app-shell:not(.editor-mode) textarea[data-slot="textarea"] {
-  min-height: min(300px, var(--wl-focus-field-height));
   max-height: var(--wl-focus-field-height);
 }
 html:has(.app-shell.editor-mode) { scroll-padding-block: 0; }
