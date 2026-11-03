@@ -1,28 +1,40 @@
 import { useLayoutEffect, type RefObject } from 'react'
 
-/** Compact page toolbar: paint only in the shell's usable viewport; keep native Tab access. */
+/** Clip only shell-overlapping pixels; keep native Tab access to every tool. */
 export function useMobileImageRail(root: RefObject<HTMLDivElement | null>, generation: number, active: boolean) {
   useLayoutEffect(() => {
     const host = root.current
     if (!host || !active) return
-    const mobile = matchMedia('(max-width: 620px)')
+    const mobile = matchMedia('(max-width: 820px)')
     let rail: HTMLElement | null = null
     const safeBounds = () => {
       const header = document.querySelector<HTMLElement>('.mobile-header')
       const tabs = document.querySelector<HTMLElement>('.bottom-tabs')
       return { top: (header?.getBoundingClientRect().bottom ?? 0) + 8, bottom: (tabs?.getBoundingClientRect().top ?? innerHeight) - 8 }
     }
+    const reset = (strip: HTMLElement) => {
+      strip.removeAttribute('data-mobile-rail'); strip.removeAttribute('aria-describedby')
+      for (const name of ['--wl-rail-clip-top', '--wl-rail-clip-bottom', '--wl-rail-bottom-clearance']) strip.style.removeProperty(name)
+      for (const button of strip.querySelectorAll<HTMLElement>('[data-shell-clipped]')) button.removeAttribute('data-shell-clipped')
+    }
     const sync = () => {
       const next = host.querySelector<HTMLElement>('.asp-workspace__rail')
-      if (rail && rail !== next) { rail.removeAttribute('data-mobile-rail'); rail.classList.remove('is-outside-safe-viewport') }
+      if (rail && rail !== next) reset(rail)
       rail = next
       if (!rail) return
-      if (!mobile.matches) { if (rail.hasAttribute('data-mobile-rail')) rail.querySelector<HTMLButtonElement>('.asp-rail__scrim')?.click(); rail.removeAttribute('data-mobile-rail'); rail.removeAttribute('aria-describedby'); rail.classList.remove('is-outside-safe-viewport'); return }
+      if (!mobile.matches) { if (rail.hasAttribute('data-mobile-rail')) rail.querySelector<HTMLButtonElement>('.asp-rail__scrim')?.click(); reset(rail); return }
       rail.dataset.mobileRail = 'true'
       rail.setAttribute('aria-describedby', 'image-mobile-rail-hint')
       const bounds = safeBounds(), rect = rail.getBoundingClientRect()
       const outside = rect.top < bounds.top - 0.5 || rect.bottom > bounds.bottom + 0.5
-      rail.classList.toggle('is-outside-safe-viewport', outside)
+      // Natural entry/exit stays visible: only pixels under shell chrome are clipped.
+      // A partially clipped button cannot be activated by pointer; Tab reveals it first.
+      rail.style.setProperty('--wl-rail-clip-top', `${Math.max(0, bounds.top - rect.top)}px`)
+      rail.style.setProperty('--wl-rail-clip-bottom', `${Math.max(0, rect.bottom - bounds.bottom)}px`)
+      for (const button of rail.querySelectorAll<HTMLElement>('.asp-rail__tool,.asp-rail__flyout-toggle')) {
+        const box = button.getBoundingClientRect()
+        button.toggleAttribute('data-shell-clipped', box.top < bounds.top - 0.5 || box.bottom > bounds.bottom + 0.5)
+      }
       rail.style.setProperty('--wl-rail-bottom-clearance', `${innerHeight - bounds.bottom}px`)
       if (outside) rail.querySelector<HTMLButtonElement>('.asp-rail__scrim')?.click()
       // Native top-layer popovers escape the horizontal strip's scroll clip and
@@ -44,7 +56,8 @@ export function useMobileImageRail(root: RefObject<HTMLDivElement | null>, gener
       const strip = target?.closest<HTMLElement>('.asp-workspace__rail')
       if (!target || !strip || !target.matches('.asp-rail__tool,.asp-rail__flyout-toggle')) return
       if (event.type === 'focusin' || target.matches('.asp-rail__flyout-toggle')) {
-        if (strip.classList.contains('is-outside-safe-viewport') || event.type === 'click') strip.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' })
+        const bounds = safeBounds(), box = strip.getBoundingClientRect()
+        if (box.top < bounds.top || box.bottom > bounds.bottom || event.type === 'click') strip.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' })
         target.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'instant' })
         sync()
       }
@@ -62,7 +75,7 @@ export function useMobileImageRail(root: RefObject<HTMLDivElement | null>, gener
       host.removeEventListener('focusin', reveal); host.removeEventListener('click', reveal, true)
       window.removeEventListener('scroll', sync, true); window.removeEventListener('resize', sync)
       window.visualViewport?.removeEventListener('resize', sync); mobile.removeEventListener('change', sync)
-      rail?.removeAttribute('data-mobile-rail'); rail?.removeAttribute('aria-describedby'); rail?.classList.remove('is-outside-safe-viewport')
+      if (rail) reset(rail)
     }
   }, [root, generation, active])
 }
