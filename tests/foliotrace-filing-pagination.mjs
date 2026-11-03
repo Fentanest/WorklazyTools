@@ -30,7 +30,7 @@ try {
       const rows = full.locator('> ul > li');
       await rows.first().waitFor();
       assert.equal(await rows.count(), 30);
-      assert.match(await full.locator('.foliotrace-block-hint').innerText(), /61/);
+      assert.match(await full.locator('.foliotrace-block-head > .foliotrace-block-hint').innerText(), /61/);
       const toggle = full.getByRole('button', { name: lang === 'ko' ? /더 보기.*31/ : /Show more.*31/ });
       assert.equal(await toggle.getAttribute('aria-controls'), 'foliotrace-latest-list');
       assert.equal(await toggle.getAttribute('aria-expanded'), 'false');
