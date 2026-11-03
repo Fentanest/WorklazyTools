@@ -11,7 +11,7 @@ import { cn } from "../lib/utils";
 import { Info, AlertTriangle, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 import { SectionCard } from "./ui";
 
-export const pairedEditorClassName = "h-80 min-h-80 max-h-80 flex-none resize-none";
+export const pairedEditorClassName = "h-80 min-h-[min(20rem,var(--wl-focus-field-height,20rem))] max-h-80 flex-none resize-none";
 
 export function UtilityPage({ toolId, children, className, flush = false }: { toolId: string; children: ReactNode; className?: string; flush?: boolean }) {
   return (
@@ -37,7 +37,7 @@ export function UtilityTextarea({ className, ...props }: TextareaHTMLAttributes<
     <textarea
       data-slot="textarea"
       className={cn(
-        "min-h-[300px] w-full resize-y rounded-2xl border border-input bg-background p-[15px] text-[15px] leading-[1.7] text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive aria-invalid:bg-destructive/5 aria-invalid:text-destructive aria-invalid:ring-destructive/20 max-[620px]:text-base",
+        "min-h-[min(300px,var(--wl-focus-field-height,300px))] w-full resize-y rounded-2xl border border-input bg-background p-[15px] text-[15px] leading-[1.7] text-foreground outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/20 aria-invalid:border-destructive aria-invalid:bg-destructive/5 aria-invalid:text-destructive aria-invalid:ring-destructive/20 max-[620px]:text-base",
         className,
       )}
       {...props}

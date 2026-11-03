@@ -790,12 +790,19 @@ input:focus-visible {
 /* Keep native keyboard-focus scrolling inside the shell's unobscured viewport.
    Header clearance includes its floating inset; mobile tabs are 72px high. */
 html:has(.app-shell) {
-  scroll-padding-block-start: calc(80px + env(safe-area-inset-top));
-  scroll-padding-block-end: 1rem;
+  --wl-focus-clearance-start: calc(80px + env(safe-area-inset-top));
+  --wl-focus-clearance-end: 1rem;
+  --wl-focus-field-height: max(4rem, calc(100dvh - var(--wl-focus-clearance-start) - var(--wl-focus-clearance-end) - 8px));
+  scroll-padding-block-start: var(--wl-focus-clearance-start);
+  scroll-padding-block-end: var(--wl-focus-clearance-end);
 }
 @media (max-width: 820px) {
   html:has(.app-shell) {
-    scroll-padding-block-end: calc(72px + max(9px, env(safe-area-inset-bottom)) + 8px);
+    --wl-focus-clearance-end: calc(72px + max(9px, env(safe-area-inset-bottom)) + 8px);
   }
+}
+/* A focused textarea must fit between both bars, including room for its ring. */
+.app-shell:not(.editor-mode) textarea[data-slot="textarea"] {
+  max-height: var(--wl-focus-field-height);
 }
 html:has(.app-shell.editor-mode) { scroll-padding-block: 0; }
