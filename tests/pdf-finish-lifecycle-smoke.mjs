@@ -26,7 +26,7 @@ try {
   });
 
   const results = [];
-  for (const action of ["navigate", "replace", "cancel"]) {
+  for (const action of ["navigate", "replace", "cancel", "save-error"]) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: "block" });
     const page = await context.newPage();
     page.setDefaultTimeout(60_000);
@@ -37,6 +37,11 @@ try {
       const boundary = 'report(input, "reading", fileIndex, input.files.length);';
       assert.ok(body.includes(boundary), "the lifecycle smoke no longer pauses at the second-file ownership boundary");
       body = body.replace(boundary, `if (fileIndex === 1 && globalThis.__finishLifecyclePause) await globalThis.__finishLifecyclePause();\n      ${boundary}`);
+      if (action === "save-error") {
+        const save = 'let bytes = await document.save({ updateFieldAppearances: false });';
+        assert.ok(body.includes(save), "the lifecycle smoke no longer injects at the serialization boundary");
+        body = body.replace(save, `if (fileIndex === 1) throw new RangeError("injected PDF serialization allocation failure");\n      ${save}`);
+      }
       replacements += 1;
       await route.fulfill({ response, body });
     });
@@ -80,19 +85,32 @@ try {
     } else if (action === "replace") {
       await page.locator("[data-ui-component='file-list'] li").first().locator("button").click();
       await page.waitForFunction(() => document.querySelectorAll("[data-ui-component='file-list'] li").length === 1);
-    } else {
+    } else if (action === "cancel") {
       await page.locator("[data-testid='pdf-finish-cancel']").click();
     }
     await page.evaluate(() => globalThis.__finishReleaseBatch());
     await page.waitForTimeout(900);
     const after = await inspectPage(page);
 
-    if (action === "cancel") {
-      assert.equal(after.finishMounted, true, "same-screen cancellation unexpectedly released the panel ownership");
-      assert.equal(after.downloads, 1, "same-screen cancellation must preserve the completed output");
-      assert.equal(after.resultFiles.length, 1, "same-screen cancellation disposed the completed OPFS output");
-      assert.equal(after.pdfUrls.length, 1, "same-screen cancellation did not register the completed PDF URL");
-      assert.equal(after.pdfUrls[0].revoked, false, "same-screen cancellation revoked the visible partial result");
+    if (action === "cancel" || action === "save-error") {
+      if (action === "save-error") {
+        await page.locator("[data-testid='pdf-error']").waitFor({ state: "visible" });
+        assert.equal(await page.locator("[data-testid='pdf-error'] span").innerText(), "The PDF could not be read. Check the file and choose it again.");
+        assert.equal(await page.locator("[data-ui-component='operation-progress'].ui-status-error").count(), 1);
+        assert.equal(await page.locator("[data-ui-component='operation-progress'].ui-status-success").count(), 0);
+        const [download] = await Promise.all([
+          page.waitForEvent("download"),
+          page.locator("[data-testid='pdf-download']").click(),
+        ]);
+        assert.equal(download.suggestedFilename(), "A-finished.pdf");
+        const saved = await fs.readFile(await download.path());
+        assert.equal((await PDFDocument.load(saved)).getPageCount(), 1);
+      }
+      assert.equal(after.finishMounted, true, "partial result unexpectedly released the panel ownership");
+      assert.equal(after.downloads, 1, "partial result must preserve the completed output");
+      assert.equal(after.resultFiles.length, 1, "partial result disposed the completed OPFS output");
+      assert.equal(after.pdfUrls.length, 1, "partial result did not register the completed PDF URL");
+      assert.equal(after.pdfUrls[0].revoked, false, "partial result revoked the visible partial result");
       await page.locator("[data-pdf-nav-mode='organize']").click();
       // Saved results do not block leaving; unsaved work would show the dialog.
       await page.waitForFunction(() => {
@@ -106,8 +124,8 @@ try {
       await page.locator("[data-testid='pdf-finish-ready']").waitFor({ state: "detached" });
       await page.waitForTimeout(400);
       const afterLeave = await inspectPage(page);
-      assert.deepEqual(afterLeave.resultFiles, [], "leaving after cancellation did not dispose the preserved OPFS output");
-      assert.equal(afterLeave.pdfUrls[0]?.revoked, true, "leaving after cancellation did not revoke the visible PDF URL");
+      assert.deepEqual(afterLeave.resultFiles, [], "leaving after partial failure did not dispose the preserved OPFS output");
+      assert.equal(afterLeave.pdfUrls[0]?.revoked, true, "leaving after partial failure did not revoke the visible PDF URL");
       results.push({ action, replacements, before, after, afterLeave });
     } else {
       assert.equal(after.downloads, 0, `${action}: an ownerless result reached the download UI`);
@@ -121,7 +139,7 @@ try {
 
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
   await fs.writeFile(reportPath, `${JSON.stringify(results, null, 2)}\n`);
-  console.log("PDF finish ownership lifecycle passed: navigation and file replacement dispose ownerless outputs; same-screen cancellation preserves one completed output.");
+  console.log("PDF finish ownership lifecycle passed: navigation and file replacement dispose ownerless outputs; cancellation and save failure preserve one downloadable completed output.");
 } finally {
   await browser?.close();
   await stopServer(server);

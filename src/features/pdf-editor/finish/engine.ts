@@ -1126,8 +1126,11 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
     if (error instanceof Error && error.name === "AbortError" && outputs.length > 0) {
       throw new PdfFinishCanceledError(error.message, outputs);
     }
-    if (outputs.length > 0 && error instanceof PdfFinishEngineError && !(error instanceof PdfFinishPartialError)) {
-      throw new PdfFinishPartialError(error.code, outputs, error);
+    if (outputs.length > 0 && !(error instanceof PdfFinishPartialError)) {
+      // Match the panel's fallback for unexpected failures (including save /
+      // serialization errors), retaining the original exception as the cause.
+      const code = error instanceof PdfFinishEngineError ? error.code : "unreadable-document";
+      throw new PdfFinishPartialError(code, outputs, error);
     }
     if (outputs.length === 0) await resultStore.dispose();
     throw error;
