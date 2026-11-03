@@ -55,11 +55,11 @@ const TOOL_CATEGORY = {
 };
 const CATEGORY_ORDER = ["spreadsheets", "documents", "media", "text-data", "work", "security-share", "investment-research"];
 
-const toolRoutes = ["product-banner",
+const toolRoutes = ["image-studio", "product-banner",
   "foliotrace", "market-calendar",
   "text-compare", "image-compare", "folder-compare",
   "excel-merger", "excel-compare", "excel-cleaner", "document-generator", "document-compare", "pdf-compare", "pdf-editor", "pdf-converter", "document-markdown", "hwp-editor", "office-editor", ...(VIDEO_STUDIO_PUBLIC ? ["video-studio"] : []), "audio-studio",
-  "image-studio", "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
+  "text-merger", "text-tools", "text-formatter", "work-calculator", "timezone-calculator", "payroll-calculator",
   "document-redactor", "image-privacy", "security-tools", "qr-studio", "qr-studio/bulk", "data-converter",
 ].filter(id=>isComparisonToolPublished(id));
 const pdfRoutes = ["pdf-converter/image-to-pdf", "pdf-converter/pdf-to-image", "pdf-converter/document-to-pdf", "pdf-converter/pdf-to-document", "pdf-converter/pdf-to-document/ocr", "pdf-editor/image-to-pdf", "pdf-editor/pdf-to-image", "pdf-editor/convert", "pdf-editor/finish", "pdf-editor/page-numbers", "pdf-editor/header-footer", "pdf-editor/watermark", "pdf-editor/stamp"];
