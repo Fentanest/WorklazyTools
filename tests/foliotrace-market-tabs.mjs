@@ -73,7 +73,10 @@ try {
       await page.locator('[data-market-tab=KOSDAQ]').click();
       await page.waitForFunction(() => {
         const top = document.querySelector('[data-market=KOSDAQ]').getBoundingClientRect().top;
-        return top >= 100 && top < 230;
+        const tabBottom = document.querySelector('.foliotrace-market-tabs').getBoundingClientRect().bottom;
+        // The heading must clear the sticky tabs and land in the upper half.
+        // Fractional layout coordinates must not fail an arbitrary 230px cutoff.
+        return top >= tabBottom && top < innerHeight / 2;
       });
       assert.equal(await kospi.isHidden(), true);
       assert.equal(await page.locator('[data-market=KOSDAQ] .foliotrace-result-count .foliotrace-num').innerText(), '418');

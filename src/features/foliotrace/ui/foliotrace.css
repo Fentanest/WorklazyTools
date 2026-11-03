@@ -184,6 +184,7 @@
 }
 
 .foliotrace-market-panel {
+  container-type: inline-size;
   min-width: 0;
   margin-top: 1.5rem;
   scroll-margin-top: 150px;
@@ -987,6 +988,10 @@
 
 .foliotrace-recent-value {
   font-weight: 700;
+  display: flex;
+  flex-direction: column;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 /* Exclusion summary */
@@ -1115,24 +1120,25 @@
   background: var(--bg-solid, #ffffff);
   border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
   border-radius: 20px;
-  padding: 0.25rem 1.25rem;
+  padding: 0.25rem 0.4rem;
 }
 
 .foliotrace-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 760px;
-  font-size: 0.88rem;
+  table-layout: fixed;
+  font-size: 0.81rem;
   color: var(--label, #18181b);
 }
 
 .foliotrace-table th,
 .foliotrace-table td {
   border-top: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
-  padding: 0.45rem 0.75rem;
+  padding: 0.55rem 0.3rem;
   text-align: left;
   vertical-align: top;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 
 .foliotrace-table thead th {
@@ -1149,7 +1155,57 @@
 }
 
 .foliotrace-table th:first-child {
-  min-width: 12rem;
+  min-width: 0;
+}
+
+/* Keep identity and the two independently signed reported figures at every
+ * desktop width. Lower-priority columns remain available in the detail sheet. */
+.foliotrace-col-quantity { width: 7.2rem; }
+.foliotrace-col-ownership { width: 5.5rem; }
+.foliotrace-col-value { width: 7.4rem; }
+.foliotrace-col-weight { width: 4.5rem; }
+.foliotrace-col-close { width: 6.2rem; }
+.foliotrace-col-date { width: 6.5rem; }
+
+.foliotrace-table .foliotrace-name-btn,
+.foliotrace-table .foliotrace-row-reason {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.foliotrace-table .foliotrace-table-code {
+  display: block;
+  text-align: left;
+  font-size: 0.68rem;
+}
+
+.foliotrace-table .foliotrace-change-delta {
+  display: block;
+  line-height: 1.5;
+}
+
+@container (max-width: 860px) {
+  .foliotrace-col-date { display: none; }
+}
+
+@container (max-width: 730px) {
+  .foliotrace-col-close { display: none; }
+}
+
+@container (max-width: 560px) {
+  .foliotrace-col-weight { display: none; }
+  .foliotrace-table { font-size: 0.76rem; }
+  .foliotrace-table th, .foliotrace-table td { padding-inline: 0.2rem; }
+  .foliotrace-col-quantity { width: 6.6rem; }
+  .foliotrace-col-ownership { width: 4.8rem; }
+  .foliotrace-col-value { width: 6.5rem; }
+}
+
+@container (max-width: 430px) {
+  .foliotrace-col-value { display: none; }
 }
 
 .foliotrace-table tbody tr {
@@ -1195,6 +1251,12 @@
   font-weight: 700;
 }
 
+.foliotrace-change-delta {
+  display: inline-block;
+  font-size: 0.85em;
+  font-weight: inherit;
+}
+
 :root[data-theme^="dark-"] .foliotrace-change-up {
   color: #ff958e;
 }
@@ -1204,6 +1266,7 @@
 }
 
 th.foliotrace-num,
+.foliotrace-table th.foliotrace-num,
 .foliotrace-table td.foliotrace-num {
   text-align: right;
 }

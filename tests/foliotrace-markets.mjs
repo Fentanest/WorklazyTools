@@ -63,6 +63,9 @@ try {
           await activate(panel);
           for (const [index, label] of labels.entries()) {
             await panel.locator('.foliotrace-pills').getByRole('button', { name: label, exact: true }).click();
+            await page.waitForFunction(({ market, expected }) =>
+              document.querySelector(`[data-market="${market}"] .foliotrace-result-count .foliotrace-num`)?.textContent.trim() === String(expected),
+            { market: await panel.getAttribute('data-market'), expected: counts[index] });
             assert.equal(await count(panel).innerText(), String(counts[index]));
             assert.equal(await chart.innerText(), chartText);
           }
@@ -72,7 +75,7 @@ try {
         await activate(kospi);
         assert.equal(await kospi.getByRole('combobox').inputValue(), 'receipt');
         await activate(kosdaq);
-        assert.equal(await kosdaq.locator('.foliotrace-mrow .foliotrace-code-plain').first().innerText(), '247540');
+        assert.equal(await kosdaq.locator('.foliotrace-mrow .foliotrace-code-plain, .foliotrace-table-code').first().innerText(), '247540');
         for (const panel of [kospi, kosdaq]) for (const key of ['weight', 'value']) {
           await activate(panel);
           await panel.getByRole('combobox').selectOption(key);
@@ -80,9 +83,9 @@ try {
         }
         assert.ok(await kospi.locator('.foliotrace-change-up').count() > 0);
         assert.ok(await kosdaq.locator('.foliotrace-change-down').count() > 0);
-        assert.ok(await kospi.locator('.foliotrace-mrow-note').count() > 0);
+        assert.ok(await kospi.locator(mobile ? '.foliotrace-mrow-note' : '.foliotrace-row-reason').count() > 0);
         await activate(kospi);
-        assert.match(await kospi.getByRole('button', { name: /KOSPI Unpriced/ }).innerText(), lang === 'ko' ? /거래\s*정지/ : /trading suspended/);
+        assert.match(await kospi.locator(mobile ? '.foliotrace-mrow' : 'tbody tr').filter({ hasText: 'KOSPI Unpriced' }).innerText(), lang === 'ko' ? /거래\s*정지/ : /trading suspended/);
         assert.equal(await count(page.locator('[data-market=KONEX]')).innerText(), '1');
         assert.equal(await count(page.locator('[data-market=UNKNOWN]')).innerText(), '1');
         for (const [panel, name, historyCount] of [[kospi, 'KOSPI Up', 3], [kosdaq, 'KOSDAQ Down', 2],

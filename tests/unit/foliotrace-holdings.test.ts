@@ -130,13 +130,13 @@ test("table filing colors compare quantity and ownership independently with exac
     quantity: currentHolding.quantity, companyOwnershipPercent: currentHolding.companyOwnershipPercent,
     source: "legacy-import" });
   assert.deepEqual(filingChangesForHoldings([currentHolding], [current, previous]).get(currentHolding),
-    { quantity: "up", ownership: "down" });
+    { quantity: "up", ownership: "down", quantityDelta: "1", ownershipDelta: "-0.1" });
 
   const sameQuantity = holding({ ...currentHolding, quantity: "1000.0", companyOwnershipPercent: "6.30" });
   assert.deepEqual(filingChangesForHoldings([sameQuantity], [
     { ...current, quantity: "1000", companyOwnershipPercent: "6.30" },
     { ...previous, quantity: "1000.00", companyOwnershipPercent: "6.20" },
-  ]).get(sameQuantity), { quantity: null, ownership: "up" });
+  ]).get(sameQuantity), { quantity: null, ownership: "up", quantityDelta: "0", ownershipDelta: "0.1" });
 });
 
 test("first reports, corrections, and indirect holdings keep their normal text color", () => {
@@ -157,7 +157,7 @@ test("first reports, corrections, and indirect holdings keep their normal text c
   assert.equal(filingChangesForHoldings([indirect], [current, previous]).has(indirect), false);
   const lowerBound = holding({ ...currentHolding, ownershipNumericKind: "lower_bound" });
   assert.deepEqual(filingChangesForHoldings([lowerBound], [current, previous]).get(lowerBound),
-    { quantity: "up", ownership: null });
+    { quantity: "up", ownership: null, quantityDelta: "100", ownershipDelta: null });
 });
 
 test("a missing value in the immediately preceding filing stays neutral for that field", () => {
@@ -169,7 +169,7 @@ test("a missing value in the immediately preceding filing stays neutral for that
     quantity: null, companyOwnershipPercent: "6.20" });
   const current = event({ receiptNo: currentHolding.receiptNo, receiptDate: "2026-01-03" });
   assert.deepEqual(filingChangesForHoldings([currentHolding], [older, current, previous]).get(currentHolding),
-    { quantity: null, ownership: "down" });
+    { quantity: null, ownership: "down", quantityDelta: null, ownershipDelta: "-0.1" });
   const otherSecurity = { ...older, stockCode: "000660" };
   assert.equal(filingChangesForHoldings([currentHolding], [current, otherSecurity]).has(currentHolding), false);
 });
@@ -446,7 +446,7 @@ test("ratio-adjusted holdings get the new exclusion labels and stay neutral in f
   const current = event({ receiptNo: "20260201000001", receiptDate: "2026-02-05", quantity: "2000" });
   const plain = holding({ stockCode: "005930", quantity: "2000", receiptNo: current.receiptNo });
   assert.deepEqual(filingChangesForHoldings([plain], [previous, current]).get(plain),
-    { quantity: "up", ownership: null });
+    { quantity: "up", ownership: null, quantityDelta: "1000", ownershipDelta: "0" });
   // Same stored quantity as the filing would colour; with an adjustment it must not.
   const adjusted = holding({
     stockCode: "005930", quantity: "2000", receiptNo: current.receiptNo,
