@@ -4371,6 +4371,62 @@ def _is_plain_blank(node):
     return True
 
 
+def _blank_lcs_pairs(a, b):
+    """Return the legacy blank-paragraph LCS index pairs in linear space.
+
+    Carry the FIRST column reached at the middle row along the actual canonical
+    suffix-DP path. A length-only Hirschberg split loses this tie information.
+    No swapping the inputs (the tie is asymmetric), no copied sequence slices.
+    """
+    out = []
+
+    def solve(lo, hi, left, right):
+        # Equal heads are forced diagonals in the production traceback.
+        while lo < hi and left < right and a[lo] == b[left]:
+            out.append((lo, left))
+            lo += 1
+            left += 1
+        if lo == hi or left == right:
+            return
+        if hi - lo == 1:
+            for j in range(left, right):
+                if a[lo] == b[j]:
+                    out.append((lo, j))
+                    break
+            return
+        mid = (lo + hi) // 2
+        width = right - left
+        below = [0] * (width + 1)
+        for i in range(hi - 1, mid - 1, -1):
+            row = [0] * (width + 1)
+            for j in range(width - 1, -1, -1):
+                row[j] = below[j + 1] + 1 if a[i] == b[left + j] else max(below[j], row[j + 1])
+            below = row
+        crossing = list(range(width + 1))
+        for i in range(mid - 1, lo - 1, -1):
+            row = [0] * (width + 1)
+            current = [width] * (width + 1)
+            for j in range(width - 1, -1, -1):
+                if a[i] == b[left + j]:
+                    row[j] = below[j + 1] + 1
+                    current[j] = crossing[j + 1]
+                elif below[j] >= row[j + 1]:
+                    row[j] = below[j]
+                    current[j] = crossing[j]
+                else:
+                    row[j] = row[j + 1]
+                    current[j] = current[j + 1]
+            below, crossing = row, current
+        cut = left + crossing[0]
+        # Release all O(width) temporaries BEFORE recursive calls.
+        del row, current, below, crossing
+        solve(lo, mid, left, cut)
+        solve(mid, hi, cut, right)
+
+    solve(0, len(a), 0, len(b))
+    return out
+
+
 def _balance_blank_paragraphs(before, after, result):
     """Empty paragraphs are left out of the comparison. Between the same neighbouring decisions,
     keep as many revised empty paragraphs as both sides have, mark the revision's extra ones as
@@ -4401,20 +4457,9 @@ def _balance_blank_paragraphs(before, after, result):
         # Pair lines of the same kind (plain, page break, ...) without crossing, as a longest
         # common subsequence. A kept line stands for the original's line it pairs with, so
         # deletions around it keep their original order on Reject All.
-        rows, columns = len(old), len(new)
-        table = [[0] * (columns + 1) for _ in range(rows + 1)]
-        for i in range(rows - 1, -1, -1):
-            for j in range(columns - 1, -1, -1):
-                table[i][j] = table[i + 1][j + 1] + 1 if old[i][1] == new[j][1] else max(table[i + 1][j], table[i][j + 1])
-        i = j = 0
         paired_old, paired_new = set(), set()
-        while i < rows and j < columns:
-            if old[i][1] == new[j][1]:
-                new[j][0][0].append(old[i][0]); paired_old.add(i); paired_new.add(j); i += 1; j += 1
-            elif table[i + 1][j] >= table[i][j + 1]:
-                i += 1
-            else:
-                j += 1
+        for i, j in _blank_lcs_pairs([value for _, value in old], [value for _, value in new]):
+            new[j][0][0].append(old[i][0]); paired_old.add(i); paired_new.add(j)
         for j, (item, _) in enumerate(new):
             if j not in paired_new:
                 item[2]["insertedBlank"] = True
