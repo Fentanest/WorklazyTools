@@ -1,6 +1,6 @@
 # Local image editor fork
 
-The current unpublished package is **1.3.0-worklazy.4**. It is derived from the
+The current unpublished package is **1.3.0-worklazy.5**. It is derived from the
 MIT fork commit `263b8cfc347c822ff1bf4d2d85b5a95c0efe51d4`, based on upstream
 `125ae084c4f68dc516702440e4e0d20ab17e581c` (1.3.0), **plus
 `ie1-safari-fixes.patch`**. The base source archive alone is not the current code.
@@ -9,7 +9,7 @@ The patch includes the local package/lock version and source-export/BG UI fixes.
 `manifest.json` names the active package in `packageFile`, the required patch in
 `sourcePatch`, and pins all three retained inputs by bytes and SHA-256:
 
-- `ascentsparksoftware-react-image-editor-1.3.0-worklazy.4.tgz`: installed package.
+- `ascentsparksoftware-react-image-editor-1.3.0-worklazy.5.tgz`: installed package.
 - `source-263b8cf.tar.gz`: original source, MIT license and archived npm lock.
 - `ie1-safari-fixes.patch`: required source delta before rebuilding.
 
@@ -37,7 +37,7 @@ npm run build -w @ascentsparksoftware/react-image-editor
 npm pack ./packages/react-image-editor
 ```
 
-The resulting package version must be `1.3.0-worklazy.4` for the current pinned
+The resulting package version must be `1.3.0-worklazy.5` for the current pinned
 inputs. Do not omit or silently skip a patch failure. Compare the rebuilt package
 contents; do not assume a new npm pack has identical gzip/tar metadata. When
 changing the source, keep the source patch, generated package, manifest and
@@ -56,3 +56,8 @@ completed result white (or the host export fill), including erased holes. SVG
 with an eraser embeds the composited PNG because Fabric SVG does not implement
 this canvas compositing operator. JSON/templates preserve the editable masks
 and original objects and continue to use the concealment export warning.
+
+worklazy.5 reports actual raster alpha via optional `onJpegTransparencyChange`
+immediately before JPEG matting. The shared `hasCanvasTransparency` helper reads
+at most 64 output rows at once and includes partial alpha. Opaque preview margins
+are not inferred from file type or the editor's checkerboard.

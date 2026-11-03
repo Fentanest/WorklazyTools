@@ -2945,7 +2945,7 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
-@ascentsparksoftware/react-image-editor 1.3.0-worklazy.4
+@ascentsparksoftware/react-image-editor 1.3.0-worklazy.5
 Declared license: MIT
 Homepage: https://github.com/ascentspark/react-image-editor#readme
 
