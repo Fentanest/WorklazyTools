@@ -535,7 +535,8 @@ export function AppShell() {
         onLeave={confirmGuardLeave}
       />
 
-      <nav className="bottom-tabs glass-bar" aria-label={t("navigation.mobileLabel")}>
+      {/* Keep fixed tab labels readable over white document previews in every theme. */}
+      <nav className="bottom-tabs glass-bar" style={{ background: "var(--bg-solid)", backdropFilter: "none", WebkitBackdropFilter: "none" }} aria-label={t("navigation.mobileLabel")}>
         {primaryNavigation.map((item) => {
           const Icon = item.icon;
           return (
