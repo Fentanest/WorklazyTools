@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { auditTsxTree } from "./i18n-literal-audit.mjs";
 import { hasPublicationTextMapping } from '../src/features/market-calendar/calendarDisplay.ts';
 
 const langs = ["ko", "en"];
@@ -87,6 +88,30 @@ if (process.env.WORKLAZY_MCAL_DATA_DIR) {
   }
   console.log(`Checked ${new Set(values).size} distinct published calendar texts.`);
 }
+
+
+// Explicit bilingual landing/native-language labels, never general English UI.
+const englishHangulAllowlist = new Set([
+  'common.language.ko', 'common.landing.titleSecondary',
+  'common.landing.descriptionSecondary', 'common.landing.continueKo',
+]);
+function checkEnglish(value, key) {
+  if (typeof value === 'string' && /[가-힣ㄱ-ㅎ]/u.test(value) && !englishHangulAllowlist.has(key)) {
+    console.error(`[en] Korean literal in locale value: ${key}`);
+    hasError = true;
+  } else if (value && typeof value === 'object') {
+    for (const [name, child] of Object.entries(value)) checkEnglish(child, `${key}.${name}`);
+  }
+}
+for (const file of fs.readdirSync('src/locales/en').filter(file => file.endsWith('.json'))) {
+  checkEnglish(JSON.parse(fs.readFileSync(path.join('src/locales/en', file), 'utf8')), file.slice(0, -5));
+}
+const literalAudit = auditTsxTree();
+for (const finding of literalAudit.findings) {
+  console.error(`${finding.file}:${finding.line}: Unlocalized Korean ${finding.kind}: ${finding.text.trim()}`);
+  hasError = true;
+}
+console.log(`Checked ${literalAudit.files} TSX files for hardcoded Korean UI; ${literalAudit.findings.length} violations, ${literalAudit.excluded.length} documented language/data exclusions.`);
 
 if (hasError) {
   process.exit(1);

@@ -1,3 +1,4 @@
+import { ToolGuideLink } from "../../components/ToolGuideLink";
 import { acceptsFile } from "../../app/fileAccepts";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
 import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
@@ -291,7 +292,7 @@ export function ExcelCleanerPage() {
         <div className="mt-3 grid gap-2.5" data-testid="excel-cleaner-files">
           {items.map((item, index) => <Card as="article" className="gap-0 overflow-visible rounded-2xl border border-border p-3 shadow-sm" key={item.id} data-testid="excel-cleaner-file" data-inspecting={item.inspecting || undefined}>
             <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5"><FileSpreadsheet className="text-primary dark:text-primary" size={18} /><span className="min-w-0"><strong className="block overflow-hidden text-ellipsis whitespace-nowrap text-sm">{item.file.name}</strong><small className="mt-0.5 block text-xs text-muted-foreground">{formatBytes(item.file.size)}{item.inspection ? ` · ${item.inspection.format.toUpperCase()}` : ""}</small></span><Button type="button" variant="ghost" size="icon-sm" className="rounded-lg text-destructive hover:bg-destructive/10 hover:text-destructive" data-testid="excel-cleaner-remove" aria-label={t("common:files.remove", { name: item.file.name })} onClick={() => void replaceFiles(items.filter((_candidate, position) => position !== index).map((candidate) => candidate.file))}><X size={16} /></Button></header>
-            {item.inspecting && <p className="mt-2 text-sm text-muted-foreground">{t("features:excelCleaner.files.inspecting")} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p>}
+            {item.inspecting && <p className="mt-2 text-sm text-muted-foreground">{t("features:excelCleaner.files.inspecting")} <ToolGuideLink /></p>}
             {item.error && <UtilityNotice className="mt-2" kind="error" role="alert"><span>{item.error}</span></UtilityNotice>}
             {item.inspection?.softLimitExceeded && !item.inspection.hardLimitExceeded && <UtilityNotice className="mt-2"><span>{t("features:excelCleaner.files.large", { count: item.inspection.cellCount.toLocaleString() })}</span></UtilityNotice>}
             {item.inspection?.hardLimitExceeded && <UtilityNotice className="mt-2" kind="error" role="alert"><span>{t("features:excelCleaner.files.tooLarge", { count: item.inspection.cellCount.toLocaleString() })}</span></UtilityNotice>}

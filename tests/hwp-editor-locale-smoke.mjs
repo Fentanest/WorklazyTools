@@ -56,6 +56,8 @@ for (const language of ['ko', 'en']) test(`${language}: pinned Studio locale, re
     const menus = (await studio.locator('#menu-bar .menu-title').allTextContents()).map(text => text.trim());
     assert.deepEqual(menus, language === 'en' ? ['File','Edit','View','Insert','Format','Page','Table','Tools'] : ['파일','편집','보기','입력','서식','쪽','표','도구']);
     assert.equal(await studio.locator('html').getAttribute('lang'), language);
+    const inputLabel = language === 'en' ? 'Document editing input' : '문서 편집 입력';
+    assert.equal(await studio.locator(`[aria-label="${inputLabel}"]`).count(), 1, 'IME accessible name follows the page locale after a document is opened');
     assert.equal(await studio.locator('#font-lang option[value=all]').textContent(), language === 'en' ? 'Font Set' : '대표');
     assert.equal(await studio.locator('#sb-mode').textContent(), language === 'en' ? 'Insert' : '삽입');
     assert.equal(await studio.locator('#sb-page').textContent(), language === 'en' ? 'Page 1 / 1' : '1 / 1 쪽');

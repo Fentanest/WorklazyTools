@@ -2907,7 +2907,9 @@
       "dpiNotice": "Every PDF page is recreated in a new PDF containing PNG raster images only. Text search and copy, signatures, forms, links, and original metadata are not preserved. Higher resolution uses more memory, and DPI is never lowered automatically when a size limit is reached.",
       "confirm": "I reviewed the pages without areas and the output summary, and I am ready to create new files.",
       "run": "Create redacted files",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+      "consequencesTitle": "What changes in the result:",
+      "consequencesDescription": "Every PDF page is converted to an image and saved in a new PDF, including pages without masked areas. Original text search, selection and copying, digital signatures, forms, links, and metadata are not preserved. Keep important originals separately."
     },
     "summary": {
       "title": "Pages without areas",
@@ -3499,6 +3501,7 @@
     "connectionError": "The official rhwp editor could not be loaded. Check your network connection or content-blocking settings.",
     "passwordError": "Check the password and open the document again.",
     "unsavedError": "Opening was cancelled while checking unsaved changes in the current document.",
-    "operationError": "The HWP editing operation failed."
+    "operationError": "The HWP editing operation failed.",
+    "documentInputLabel": "Document editing input"
   }
 }

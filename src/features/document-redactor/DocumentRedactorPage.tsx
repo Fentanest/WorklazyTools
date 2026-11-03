@@ -1,3 +1,4 @@
+import { ToolGuideLink } from "../../components/ToolGuideLink";
 import { usePersistentHandoffReceiver } from "../../app/useHandoffReceiver";
 import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import type { IntakeContext } from "../../app/memoryHandoff";
@@ -126,7 +127,7 @@ export function DocumentRedactorPage() {
       {<ToolGuideWrapper slug="documentRedactor">{c.fallbackNotice && <UtilityNotice className="mt-4" kind="warning">{c.fallbackNotice}</UtilityNotice>}</ToolGuideWrapper>}
     </UtilityPage>
   );
-  return <UtilityPage toolId="document-redactor"><header className="mb-5"><h1 className="text-2xl font-extrabold">{c.title}</h1><p className="mt-2 text-muted-foreground">{c.description} <a href="#tool-guide-title" className="inline-block text-sm font-medium text-[var(--brand,theme(colors.blue.600))] hover:underline dark:text-[var(--brand,theme(colors.blue.400))]">처음 사용하시나요? 사용 안내 보기 &darr;</a></p></header>
+  return <UtilityPage toolId="document-redactor"><header className="mb-5"><h1 className="text-2xl font-extrabold">{c.title}</h1><p className="mt-2 text-muted-foreground">{c.description} <ToolGuideLink /></p></header>
     {recovery}<UtilitySectionCard title={c.files.title} description={c.files.description}>{ready?<div className="redactor-file-picker"><FileDropZone label={c.files.label} hint={imageEnabled?c.files.hint:c.files.pdfHint} accept={imageEnabled?'application/pdf,image/jpeg,image/png,image/webp':'application/pdf'} multiple files={files} onFiles={async next=>{await replaceInputs(next)}} disabled={busy}/></div>:<p role="status">{c.preparing}</p>}<UtilityNotice>{c.files.limits}</UtilityNotice>{ready&&!imageEnabled&&<UtilityNotice kind="warning">{c.files.imageUnavailable}</UtilityNotice>}
       {failures.length>0&&<UtilityNotice  kind="error"><ul>{failures.map((f,i)=><li key={i}>{c.document.replace('{{number}}',String(f.index+1))}: {c.errors[f.code]}</li>)}</ul></UtilityNotice>}
       {inputs.length>0&&<ol className="redactor-document-list">{inputs.map((value,i)=><li key={value.id}><button type="button" disabled={busy} aria-current={value.id===fileId?'true':undefined} onClick={()=>{setFileId(value.id);setPageIndex(0);setResultMode(false)}}>{c.document.replace('{{number}}',String(i+1))} · {value.pages.length} {c.pages}</button><Button type="button" variant="ghost" disabled={busy} aria-label={`${c.remove} ${i+1}`} onClick={()=>void replaceInputs(files.filter((_,n)=>n!==i))}><Trash2 size={16}/></Button></li>)}</ol>}
@@ -142,7 +143,7 @@ export function DocumentRedactorPage() {
       <div><strong>{c.summary.title}</strong>{totalUnmasked.length?<ul>{totalUnmasked.map(value=><li key={value}>{value}</li>)}</ul>:<p>{c.summary.allMasked}</p>}</div>
       
       <UtilityNotice kind="warning" className="mb-4">
-        <strong>결과에서 달라지는 점:</strong> PDF는 모든 페이지를 이미지로 바꿔 새 PDF로 저장합니다. 가리지 않은 페이지도 같은 방식으로 저장됩니다. 원래의 글자 검색·선택·복사 기능, 전자서명, 입력 양식, 링크, 원본 메타데이터는 유지되지 않습니다. 중요한 원본은 따로 보관하세요.
+        <strong>{c.output.consequencesTitle}</strong>{" "}{c.output.consequencesDescription}
       </UtilityNotice>
       <label className="redactor-confirm">
 <input data-testid="redactor-confirm" type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)} disabled={busy}/>{c.output.confirm}</label><div data-testid="redactor-run"><PrimaryButton accent="violet" disabled={selecting||!inputs.length||inputs.some(value=>countMasks(histories[value.id]?.present??{})===0)||!confirmed} loading={running} onClick={()=>void runExport()}>{c.output.run}</PrimaryButton></div>{running&&<Button className="bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-950/70 dark:text-red-300 dark:hover:bg-red-950" data-testid="redactor-cancel" type="button" variant="destructive" onClick={()=>{abort.current?.abort();client.current?.cancel()}}>{c.output.cancel}</Button>}<OperationProgress {...operation} accent="violet" title={c.progress.title}/>
