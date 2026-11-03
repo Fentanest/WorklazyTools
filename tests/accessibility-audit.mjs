@@ -1,4 +1,5 @@
 import { startOwnedPreview, stopOwnedPreview } from "./helpers/owned-preview.mjs";
+import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -669,18 +670,34 @@ async function prepareExcelDuplicateResult(page) {
     mimeType: "text/csv",
     buffer: Buffer.from(`Key,Value\nA,${"accessible-long-value-".repeat(16)}\nA,left-tail`, "utf8"),
   });
+  // Since 5e4aa258 the shared drop zone blocks further selections while its
+  // async consumer inspects the first file. setInputFiles does not wait for
+  // enabled state; sending the right file early silently loses that selection.
+  await page.waitForFunction(() => {
+    const input = document.querySelector('[data-testid="excel-compare-page"] input[type="file"]');
+    return input instanceof HTMLInputElement && !input.disabled
+      && document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 1;
+  });
   await input.setInputFiles({
     name: "a11y-duplicate-right.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("Key,Value\nA,right-only", "utf8"),
   });
   await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2);
+  assert.deepEqual(await page.locator('[data-testid="excel-selected-file"] strong').allTextContents(), [
+    "a11y-duplicate-left.csv", "a11y-duplicate-right.csv",
+  ]);
   await page.locator('[data-testid="excel-compare-mode-grid"] button:nth-child(2)').click();
-  await page.waitForFunction(() => !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
+  await page.waitForFunction(() => {
+    const button = document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+    return button instanceof HTMLButtonElement && !button.disabled;
+  });
   await page.locator('[data-testid="excel-compare-actions"] [data-ui-component="primary-button"]').click();
   await page.locator('[data-testid="excel-duplicate-row"]').waitFor({ state: "visible", timeout: 240_000 });
   await page.locator('[data-testid="excel-duplicate-toggle"][data-side="left"]').click();
   await page.locator('[data-testid="excel-duplicate-list"][data-side="left"]').waitFor({ state: "visible" });
+  assert.equal(await page.locator('[data-testid="excel-duplicate-row"]').count(), 1);
+  assert.equal(await page.locator('[data-testid="excel-duplicate-list"][data-side="left"] li').count(), 2);
 }
 
 async function measureDuplicateResultContrast(page) {

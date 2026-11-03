@@ -72,7 +72,7 @@ try {
           assert.match(await page.locator("[data-testid='pdf-stamp-notice']").innerText(), language === "ko" ? /공인 전자서명|디지털 서명/u : /certified electronic|digital signature/iu);
         }
         await page.waitForFunction(() => !document.querySelector(".tool-route-loading") && !Object.keys(sessionStorage).some((key) => key.startsWith("worklazy_tool_reload:")));
-        assert.equal(await page.locator(".pdf-tool-navigation [data-pdf-nav-mode]").count(), 5);
+        await assertEditorNavigation(page, language);
         assert.equal(await page.locator(".pdf-tool-navigation [data-pdf-nav-mode='finish'][data-active='true']").count(), 1);
         assert.ok(documentNavigations.filter((url) => url.startsWith(baseUrl)).length <= 2, `${language}/${route}/${viewport.id} exceeded the one-reload recovery budget`);
         assert.equal(await page.locator("[data-route-error]").count(), 0);
@@ -186,8 +186,20 @@ async function testDisplayModuleRecovery(browserInstance, fixture) {
   }
 }
 
+// Image and document conversions moved to dedicated tools (092f75d4/ff80a437).
+// Keep an exact menu/route contract rather than accepting any nonempty menu.
+async function assertEditorNavigation(page, language) {
+  assert.deepEqual(await page.locator(".pdf-tool-navigation [data-pdf-nav-mode]").evaluateAll((links) => links.map((link) => ({
+    mode: link.getAttribute("data-pdf-nav-mode"),
+    path: new URL(link.href).pathname.replace(/\/+$/, ""),
+  }))), [
+    { mode: "organize", path: `/${language}/tools/pdf-editor` },
+    { mode: "finish", path: `/${language}/tools/pdf-editor/finish` },
+  ]);
+}
+
 async function testNavigation(browserInstance) {
-  for (const width of [320, 390, 820, 821]) {
+  for (const [width, expectedOverflow] of [[320, true], [390, true], [820, false], [821, false]]) {
     const context = await browserInstance.newContext({ viewport: { width, height: 844 }, locale: "en-US", serviceWorkers: "block" });
     await context.addInitScript(() => localStorage.setItem("worklazy_privacy_consent_v2", "denied"));
     const page = await context.newPage();
@@ -198,7 +210,6 @@ async function testNavigation(browserInstance) {
       const navRect = navigation.getBoundingClientRect();
       const activeRect = active.getBoundingClientRect();
       return {
-        count: navigation.querySelectorAll("[data-pdf-nav-mode]").length,
         overflow: navigation.scrollWidth > navigation.clientWidth,
         activeVisible: activeRect.left >= navRect.left - 1 && activeRect.right <= navRect.right + 1,
         cue: navigation.parentElement?.getAttribute("data-scroll-cue"),
@@ -221,17 +232,14 @@ async function testNavigation(browserInstance) {
         }),
       };
     });
-    assert.equal(metrics.count, 5);
+    await assertEditorNavigation(page, "en");
     assert.ok(metrics.activeVisible, `active finish navigation is clipped at ${width}px`);
+    assert.equal(metrics.overflow, expectedOverflow, `editor navigation overflow is incorrect at ${width}px`);
+    assert.equal(metrics.labelsFit, true, `English navigation labels overlap or clip at ${width}px`);
+    if (expectedOverflow) assert.notEqual(metrics.cue, "none", `overflow must retain a visible scroll cue at ${width}px`);
+    else assert.equal(metrics.cue, "none", `fitting navigation must not show a scroll cue at ${width}px`);
     if (width <= 390) {
-      assert.equal(metrics.overflow, true);
-      assert.notEqual(metrics.cue, "none");
       assert.deepEqual(finishTabs, { inside: true, separated: true, contentFits: true }, `finish tabs overlap at ${width}px`);
-    }
-    if (width === 821) {
-      assert.equal(metrics.overflow, true, "the 821px shell must keep scrolling when the sidebar reduces available width");
-      assert.notEqual(metrics.cue, "none", "the 821px overflow must retain a visible scroll cue");
-      assert.equal(metrics.labelsFit, true, "English navigation labels must not overlap or clip at 821px");
     }
     await context.close();
   }
