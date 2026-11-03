@@ -1,5 +1,9 @@
 # 검토 기록 (Review Notes)
 
+## 2026-11-03 — 이미지 하위 랜딩 본문 용어 후속 (정식 검수 대기·미배포)
+
+Reviewer(sonnet) SUBPAGES의 P3-a와 사용자 결정 B의 연장이다. bf41c1e에서 이어 ko guides.image·features.image의 본문, FAQ·소제목과 공통 편집 안내를 이미지로 정리한다. GIF의 공유 색상 안내도 같은 용어를 쓴다. imagePrivacy·sendTo.privacy 등 별도 사진 정보 제거/EXIF 고유명과 영어 전체·검색 동의어·라우트·SEO 구조는 유지한다. 파생 HTML과 FAQ JSON-LD의 문구를 같은 입력에서 생성하며 기능 로직은 변경하지 않는다. 검사·전후 관측·직접 열람은 SOL-IMAGE-SUBPAGES-BODY-REPORT.md에 보존한다. — Codx
+
 ## 2026-11-03 — 이미지 편집 하위 랜딩 명칭 통일 (정식 검수 대기·미배포)
 
 사용자 11/3 결정 2.B에 따라 resize·mosaic·watermark의 한국어 제목을 ‘이미지 크기 줄이기’, ‘이미지 모자이크’, ‘이미지 워터마크 넣기’로 정리했다. SEO 정본에서 static h1·OG/Twitter·RSS·허브·관련 링크가 파생되며, 앱의 한국어 하위 페이지 h1도 같은 정본을 쓴다. 영어 정본과 URL·canonical·sitemap loc은 유지한다. 옛 사진 검색어는 ko 도구 카탈로그의 비노출 synonyms에 보존한다. 공유 그림은 이미 이미지인 mosaic은 그대로 두고 제목이 바뀐 resize·watermark 슬러그만 재생성한다. 검사·소스 근거·직접 열람 캡처는 SOL-IMAGE-SUBPAGES-REPORT.md와 연결 증거에 보존한다. — Codx
