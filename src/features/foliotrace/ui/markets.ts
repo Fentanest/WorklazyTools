@@ -4,8 +4,20 @@ import reference from '../data/marketReference.json' with { type: 'json' };
 export const LISTING_MARKETS = ['KOSPI', 'KOSDAQ', 'KONEX', 'UNKNOWN'] as const;
 export type ListingMarket = typeof LISTING_MARKETS[number];
 export const marketReferenceDate = reference.asOfDate;
+export const MARKET_REFERENCE_MAX_AGE_DAYS = 30;
 export const marketSourceUrl = 'https://data.krx.co.kr/contents/MDC/MAIN/main/index.cmd';
 const marketCodes: Readonly<Record<string, string>> = reference.markets;
+
+/** Calendar days relative to the valuation day, not to the browser's clock. */
+export function marketReferenceAgeDays(valuationDate: string | null, referenceDate = marketReferenceDate): number | null {
+  const day = (value: string) => {
+    const time = Date.parse(`${value}T00:00:00Z`);
+    return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value ? time / 86400000 : null;
+  };
+  if (!valuationDate) return null;
+  const valuation = day(valuationDate), reference = day(referenceDate);
+  return valuation === null || reference === null ? null : Math.max(0, valuation - reference);
+}
 
 export function marketOf(stockCode: string): ListingMarket {
   const market = marketCodes[stockCode];

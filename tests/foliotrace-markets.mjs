@@ -41,6 +41,10 @@ try {
       try {
         const kospi = page.locator('[data-market=KOSPI]'), kosdaq = page.locator('[data-market=KOSDAQ]');
         assert.equal(await kospi.count(), 1); assert.equal(await kosdaq.count(), 1);
+        const activate = async panel => {
+          const market = await panel.getAttribute('data-market');
+          if (mobile && (market === 'KOSPI' || market === 'KOSDAQ')) await page.locator(`[data-market-tab=${market}]`).click();
+        };
         const chart = page.locator('.foliotrace-market-allocation');
         const chartText = await chart.innerText(); assert.match(chartText, /115,000,000/);
         for (const [market, percent] of [['KOSPI', '69.57%'], ['KOSDAQ', '17.39%'], ['KONEX', '8.70%'], ['UNKNOWN', '4.35%']]) {
@@ -56,17 +60,19 @@ try {
         const labels = lang === 'ko' ? ['평가 포함', '평가 제외', '5% 미만', '비율 보정', '전체'] :
           ['Included in valuation', 'Excluded from valuation', 'Below 5%', 'Ratio-adjusted', 'All'];
         for (const [panel, counts] of [[kospi, [1, 1, 1, 0, 2]], [kosdaq, [1, 1, 1, 1, 2]]]) {
+          await activate(panel);
           for (const [index, label] of labels.entries()) {
             await panel.locator('.foliotrace-pills').getByRole('button', { name: label, exact: true }).click();
             assert.equal(await count(panel).innerText(), String(counts[index]));
             assert.equal(await chart.innerText(), chartText);
           }
         }
-        await kospi.getByRole('combobox').selectOption('receipt');
-        await kosdaq.getByRole('combobox').selectOption('ownership');
+        await activate(kospi); await kospi.getByRole('combobox').selectOption('receipt');
+        await activate(kosdaq); await kosdaq.getByRole('combobox').selectOption('ownership');
         assert.equal(await kospi.getByRole('combobox').inputValue(), 'receipt');
         assert.equal(await kosdaq.locator('.foliotrace-mrow .foliotrace-code-plain').first().innerText(), '247540');
         for (const panel of [kospi, kosdaq]) for (const key of ['weight', 'value']) {
+          await activate(panel);
           await panel.getByRole('combobox').selectOption(key);
           assert.equal(await count(panel).innerText(), '2');
         }
@@ -78,14 +84,17 @@ try {
         assert.equal(await count(page.locator('[data-market=UNKNOWN]')).innerText(), '1');
         for (const [panel, name, historyCount] of [[kospi, 'KOSPI Up', 3], [kosdaq, 'KOSDAQ Down', 2],
           [page.locator('[data-market=KONEX]'), 'KONEX Fixture', 1], [page.locator('[data-market=UNKNOWN]'), 'Unconfirmed Fixture', 1]]) {
+          await activate(panel);
           await panel.getByRole('button', { name: new RegExp(name) }).first().click();
           const sheet = page.getByRole('dialog'); await sheet.waitFor();
           assert.ok((await sheet.innerText()).includes(name));
           assert.equal(await sheet.locator('.foliotrace-events li').count(), historyCount);
           await page.keyboard.press('Escape'); await sheet.waitFor({ state: 'hidden' });
         }
-        const left = await kospi.boundingBox(), right = await kosdaq.boundingBox();
-        if (mobile) { assert.ok(Math.abs(left.x - right.x) < 1); assert.ok(right.y >= left.y + left.height); }
+        await activate(kospi); const left = await kospi.boundingBox();
+        if (mobile) assert.equal(await kosdaq.isHidden(), true);
+        await activate(kosdaq); const right = await kosdaq.boundingBox();
+        if (mobile) { assert.equal(await kospi.isHidden(), true); assert.ok(Math.abs(left.x - right.x) < 1); }
         else { assert.ok(right.x > left.x + left.width); assert.ok(Math.abs(left.y - right.y) < 1); }
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
         await page.evaluate(() => document.fonts.ready);
@@ -96,6 +105,7 @@ try {
         await columns.evaluate(node => window.scrollTo(0, node.getBoundingClientRect().top + scrollY - 100));
         await columns.screenshot({ path: path.join(out, `${id}-columns.png`), style: captureStyle });
         if (mobile) for (const [panel, market] of [[kospi, 'KOSPI'], [kosdaq, 'KOSDAQ']]) {
+          await activate(panel);
           await panel.evaluate(node => window.scrollTo(0, node.getBoundingClientRect().top + scrollY - 100));
           await panel.screenshot({ path: path.join(out, `${id}-${market}.png`), style: captureStyle });
         }

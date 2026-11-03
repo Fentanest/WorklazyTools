@@ -1,5 +1,5 @@
 import { useMemo, useState, useSyncExternalStore } from "react";
-import type { ReactNode } from "react";
+import type { ReactNode, KeyboardEvent } from "react";
 
 import { PageHeader, SectionCard } from "../../../components/ui";
 import { UtilityPage } from "../../../components/UtilitySurface";
@@ -49,7 +49,7 @@ import type { FilingChangeDirection, Lang, QualityFilter, SortKey } from "./hold
 import { XIcon } from "lucide-react";
 import { getFaqsForPath } from "./faq";
 import delistedReference from "../data/delistedReference.json";
-import { LISTING_MARKETS, groupHoldingsByMarket, marketAllocation, marketReferenceDate, marketSourceUrl } from "./markets";
+import { LISTING_MARKETS, groupHoldingsByMarket, marketAllocation, marketReferenceDate, marketSourceUrl, marketReferenceAgeDays, MARKET_REFERENCE_MAX_AGE_DAYS } from "./markets";
 import type { ListingMarket } from "./markets";
 
 const delistedItems = [...delistedReference.items].sort((a, b) =>
@@ -57,6 +57,11 @@ const delistedItems = [...delistedReference.items].sort((a, b) =>
   (a.delistedDate ?? "").localeCompare(b.delistedDate ?? "") || a.nameKo.localeCompare(b.nameKo, "ko"));
 
 const LATEST_FILINGS_PREVIEW = 30;
+const MARKET_TAB_KEY = "worklazy.foliotrace.market-tab.v1";
+function readMarketTab(): "KOSPI" | "KOSDAQ" {
+  try { return window.sessionStorage.getItem(MARKET_TAB_KEY) === "KOSDAQ" ? "KOSDAQ" : "KOSPI"; }
+  catch { return "KOSPI"; }
+}
 type MarketFilters = { query: string; quality: QualityFilter; sortKey: SortKey };
 const initialMarketFilters = () => Object.fromEntries(LISTING_MARKETS.map(market =>
   [market, { query: "", quality: "all", sortKey: "value" }])) as Record<ListingMarket, MarketFilters>;
@@ -111,7 +116,9 @@ const STR = {
     marketChartNote: "평가할 수 있는 전체 보유액 기준입니다. 검색·필터와 무관하며, 평가 제외 종목은 금액 합계에서 뺍니다. 코넥스·시장 미확인 금액도 확인되면 분모에 포함합니다.",
     marketUnavailable: "시장별 비중을 계산할 수 없습니다.",
     marketPriced: "평가 포함 {priced}/{total}종목",
-    marketReference: "상장시장 구분: {date} KRX 기준",
+    marketReference: "상장시장 구분 출처: 한국거래소(KRX), {date} 기준",
+    marketTabs: "보유 종목 시장 선택",
+    marketReferenceOld: "시장 구분 자료가 평가일보다 {days}일 오래되었습니다. 출처 기준일 {reference} · 평가일 {valuation}. 최근 이전상장 등은 KRX에서 확인해 주세요.",
     tableUnavailable: "—는 확인된 평가 금액이 없다는 뜻입니다. 종목명 아래에서 제외 사유를 확인하세요.",
     tableChangeNote: "같은 종목의 직전 공시 숫자보다 크면 빨강, 작으면 파랑으로 표시합니다. 첫 확인·비교 불가 값은 기본색이며, 색이 실제 매매를 뜻하지는 않습니다.",
     changeUp: "직전 공시 수치보다 증가",
@@ -327,7 +334,9 @@ const STR = {
     marketChartNote: "Based on all holdings we can value, independent of search and filters. Unpriced holdings are excluded from the amount. Priced KONEX and unconfirmed-market holdings remain in the denominator.",
     marketUnavailable: "Market shares cannot be calculated.",
     marketPriced: "{priced}/{total} securities priced",
-    marketReference: "Listing markets: KRX as of {date}",
+    marketReference: "Listing-market source: Korea Exchange (KRX), as of {date}",
+    marketTabs: "Select holdings market",
+    marketReferenceOld: "Listing-market data is {days} days older than the valuation date (reference {reference}; valuation {valuation}). Check KRX for recent listing changes.",
     tableUnavailable: "— means no verified valuation is available. See the exclusion reason under the security name.",
     tableChangeNote: "Reported numbers appear red when above the previous filing for the same security and blue when below it. First reports and incomparable values keep the usual color; colors do not establish a trade.",
     changeUp: "Higher than the previous filing",
@@ -570,6 +579,16 @@ function useIsPhone(): boolean {
   return useSyncExternalStore(subscribePhone, () => window.matchMedia("(max-width: 640px)").matches, () => false);
 }
 
+function subscribeMarketWidth(callback: () => void): () => void {
+  const query = window.matchMedia("(max-width: 900px)");
+  query.addEventListener("change", callback);
+  return () => query.removeEventListener("change", callback);
+}
+
+function useMarketTabs(): boolean {
+  return useSyncExternalStore(subscribeMarketWidth, () => window.matchMedia("(max-width: 900px)").matches, () => false);
+}
+
 function ratioLineText(t: { ratioLine: string }, qa: NonNullable<Holding["quantityAdjustment"]>): string {
   return t.ratioLine.replace("{r}", formatQty(qa.reportedQuantity))
     .replace("{n}", qa.ratioNumerator).replace("{d}", qa.ratioDenominator);
@@ -658,6 +677,20 @@ function ReadyView({
   const [marketFilters, setMarketFilters] = useState(initialMarketFilters);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [showAllFilings, setShowAllFilings] = useState(false);
+  const [activeMarket, setActiveMarket] = useState(readMarketTab);
+  const marketTabs = useMarketTabs();
+  const referenceAge = marketReferenceAgeDays(snapshot.valuationTradeDate);
+  const activateMarket = (market: "KOSPI" | "KOSDAQ") => {
+    setActiveMarket(market);
+    try { window.sessionStorage.setItem(MARKET_TAB_KEY, market); } catch { /* UI still works without storage. */ }
+  };
+  const marketTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+    const next = event.key === "Home" ? "KOSPI" : event.key === "End" ? "KOSDAQ" :
+      event.key === "ArrowLeft" || event.key === "ArrowRight" ? (activeMarket === "KOSPI" ? "KOSDAQ" : "KOSPI") : null;
+    if (!next) return;
+    event.preventDefault(); activateMarket(next);
+    event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-market-tab="${next}"]`)?.focus();
+  };
 
   const marketGroups = useMemo(() => groupHoldingsByMarket(snapshot.holdings), [snapshot.holdings]);
   const allocation = useMemo(() => marketAllocation(snapshot.holdings), [snapshot.holdings]);
@@ -802,7 +835,10 @@ function ReadyView({
     const setQuality = (quality: QualityFilter) => updateMarketFilter(market, { quality });
     const setSortKey = (sortKey: SortKey) => updateMarketFilter(market, { sortKey });
     return (
-      <section data-market={market} className="foliotrace-market-panel" aria-labelledby={`foliotrace-market-${market}-h`}>
+      <section data-market={market} id={`foliotrace-market-${market}-panel`} className="foliotrace-market-panel"
+        hidden={marketTabs && (market === "KOSPI" || market === "KOSDAQ") && activeMarket !== market}
+        role={marketTabs && (market === "KOSPI" || market === "KOSDAQ") ? "tabpanel" : undefined}
+        aria-labelledby={marketTabs && (market === "KOSPI" || market === "KOSDAQ") ? `foliotrace-market-tab-${market}` : `foliotrace-market-${market}-h`}>
         <div className="foliotrace-block-head foliotrace-holdings-head">
           <h3 id={`foliotrace-market-${market}-h`} className="foliotrace-h2">
             {marketLabels[market]} <span className="foliotrace-count foliotrace-num">{formatCount(holdings.length)}</span>
@@ -1176,7 +1212,20 @@ function ReadyView({
             })}
           </ul>
           <p className="foliotrace-block-hint"><a href={marketSourceUrl} target="_blank" rel="noreferrer">{t.marketReference.replace("{date}", marketReferenceDate)}</a></p>
+          {referenceAge !== null && referenceAge > MARKET_REFERENCE_MAX_AGE_DAYS && (
+            <p className="foliotrace-reference-notice" role="note">{t.marketReferenceOld
+              .replace("{days}", formatCount(referenceAge)).replace("{reference}", marketReferenceDate)
+              .replace("{valuation}", snapshot.valuationTradeDate ?? "—")}</p>
+          )}
         </figure>
+        {marketTabs && <div className="foliotrace-market-tabs" role="tablist" aria-label={t.marketTabs}>
+          {(["KOSPI", "KOSDAQ"] as const).map(market => <button key={market} type="button" role="tab"
+            id={`foliotrace-market-tab-${market}`} data-market-tab={market}
+            aria-selected={activeMarket === market} aria-controls={`foliotrace-market-${market}-panel`}
+            tabIndex={activeMarket === market ? 0 : -1} onClick={() => activateMarket(market)} onKeyDown={marketTabKeyDown}>
+            {marketLabels[market]} <span className="foliotrace-count">{formatCount(marketGroups[market].length)}</span>
+          </button>)}
+        </div>}
         <div className="foliotrace-market-columns">
           {renderMarketPanel("KOSPI")}
           {renderMarketPanel("KOSDAQ")}

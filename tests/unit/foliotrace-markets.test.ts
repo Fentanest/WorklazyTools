@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import type { Holding } from '../../src/features/foliotrace/contracts.ts';
 import { validSnapshot } from '../../src/features/foliotrace/data/loadSnapshot.ts';
-import { groupHoldingsByMarket, marketAllocation, marketOf } from '../../src/features/foliotrace/ui/markets.ts';
+import { groupHoldingsByMarket, marketAllocation, marketOf, marketReferenceAgeDays, MARKET_REFERENCE_MAX_AGE_DAYS } from '../../src/features/foliotrace/ui/markets.ts';
 
 function holding(stockCode: string, estimatedValue: string | null): Holding {
   return { stockCode, estimatedValue } as Holding;
@@ -64,4 +64,13 @@ test('market allocation ignores stored portfolio percentages and does not modify
   const result = marketAllocation(Object.freeze([row, Object.freeze(holding('086520', '2'))]));
   assert.equal(result.markets.KOSPI.percent, '33.33'); assert.equal(result.markets.KOSDAQ.percent, '66.67');
   assert.equal(row.portfolioWeightPercent, '99.999');
+});
+
+test('market reference age is measured against valuation day in UTC, with a strict 30-day threshold', () => {
+  assert.equal(MARKET_REFERENCE_MAX_AGE_DAYS, 30);
+  assert.equal(marketReferenceAgeDays('2026-12-03', '2026-11-03'), 30);
+  assert.equal(marketReferenceAgeDays('2026-12-04', '2026-11-03'), 31);
+  assert.equal(marketReferenceAgeDays('2026-11-02', '2026-11-03'), 0);
+  assert.equal(marketReferenceAgeDays(null), null);
+  assert.equal(marketReferenceAgeDays('2026-02-30'), null);
 });

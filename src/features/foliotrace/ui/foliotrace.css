@@ -188,6 +188,55 @@
   margin-top: 1.5rem;
 }
 
+.foliotrace-market-panel[hidden] {
+  display: none;
+}
+
+.foliotrace-market-tabs {
+  position: sticky;
+  top: 80px;
+  z-index: 3;
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 1rem;
+  padding: 0.4rem;
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
+  border-radius: 18px;
+  background: var(--bg-solid, #ffffff);
+}
+
+.foliotrace-market-tabs button {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--label, #18181b);
+  font: inherit;
+  cursor: pointer;
+}
+
+.foliotrace-market-tabs button[aria-selected="true"] {
+  background: var(--label, #18181b);
+  color: var(--bg-solid, #ffffff);
+}
+
+.foliotrace-market-tabs button[aria-selected="true"] .foliotrace-count {
+  color: inherit;
+}
+
+.foliotrace-market-tabs button:focus-visible {
+  outline: 2px solid var(--brand-on-bg, var(--brand, #e8502f));
+  outline-offset: 2px;
+}
+
+.foliotrace-reference-notice {
+  margin: 0.5rem 0 0;
+  font-size: 0.82rem;
+  color: var(--label-secondary, #636369);
+}
+
 .foliotrace-market-panel .foliotrace-controls {
   width: 100%;
 }
