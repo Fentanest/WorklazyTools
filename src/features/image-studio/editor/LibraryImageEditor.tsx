@@ -1,6 +1,6 @@
 import { ImageEditor, ERROR_MESSAGES, type BeforeExportContext, type ExportDecision } from '@ascentsparksoftware/react-image-editor';
 import '@ascentsparksoftware/react-image-editor/styles.css';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '../../../components/ui';
 import { Button } from '../../../components/ui/button';
@@ -32,6 +32,13 @@ const fontResolver = (family: string) => localFonts.has(family) || family.includ
 const readThemeMode = (): 'light' | 'dark' => document.documentElement.dataset.theme?.startsWith('dark') || getComputedStyle(document.documentElement).colorScheme === 'dark' ? 'dark' : 'light';
 const resultPlanKey = (format: ImageOutputFormat, size?: PixelSize) => `${format}:${size?.width ?? 'auto'}x${size?.height ?? 'auto'}`;
 const initialTool = (preset?: ImageDirectPreset) => preset?.purpose === 'mosaic' ? 'redact' : preset?.purpose === 'watermark' ? 'text' : preset?.purpose === 'resize' ? 'resize' : 'select';
+const coarsePrimaryPointer = () => matchMedia('(pointer: coarse)').matches;
+const subscribePrimaryPointer = (notify: () => void) => {
+  const query = matchMedia('(pointer: coarse)');
+  query.addEventListener('change', notify);
+  return () => query.removeEventListener('change', notify);
+};
+const serverPrimaryPointer = () => false;
 
 export default function LibraryImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: Props) {
   const { t, i18n } = useTranslation('features');
@@ -106,7 +113,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   })));
   const secureBackgroundContext = globalThis.isSecureContext && !!globalThis.crypto?.subtle;
   const productRestricted = !!productDeviceRestriction();
-  const [touchInput] = useState(() => navigator.maxTouchPoints > 0 || matchMedia('(pointer: coarse)').matches);
+  const touchInput = useSyncExternalStore(subscribePrimaryPointer, coarsePrimaryPointer, serverPrimaryPointer);
   const labels = useMemo<Record<string, string>>(() => ({
     ...t('image.library.labels', { returnObjects: true }) as Record<string, string>,
     ...(touchInput ? { 'Click an object on the canvas to select it. Use the Layers panel to lock, reorder, group, align, or change opacity. Shift-click to multi-select.': t('image.library.touchSelectionHelp') } : {}),

@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 import { PNG } from 'pngjs';
 import { startRecoveryServer } from '../recovery-server.mjs';
 
-const out = process.env.IE1_OUTPUT || '/tmp/sol-ios-bg/ui';
+const out = process.env.IE1_OUTPUT || '/tmp/sol-ios-bg-docs/ui';
 await fs.mkdir(out, { recursive: true });
 const server = process.env.TEST_BASE_URL ? null : await startRecoveryServer({ root: 'dist' });
 const base = process.env.TEST_BASE_URL || server.url;
@@ -17,13 +17,32 @@ const devices = [
   { id: 'ipad-desktop', ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15', platform: 'MacIntel', touch: 5, memory: null, blocked: true },
   { id: 'android-4', ua: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/138.0 Mobile Safari/537.36', platform: 'Linux armv8l', touch: 5, memory: 4, blocked: true },
   { id: 'desktop-8', ua: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/138.0 Safari/537.36', platform: 'Linux x86_64', touch: 0, memory: 8, blocked: false },
+  { id: 'touch-laptop', ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/138.0 Safari/537.36', platform: 'Win32', touch: 10, coarse: false, mobile: false, memory: 8, blocked: false },
 ];
 try {
   for (const lang of ['ko', 'en']) for (const device of devices) await test(`${lang} ${device.id}: product eligibility and input-specific selection help`, async () => {
-    const context = await browser.newContext({ userAgent: device.ua, viewport: { width: device.touch ? 414 : 1280, height: 900 }, hasTouch: !!device.touch, isMobile: !!device.touch });
+    const mobile = device.mobile ?? !!device.touch;
+    const context = await browser.newContext({ userAgent: device.ua, viewport: { width: mobile ? 414 : 1280, height: 900 }, hasTouch: !!device.touch, isMobile: mobile });
     const heavy = [], errors = [];
     await context.addInitScript(device => {
       window.__WORKLAZY_MOCK_PROVIDERS__ = true;
+      if (device.coarse !== undefined) {
+        const original = window.matchMedia.bind(window), queries = new Map();
+        let coarse = device.coarse;
+        window.matchMedia = query => {
+          if (query !== '(pointer: coarse)' && query !== '(pointer: fine)') return original(query);
+          if (!queries.has(query)) {
+            const listeners = new Set();
+            queries.set(query, { media: query, get matches() { return query === '(pointer: coarse)' ? coarse : !coarse; },
+              addEventListener: (_, listener) => listeners.add(listener), removeEventListener: (_, listener) => listeners.delete(listener), listeners });
+          }
+          return queries.get(query);
+        };
+        window.__setPrimaryPointerCoarse = value => {
+          coarse = value;
+          for (const query of queries.values()) for (const listener of query.listeners) listener({ matches: query.matches, media: query.media });
+        };
+      }
       for (const [key, value] of Object.entries({ platform: device.platform, maxTouchPoints: device.touch, deviceMemory: device.memory ?? undefined,
         gpu: { requestAdapter: async () => ({ features: { has: name => name === 'shader-f16' } }) } })) Object.defineProperty(navigator, key, { configurable: true, value });
       const Original = window.Worker; window.__bgWorkers = 0;
@@ -56,8 +75,20 @@ try {
       await page.waitForFunction(() => !document.querySelector('[data-testid=image-editor-add-to-batch]').disabled);
       const panel = editor.locator('.asp-options-panel');
       const help = await panel.innerText();
-      if (device.touch) { assert.ok(help.includes(lib.touchSelectionHelp)); assert.doesNotMatch(help, /Shift/); }
+      const coarse = device.coarse ?? !!device.touch;
+      if (coarse) { assert.ok(help.includes(lib.touchSelectionHelp)); assert.doesNotMatch(help, /Shift/); }
       else assert.match(help, /Shift/);
+      if (device.id === 'touch-laptop') {
+        await page.evaluate(() => window.__setPrimaryPointerCoarse(true));
+        await panel.getByText(lib.touchSelectionHelp, { exact: true }).waitFor();
+        assert.doesNotMatch(await panel.innerText(), /Shift/);
+        await panel.screenshot({ path: `${out}/${lang}-laptop-coarse.png` });
+        await page.evaluate(() => window.__setPrimaryPointerCoarse(false));
+        await page.waitForFunction(() => document.querySelector('.asp-options-panel')?.textContent.includes('Shift'));
+        assert.match(await panel.innerText(), /Shift/);
+        assert.equal(await page.getByTestId('image-editor-add-to-batch').isDisabled(), false, 'input remains loaded after pointer changes');
+        await panel.screenshot({ path: `${out}/${lang}-laptop-fine.png` });
+      }
       if (device.blocked) {
         // A forced/stale selector must not bypass the controller's guard.
         await select.locator('option[value=product]').evaluate(option => { option.disabled = false; });
@@ -74,7 +105,7 @@ try {
       assert.equal(await page.evaluate(() => window.__bgWorkers), 0);
       assert.deepEqual(errors, []);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true);
-      records.push({ lang, device: device.id, blocked: device.blocked, shaderF16: true, memory: device.memory, touchHelp: !!device.touch, consent: 0, heavyRequests: heavy.length, workers: 0, errors });
+      records.push({ lang, device: device.id, blocked: device.blocked, shaderF16: true, memory: device.memory, touchPoints: device.touch, touchHelp: coarse, pointerChanges: device.id === 'touch-laptop' ? ['fine', 'coarse', 'fine'] : null, consent: 0, heavyRequests: heavy.length, workers: 0, errors });
     } catch (error) {
       console.log(JSON.stringify({ lang, device: device.id, signals: await page.evaluate(() => ({ ua: navigator.userAgent, platform: navigator.platform, touch: navigator.maxTouchPoints, memory: navigator.deviceMemory, option: document.querySelector('[data-testid=image-background-controls] option[value=product]')?.outerHTML, warning: document.querySelector('[data-testid=image-background-product-restriction]')?.textContent })) }));
       await page.screenshot({ path: `${out}/${lang}-${device.id}-failure.png` });
