@@ -683,6 +683,11 @@ function ReadyView({
   const activateMarket = (market: "KOSPI" | "KOSDAQ") => {
     setActiveMarket(market);
     try { window.sessionStorage.setItem(MARKET_TAB_KEY, market); } catch { /* UI still works without storage. */ }
+    requestAnimationFrame(() => {
+      if (window.matchMedia("(max-width: 900px)").matches) {
+        document.getElementById(`foliotrace-market-${market}-panel`)?.scrollIntoView({ block: "start", behavior: "instant" });
+      }
+    });
   };
   const marketTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const next = event.key === "Home" ? "KOSPI" : event.key === "End" ? "KOSDAQ" :
