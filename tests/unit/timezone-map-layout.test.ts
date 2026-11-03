@@ -1,7 +1,30 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { layoutMapLabels, mapLeaderEnd, mapLeaderIntersectsPin, nearestMapPin, rectanglesOverlap } from "../../src/features/timezone-calculator/mapLayout.ts";
+import { layoutMapLabels, leaderSegmentsCross, mapLeaderEnd, mapLeaderIntersectsPin, nearestMapPin, rectanglesOverlap, segmentDistanceSquared } from "../../src/features/timezone-calculator/mapLayout.ts";
 import { exceedsMapDragThreshold } from "../../src/features/timezone-calculator/mapInteraction.ts";
+import { geoEqualEarth } from "d3-geo";
+import { WORLD_CITIES } from "../../src/features/timezone-calculator/cities.ts";
+
+test("leader geometry includes endpoint and collinear contact without flagging separated paths", () => {
+  const a={x:0,y:0},b={x:10,y:10};
+  assert.equal(leaderSegmentsCross(a,b,{x:0,y:10},{x:10,y:0}),true);
+  assert.equal(leaderSegmentsCross(a,b,b,{x:20,y:20}),true);
+  assert.equal(leaderSegmentsCross(a,b,{x:4,y:4},{x:7,y:7}),true);
+  assert.equal(leaderSegmentsCross(a,b,{x:20,y:0},{x:20,y:10}),false);
+  assert.equal(segmentDistanceSquared({x:5,y:5},{x:0,y:0},{x:10,y:0}),25);
+});
+
+test("six real European and East Asian cities route without pin or leader intersections", () => {
+  const projection=geoEqualEarth().fitExtent([[18,18],[942,482]],{type:"Sphere"});
+  const cities=WORLD_CITIES.map(c=>{const p=projection([...c.coordinates])!;return{id:c.id,x:p[0],y:p[1]};});
+  for(const ids of [["london","paris","berlin","amsterdam","madrid","rome"],["seoul","tokyo","beijing","hong-kong","taipei","manila"]])for(const zoom of[1,1.5,3]) {
+    const pins=cities.map(p=>({...p,x:480+(p.x-480)*zoom,y:250+(p.y-250)*zoom}));
+    const result=layoutMapLabels(ids.map((id,i)=>({...pins.find(p=>p.id===id)!,width:ids[0]==="seoul"?[84.35,84.35,99.02,84.35,113.73,99.02][i]:110,height:30.46})),pins,960,500);
+    const segments=(l:typeof result[number])=>l.leaderPath.slice(1).map((p,i)=>[l.leaderPath[i],p] as const).filter(([a,b])=>Math.hypot(a.x-b.x,a.y-b.y)>.01);
+    for(const label of result)for(const [a,b]of segments(label))for(const pin of pins)if(pin.id!==label.id)assert.ok(segmentDistanceSquared({x:pin.x,y:pin.y-10},a,b)>=81-1e-6,`${label.id}/${pin.id} at ${zoom}`);
+    for(let i=0;i<result.length;i++)for(let j=i+1;j<result.length;j++)for(const[a,b]of segments(result[i]))for(const[c,d]of segments(result[j]))assert.equal(leaderSegmentsCross(a,b,c,d,0),false,`${result[i].id}/${result[j].id} at ${zoom}`);
+  }
+});
 
 test("three nearby city pairs have independent, bounded label boxes, including zoomed edge anchors", () => {
   const anchors = [{ id: "seoul", x: 775, y: 130 }, { id: "tokyo", x: 807, y: 133 }, { id: "new-york", x: 312, y: 116 }, { id: "toronto", x: 304, y: 107 }, { id: "london", x: 479, y: 80 }, { id: "paris", x: 485, y: 92 }];

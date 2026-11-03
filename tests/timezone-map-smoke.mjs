@@ -69,38 +69,30 @@ for (const lang of ["ko", "en"]) for (const width of [1440, 390]) test(`P3 ${lan
         await page.screenshot({ path: path.join(output, `p3-${lang}-${width}-${zoom}-keyboard.png`) });
       });
     }
-    await t.test("dense European labels keep readable boxes and record leader clearance", async () => {
-      const reset = page.getByTestId("timezone-map-controls").getByRole("button").last(); await reset.click();
-      await page.getByTestId("timezone-base-city").selectOption("london");
-      const ids = ["london", "paris", "berlin", "amsterdam", "madrid", "rome"];
+    for (const [cluster, baseCity, ids] of [
+      ["europe", "london", ["london", "paris", "berlin", "amsterdam", "madrid", "rome"]],
+      ["east-asia", "seoul", ["seoul", "tokyo", "beijing", "hong-kong", "taipei", "manila"]],
+    ]) await t.test(`dense ${cluster}: no leader-pin or leader-leader intersections`, async () => {
+      await page.getByTestId("timezone-map-controls").getByRole("button").last().click();
+      await page.getByTestId("timezone-base-city").selectOption(baseCity);
       for (const p of await page.getByTestId("timezone-map-pin").all()) {
-        const id = await p.getAttribute("data-city");
-        if ((await p.getAttribute("aria-pressed") === "true") !== ids.includes(id)) { await p.focus(); await p.press("Enter"); }
+        if (await p.getAttribute("aria-pressed") === "true" && !ids.includes(await p.getAttribute("data-city"))) { await p.focus(); await p.press("Enter"); }
       }
-      // Two passes also cover newly added cities that precede a removed city.
       for (const id of ids) { const p = page.getByTestId("timezone-map-pin").and(page.locator(`[data-city="${id}"]`)); if (await p.getAttribute("aria-pressed") !== "true") { await p.focus(); await p.press("Enter"); } }
-      await svg.scrollIntoViewIfNeeded(); await page.mouse.move(0, 0); await settle(page);
-      const geometry = await page.evaluate(() => {
-        const svg = document.querySelector('[data-testid="timezone-world-map"] svg[role="img"]'), bounds = svg.getBoundingClientRect();
-        const pins = [...svg.querySelectorAll('[data-testid="timezone-map-pin"]')].map(el => { const m = el.transform.baseVal.consolidate().matrix; return { id: el.getAttribute("data-city"), x: m.e, y: m.f - 10 }; });
-        let avoidable = 0, atOrigin = 0;
-        const labels = [...svg.querySelectorAll('[data-testid="timezone-map-label"]')].map(el => {
-          const line = el.parentElement.querySelector("line"), r = el.getBoundingClientRect();
-          const a = { x: Number(line.getAttribute("x1")), y: Number(line.getAttribute("y1")) }, b = { x: Number(line.getAttribute("x2")), y: Number(line.getAttribute("y2")) };
-          for (const pin of pins) {
-            if (pin.id === el.getAttribute("data-city")) continue;
-            const dx = b.x - a.x, dy = b.y - a.y, t = dx || dy ? Math.max(0, Math.min(1, ((pin.x - a.x) * dx + (pin.y - a.y) * dy) / (dx * dx + dy * dy))) : 0;
-            if ((pin.x - a.x - t * dx) ** 2 + (pin.y - a.y - t * dy) ** 2 < 81) {
-              if ((pin.x - a.x) ** 2 + (pin.y - a.y) ** 2 < 81) atOrigin++; else avoidable++;
-            }
-          }
-          return { id: el.getAttribute("data-city"), x: r.x - bounds.x, y: r.y - bounds.y, w: r.width, h: r.height };
-        });
-        return { viewport: { w: bounds.width, h: bounds.height }, labels, avoidable, atOrigin };
-      });
-      await fs.writeFile(path.join(output, `p3-${lang}-${width}-europe.json`), JSON.stringify(geometry, null, 2));
-      await page.screenshot({ path: path.join(output, `p3-${lang}-${width}-europe.png`) });
-      assert.equal(geometry.labels.length, 6); assertLayout(geometry);
+      for (const zoom of [1, 1.5, 3]) {
+        if (zoom === 1.5) await page.getByRole("button", { name: names[lang].zoom, exact: true }).click();
+        if (zoom === 3) for (let i = 0; i < 3; i++) await page.getByRole("button", { name: names[lang].zoom, exact: true }).click();
+        await svg.scrollIntoViewIfNeeded(); await page.mouse.move(0, 0); await settle(page);
+        const geometry = await leaderGeometry(page);
+        const stem = `leaders-${cluster}-${lang}-${width}-${zoom}`;
+        await fs.writeFile(path.join(output, stem + ".json"), JSON.stringify(geometry, null, 2));
+        await page.screenshot({ path: path.join(output, stem + ".png") });
+        assert.equal(geometry.labels.length, 6); assertLayout(geometry);
+        if (process.env.TZMAP_MEASURE_ONLY !== "1") {
+          assert.equal(geometry.pinIntersections, 0, "Every visible leader segment avoids every other pin, including its start");
+          assert.equal(geometry.leaderIntersections, 0, "Leader paths do not cross or touch each other");
+        }
+      }
     });
   } finally { await recordRuntime(); await context.close(); }
 });
@@ -119,6 +111,32 @@ function watchRuntime(page, prefix) {
     await fs.writeFile(prefix + "-runtime.json", JSON.stringify({ url: page.url(), pins, errors }, null, 2));
     if (!pins || errors.length) await page.screenshot({ path: prefix + "-runtime.png" });
   };
+}
+async function leaderGeometry(page) {
+  return page.evaluate(() => {
+    const svg = document.querySelector('[data-testid="timezone-world-map"] svg[role="img"]'), bounds = svg.getBoundingClientRect();
+    const w = svg.viewBox.baseVal.width, h = svg.viewBox.baseVal.height;
+    const distance = (p, a, b) => { const dx = b.x-a.x, dy = b.y-a.y, t = dx || dy ? Math.max(0, Math.min(1, ((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy))) : 0; return (p.x-a.x-t*dx)**2+(p.y-a.y-t*dy)**2; };
+    const cross = (a,b,c) => (b.x-a.x)*(c.y-a.y)-(b.y-a.y)*(c.x-a.x);
+    const intersects = (a,b,c,d) => cross(a,b,c)*cross(a,b,d)<0 && cross(c,d,a)*cross(c,d,b)<0 || Math.min(distance(a,c,d),distance(b,c,d),distance(c,a,b),distance(d,a,b))<1e-8;
+    const clip = (a,b) => {
+      let lo=0,hi=1; const dx=b.x-a.x,dy=b.y-a.y;
+      for (const [p,q] of [[-dx,a.x],[dx,w-a.x],[-dy,a.y],[dy,h-a.y]]) { if (!p) { if(q<0)return null;continue; } const t=q/p; if(p<0)lo=Math.max(lo,t);else hi=Math.min(hi,t); if(lo>hi)return null; }
+      return [{x:a.x+lo*dx,y:a.y+lo*dy},{x:a.x+hi*dx,y:a.y+hi*dy}];
+    };
+    const pins = [...svg.querySelectorAll('[data-testid="timezone-map-pin"]')].map(el => { const m=el.transform.baseVal.consolidate().matrix;return {id:el.getAttribute("data-city"),x:m.e,y:m.f-10}; });
+    const labels=[],routes=[];
+    for(const el of svg.querySelectorAll('[data-testid="timezone-map-label"]')) {
+      const id=el.getAttribute("data-city"),r=el.getBoundingClientRect(),shape=el.parentElement.querySelector("polyline,line");
+      const points=shape.tagName.toLowerCase()==="line" ? [{x:Number(shape.getAttribute("x1")),y:Number(shape.getAttribute("y1"))},{x:Number(shape.getAttribute("x2")),y:Number(shape.getAttribute("y2"))}] : [...shape.points].map(p=>({x:p.x,y:p.y}));
+      const segments=points.slice(1).map((p,i)=>clip(points[i],p)).filter(s=>s && Math.hypot(s[0].x-s[1].x,s[0].y-s[1].y)>.01);
+      routes.push({id,points,segments}); labels.push({id,x:r.x-bounds.x,y:r.y-bounds.y,w:r.width,h:r.height});
+    }
+    const pinHits=[],lineHits=[];
+    for(const route of routes)for(const pin of pins)if(pin.id!==route.id && route.segments.some(([a,b])=>distance(pin,a,b)<81-1e-6))pinHits.push([route.id,pin.id]);
+    for(let i=0;i<routes.length;i++)for(let j=i+1;j<routes.length;j++)if(routes[i].segments.some(([a,b])=>routes[j].segments.some(([c,d])=>intersects(a,b,c,d))))lineHits.push([routes[i].id,routes[j].id]);
+    return {viewport:{w:bounds.width,h:bounds.height},labels,routes,pinIntersections:pinHits.length,leaderIntersections:lineHits.length,pinHits,lineHits};
+  });
 }
 async function pin(page, id) {
   const ids = { seoul: ["서울", "Seoul"], tokyo: ["도쿄", "Tokyo"], "new-york": ["뉴욕", "New York"], toronto: ["토론토", "Toronto"], london: ["런던", "London"], paris: ["파리", "Paris"] };

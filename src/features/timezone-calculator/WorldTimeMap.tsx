@@ -11,7 +11,7 @@ import worldAtlas from "world-atlas/countries-110m.json";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { cityName, countryName, type WorldCity } from "./cities";
-import { layoutMapLabels, mapLeaderEnd, nearestMapPin } from "./mapLayout";
+import { layoutMapLabels, nearestMapPin } from "./mapLayout";
 import { exceedsMapDragThreshold } from "./mapInteraction";
 
 const MAP_WIDTH = 960;
@@ -242,9 +242,8 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
               {labels.map(label => {
                 const city = pins.find(pin => pin.id === label.id)!;
                 const size = metrics[label.id];
-                const end = mapLeaderEnd(city, label);
                 return <g key={label.id}>
-                  <line className="stroke-sky-600/50 [stroke-width:1]" x1={city.x} y1={city.y - 10} x2={end.x} y2={end.y} />
+                  <polyline data-testid="timezone-map-leader" data-city={label.id} className="fill-none stroke-sky-600/50 [stroke-width:1]" points={label.leaderPath.map(p => `${p.x},${p.y}`).join(" ")} />
                   <text
                     ref={element => { if (element) textRefs.current.set(label.id, element); else textRefs.current.delete(label.id); }}
                     data-testid="timezone-map-label" data-city={label.id}
