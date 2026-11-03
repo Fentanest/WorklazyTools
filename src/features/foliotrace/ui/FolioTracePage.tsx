@@ -49,6 +49,7 @@ import type { FilingChangeDirection, Lang, QualityFilter, SortKey } from "./hold
 import { XIcon } from "lucide-react";
 import { getFaqsForPath } from "./faq";
 import delistedReference from "../data/delistedReference.json";
+import { HistoryChart } from "./HistoryChart";
 import { LISTING_MARKETS, groupHoldingsByMarket, marketAllocation, marketReferenceDate, marketSourceUrl, marketReferenceAgeDays, MARKET_REFERENCE_MAX_AGE_DAYS } from "./markets";
 import type { ListingMarket } from "./markets";
 
@@ -107,9 +108,6 @@ const STR = {
     noHoldingsDesc: "현재 표시할 종목이 없습니다. 잠시 후 다시 조회해 보세요.",
     topWeights: "상위 보유 종목 비중",
     topWeightsDesc: "평가할 수 있는 종목의 전체 금액을 기준으로 계산한 비중입니다. 검색·필터를 바꿔도 이 기준은 같습니다.",
-    historyTitle: "추정 평가금액 추이",
-    historyDesc: "같은 계산 기준의 실제 기록이 두 번 이상 쌓이면 표시합니다.",
-    historySingle: "같은 방식으로 계산한 기록이 더 쌓이면 추이를 보여 드립니다.",
     tableTitle: "종목 표",
     marketKospi: "코스피", marketKosdaq: "코스닥", marketKonex: "코넥스", marketUnknown: "기타·시장 미확인",
     marketChart: "시장별 보유 비중", marketTotal: "평가 포함 보유액 합계",
@@ -325,9 +323,6 @@ const STR = {
     noHoldingsDesc: "There are no holdings to show right now. Please try again later.",
     topWeights: "Top holdings by weight",
     topWeightsDesc: "Shares of the total value we can estimate. Search and filters do not change the total.",
-    historyTitle: "Estimated value history",
-    historyDesc: "Shown after at least two real records use the same calculation method.",
-    historySingle: "A trend will appear when more values calculated the same way are available.",
     tableTitle: "Holdings table",
     marketKospi: "KOSPI", marketKosdaq: "KOSDAQ", marketKonex: "KONEX", marketUnknown: "Other / market unconfirmed",
     marketChart: "Holdings by market", marketTotal: "Total priced holdings",
@@ -1055,6 +1050,8 @@ function ReadyView({
         </div>
       </section>
 
+      <HistoryChart snapshot={snapshot} lang={lang} />
+
       <div className="foliotrace-status-line" role="status" aria-live="polite">
         <span className={stale ? "foliotrace-badge-warn" : "foliotrace-badge-ok"}>{stale ? t.staleBadge : t.freshBadge}</span>
         <span>{entityName} · {scope}</span>
@@ -1237,25 +1234,6 @@ function ReadyView({
         </div>
         {marketGroups.KONEX.length > 0 && renderMarketPanel("KONEX")}
         {marketGroups.UNKNOWN.length > 0 && renderMarketPanel("UNKNOWN")}
-      </section>
-
-      <section className="foliotrace-block" aria-labelledby="foliotrace-history-h">
-        <div className="foliotrace-block-head">
-          <h2 id="foliotrace-history-h" className="foliotrace-h2">{t.historyTitle}</h2>
-          <span className="foliotrace-block-hint">{t.historyDesc}</span>
-        </div>
-        {snapshot.history.length >= 2 ? (
-          <ul className="foliotrace-history">
-            {snapshot.history.map((h) => (
-              <li key={`${h.tradeDate}-${h.datasetVersion}`}>
-                <span>{h.tradeDate}</span>
-                <span className="foliotrace-num">{breakableValue(formatKrw(h.estimatedValue, lang))}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="foliotrace-state-text">{t.historySingle}</p>
-        )}
       </section>
 
       <section id="foliotrace-events" className="foliotrace-block" aria-labelledby="foliotrace-events-h">

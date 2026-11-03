@@ -1,4 +1,5 @@
 import type { FolioTraceView, QuantityAdjustmentKind, Snapshot, SourceKind } from '../contracts'
+import { validPublishedHistory, validValuationSeries } from './valuationSeries.ts'
 
 const DATA_ROOT = '/data/foliotrace/v1/'
 const VERSION = /^[a-f0-9]{64}$/
@@ -242,10 +243,15 @@ export function validSnapshot(value: unknown, version: string): value is Snapsho
       (!Array.isArray(value.issuerScopeObservations) || !value.issuerScopeObservations.every(validIssuerScopeObservation))) return false
   if (value.issuerScopeLaterChanges !== undefined &&
       (!Array.isArray(value.issuerScopeLaterChanges) || !value.issuerScopeLaterChanges.every(validIssuerScopeLaterChange))) return false
+  if (value.valuationSeries !== undefined) {
+    const valuationDay = typeof value.valuationTradeDate === 'string' ? value.valuationTradeDate : null
+    if (!validValuationSeries(value.valuationSeries) || value.valuationSeries.portfolioId !== value.portfolio.id ||
+      value.valuationSeries.methodologyVersion !== value.portfolio.methodologyVersion ||
+      (valuationDay !== null && value.valuationSeries.points.some(point => point.tradeDate > valuationDay))) return false
+  }
   if (value.holdings.length > SNAPSHOT_LIMITS.maxHoldings || value.events.length > SNAPSHOT_LIMITS.maxEvents ||
     value.history.length > SNAPSHOT_LIMITS.maxHistory) return false
-  return value.holdings.every(validHolding) && value.events.every(validEvent) && value.history.every((row: unknown) =>
-    isRecord(row) && isoDate(row.tradeDate) && decimal(row.estimatedValue) && str(row.datasetVersion) && VERSION.test(row.datasetVersion))
+  return value.holdings.every(validHolding) && value.events.every(validEvent) && validPublishedHistory(value.history)
 }
 
 async function digestHex(data: ArrayBuffer): Promise<string> {

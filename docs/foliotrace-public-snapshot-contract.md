@@ -76,3 +76,37 @@
 1. 연말 목록 행의 `receiptNo`를 자리표시 `00000000000000` 대신 `null`로 낸다(둘 다 통과하지만 null이 계약).
 2. `contract_v1/` 사본(`contracts.ts`, `loadSnapshot.ts`)을 이 저장소의 개정 2 파일로 교체하고 드리프트 시험을 갱신한다. `scripts/foliotrace-public-data.mjs`의 비공개 내용 검사와 `gate.py`의 목록을 맞춘다.
 3. 전달 시 `manifest.json`·`snapshots/<버전>.json` 외 파일을 데이터 경로에 두지 않는다.
+
+
+## F6 선택 확장 valuationSeries (2026-11-03)
+
+`schemaVersion=1`, data URL, 기존 `history`의 3개 필드와 공개값 의미는 유지한다.
+선택적 `valuationSeries`의 형은 `src/features/foliotrace/valuationSeriesContract.ts`,
+검증은 `data/valuationSeries.ts`다. 데이터 담당의 `f6-data-20261103/contract.ts` 인계를 반영한다.
+
+- 확장이 없으면 기존 공개 history만 읽는다. 확장이 있는데 잘못되면 schema-error로 거절한다.
+  재구성 점을 공개 history로 변환하거나 조용히 공개값만으로 대체하지 않는다.
+- 확장은 최대 1,000점, 실제 달력 날짜·엄격한 오름차순·날짜 중복 금지다. 기존 history도
+  최대 1,000점의 엄격한 오름차순/중복 금지를 검사한다.
+- 재구성은 `kind=reconstructed`, `reconstructed=true`, `datasetVersion=null`, methodology=2다.
+  점의 calculationPolicyRevision은 계열과 같아야 한다. KRW·포트폴리오·knowledgePolicy·priceBasis를 검사한다.
+- tracked=priced+unvalued, 제외 사유별 합계=unvalued, 0 이상 안전한 정수·상한과 coverage를 검사한다.
+  null 금액은 합계의 결손이다. 종목별 평가 수와 별개로 보존하며 0이나 전일값으로 채우지 않는다.
+- knowledgeCutoff는 거래일 이하, 거래일/조립일은 생성일 이하, 확장 거래일은 공개 스냅샷 평가일 이하로 검사한다.
+  이는 공개 메타데이터 검증이며 원장/공시 원문까지 독립 재판독하는 것은 아니다.
+- SHA-256 형식·식별자·문자열/배열 상한을 검사한다. 파일 검증기는 같은 validSnapshot 및 기존 비공개 정보 검사를 사용한다.
+
+### 최신 사용자 표시 결정
+
+원본 확장19점은 모두 재구성으로 보존/검증한다. 화면에서는 날짜가 겹치면 기존 history의
+공개값을 우선한다. 현재 표시는 **공개7점 + 중복이 없는 재구성12점 = 19개 날짜**다.
+이 결정은 초안 HANDOFF의 두 계열 중첩 표시안보다 나중에 주어진 사용자 지시를 따른다.
+
+공개 실선/재구성 점선, 표지·범례·툴팁의 재구성 설명으로 출처를 구분한다.
+문구의 약0.06%는 이번 중복 구간의 수량 시점 차이 비교이며 실제 보유액 정확도 보장이 아니다.
+출처가 달라지는 경계와 null 결손은 선을 잇지 않는다. 변화 요약도 공개/재구성 구간별로
+분리해 실제 운용 수익률로 오해하지 않게 한다. 과거 공개점에 없는 평가/제외 종목 수는
+추정하지 않으며, 해당 공개 datasetVersion/평가일과 현재 스냅샷이 일치할 때만 현재 수를 연결한다.
+
+차트 좌표에서만 유한 Number를 사용하고 원화 레이블/차이는 원본 십진 문자열·BigInt로 유지한다.
+1~2개 유효 값에는 추이 선 대신 기록 부족 상태와 날짜별 대체 기록을 제공한다.

@@ -238,6 +238,138 @@
   color: var(--label-secondary, #636369);
 }
 
+.foliotrace-trend-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: 0.75rem 1.25rem;
+  margin: 0.9rem 0;
+}
+
+.foliotrace-trend-summary > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.foliotrace-trend-summary span,
+.foliotrace-trend-summary small {
+  color: var(--label-secondary, #636369);
+  font-size: 0.8rem;
+}
+
+.foliotrace-trend-summary strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95rem;
+}
+
+.foliotrace-trend-figure {
+  margin: 0;
+}
+
+.foliotrace-trend-plot {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
+  border-radius: 14px;
+}
+
+.foliotrace-trend-canvas {
+  width: 100%;
+  height: 300px;
+  background: var(--bg-solid, #ffffff);
+  color: var(--label-secondary, #636369);
+}
+
+.foliotrace-chart-tooltip {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  gap: 0.3rem;
+  max-width: min(23rem, calc(100% - 16px));
+  padding: 0.75rem;
+  border: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
+  border-radius: 12px;
+  background: var(--bg-solid, #ffffff);
+  color: var(--label, #18181b);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  overflow-wrap: anywhere;
+  font-size: 0.82rem;
+}
+
+.foliotrace-chart-tooltip[hidden] {
+  display: none;
+}
+
+.foliotrace-chart-tooltip strong {
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.foliotrace-trend-legend {
+  display: grid;
+  gap: 0.4rem;
+  margin: 0.65rem 0;
+  font-size: 0.82rem;
+}
+
+.foliotrace-trend-legend > span {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.foliotrace-history-line {
+  flex: 0 0 1.75rem;
+  border-top: 2px solid var(--brand-on-bg, var(--brand, #e8502f));
+}
+
+.foliotrace-history-line-reconstructed {
+  border-top-style: dashed;
+  border-top-color: var(--label-secondary, #636369);
+}
+
+.foliotrace-trend-details summary {
+  min-height: 44px;
+  padding: 0.75rem 0;
+  cursor: pointer;
+}
+
+.foliotrace-trend-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.foliotrace-trend-table {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.foliotrace-trend-table th,
+.foliotrace-trend-table td {
+  padding: 0.6rem;
+  border-bottom: 1px solid var(--separator, rgba(60, 60, 67, 0.13));
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.foliotrace-trend-table td:nth-child(2) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 640px) {
+  .foliotrace-trend-canvas {
+    height: 250px;
+  }
+}
+
 .foliotrace-market-panel .foliotrace-controls {
   width: 100%;
 }
