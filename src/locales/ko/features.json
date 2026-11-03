@@ -1615,7 +1615,9 @@
       "backgroundProcessing": "배경 제거 중…",
       "downloadProgress": "모델·실행 파일 받는 중 · {{progress}}%",
       "unsupportedFormat": "이 브라우저는 선택한 이미지 형식으로 저장할 수 없습니다. PNG 또는 JPG를 선택해 주세요.",
-      "templateHelp": "편집을 이어가려면 위쪽 이미지 메뉴에서 템플릿 저장·불러오기를 사용하세요."
+      "templateHelp": "편집을 이어가려면 위쪽 이미지 메뉴에서 템플릿 저장·불러오기를 사용하세요.",
+      "cancelled": "취소했습니다.",
+      "httpsHint": "배경 제거에는 HTTPS 보안 연결이 필요합니다. 실행하기 전에 HTTPS 주소로 접속해 주세요."
     }
   },
   "video": {

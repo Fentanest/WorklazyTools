@@ -152,6 +152,9 @@ try {
                     await page.getByTestId('image-editor-export-action').locator('button').click();
                 }
                 await page.getByRole('alert').filter({ hasText: /cannot encode/ }).waitFor();
+            await page.waitForFunction(() => document.activeElement?.closest('[role=alert]'));
+            await page.waitForTimeout(100);
+            assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('role')), 'alert', 'failure focus remains at the operation alert');
                 await page.waitForTimeout(100);
                 assert.equal(downloads, 0, 'unsupported encoder must not produce a disguised PNG download');
             }

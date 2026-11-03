@@ -1622,7 +1622,9 @@
       "backgroundProcessing": "Removing the background…",
       "downloadProgress": "Downloading model/runtime · {{progress}}%",
       "unsupportedFormat": "This browser cannot encode this image format. Choose PNG or JPG.",
-      "templateHelp": "To continue editing later, use Save template and Load template in the Image menu above."
+      "templateHelp": "To continue editing later, use Save template and Load template in the Image menu above.",
+      "cancelled": "Cancelled.",
+      "httpsHint": "Background removal requires a secure HTTPS connection. Open the HTTPS address before running it."
     }
   },
   "video": {

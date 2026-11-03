@@ -60,6 +60,9 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const setError = useCallback((message: string) => { setErrorText(message); if (message) setErrorPresentation(value => value + 1); }, []);
   const [errorCode, setErrorCode] = useState<string>();
   const [notice, setNotice] = useState('');
+  const [backgroundCancelled, setBackgroundCancelled] = useState(false);
+  const noticeRevision = useRef(0);
+  const clearFeedback = useCallback(() => { noticeRevision.current++; setNotice(''); setBackgroundCancelled(false); }, []);
   const [mode, setMode] = useState<BgMode>('person');
   const modeRef = useRef(mode); modeRef.current = mode;
   const modeChosen = useRef(false);
@@ -81,7 +84,15 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const activeRef = useRef(active); activeRef.current = active;
   const onDirtyRef = useRef(onDirty); onDirtyRef.current = onDirty;
   const loadedAck = useRef<{ resolve: (ok: boolean) => void; version: number } | undefined>(undefined);
-  useEffect(() => { if (error) root.current?.querySelector('[role="alert"]')?.scrollIntoView({ block: 'center' }); }, [error, errorPresentation]);
+  useEffect(() => {
+    if (!error) return;
+    const frame = requestAnimationFrame(() => {
+      const alert = root.current?.querySelector<HTMLElement>('[data-testid="image-editor-operation-error"]');
+      alert?.focus({ preventScroll: true });
+      alert?.scrollIntoView({ block: 'center' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [error, errorPresentation]);
   const destination = useRef<'result' | 'batch' | 'download' | 'privacy' | 'pdf'>('result');
   const batchLock = useRef(false);
   const batchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -90,10 +101,11 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     primaryPointerCoarse: matchMedia('(pointer: coarse)').matches ? true : matchMedia('(pointer: fine)').matches ? false : null,
     maxTouchPoints: navigator.maxTouchPoints, screenShortEdgeCssPx: Math.min(screen.width, screen.height),
   })));
+  const secureBackgroundContext = globalThis.isSecureContext && !!globalThis.crypto?.subtle;
   const labels = useMemo<Record<string, string>>(() => ({
     ...t('image.library.labels', { returnObjects: true }) as Record<string, string>,
-    'runs an AI model entirely in your browser — no upload. The model (~tens of MB) downloads once on first use, then is cached.': t(mode === 'person' ? 'image.library.personModelHelp' : 'image.library.productModelHelp'),
-  }), [t, mode]);
+    'runs an AI model entirely in your browser — no upload. The model (~tens of MB) downloads once on first use, then is cached.': t(!secureBackgroundContext ? 'image.library.httpsHint' : mode === 'person' ? 'image.library.personModelHelp' : 'image.library.productModelHelp'),
+  }), [t, mode, secureBackgroundContext]);
   const exportFileName = `${(source?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited`;
   const labelsRef = useRef(labels); labelsRef.current = labels;
   const applyPresetRef = useRef<(next?: ImageDirectPreset) => void>(() => {});
@@ -111,6 +123,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     saving.current = false; destination.current = 'result'; pendingCommits.current = [];
     setBgBusy(false); setLoading(false);
   }, [dismissPending]);
+  const cancelBackgroundRemoval = useCallback(() => { cancel(); clearFeedback(); setBackgroundCancelled(true); }, [cancel, clearFeedback]);
   useEffect(() => {
     const controller = new BackgroundRemovalController({ language,
       confirm: info => new Promise<boolean>(resolve => {
@@ -121,7 +134,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     void controller.defaultMode().then(value => { if (bg.current === controller && !modeChosen.current) setMode(value); });
     return () => { controller.dispose(); dismissPending(); if (bg.current === controller) bg.current = undefined; };
   }, [language, dismissPending]);
-  useEffect(() => { if (!active) cancel(); }, [active, cancel]);
+  useEffect(() => { if (!active) { cancel(); clearFeedback(); } }, [active, cancel, clearFeedback]);
   useEffect(() => {
     onDirtyRef.current(!!source || hasTemplateInput || hasHistoryInput || dirty || loading || bgBusy || !!result || !!preparedSend);
   }, [source, hasTemplateInput, hasHistoryInput, dirty, loading, bgBusy, result, preparedSend]);
@@ -136,12 +149,12 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] }); return () => observer.disconnect();
   }, []);
 
-  useEffect(() => { invalidatePrepared(); }, [outputFormat, outputSize?.width, outputSize?.height, invalidatePrepared]);
+  useEffect(() => { invalidatePrepared(); clearFeedback(); }, [outputFormat, outputSize?.width, outputSize?.height, invalidatePrepared, clearFeedback]);
 
   const receive = async (file: File, context?: IntakeContext) => {
     if (!filterRasterImages([file]).length || context?.signal.aborted) return false;
     cancel(); const request = version.current;
-    invalidatePrepared(); setLoading(true); setError(''); setErrorCode(undefined); setNotice(''); setResult(undefined); setOutputSize(undefined); setNativeOutputSize(undefined);
+    invalidatePrepared(); setLoading(true); setError(''); setErrorCode(undefined); clearFeedback(); setResult(undefined); setOutputSize(undefined); setNativeOutputSize(undefined);
     const abort = () => { if (request === version.current) cancel(); };
     context?.signal.addEventListener('abort', abort, { once: true });
     try {
@@ -186,7 +199,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     input.dispatchEvent(new Event('input', { bubbles: true }));
   };
   applyPresetRef.current = next => {
-    cancel(); invalidatePrepared(); setSelectedPreset(next); setResult(undefined);
+    cancel(); clearFeedback(); invalidatePrepared(); setSelectedPreset(next); setResult(undefined);
     const request = version.current;
     requestAnimationFrame(() => {
       if (request !== version.current || !activeRef.current) return;
@@ -211,6 +224,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
 
 
   const beforeExport = async ({ format, path, hasConcealment }: BeforeExportContext): Promise<ExportDecision> => {
+    clearFeedback();
     setError(''); setErrorCode(undefined);
     // Commit may apply a pending crop before this hook. Snapshot the resulting
     // revision and each request's destination/size before asynchronous encoding.
@@ -223,9 +237,12 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     return new Promise(resolve => { const pending = { resolve }; exportPending.current = pending; setExportPrompt(pending); });
   };
   const finishExport = (value: ExportDecision) => { exportPending.current?.resolve(value); exportPending.current = undefined; setExportPrompt(undefined); };
-  const finishConsent = (value: boolean) => { consentPending.current?.resolve(value); consentPending.current = undefined; setConsent(undefined); };
+  const finishConsent = (value: boolean) => {
+    consentPending.current?.resolve(value); consentPending.current = undefined; setConsent(undefined);
+    if (!value) { clearFeedback(); setBackgroundCancelled(true); }
+  };
   const backgroundRemovalLoader = async () => ({ removeBackground: async (input: Blob | string, options?: { progress?: (key: string, current: number, total: number) => void }) => {
-    const request = version.current; setBgBusy(true); setProgress(0); setBgPhase('preparing'); setError(''); setErrorCode(undefined);
+    const request = version.current; clearFeedback(); setBgBusy(true); setProgress(0); setBgPhase('preparing'); setError(''); setErrorCode(undefined);
     try {
       const controller = bg.current;
       if (!controller || !activeRef.current) throw new BgRemovalError('ai-cancelled');
@@ -302,17 +319,20 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       <FileDropZone files={source ? [source.file] : []} disabled={loading || bgBusy} accept={RASTER_IMAGE_ACCEPT} hint={t('image.editor.hint')} onFiles={files => { const next = filterRasterImages(files).at(-1); if (next) void receiveRef.current(next); }} accent="sky" />
       <ClipboardHint mode="replace" />
       {shrink && <UtilityNotice role="status" className="mt-2" data-testid="image-editor-shrink">{shrink}</UtilityNotice>}
-      {displayedError && <UtilityNotice kind="error" role="alert" className="mt-2">{displayedError}{mode === 'product' && (errorCode === 'bg-inference-failed' || errorCode === 'bg-unsupported') && <Button className="ml-2" type="button" variant="outline" onClick={() => {
+      {displayedError && <UtilityNotice kind="error" role="alert" tabIndex={-1} data-testid="image-editor-operation-error" className="mt-2">{displayedError}{mode === 'product' && (errorCode === 'bg-inference-failed' || errorCode === 'bg-unsupported') && <Button className="ml-2" type="button" variant="outline" onClick={() => {
         modeChosen.current = true; modeRef.current = 'person'; setMode('person'); setError(''); setErrorCode(undefined); setNotice(t('image.library.retryReady'));
       }}>{t('image.library.retryPerson')}</Button>}</UtilityNotice>}
       {notice && <UtilityNotice role="status" className="mt-2">{notice}</UtilityNotice>}
       <UtilityNotice className="mt-2">{t('image.library.redactionHint')}</UtilityNotice>
       <div className="my-3 flex flex-wrap items-center gap-2" data-testid="image-background-controls">
-        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { modeChosen.current = true; setMode(event.target.value as BgMode); }}>
+        <label className="flex min-h-11 items-center gap-2 text-sm">{t('image.library.backgroundMode')}<select className="min-h-11 rounded-xl border border-border bg-background px-3" value={mode} disabled={bgBusy} onChange={event => { clearFeedback(); modeChosen.current = true; setMode(event.target.value as BgMode); }}>
           <option value="person">{t('image.library.person')}</option><option value="product">{t('image.library.product')}</option>
         </select></label>
-        <Button type="button" variant="outline" onClick={() => { cancel(); void bg.current?.clearStoredModels().then(ok => { if (ok) setNotice(t('image.library.modelsCleared')); }); }}>{t('image.library.clearModels')}</Button>
-        {bgBusy && <><span role="status">{t(bgPhase === 'download' ? 'image.library.downloadProgress' : bgPhase === 'preparing' ? 'image.library.backgroundPreparing' : 'image.library.backgroundProcessing', { progress })}</span><Button type="button" variant="secondary" onClick={cancel}>{t('image.cancel')}</Button></>}
+        <Button type="button" variant="outline" onClick={() => {
+          cancel(); clearFeedback(); const revision = noticeRevision.current; const controller = bg.current;
+          void controller?.clearStoredModels().then(ok => { if (ok && activeRef.current && controller === bg.current && revision === noticeRevision.current) setNotice(t('image.library.modelsCleared')); });
+        }}>{t('image.library.clearModels')}</Button>
+        {bgBusy && <><span role="status">{t(bgPhase === 'download' ? 'image.library.downloadProgress' : bgPhase === 'preparing' ? 'image.library.backgroundPreparing' : 'image.library.backgroundProcessing', { progress })}</span><Button type="button" variant="secondary" onClick={cancelBackgroundRemoval}>{t('image.cancel')}</Button></>}
       </div>
       <p className="mb-2 text-sm text-muted-foreground">{t('image.library.magicWandHint')}</p>
       <p className="mb-3 text-sm text-muted-foreground">{t('image.library.templateHelp')}</p>
@@ -325,7 +345,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           {outputSize && <Button type="button" variant="ghost" onClick={() => { setOutputSize(undefined); }}>{t('image.library.autoSize')}</Button>}
         </div>
       </fieldset>
-      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onChangeCapture={event => {
+      <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onClickCapture={clearFeedback} onChangeCapture={event => {
         const input = event.target;
         // Template loading establishes a clean library baseline, but still owns a
         // user file. Protect it and cancel any operation on the previous scene.
@@ -341,7 +361,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       }}>
         <ImageEditor key={generation} src={source?.file ?? null} mode="full" height={640} themeMode={theme} baseColor={theme === 'dark' ? '#18181b' : '#ffffff'} accentColor="#0284c7"
           exportFormats={FORMATS} exportQuality={92} jpegExportQuality={95} commitFormat="png" showCommit commitLabel={t('image.library.makeResult')}
-          resolutionLimits={policy.resolutionLimits} exportArea="image" exportFileName={exportFileName} onCancelBackgroundRemoval={cancel} onOutputSizeChange={size => { if (generation === latestGeneration.current) setNativeOutputSize(old => old?.width === size.width && old?.height === size.height ? old : size); }} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
+          resolutionLimits={policy.resolutionLimits} exportArea="image" exportFileName={exportFileName} onCancelBackgroundRemoval={cancelBackgroundRemoval} onOutputSizeChange={size => { if (generation === latestGeneration.current) setNativeOutputSize(old => old?.width === size.width && old?.height === size.height ? old : size); }} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
           labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
           onImageLoaded={() => {
             const request = version.current;
@@ -363,6 +383,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
             if (!failure.code.endsWith('cancelled')) { setErrorCode(failure.code); setError(messages[language][failure.code as keyof typeof messages.ko] || labels[ERROR_MESSAGES[failure.code]] || t('image.library.failed')); }
             return true;
           }} />
+        {backgroundCancelled && <UtilityNotice role="status" announce="polite" data-testid="image-background-cancelled" className="sticky bottom-20 z-10 mt-2 bg-background shadow-md">{t('image.library.cancelled')}</UtilityNotice>}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="image-editor-result-actions">
         <Button variant="outline" type="button" data-testid="image-editor-add-to-batch" aria-disabled={adding} className={adding ? 'opacity-60' : ''} disabled={!loaded || loading || bgBusy} onClick={() => commit('batch')}>{t('image.handoff.add', { count: batchCount })}</Button>
@@ -371,7 +392,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="image-editor-send-actions" data-prepared-send={!!preparedSend}>
         <p className="w-full text-sm text-muted-foreground">{t('image.library.outputFormatHelp')}</p>
         <div role="group" aria-label={t('image.editor.format')} className="flex gap-1">
-          {(['png','jpeg','webp'] as const).map(format => <Button key={format} type="button" variant={outputFormat === format ? 'secondary' : 'outline'} aria-pressed={outputFormat === format} onClick={() => setOutputFormat(format)}>{format === 'jpeg' ? 'JPG' : format === 'webp' ? 'WebP' : 'PNG'}</Button>)}
+          {(['png','jpeg','webp'] as const).map(format => <Button key={format} type="button" variant={outputFormat === format ? 'secondary' : 'outline'} aria-pressed={outputFormat === format} onClick={() => { clearFeedback(); setOutputFormat(format); }}>{format === 'jpeg' ? 'JPG' : format === 'webp' ? 'WebP' : 'PNG'}</Button>)}
         </div>
         <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-privacy" disabled={!loaded || loading || bgBusy} onClick={() => commit('privacy')}>{sendT('sendTo.privacy')}</Button>
         <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-pdf" disabled={outputFormat === 'webp' || !loaded || loading || bgBusy} aria-describedby={outputFormat === 'webp' ? 'image-send-webp-reason' : undefined} onClick={() => commit('pdf')}>{sendT('sendTo.imagePdf')}</Button>
