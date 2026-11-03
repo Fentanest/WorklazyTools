@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { createGzip } from "node:zlib";
+import { patchNativeThreadReadiness } from "./libreoffice-native-threads.mjs";
 
 // BentoPDF's checked-in public WASM files match its asset-introduction lock at
 // @matbee/libreoffice-converter 2.3.1, even though its later HEAD lock advanced.
@@ -21,7 +22,7 @@ const workerPingAnchor = 'self.onmessage=async l=>{let e=l.data;switch(e.type){c
 const workerPingReplacement = 'self.onmessage=async l=>{let e=l.data;switch(e.type){case "worklazy-ping":self.postMessage({type:"ready",id:e.id});break;case "init":';
 const moduleStartAnchor = 'self.Module={mainScriptUrlOrBlob:e';
 const moduleStartReplacement = 'self.__worklazyFont=await(async()=>{const r=await fetch(new URL("NanumGothic-Regular.ttf",e));if(!r.ok)throw new Error("Office font download failed");const b=new Uint8Array(await r.arrayBuffer());if(b.byteLength!==2054744)throw new Error("Office font size mismatch");return b})(),self.Module={noInitialRun:!0,preRun:[()=>{for(const d of ["/instdir","/instdir/share","/instdir/share/fonts","/instdir/share/fonts/truetype"])try{self.Module.FS.mkdir(d)}catch{}self.Module.FS.writeFile("/instdir/share/fonts/truetype/NanumGothic-Regular.ttf",self.__worklazyFont)}],mainScriptUrlOrBlob:e';
-const patchedWorkerSha256 = "9396e0969f4d37001f00bbff6957aa9009e623a1c1e51d99707cdeb548dda999";
+const patchedWorkerSha256 = "a175deb48d1c65b5561e3a4afd2a87a868f9b039cd4cf05de006bb58b4d5f69f";
 const fontSha256 = "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31";
 const root = path.resolve(fileURLToPath(new URL("..", import.meta.url)));
 const source = path.join(root, "node_modules", "@matbee", "libreoffice-converter");
@@ -47,8 +48,8 @@ try {
       // Fetch the fixed TTF before importScripts; preRun installs it before
       // LibreOffice main/LOK/fontconfig. noInitialRun prevents a second native
       // main from racing LOK while the font is scanned.
-      const patched = original.replace(workerPingAnchor, workerPingReplacement)
-        .replace(moduleStartAnchor, moduleStartReplacement);
+      const patched = patchNativeThreadReadiness(original.replace(workerPingAnchor, workerPingReplacement)
+        .replace(moduleStartAnchor, moduleStartReplacement));
       if (createHash("sha256").update(patched).digest("hex") !== patchedWorkerSha256) throw new Error("LibreOffice worker cleanup probe hash mismatch");
       await fs.writeFile(path.join(staging, name), patched);
     } else {
@@ -63,7 +64,7 @@ try {
     throw new Error("Office font snapshot mismatch");
   }
   await fs.writeFile(path.join(staging, "NanumGothic-Regular.ttf"), fontBytes);
-  await fs.writeFile(path.join(staging, "manifest.json"), `${JSON.stringify({ version: VERSION, package: "@matbee/libreoffice-converter", upstreamCommit: "b94b8a6887d223be93b082543f5fd32bbd8dc646", sourceSha256: Object.fromEntries(assets), workerPatch: { fontPreRun: true, noInitialRun: true, cleanupProbe: "worklazy-ping", outputSha256: patchedWorkerSha256 }, font: { name: "NanumGothic-Regular.ttf", sha256: fontSha256 } }, null, 2)}\n`);
+  await fs.writeFile(path.join(staging, "manifest.json"), `${JSON.stringify({ version: VERSION, package: "@matbee/libreoffice-converter", upstreamCommit: "b94b8a6887d223be93b082543f5fd32bbd8dc646", sourceSha256: Object.fromEntries(assets), workerPatch: { fontPreRun: true, noInitialRun: true, cleanupProbe: "worklazy-ping", readyNativeThreadReserve: 4, outputSha256: patchedWorkerSha256 }, font: { name: "NanumGothic-Regular.ttf", sha256: fontSha256 } }, null, 2)}\n`);
   await fs.rm(destination, { recursive: true, force: true });
   await fs.rename(staging, destination);
 } catch (error) {
