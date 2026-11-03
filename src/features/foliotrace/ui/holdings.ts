@@ -320,16 +320,16 @@ const EXCLUSION_REASON_LABELS: Record<string, Record<Lang, string>> = {
     en: "Temporarily excluded: a corporate action is in progress (trading suspended)",
   },
   corporate_action_ratio_unverified: {
-    ko: "기업행위 비율을 확인하지 못해 평가에서 제외",
-    en: "Excluded: the corporate-action ratio could not be confirmed",
+    ko: "기업행위 후 보유 수량·조정 근거 확인을 기다려 평가에서 제외",
+    en: "Excluded pending verification of holdings and corporate-action adjustments",
   },
   delisting_pending: {
     ko: "상장폐지 진행 중이라 평가에서 제외",
     en: "Excluded while delisting is in progress",
   },
   corporate_action_unverified: {
-    ko: "공시 후 주식 변동 여부가 확인되지 않아 평가에서 제외",
-    en: "Excluded: share changes since the filing are unverified",
+    ko: "공시 후 주식 변동·실제 보유 수량 확인을 기다려 평가에서 제외",
+    en: "Excluded pending verification of share changes and actual holdings since the filing",
   },
 };
 
