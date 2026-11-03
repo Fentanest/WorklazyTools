@@ -30,6 +30,9 @@ function leaderHitsRect(a: LeaderPoint, b: LeaderPoint, rect: MapRect) {
 }
 
 const PORTS = Array.from({ length: 32 }, (_, i) => ({ x: Math.cos(i * Math.PI / 16) * 7, y: Math.sin(i * Math.PI / 16) * 7 }));
+const ORDER_ROUTE_BUDGET = 3_000;
+const GRID_ROUTE_BUDGET = 24_000;
+const RECTANGLE_BUDGET = 2_048;
 
 function visibleLeaderStart(start: LeaderPoint, end: LeaderPoint, width: number, height: number) {
   let t = 0;
@@ -62,26 +65,35 @@ export function layoutMapLabels(labels: readonly MapLabel[], pins: readonly MapP
     .map(p => ({ x: p.x - 9, y: p.y - 20, width: 18, height: 24 }));
   const margin = 6;
   const ordered = labels.map(label => ({ label, ports: PORTS.map(p => ({ x: label.x + p.x, y: label.y - 10 + p.y }))
-    .filter(p => pins.every(pin => pin.id === label.id || (p.x - pin.x) ** 2 + (p.y - (pin.y - 10)) ** 2 >= 100)) }))
+    .filter(p => pins.every(pin => pin.id === label.id || (p.x - pin.x) ** 2 + (p.y - (pin.y - 10)) ** 2 >= 100)),
+    neighbours: pins.filter(pin => pin.id !== label.id).map(pin => ({ x: pin.x, y: pin.y - 10 })), }))
     .sort((a, b) => a.ports.length - b.ports.length || b.label.y - a.label.y || a.label.x - b.label.x);
   const tryOrder = (order: typeof ordered, allowGrid: boolean) => {
     const placed: MapLabelPlacement[] = [];
+    const placedSegments: ReturnType<typeof pathSegments>[] = [];
+    let routeChecks = 0, rectangleChecks = 0, exhausted = false;
+    const routeBudget = allowGrid ? GRID_ROUTE_BUDGET : ORDER_ROUTE_BUDGET;
     // Give crowded pins their limited escape directions before unconstrained ones.
-    for (const { label, ports } of order) {
+    for (const { label, ports, neighbours } of order) {
+      const visited = new Set<string>();
       const bounded = (x: number, y: number): MapRect => ({
         x: Math.max(margin, Math.min(width - label.width - margin, x)),
         y: Math.max(margin, Math.min(height - label.height - margin, y)),
         width: label.width, height: label.height,
       });
-      const free = (rect: MapRect, avoidPins: boolean) => !placed.some(p => rectanglesOverlap(p, rect, 6) || pathSegments(p.leaderPath).some(([a, b]) => leaderHitsRect(a, b, rect)))
+      const free = (rect: MapRect, avoidPins: boolean) => !placed.some((p, i) => rectanglesOverlap(p, rect, 6) || placedSegments[i].some(([a, b]) => leaderHitsRect(a, b, rect)))
         && (!avoidPins || !obstacles.some(p => rectanglesOverlap(p, rect, 3)));
-      const neighbours = pins.filter(pin => pin.id !== label.id).map(pin => ({ x: pin.x, y: pin.y - 10 }));
       // Start at an exposed point on the pin body, not at a centre already
       // covered by another pin. This preserves geographic pin positions.
       let chosen: MapLabelPlacement | undefined;
       let fallback: MapLabelPlacement | undefined;
       let fallbackCost = Infinity;
       const tryRect = (rect: MapRect, avoidPins = true) => {
+        if (exhausted) return undefined;
+        const key = `${rect.x}:${rect.y}:${avoidPins}`;
+        if (visited.has(key)) return undefined;
+        visited.add(key);
+        if (++rectangleChecks > RECTANGLE_BUDGET) { exhausted = true; return undefined; }
         if (!free(rect, avoidPins)) return undefined;
         const end = mapLeaderEnd(label, rect);
         if (!ports.length) { const start = { x: label.x, y: label.y - 10 }; return { ...label, ...rect, leaderStart: start, leaderEnd: end, leaderPath: [start, end] }; }
@@ -97,11 +109,12 @@ export function layoutMapLabels(labels: readonly MapLabel[], pins: readonly MapP
             if (y >= 0 && y <= height) routes.push([start, { x: start.x, y }, { x: end.x, y }, end]);
           }
           for (const route of routes) {
+            if (++routeChecks > routeBudget) { exhausted = true; return undefined; }
             const segments = pathSegments(route).filter(([a, b]) => Math.hypot(a.x - b.x, a.y - b.y) > .01);
             const blocked = segments.some(([a, b]) => leaderHitsRect(a, b, { x: rect.x + 3, y: rect.y + 3, width: rect.width - 6, height: rect.height - 6 })
               || neighbours.some(pin => pin.x >= Math.min(a.x, b.x) - 10 && pin.x <= Math.max(a.x, b.x) + 10
               && pin.y >= Math.min(a.y, b.y) - 10 && pin.y <= Math.max(a.y, b.y) + 10 && segmentDistanceSquared(pin, a, b) < 100)
-              || placed.some(p => pathSegments(p.leaderPath).some(([c, d]) => leaderSegmentsCross(a, b, c, d)) || leaderHitsRect(a, b, p)));
+              || placed.some((p, i) => placedSegments[i].some(([c, d]) => leaderSegmentsCross(a, b, c, d)) || leaderHitsRect(a, b, p)));
             const result = { ...label, ...rect, leaderStart: start, leaderEnd: end, leaderPath: route };
             if (!blocked) return result;
             const cost = segments.reduce((sum, [a, b]) => sum + Math.hypot(a.x - b.x, a.y - b.y), 0);
@@ -111,7 +124,7 @@ export function layoutMapLabels(labels: readonly MapLabel[], pins: readonly MapP
         return undefined;
       };
       // Prefer nearby positions before searching farther from a dense cluster.
-      for (let distance = 8; distance <= 200 && !chosen; distance += 12) {
+      for (let distance = 8; distance <= 200 && !chosen && !exhausted; distance += 12) {
         const x = label.x, y = label.y;
         const candidates = [
           bounded(x - label.width / 2, y - 20 - distance - label.height),
@@ -129,7 +142,7 @@ export function layoutMapLabels(labels: readonly MapLabel[], pins: readonly MapP
       // A zoomed/panned-offscreen anchor can still keep its selected label visible.
       for (const avoidPins of [true, false]) {
         if (chosen) break;
-        for (let y = margin; y + label.height <= height - margin && !chosen; y += 20) for (let x = margin; x + label.width <= width - margin; x += 20) {
+        for (let y = margin; y + label.height <= height - margin && !chosen && !exhausted; y += 20) for (let x = margin; x + label.width <= width - margin && !exhausted; x += 20) {
           chosen = tryRect(bounded(x, y), avoidPins); if (chosen) break;
         }
       }
@@ -138,6 +151,7 @@ export function layoutMapLabels(labels: readonly MapLabel[], pins: readonly MapP
       const rect = bounded(label.x - label.width / 2, label.y - label.height - 28);
       const start = { x: label.x, y: label.y - 10 }, end = mapLeaderEnd(label, rect);
       placed.push(chosen ?? fallback ?? { ...label, ...rect, leaderStart: start, leaderEnd: end, leaderPath: [start, end] });
+      placedSegments.push(pathSegments(placed[placed.length - 1].leaderPath));
     }
     return placed;
   };

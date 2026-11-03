@@ -2,7 +2,7 @@ import { geoEqualEarth, geoGraticule10, geoPath } from "d3-geo";
 import type { FeatureCollection } from "geojson";
 import { Minus, Plus, RotateCcw } from "lucide-react";
 import type { DateTime } from "luxon";
-import { useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { feature } from "topojson-client";
 import type { Topology } from "topojson-specification";
@@ -42,11 +42,14 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   const { t } = useTranslation("features");
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState<PanPoint>({ x: 0, y: 0 });
+  const [layoutPan, setLayoutPan] = useState<PanPoint>({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
   const [hoveredId, setHoveredId] = useState<string>();
   const [focusedId, setFocusedId] = useState<string>();
   const [metrics, setMetrics] = useState<Record<string, LabelMetrics>>({});
   const svgRef = useRef<SVGSVGElement>(null);
   const textRefs = useRef(new Map<string, SVGTextElement>());
+  const metricCache = useRef(new Map<string, { key: string; value: LabelMetrics }>());
   const dragRef = useRef<{ pointerId: number; x: number; y: number; pan: PanPoint; moved: boolean; capture: SVGElement } | undefined>(undefined);
   const suppressPointerClick = useRef(false);
   const projection = useMemo(() => geoEqualEarth().fitExtent([[18, 18], [MAP_WIDTH - 18, MAP_HEIGHT - 18]], { type: "Sphere" }), []);
@@ -54,21 +57,39 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   const countryPaths = useMemo(() => countries.features.map((country) => path(country) ?? ""), [path]);
   const graticulePath = useMemo(() => path(geoGraticule10()) ?? "", [path]);
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
-  const pins = useMemo(() => cities.flatMap(city => {
+  const basePins = useMemo(() => cities.flatMap(city => {
     const point = projection([...city.coordinates]);
     if (!point) return [];
     const local = instant.setZone(city.zone);
     const time = local.isValid ? local.toFormat("HH:mm") : "--:--";
     return [{
       ...city,
-      x: MAP_WIDTH / 2 + (point[0] - MAP_WIDTH / 2) * zoom + pan.x,
-      y: MAP_HEIGHT / 2 + (point[1] - MAP_HEIGHT / 2) * zoom + pan.y,
+      x: point[0],
+      y: point[1],
       text: `${cityName(city, language)} ${time}`,
       accessibleLabel: `${cityName(city, language)}, ${countryName(city, language)} · ${local.isValid ? time : t("timezone.map.unavailable")}`,
     }];
-  }), [cities, projection, instant, language, zoom, pan, t]);
-  const labelPins = useMemo(() => pins.filter(city => selected.has(city.id) || city.id === hoveredId || city.id === focusedId), [pins, selected, hoveredId, focusedId]);
+  }), [cities, projection, instant, language, t]);
+  const pins = useMemo(() => basePins.map(city => ({ ...city,
+    x: MAP_WIDTH / 2 + (city.x - MAP_WIDTH / 2) * zoom + pan.x,
+    y: MAP_HEIGHT / 2 + (city.y - MAP_HEIGHT / 2) * zoom + pan.y,
+  })), [basePins, zoom, pan]);
+  const layoutPins = useMemo(() => basePins.map(city => ({ ...city,
+    x: MAP_WIDTH / 2 + (city.x - MAP_WIDTH / 2) * zoom + layoutPan.x,
+    y: MAP_HEIGHT / 2 + (city.y - MAP_HEIGHT / 2) * zoom + layoutPan.y,
+  })), [basePins, zoom, layoutPan]);
+  const labelIds = [...new Set([...selectedIds, ...(hoveredId ? [hoveredId] : []), ...(focusedId ? [focusedId] : [])])].sort().join("|");
+  const labelPins = useMemo(() => {
+    const ids = new Set(labelIds.split("|"));
+    return layoutPins.filter(city => ids.has(city.id));
+  }, [layoutPins, labelIds]);
   const labelSignature = labelPins.map(city => `${city.id}:${city.text}`).join("|");
+
+  useEffect(() => {
+    if (dragging || (layoutPan.x === pan.x && layoutPan.y === pan.y)) return;
+    const timer = window.setTimeout(() => setLayoutPan(pan), 80);
+    return () => window.clearTimeout(timer);
+  }, [dragging, pan, layoutPan]);
 
   useLayoutEffect(() => {
     let active = true;
@@ -78,8 +99,15 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
       for (const city of labelPins) {
         const text = textRefs.current.get(city.id);
         if (!text) continue;
-        const box = text.getBBox();
-        next[city.id] = { width: box.width, height: box.height, offsetY: box.y - text.y.baseVal.getItem(0).value };
+        const style = window.getComputedStyle(text);
+        const key = `${city.text}|${style.font}|${style.letterSpacing}`;
+        const cached = metricCache.current.get(city.id);
+        if (cached?.key === key) next[city.id] = cached.value;
+        else {
+          const box = text.getBBox();
+          next[city.id] = { width: box.width, height: box.height, offsetY: box.y - text.y.baseVal.getItem(0).value };
+          metricCache.current.set(city.id, { key, value: next[city.id] });
+        }
       }
       setMetrics(previous => Object.keys(previous).length === Object.keys(next).length && Object.entries(next).every(([id, value]) => {
         const old = previous[id];
@@ -89,9 +117,10 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
     measure();
     const observer = new ResizeObserver(measure);
     if (svgRef.current) observer.observe(svgRef.current);
-    void document.fonts.ready.then(measure);
-    document.fonts.addEventListener("loadingdone", measure);
-    return () => { active = false; observer.disconnect(); document.fonts.removeEventListener("loadingdone", measure); };
+    const fontsLoaded = () => { metricCache.current.clear(); measure(); };
+    if (document.fonts.status === "loading") void document.fonts.ready.then(() => { if (active) fontsLoaded(); });
+    document.fonts.addEventListener("loadingdone", fontsLoaded);
+    return () => { active = false; observer.disconnect(); document.fonts.removeEventListener("loadingdone", fontsLoaded); };
     // Only the label identities/text affect measurement; zoom and pan move the
     // boxes without changing the glyphs. ResizeObserver covers responsive fonts.
   }, [labelSignature]);
@@ -99,7 +128,7 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   const labels = useMemo(() => layoutMapLabels(labelPins.map(city => {
     const size = metrics[city.id] ?? { width: city.text.length * 10, height: 18 };
     return { id: city.id, x: city.x, y: city.y, width: size.width + 6, height: size.height + 6 };
-  }), pins, MAP_WIDTH, MAP_HEIGHT), [labelPins, pins, metrics]);
+  }), layoutPins, MAP_WIDTH, MAP_HEIGHT), [labelPins, layoutPins, metrics]);
 
   const pointerPin = (event: MouseEvent<SVGGElement> | PointerEvent<SVGGElement>) => {
     const transform = svgRef.current?.getScreenCTM();
@@ -112,18 +141,22 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
 
   const setZoomLevel = (nextValue: number) => {
     const next = clamp(nextValue, MIN_ZOOM, MAX_ZOOM);
+    const nextPan = next === 1 ? { x: 0, y: 0 } : clampPan(pan, next);
     setZoom(next);
-    setPan((current) => next === 1 ? { x: 0, y: 0 } : clampPan(current, next));
+    setPan(nextPan);
+    setLayoutPan(nextPan);
   };
 
   const resetView = () => {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+    setLayoutPan({ x: 0, y: 0 });
   };
 
   const startDrag = (event: PointerEvent<SVGSVGElement>) => {
     if (event.button !== 0 || !event.isPrimary) return;
     suppressPointerClick.current = false;
+    setDragging(true);
     setFocusedId(undefined);
     // Capturing the pressed pin preserves ordinary clicks; capturing the SVG
     // would retarget its click to the background. Moves still bubble to SVG.
@@ -154,6 +187,7 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
     if (!drag || drag.pointerId !== event.pointerId) return;
     suppressPointerClick.current = drag.moved || event.type !== "pointerup";
     dragRef.current = undefined;
+    setDragging(false);
     if (drag.capture.hasPointerCapture(event.pointerId)) drag.capture.releasePointerCapture(event.pointerId);
   };
 
@@ -238,7 +272,9 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
                 </g>
               );
             })}
-            <g className="pointer-events-none" aria-hidden="true" data-testid="timezone-map-labels">
+            <g className="pointer-events-none" aria-hidden="true" data-testid="timezone-map-labels"
+              data-layout-pending={dragging || layoutPan.x !== pan.x || layoutPan.y !== pan.y}
+              transform={`translate(${pan.x - layoutPan.x} ${pan.y - layoutPan.y})`}>
               {labels.map(label => {
                 const city = pins.find(pin => pin.id === label.id)!;
                 const size = metrics[label.id];

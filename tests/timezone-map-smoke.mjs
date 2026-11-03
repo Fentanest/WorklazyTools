@@ -40,7 +40,7 @@ for (const lang of ["ko", "en"]) for (const width of [1440, 390]) test(`P3 ${lan
         await page.mouse.move(start.x, start.y); await page.mouse.down();
         let middlePan;
         try {
-          await page.mouse.move(start.x + 80, start.y + 15, { steps: 12 }); await settle(page);
+          await page.mouse.move(start.x + 80, start.y + 15, { steps: 12 }); await settle(page, false);
           middlePan = await transform();
           await page.mouse.move(start.x, start.y, { steps: 12 });
         } finally { await page.mouse.up(); }
@@ -72,7 +72,7 @@ for (const lang of ["ko", "en"]) for (const width of [1440, 390]) test(`P3 ${lan
     for (const [cluster, baseCity, ids] of [
       ["europe", "london", ["london", "paris", "berlin", "amsterdam", "madrid", "rome"]],
       ["east-asia", "seoul", ["seoul", "tokyo", "beijing", "hong-kong", "taipei", "manila"]],
-    ]) await t.test(`dense ${cluster}: no leader-pin or leader-leader intersections`, async () => {
+    ]) await t.test(`dense ${cluster}: no leader-pin or leader-leader intersections`, async dense => {
       await page.getByTestId("timezone-map-controls").getByRole("button").last().click();
       await page.getByTestId("timezone-base-city").selectOption(baseCity);
       for (const p of await page.getByTestId("timezone-map-pin").all()) {
@@ -93,13 +93,39 @@ for (const lang of ["ko", "en"]) for (const width of [1440, 390]) test(`P3 ${lan
           assert.equal(geometry.leaderIntersections, 0, "Leader paths do not cross or touch each other");
         }
       }
+      if (lang === "en" && width === 390 && cluster === "europe") await dense.test("dense mobile pan reuses its noncrossing routes, then settles in bounds", async () => {
+        await page.getByTestId("timezone-map-controls").getByRole("button").last().click();
+        for (let i = 0; i < 2; i++) await page.getByRole("button", { name: names[lang].zoom, exact: true }).click();
+        await page.mouse.move(0, 0); await settle(page);
+        const routes = () => svg.locator('[data-testid="timezone-map-leader"]').evaluateAll(nodes => nodes.map(n => n.getAttribute("points")));
+        const before = await routes(), r = await svg.boundingBox();
+        const a = { x: r.x + r.width * .2, y: r.y + r.height * .55 };
+        await page.mouse.move(a.x, a.y); await page.mouse.down();
+        try {
+          for (let i = 1; i <= 30; i++) {
+            await page.mouse.move(a.x + r.width * .45 * i / 30, a.y - r.height * .2 * i / 30);
+            if (i % 5) continue;
+            assert.deepEqual(await routes(), before, "Panning translates the previous routes instead of searching again");
+            const geometry = await leaderGeometry(page);
+            assert.equal(geometry.pinIntersections, 0); assert.equal(geometry.leaderIntersections, 0);
+            await fs.writeFile(path.join(output, `moving-europe-en-390-${i}.json`), JSON.stringify(geometry, null, 2));
+          }
+        } finally { await page.mouse.up(); }
+        await page.mouse.move(0, 0); await settle(page);
+        const final = await leaderGeometry(page);
+        assertLayout(final); assert.equal(final.pinIntersections, 0); assert.equal(final.leaderIntersections, 0);
+        await fs.writeFile(path.join(output, "moving-europe-en-390-settled.json"), JSON.stringify(final, null, 2));
+      });
     });
   } finally { await recordRuntime(); await context.close(); }
 });
 after(async () => { await browser?.close(); await server?.close(); console.log(`Timezone map evidence: ${output}`); });
 
-async function settle(page) {
+async function settle(page, waitForLayout = true) {
   await page.evaluate(() => document.fonts.ready);
+  // A held gesture intentionally reuses its translated layout. Only wait for
+  // the debounced search after release; mid-gesture assertions need paint only.
+  if (waitForLayout) await page.waitForFunction(() => document.querySelector('[data-testid="timezone-map-labels"]')?.getAttribute("data-layout-pending") !== "true");
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 function watchRuntime(page, prefix) {
@@ -128,7 +154,9 @@ async function leaderGeometry(page) {
     const labels=[],routes=[];
     for(const el of svg.querySelectorAll('[data-testid="timezone-map-label"]')) {
       const id=el.getAttribute("data-city"),r=el.getBoundingClientRect(),shape=el.parentElement.querySelector("polyline,line");
-      const points=shape.tagName.toLowerCase()==="line" ? [{x:Number(shape.getAttribute("x1")),y:Number(shape.getAttribute("y1"))},{x:Number(shape.getAttribute("x2")),y:Number(shape.getAttribute("y2"))}] : [...shape.points].map(p=>({x:p.x,y:p.y}));
+      const local=shape.tagName.toLowerCase()==="line" ? [{x:Number(shape.getAttribute("x1")),y:Number(shape.getAttribute("y1"))},{x:Number(shape.getAttribute("x2")),y:Number(shape.getAttribute("y2"))}] : [...shape.points].map(p=>({x:p.x,y:p.y}));
+      const transform=svg.getScreenCTM().inverse().multiply(shape.getScreenCTM());
+      const points=local.map(p=>{const q=new DOMPoint(p.x,p.y).matrixTransform(transform);return{x:q.x,y:q.y};});
       const segments=points.slice(1).map((p,i)=>clip(points[i],p)).filter(s=>s && Math.hypot(s[0].x-s[1].x,s[0].y-s[1].y)>.01);
       routes.push({id,points,segments}); labels.push({id,x:r.x-bounds.x,y:r.y-bounds.y,w:r.width,h:r.height});
     }
