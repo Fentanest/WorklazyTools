@@ -192,6 +192,8 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   };
 
   const mapTransform = `translate(${MAP_WIDTH / 2 + pan.x} ${MAP_HEIGHT / 2 + pan.y}) scale(${zoom}) translate(${-MAP_WIDTH / 2} ${-MAP_HEIGHT / 2})`;
+  // Keep the parent matrix stable when the debounced child layout commits.
+  const labelTransform = `translate(${pan.x} ${pan.y})`;
 
   return (
     <div className="overflow-hidden rounded-[18px] border border-sky-600/15 bg-[linear-gradient(145deg,rgba(21,155,215,.08),rgba(0,122,255,.025))]" data-testid="timezone-world-map">
@@ -274,17 +276,17 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
             })}
             <g className="pointer-events-none" aria-hidden="true" data-testid="timezone-map-labels"
               data-layout-pending={dragging || layoutPan.x !== pan.x || layoutPan.y !== pan.y}
-              transform={`translate(${pan.x - layoutPan.x} ${pan.y - layoutPan.y})`}>
+              transform={labelTransform}>
               {labels.map(label => {
                 const city = pins.find(pin => pin.id === label.id)!;
                 const size = metrics[label.id];
                 return <g key={label.id}>
-                  <polyline data-testid="timezone-map-leader" data-city={label.id} className="fill-none stroke-sky-600/50 [stroke-width:1]" points={label.leaderPath.map(p => `${p.x},${p.y}`).join(" ")} />
+                  <polyline data-testid="timezone-map-leader" data-city={label.id} className="fill-none stroke-sky-600/50 [stroke-width:1]" points={label.leaderPath.map(p => `${p.x - layoutPan.x},${p.y - layoutPan.y}`).join(" ")} />
                   <text
                     ref={element => { if (element) textRefs.current.set(label.id, element); else textRefs.current.delete(label.id); }}
                     data-testid="timezone-map-label" data-city={label.id}
                     className="fill-foreground stroke-background text-[13px] font-extrabold [paint-order:stroke] [stroke-width:4px] [text-anchor:middle] max-[620px]:text-base"
-                    x={label.x + label.width / 2} y={label.y + 3 - (size?.offsetY ?? -13)}
+                    x={label.x - layoutPan.x + label.width / 2} y={label.y - layoutPan.y + 3 - (size?.offsetY ?? -13)}
                   >{city.text}</text>
                 </g>;
               })}

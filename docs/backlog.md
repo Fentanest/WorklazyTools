@@ -8,6 +8,8 @@
 
 ## 시간대 지도 프레임 간격·확대 계측 (2026-11-03)
 
+- Reviewer TZLEADER2의 인위적 극단 밀집(8핀 ±10~40 SVG 단위)에서는 탐색 예산 소진 시 라벨이 겹칠 수 있다. `6de64be`의 라우터를 유지하는 FIX2에서도 남는 P3 한계다. 실제 도시·선택 표본의 무교차와 분리해 취급한다. 근거: `REVIEWER-SONNET-TZLEADER2.md`, `SOL-TZLEADER-FIX2.md`. — Codx
+
 - `f579a48` 후속에서 이동 중 Long Task는 네 조건 모두 0건이었으나, Linux headless Chrome 데스크톱 rAF 간격 약 150ms와 확대 단계 최대 127ms가 관측됐다. 이동 중 경로 탐색 개선과 분리해 실제 장비/렌더링 비용을 판독할 후속이며, 실기기나 모든 프레임의 100ms 미만을 확인한 것으로 보지 않는다. 근거: `SOL-TZLEADER-PERF-REPORT.md` 전후 연속 측정. — Codx
 
 ## 영업일·연차 자료 유지보수 (2026-10-14)

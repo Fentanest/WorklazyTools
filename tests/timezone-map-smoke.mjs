@@ -105,16 +105,40 @@ for (const lang of ["ko", "en"]) for (const width of [1440, 390]) test(`P3 ${lan
           for (let i = 1; i <= 30; i++) {
             await page.mouse.move(a.x + r.width * .45 * i / 30, a.y - r.height * .2 * i / 30);
             if (i % 5) continue;
+            await settle(page, false);
             assert.deepEqual(await routes(), before, "Panning translates the previous routes instead of searching again");
             const geometry = await leaderGeometry(page);
-            assert.equal(geometry.pinIntersections, 0); assert.equal(geometry.leaderIntersections, 0);
             await fs.writeFile(path.join(output, `moving-europe-en-390-${i}.json`), JSON.stringify(geometry, null, 2));
+            assert.equal(geometry.pinIntersections, 0); assert.equal(geometry.leaderIntersections, 0);
           }
         } finally { await page.mouse.up(); }
         await page.mouse.move(0, 0); await settle(page);
         const final = await leaderGeometry(page);
-        assertLayout(final); assert.equal(final.pinIntersections, 0); assert.equal(final.leaderIntersections, 0);
         await fs.writeFile(path.join(output, "moving-europe-en-390-settled.json"), JSON.stringify(final, null, 2));
+        assertLayout(final); assert.equal(final.pinIntersections, 0); assert.equal(final.leaderIntersections, 0);
+        // Prove the same checker still rejects an actual SVG path through a
+        // different visible pin; restore the DOM before leaving this scenario.
+        const control = await svg.evaluate(el => {
+          const leader = el.querySelector('[data-testid="timezone-map-leader"]');
+          const target = [...el.querySelectorAll('[data-testid="timezone-map-pin"]')].find(pin => {
+            const m = pin.transform.baseVal.getItem(0).matrix;
+            return pin.getAttribute("data-city") !== leader.getAttribute("data-city") && m.e > 20 && m.e < 940 && m.f > 30 && m.f < 480;
+          });
+          if (!target) throw new Error("Negative control needs a visible non-owner pin");
+          const m = target.transform.baseVal.getItem(0).matrix;
+          const origin = leader.closest('[data-testid="timezone-map-labels"]').transform.baseVal.getItem(0).matrix;
+          const previous = leader.getAttribute("points");
+          leader.setAttribute("points", `${m.e - origin.e - 12},${m.f - origin.f - 10} ${m.e - origin.e + 12},${m.f - origin.f - 10}`);
+          return { id: leader.getAttribute("data-city"), previous };
+        });
+        try {
+          const invalid = await leaderGeometry(page);
+          await fs.writeFile(path.join(output, "geometry-negative-control.json"), JSON.stringify(invalid, null, 2));
+          assert.ok(invalid.pinIntersections > 0, "A real pin crossing must be rejected by the checker");
+        } finally {
+          await svg.locator(`[data-testid="timezone-map-leader"][data-city="${control.id}"]`).evaluate((el, points) => el.setAttribute("points", points), control.previous);
+        }
+        assert.equal((await leaderGeometry(page)).pinIntersections, 0);
       });
     });
   } finally { await recordRuntime(); await context.close(); }
@@ -123,10 +147,30 @@ after(async () => { await browser?.close(); await server?.close(); console.log(`
 
 async function settle(page, waitForLayout = true) {
   await page.evaluate(() => document.fonts.ready);
-  // A held gesture intentionally reuses its translated layout. Only wait for
-  // the debounced search after release; mid-gesture assertions need paint only.
-  if (waitForLayout) await page.waitForFunction(() => document.querySelector('[data-testid="timezone-map-labels"]')?.getAttribute("data-layout-pending") !== "true");
-  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // Check after paint opportunities, not before them: a queued React commit
+  // can turn the previous "settled" DOM into a pending debounced layout.
+  await page.waitForFunction(async wait => {
+    let previous, stable = 0;
+    while (stable < 2) {
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const labels = document.querySelector('[data-testid="timezone-map-labels"]');
+      const svg = labels?.ownerSVGElement;
+      const view = svg?.querySelector("g[transform]")?.getAttribute("transform");
+      const matrices = [svg?.getScreenCTM(), labels?.getScreenCTM()]
+        .map(m => m ? [m.a, m.b, m.c, m.d, m.e, m.f] : null);
+      const box = svg?.getBoundingClientRect();
+      const scene = JSON.stringify([view, matrices, box?.width, box?.height, labels?.getAttribute("transform"),
+        [...labels?.querySelectorAll("text,polyline") || []].map(el => {
+          const local = el.getBBox(), painted = el.getBoundingClientRect();
+          return [el.getAttribute("x"), el.getAttribute("y"), el.getAttribute("points"), el.textContent,
+            local.x, local.y, local.width, local.height, painted.x, painted.y, painted.width, painted.height];
+        })]);
+      const settled = labels && (!wait || labels.getAttribute("data-layout-pending") !== "true");
+      stable = settled && scene === previous ? stable + 1 : 0;
+      previous = scene;
+    }
+    return true;
+  }, waitForLayout);
 }
 function watchRuntime(page, prefix) {
   const errors = [];
@@ -150,20 +194,34 @@ async function leaderGeometry(page) {
       for (const [p,q] of [[-dx,a.x],[dx,w-a.x],[-dy,a.y],[dy,h-a.y]]) { if (!p) { if(q<0)return null;continue; } const t=q/p; if(p<0)lo=Math.max(lo,t);else hi=Math.min(hi,t); if(lo>hi)return null; }
       return [{x:a.x+lo*dx,y:a.y+lo*dy},{x:a.x+hi*dx,y:a.y+hi*dy}];
     };
-    const pins = [...svg.querySelectorAll('[data-testid="timezone-map-pin"]')].map(el => { const m=el.transform.baseVal.consolidate().matrix;return {id:el.getAttribute("data-city"),x:m.e,y:m.f-10}; });
+    // SVG screen CTMs can lag baseVal by one input frame. Read both pins and
+    // leaders from the same committed SVG transform lists, without mutating
+    // them via consolidate() or mixing a cached screen matrix with baseVal.
+    const toMap = (element, point) => {
+      let p = new DOMPoint(point.x, point.y);
+      for (let node = element; node && node !== svg; node = node.parentElement) {
+        let matrix = new DOMMatrix();
+        const list = node.transform?.baseVal;
+        for (let i = 0; list && i < list.numberOfItems; i++) matrix = matrix.multiply(list.getItem(i).matrix);
+        p = p.matrixTransform(matrix);
+      }
+      return { x: p.x, y: p.y };
+    };
+    const pins = [...svg.querySelectorAll('[data-testid="timezone-map-pin"]')].map(el => ({id:el.getAttribute("data-city"),...toMap(el,{x:0,y:-10})}));
     const labels=[],routes=[];
     for(const el of svg.querySelectorAll('[data-testid="timezone-map-label"]')) {
       const id=el.getAttribute("data-city"),r=el.getBoundingClientRect(),shape=el.parentElement.querySelector("polyline,line");
       const local=shape.tagName.toLowerCase()==="line" ? [{x:Number(shape.getAttribute("x1")),y:Number(shape.getAttribute("y1"))},{x:Number(shape.getAttribute("x2")),y:Number(shape.getAttribute("y2"))}] : [...shape.points].map(p=>({x:p.x,y:p.y}));
-      const transform=svg.getScreenCTM().inverse().multiply(shape.getScreenCTM());
-      const points=local.map(p=>{const q=new DOMPoint(p.x,p.y).matrixTransform(transform);return{x:q.x,y:q.y};});
+      const points=local.map(p=>toMap(shape,p));
       const segments=points.slice(1).map((p,i)=>clip(points[i],p)).filter(s=>s && Math.hypot(s[0].x-s[1].x,s[0].y-s[1].y)>.01);
       routes.push({id,points,segments}); labels.push({id,x:r.x-bounds.x,y:r.y-bounds.y,w:r.width,h:r.height});
     }
     const pinHits=[],lineHits=[];
     for(const route of routes)for(const pin of pins)if(pin.id!==route.id && route.segments.some(([a,b])=>distance(pin,a,b)<81-1e-6))pinHits.push([route.id,pin.id]);
     for(let i=0;i<routes.length;i++)for(let j=i+1;j<routes.length;j++)if(routes[i].segments.some(([a,b])=>routes[j].segments.some(([c,d])=>intersects(a,b,c,d))))lineHits.push([routes[i].id,routes[j].id]);
-    return {viewport:{w:bounds.width,h:bounds.height},labels,routes,pinIntersections:pinHits.length,leaderIntersections:lineHits.length,pinHits,lineHits};
+    return {viewport:{w:bounds.width,h:bounds.height},labels,routes,pinIntersections:pinHits.length,leaderIntersections:lineHits.length,pinHits,lineHits,
+      layoutPending:svg.querySelector('[data-testid="timezone-map-labels"]')?.getAttribute("data-layout-pending"),
+      labelTransform:svg.querySelector('[data-testid="timezone-map-labels"]')?.getAttribute("transform")};
   });
 }
 async function pin(page, id) {
@@ -174,9 +232,11 @@ async function boxes(page) {
   return page.evaluate((ids) => {
     const svg = document.querySelector('[data-testid="timezone-world-map"] svg[role="img"]');
     const r = svg.getBoundingClientRect();
-    const rect = e => { const b = e.getBoundingClientRect(); return { x: b.x - r.x, y: b.y - r.y, w: b.width, h: b.height }; };
+    const rect = e => { e.getBBox(); const b = e.getBoundingClientRect(); return { x: b.x - r.x, y: b.y - r.y, w: b.width, h: b.height }; };
     const aliases = { seoul: "서울|Seoul", tokyo: "도쿄|Tokyo", "new-york": "뉴욕|New York", toronto: "토론토|Toronto", london: "런던|London", paris: "파리|Paris" };
-    return { viewport: { w: r.width, h: r.height }, labels: ids.map(id => {
+    return { layoutPending: svg.querySelector('[data-testid="timezone-map-labels"]')?.getAttribute("data-layout-pending"),
+      labelTransform: svg.querySelector('[data-testid="timezone-map-labels"]')?.getAttribute("transform"),
+      viewport: { w: r.width, h: r.height }, labels: ids.map(id => {
       const fixed = document.querySelector(`[data-testid="timezone-map-label"][data-city="${id}"]`);
       const original = [...document.querySelectorAll('[data-testid="timezone-map-pin"]')].find(e => new RegExp(`^(?:${aliases[id]}),`).test(e.getAttribute("aria-label"))).querySelector("text");
       const el = fixed || original;
@@ -258,7 +318,9 @@ for (const lang of ["ko", "en"]) for (const width of [1440, 620, 390, 320]) test
       const before = await svg.locator('g[transform]').first().getAttribute("transform");
       await page.mouse.move(r.x + r.width * .15, r.y + r.height * .8); await page.mouse.down(); await page.mouse.move(r.x + r.width * .3, r.y + r.height * .75, { steps: 10 }); await page.mouse.up(); await settle(page);
       assert.notEqual(await svg.locator('g[transform]').first().getAttribute("transform"), before, "Drag must actually move the map");
-      assertLayout(await boxes(page));
+      const result = await boxes(page);
+      await fs.writeFile(prefix + "-panned.json", JSON.stringify(result, null, 2));
+      assertLayout(result);
     });
     await t.test("responsive resize and zooming back out remeasure labels", async () => {
       await page.setViewportSize({ width: width > 620 ? 390 : 1440, height: 900 });
