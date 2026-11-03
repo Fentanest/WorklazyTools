@@ -3392,3 +3392,15 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - 원문 로그·입력 해시·좌표·필수 검사·320px 한영/라이트·다크 캡처는 `scratch/shell-a11y/`, 요구사항 고정은 gitignored `docs/jobs/todo/shell-a11y/`, 제출 보고는 `SOL-SHELL-A11Y-REPORT.md`에 둔다. 정식 검수·push·통합·배포는 수행하지 않았다.
 
 - 최종 자체 검사: 실제 200% 24/24조합, Tab 정지점 2,184회·입력 관측 584회·완전 가림/이탈/초기 입력 누락 0. 부분 겹침 62회(300/320px textarea 60회, 95.43% 노출 숫자 입력 2회)는 별도 유지한다. unit 1,285+17=1,302/1,302, i18n·build·static 종료 0이다. 캡처 clip 교정은 테스트만 변경했고 최종 입력 해시 영수증을 다시 확보했다.
+
+
+## 2026-11-03 — SHELL-A11Y FIX1 (Codx, 새 후보 검수 대기)
+
+- Reviewer(sonnet)는 기존 `b9f8cb9`를 PASS(P3 2건)로 판정했다. 같은 브랜치에서 로컬 main `2f6d9942`를 `6f902343`으로 merge했다. CHANGELOG 충돌은 셸 보정·이미지 메뉴 변경 두 기록을 모두 보존했고, backlog 자동 병합은 U6 해소·T7 후보 기록과 main의 FolioTrace 등 정리를 대조했다.
+- P3-1: 문서 루트의 고정 헤더 scroll-padding은 유지하고 안내 제목의 header-height 기반 scroll-margin만 일반 1rem 여백으로 바꿨다. 기존 guide-link-smoke의 헤더 아래/뷰포트 안 단언을 유지하며 320×640·실제 Chrome 200%를 포함한 새 18건의 클릭/직접 fragment 전후 측정을 추가했다. 병합 직후 빌드의 새 검사 18건은 여백 상한 초과로 모두 실패했다.
+- 검수에서 timeout이던 한영 image-studio 초기 화면은 기본 library 엔진에 실제 안내 링크가 없었다(제목 1개·링크 0개). 엔진 공통 페이지에 기존 ToolGuideLink를 배치해 원래 초기 상태 클릭 검사를 살렸으며 테스트를 삭제하거나 링크를 주입하지 않았다.
+- backlog의 광고 S4·utilities N02는 제공된 SOL-CHUNKRACE/SOL-LANGSWITCH의 2026-11-03 기준 main 증거(경쟁 0/20·51경로 왕복 유실 0)를 재사용해 상태를 갱신했다. 이번에 해당 재현을 새로 실행한 것으로 보고하지 않는다. P3-2 부분 겹침은 WCAG 2.4.12 해결로 바꾸지 않는다.
+
+- P3-1 최종 위치 검사 18/18 및 기존 guide-link-smoke 26/26 통과. 320×640·실제 200%에서 클릭 후 제목은 헤더 아래 약 33px, 재진입은 약 25px이다. 고정 600ms 측정의 초기 17/18(이동 중 redactor 200% 1건)을 숨기지 않고 새 하네스에 5프레임 스크롤 안정화 대기만 보완했다. 상한·헤더 아래 단언과 제품 CSS는 그대로 유지했다. unit 1,288+17=1,305건, i18n·build·static은 종료 0이다.
+
+- 200% 회귀의 실제 Node 종료 0/TAP 24/24, Tab 정지점 2,184·입력 관측 584·완전 가림/누락 0을 확인했다(부분 겹침 62회 별도). 독립 offset 하네스 수정 때문에 넓은 선언 입력을 가진 focus 영수증 래퍼는 source_unchanged=false/종료 2였으며 이를 통과로 조작하지 않았다. 원래 제품·focus/guide 직접 입력 등 1,206개 해시가 같고 독립 offset 파일 1개만 다른 것을 대조해 영향 없는 실제 결과를 재사용했다. 상세 `SOL-SHELL-A11Y-FIX1.md`·`input-reuse-proof.json`.
