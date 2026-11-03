@@ -11,7 +11,8 @@ import worldAtlas from "world-atlas/countries-110m.json";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
 import { cityName, countryName, type WorldCity } from "./cities";
-import { layoutMapLabels, nearestMapPin } from "./mapLayout";
+import { layoutMapLabels, mapLeaderEnd, nearestMapPin } from "./mapLayout";
+import { exceedsMapDragThreshold } from "./mapInteraction";
 
 const MAP_WIDTH = 960;
 const MAP_HEIGHT = 500;
@@ -46,7 +47,8 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   const [metrics, setMetrics] = useState<Record<string, LabelMetrics>>({});
   const svgRef = useRef<SVGSVGElement>(null);
   const textRefs = useRef(new Map<string, SVGTextElement>());
-  const dragRef = useRef<{ pointerId: number; x: number; y: number; pan: PanPoint } | undefined>(undefined);
+  const dragRef = useRef<{ pointerId: number; x: number; y: number; pan: PanPoint; moved: boolean; capture: SVGElement } | undefined>(undefined);
+  const suppressPointerClick = useRef(false);
   const projection = useMemo(() => geoEqualEarth().fitExtent([[18, 18], [MAP_WIDTH - 18, MAP_HEIGHT - 18]], { type: "Sphere" }), []);
   const path = useMemo(() => geoPath(projection), [projection]);
   const countryPaths = useMemo(() => countries.features.map((country) => path(country) ?? ""), [path]);
@@ -120,14 +122,24 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   };
 
   const startDrag = (event: PointerEvent<SVGSVGElement>) => {
-    if (zoom <= 1 || event.button !== 0 || (event.target as Element).closest('[data-testid="timezone-map-pin"]')) return;
-    event.currentTarget.setPointerCapture(event.pointerId);
-    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, pan };
+    if (event.button !== 0 || !event.isPrimary) return;
+    suppressPointerClick.current = false;
+    setFocusedId(undefined);
+    // Capturing the pressed pin preserves ordinary clicks; capturing the SVG
+    // would retarget its click to the background. Moves still bubble to SVG.
+    const capture = (event.target as Element).closest<SVGElement>('[data-testid="timezone-map-pin"]') ?? event.currentTarget;
+    capture.setPointerCapture(event.pointerId);
+    dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, pan, moved: false, capture };
   };
 
   const moveDrag = (event: PointerEvent<SVGSVGElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    if (!drag.moved && exceedsMapDragThreshold(drag.x, drag.y, event.clientX, event.clientY)) {
+      drag.moved = true;
+      setHoveredId(undefined);
+    }
+    if (!drag.moved || zoom <= 1) return;
     const bounds = event.currentTarget.getBoundingClientRect();
     const scaleX = MAP_WIDTH / bounds.width;
     const scaleY = MAP_HEIGHT / bounds.height;
@@ -138,9 +150,11 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
   };
 
   const stopDrag = (event: PointerEvent<SVGSVGElement>) => {
-    if (dragRef.current?.pointerId !== event.pointerId) return;
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    suppressPointerClick.current = drag.moved || event.type !== "pointerup";
     dragRef.current = undefined;
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+    if (drag.capture.hasPointerCapture(event.pointerId)) drag.capture.releasePointerCapture(event.pointerId);
   };
 
   const mapTransform = `translate(${MAP_WIDTH / 2 + pan.x} ${MAP_HEIGHT / 2 + pan.y}) scale(${zoom}) translate(${-MAP_WIDTH / 2} ${-MAP_HEIGHT / 2})`;
@@ -171,6 +185,13 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
           onPointerMove={moveDrag}
           onPointerUp={stopDrag}
           onPointerCancel={stopDrag}
+          onLostPointerCapture={stopDrag}
+          onClickCapture={event => {
+            if (event.detail > 0 && suppressPointerClick.current) {
+              suppressPointerClick.current = false;
+              event.preventDefault(); event.stopPropagation();
+            }
+          }}
         >
           <defs><clipPath id="world-time-map-clip"><rect width={MAP_WIDTH} height={MAP_HEIGHT} rx="24" /></clipPath></defs>
           <rect className="fill-sky-500/5" width={MAP_WIDTH} height={MAP_HEIGHT} rx="24" />
@@ -193,10 +214,10 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
                   aria-pressed={isSelected}
                   aria-label={`${city.accessibleLabel}${isBase ? ` · ${t("timezone.map.baseSuffix")}` : ""}`}
                   key={city.id}
-                  onPointerEnter={(event) => setHoveredId(pointerPin(event)?.id ?? city.id)}
-                  onPointerMove={(event) => setHoveredId(pointerPin(event)?.id ?? city.id)}
+                  onPointerEnter={(event) => { if (!dragRef.current?.moved) setHoveredId(pointerPin(event)?.id ?? city.id); }}
+                  onPointerMove={(event) => { if (!dragRef.current?.moved) setHoveredId(pointerPin(event)?.id ?? city.id); }}
                   onPointerLeave={() => setHoveredId(undefined)}
-                  onFocus={() => setFocusedId(city.id)}
+                  onFocus={event => setFocusedId(event.currentTarget.matches(":focus-visible") ? city.id : undefined)}
                   onBlur={() => setFocusedId(undefined)}
                   onClick={(event) => {
                     event.stopPropagation();
@@ -205,6 +226,7 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
                     if (target !== city.id) svgRef.current?.querySelector<SVGGElement>(`[data-city="${target}"]`)?.focus({ preventScroll: true });
                   }}
                   onKeyDown={(event: KeyboardEvent<SVGGElement>) => {
+                    setFocusedId(event.currentTarget.matches(":focus-visible") ? city.id : undefined);
                     if (event.key !== "Enter" && event.key !== " ") return;
                     event.preventDefault();
                     onToggle(city.id);
@@ -220,10 +242,9 @@ export function WorldTimeMap({ cities, selectedIds, baseCityId, instant, selecti
               {labels.map(label => {
                 const city = pins.find(pin => pin.id === label.id)!;
                 const size = metrics[label.id];
-                const endX = Math.max(label.x, Math.min(label.x + label.width, city.x));
-                const endY = Math.max(label.y, Math.min(label.y + label.height, city.y - 10));
+                const end = mapLeaderEnd(city, label);
                 return <g key={label.id}>
-                  <line className="stroke-sky-600/50 [stroke-width:1]" x1={city.x} y1={city.y - 10} x2={endX} y2={endY} />
+                  <line className="stroke-sky-600/50 [stroke-width:1]" x1={city.x} y1={city.y - 10} x2={end.x} y2={end.y} />
                   <text
                     ref={element => { if (element) textRefs.current.set(label.id, element); else textRefs.current.delete(label.id); }}
                     data-testid="timezone-map-label" data-city={label.id}

@@ -18,11 +18,107 @@ before(async () => {
   base = process.env.TEST_BASE_URL || server.url;
   browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || "/usr/bin/google-chrome", args: ["--no-sandbox", "--disable-dev-shm-usage"] });
 });
+
+for (const lang of ["ko", "en"]) for (const width of [1440, 390]) test(`P3 ${lang} ${width}px pin gestures and focus modality`, async t => {
+  const context = await browser.newContext({ viewport: { width, height: 900 }, colorScheme: "light", reducedMotion: "reduce" });
+  await context.route("**/*", route => { const u = new URL(route.request().url()); return ["data:", "blob:"].includes(u.protocol) || u.origin === new URL(base).origin ? route.continue() : route.abort(); });
+  const page = await context.newPage(); page.setDefaultTimeout(12000);
+  const recordRuntime = watchRuntime(page, path.join(output, `p3-${lang}-${width}`));
+  try {
+    await page.goto(`${base}/${lang}/tools/timezone-calculator/`, { waitUntil: "domcontentloaded" });
+    const lagos = page.getByTestId("timezone-map-pin").and(page.getByRole("button", { name: /^(라고스|Lagos),/ }));
+    await lagos.waitFor();
+    await page.locator('input[type=date]').fill("2026-01-15"); await page.locator('input[type=time]').fill("18:00");
+    const svg = page.getByTestId("timezone-world-map").locator('svg[role="img"]');
+    const transform = () => svg.locator('g[transform]').first().getAttribute("transform");
+    const center = () => lagos.evaluate(el => { const p = new DOMPoint(0, -8).matrixTransform(el.getScreenCTM()); return { x: p.x, y: p.y }; });
+    for (const zoom of [1, 3]) {
+      if (zoom === 3) for (let i = 0; i < 4; i++) await page.getByRole("button", { name: names[lang].zoom, exact: true }).click();
+      await svg.scrollIntoViewIfNeeded(); await settle(page);
+      await t.test(`${zoom * 100}% pin drag out and back does not click; pin drag pans`, async () => {
+        const start = await center(), initialPan = await transform(), initialSelection = await lagos.getAttribute("aria-pressed");
+        await page.mouse.move(start.x, start.y); await page.mouse.down();
+        let middlePan;
+        try {
+          await page.mouse.move(start.x + 80, start.y + 15, { steps: 12 }); await settle(page);
+          middlePan = await transform();
+          await page.mouse.move(start.x, start.y, { steps: 12 });
+        } finally { await page.mouse.up(); }
+        await settle(page);
+        if (zoom > 1) assert.notEqual(middlePan, initialPan, "Dragging from a pin must pan once the threshold is exceeded");
+        assert.equal(await lagos.getAttribute("aria-pressed"), initialSelection, "An out-and-back drag must not toggle its starting pin");
+        assert.equal(await transform(), initialPan);
+        await page.screenshot({ path: path.join(output, `p3-${lang}-${width}-${zoom}-drag.png`) });
+      });
+      if (await lagos.getAttribute("aria-pressed") === "true") await lagos.dispatchEvent("click", { bubbles: true, detail: 0 });
+      await t.test(`${zoom * 100}% following tap and sub-threshold motion still select`, async () => {
+        const start = await center(); await page.mouse.click(start.x, start.y);
+        assert.equal(await lagos.getAttribute("aria-pressed"), "true", "A previous drag must not swallow the next tap");
+        await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(start.x + 2, start.y + 1); await page.mouse.up();
+        assert.equal(await lagos.getAttribute("aria-pressed"), "false", "Small hand movement is still a click");
+      });
+      await t.test(`${zoom * 100}% pointer focus clears its label; keyboard focus retains it`, async () => {
+        const label = page.getByTestId("timezone-map-label").filter({ hasText: /^(라고스|Lagos) / });
+        await page.mouse.move(0, 0); await label.waitFor({ state: "hidden" });
+        assert.equal(await lagos.evaluate(el => el.matches(":focus-visible")), false);
+        await lagos.press("Tab"); await page.keyboard.press("Shift+Tab"); await label.waitFor();
+        assert.equal(await lagos.evaluate(el => el.matches(":focus-visible")), true);
+        await lagos.press("Enter"); await lagos.press("Space"); assert.equal(await lagos.getAttribute("aria-pressed"), "false");
+        await lagos.dispatchEvent("click", { bubbles: true, detail: 0 }); assert.equal(await lagos.getAttribute("aria-pressed"), "true");
+        await lagos.dispatchEvent("click", { bubbles: true, detail: 0 }); assert.equal(await lagos.getAttribute("aria-pressed"), "false");
+        await page.screenshot({ path: path.join(output, `p3-${lang}-${width}-${zoom}-keyboard.png`) });
+      });
+    }
+    await t.test("dense European labels keep readable boxes and record leader clearance", async () => {
+      const reset = page.getByTestId("timezone-map-controls").getByRole("button").last(); await reset.click();
+      await page.getByTestId("timezone-base-city").selectOption("london");
+      const ids = ["london", "paris", "berlin", "amsterdam", "madrid", "rome"];
+      for (const p of await page.getByTestId("timezone-map-pin").all()) {
+        const id = await p.getAttribute("data-city");
+        if ((await p.getAttribute("aria-pressed") === "true") !== ids.includes(id)) { await p.focus(); await p.press("Enter"); }
+      }
+      // Two passes also cover newly added cities that precede a removed city.
+      for (const id of ids) { const p = page.getByTestId("timezone-map-pin").and(page.locator(`[data-city="${id}"]`)); if (await p.getAttribute("aria-pressed") !== "true") { await p.focus(); await p.press("Enter"); } }
+      await svg.scrollIntoViewIfNeeded(); await page.mouse.move(0, 0); await settle(page);
+      const geometry = await page.evaluate(() => {
+        const svg = document.querySelector('[data-testid="timezone-world-map"] svg[role="img"]'), bounds = svg.getBoundingClientRect();
+        const pins = [...svg.querySelectorAll('[data-testid="timezone-map-pin"]')].map(el => { const m = el.transform.baseVal.consolidate().matrix; return { id: el.getAttribute("data-city"), x: m.e, y: m.f - 10 }; });
+        let avoidable = 0, atOrigin = 0;
+        const labels = [...svg.querySelectorAll('[data-testid="timezone-map-label"]')].map(el => {
+          const line = el.parentElement.querySelector("line"), r = el.getBoundingClientRect();
+          const a = { x: Number(line.getAttribute("x1")), y: Number(line.getAttribute("y1")) }, b = { x: Number(line.getAttribute("x2")), y: Number(line.getAttribute("y2")) };
+          for (const pin of pins) {
+            if (pin.id === el.getAttribute("data-city")) continue;
+            const dx = b.x - a.x, dy = b.y - a.y, t = dx || dy ? Math.max(0, Math.min(1, ((pin.x - a.x) * dx + (pin.y - a.y) * dy) / (dx * dx + dy * dy))) : 0;
+            if ((pin.x - a.x - t * dx) ** 2 + (pin.y - a.y - t * dy) ** 2 < 81) {
+              if ((pin.x - a.x) ** 2 + (pin.y - a.y) ** 2 < 81) atOrigin++; else avoidable++;
+            }
+          }
+          return { id: el.getAttribute("data-city"), x: r.x - bounds.x, y: r.y - bounds.y, w: r.width, h: r.height };
+        });
+        return { viewport: { w: bounds.width, h: bounds.height }, labels, avoidable, atOrigin };
+      });
+      await fs.writeFile(path.join(output, `p3-${lang}-${width}-europe.json`), JSON.stringify(geometry, null, 2));
+      await page.screenshot({ path: path.join(output, `p3-${lang}-${width}-europe.png`) });
+      assert.equal(geometry.labels.length, 6); assertLayout(geometry);
+    });
+  } finally { await recordRuntime(); await context.close(); }
+});
 after(async () => { await browser?.close(); await server?.close(); console.log(`Timezone map evidence: ${output}`); });
 
 async function settle(page) {
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+}
+function watchRuntime(page, prefix) {
+  const errors = [];
+  page.on("pageerror", error => errors.push({ error: error.message }));
+  page.on("requestfailed", request => { if (request.url().startsWith(base)) errors.push({ url: request.url(), error: request.failure() }); });
+  return async () => {
+    const pins = await page.getByTestId("timezone-map-pin").count();
+    await fs.writeFile(prefix + "-runtime.json", JSON.stringify({ url: page.url(), pins, errors }, null, 2));
+    if (!pins || errors.length) await page.screenshot({ path: prefix + "-runtime.png" });
+  };
 }
 async function pin(page, id) {
   const ids = { seoul: ["서울", "Seoul"], tokyo: ["도쿄", "Tokyo"], "new-york": ["뉴욕", "New York"], toronto: ["토론토", "Toronto"], london: ["런던", "London"], paris: ["파리", "Paris"] };
@@ -58,8 +154,9 @@ for (const lang of ["ko", "en"]) for (const width of [1440, 620, 390, 320]) test
   await context.route("**/*", route => { const u = new URL(route.request().url()); return ["data:", "blob:"].includes(u.protocol) || u.origin === new URL(base).origin ? route.continue() : route.abort(); });
   const page = await context.newPage(); page.setDefaultTimeout(12000);
   const prefix = path.join(output, `${lang}-${width}`);
+  const recordRuntime = watchRuntime(page, prefix);
   try {
-    await page.goto(`${base}/${lang}/tools/timezone-calculator/`);
+    await page.goto(`${base}/${lang}/tools/timezone-calculator/`, { waitUntil: "domcontentloaded" });
     await page.getByTestId("timezone-map-pin").first().waitFor();
     assert.equal(await page.getByTestId("timezone-map-pin").count(), 44);
     await page.locator('input[type=date]').fill("2026-01-15");
@@ -123,5 +220,5 @@ for (const lang of ["ko", "en"]) for (const width of [1440, 620, 390, 320]) test
       assert.equal(await page.getByTestId("timezone-map-controls").locator("output").innerText(), "100%");
       await page.getByTestId("timezone-world-map").scrollIntoViewIfNeeded(); await settle(page); assertLayout(await boxes(page));
     });
-  } finally { await context.close(); }
+  } finally { await recordRuntime(); await context.close(); }
 });
