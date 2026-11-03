@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { JSDOM } from 'jsdom';
 import { GUIDE_INITIAL_LAYOUT_MS, restoreGuideFragment } from '../../src/app/guideFragment.ts';
 
-function fixture(hash = '#tool-guide-title') {
+function fixture(hash = '#tool-guide-title', navigation = 'navigate') {
   const dom = new JSDOM('<main class="main-content"><div id="page"><h2 id="tool-guide-title">Guide</h2></div></main>', { url: `https://example.test/tools/text-tools/${hash}` });
   const frames = new Map<number, FrameRequestCallback>();
   let sequence = 0;
@@ -25,16 +25,28 @@ function fixture(hash = '#tool-guide-title') {
     observe(element: Element) { observed.push(element); }
     disconnect() { disconnected = true; }
   }
-  const values = { window: dom.window, document: dom.window.document, Element: dom.window.Element,
+  const values = { performance: { getEntriesByType: () => [{ type: navigation }] }, window: dom.window, document: dom.window.document, Element: dom.window.Element,
     ResizeObserver: Observer, requestAnimationFrame: (callback: FrameRequestCallback) => { frames.set(++sequence, callback); return sequence; },
     cancelAnimationFrame: (id: number) => { frames.delete(id); } };
   const saved = new Map(Object.keys(values).map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
   for (const [key, value] of Object.entries(values)) Object.defineProperty(globalThis, key, { configurable: true, value });
   const title = dom.window.document.querySelector('h2')!;
   const scrolls: unknown[] = [];
-  title.scrollIntoView = options => { scrolls.push(options); };
+  let documentY = 1000;
+  title.getBoundingClientRect = () => ({ top: documentY - dom.window.scrollY }) as DOMRect;
+  const scrollTo = (y: number) => {
+    Object.defineProperty(dom.window, 'scrollY', { configurable: true, value: y });
+    dom.window.dispatchEvent(new dom.window.Event('scroll'));
+  };
+  title.scrollIntoView = options => {
+    scrolls.push(options);
+    // Real browsers dispatch this asynchronously, after the expected position
+    // has been recorded by the correction. Tests deliver it explicitly.
+    Object.defineProperty(dom.window, 'scrollY', { configurable: true, value: documentY - 100 });
+  };
   const stop = restoreGuideFragment(title);
-  return { dom, title, fonts, scrolls, frames, observed, resolveFonts, timers,
+  return { dom, title, fonts, scrolls, frames, observed, resolveFonts, timers, scrollTo,
+    shift: (dy: number) => { documentY += dy; },
     advance: (ms: number) => {
       clock += ms;
       for (const [id, timer] of timers) if (timer.at <= clock) { timers.delete(id); timer.callback(); }
@@ -122,16 +134,76 @@ test('initial layout deadline permanently releases the guide without user input'
   } finally { f.close(); }
 });
 
-test('a late browser scroll restoration is corrected without a layout or font change', () => {
+test('own delayed scroll event does not schedule another correction or release layout tracking', () => {
   const f = fixture();
   try {
     f.frame();
-    f.dom.window.dispatchEvent(new f.dom.window.Event('scroll'));
-    f.dom.window.dispatchEvent(new f.dom.window.Event('scroll'));
+    f.scrollTo(f.dom.window.scrollY); f.frame();
+    assert.equal(f.scrolls.length, 1);
+    assert.equal(f.disconnected(), false);
+    f.resize(); f.frame();
+    assert.equal(f.scrolls.length, 2);
+  } finally { f.close(); }
+});
+
+for (const navigation of ['navigate', 'reload', 'back_forward']) for (const y of [0, 320]) {
+  test(`${navigation}: pointerless scroll to ${y} permanently releases correction`, async () => {
+    const f = fixture('#tool-guide-title', navigation);
+    try {
+      f.frame();
+      // A genuine restoration checkpoint is already over before user scroll.
+      f.dom.window.dispatchEvent(new f.dom.window.PageTransitionEvent('pageshow'));
+      f.frame();
+      const before = f.scrolls.length;
+      f.resize(); // Even a queued correction must be cancelled immediately.
+      f.scrollTo(y);
+      assert.equal(f.disconnected(), true);
+      assert.equal(f.frames.size, 0);
+      assert.equal(f.timers.size, 0);
+      f.shift(200); f.resize();
+      f.resolveFonts(); await Promise.resolve();
+      f.dom.window.dispatchEvent(new f.dom.window.Event('load')); f.frame();
+      assert.equal(f.scrolls.length, before);
+      assert.equal(f.dom.window.scrollY, y);
+    } finally { f.close(); }
+  });
+}
+
+test('layout scroll before ResizeObserver delivery is corrected', () => {
+  const f = fixture();
+  try {
+    f.frame(); f.shift(200); f.scrollTo(1100); f.frame();
+    assert.equal(f.scrolls.length, 2);
+    assert.equal(f.disconnected(), false);
+  } finally { f.close(); }
+});
+
+for (const navigation of ['reload', 'back_forward']) {
+  test(`${navigation}: one pageshow restoration is corrected without a layout or font change`, () => {
+    const f = fixture('#tool-guide-title', navigation);
+    try {
+      f.frame();
+      f.dom.window.dispatchEvent(new f.dom.window.PageTransitionEvent('pageshow'));
+      f.scrollTo(0); f.frame();
+      assert.equal(f.scrolls.length, 2);
+      assert.equal(f.dom.window.scrollY, 900);
+      assert.equal(f.disconnected(), false);
+      f.dom.window.dispatchEvent(new f.dom.window.PageTransitionEvent('pageshow'));
+      f.scrollTo(0); f.frame();
+      assert.equal(f.scrolls.length, 2, 'restoration checkpoint is one-shot');
+      assert.equal(f.disconnected(), true);
+    } finally { f.close(); }
+  });
+}
+
+test('manual history scroll restoration grants no scroll exception', () => {
+  const f = fixture('#tool-guide-title', 'reload');
+  try {
+    f.dom.window.history.scrollRestoration = 'manual';
     f.frame();
-    assert.equal(f.scrolls.length, 2, 'browser restoration after first paint must realign the guide once');
-    f.dom.window.dispatchEvent(new f.dom.window.Event('keydown'));
-    f.dom.window.dispatchEvent(new f.dom.window.Event('scroll')); f.frame();
-    assert.equal(f.scrolls.length, 2, 'input must also release scroll restoration correction');
+    f.dom.window.dispatchEvent(new f.dom.window.PageTransitionEvent('pageshow'));
+    f.scrollTo(0); f.frame();
+    assert.equal(f.scrolls.length, 1);
+    assert.equal(f.disconnected(), true);
   } finally { f.close(); }
 });

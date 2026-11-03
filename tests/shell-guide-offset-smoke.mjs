@@ -113,28 +113,11 @@ test('automatic late result cannot reclaim the guide after the initial layout wi
   const record = { regression: 'automatic-late-result' };
   diagnostics(page, record);
   // Observe the actual lifecycle instead of sleeping until an assumed deadline.
-  await page.addInitScript(() => {
-    const NativeObserver = ResizeObserver;
-    window.guideLayoutObserver = { started: false, released: false };
-    window.ResizeObserver = class extends NativeObserver {
-      observe(target, options) {
-        if (target.matches('.main-content')) { this.guide = true; window.guideLayoutObserver.started = true; }
-        super.observe(target, options);
-      }
-      disconnect() {
-        if (this.guide) window.guideLayoutObserver.released = true;
-        super.disconnect();
-      }
-    };
-  });
+  await trackGuideObserver(page);
   try {
     await page.goto(`${server.url}/ko/tools/text-tools/#tool-guide-title`, { waitUntil: 'domcontentloaded' });
     await ready(page, 'text-tools');
     record.initial = await position(page); checkHeading(record.initial);
-    // History restoration can overwrite the scroll after layout, fonts and
-    // entry animation have finished, without producing another resize.
-    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
-    record.browserRestoration = await position(page); checkHeading(record.browserRestoration);
     await page.waitForFunction(() => window.guideLayoutObserver.started && window.guideLayoutObserver.released, null, { timeout: 15000 });
     record.before = await page.evaluate(() => {
       // Remove native browser scroll anchoring from this product-correction test.
@@ -155,6 +138,113 @@ test('automatic late result cannot reclaim the guide after the initial layout wi
     record.passed = true;
   } catch (error) { record.passed = false; record.error = error.message; throw error; }
   finally { records.push(record); await context.close(); }
+});
+for (const navigation of ['navigate', 'reload']) for (const y of [0, 320]) {
+  test(`${navigation}: pointerless scroll to ${y} is never reclaimed`, { timeout: 30000 }, async () => {
+    const context = await browser.newContext({ viewport: { width: 320, height: 640 }, serviceWorkers: 'block' });
+    await blockExternal(context);
+    const page = await context.newPage();
+    const record = { regression: 'pointerless-user-scroll', navigation, y };
+    diagnostics(page, record);
+    await trackGuideObserver(page);
+    try {
+      await page.goto(`${server.url}/ko/tools/text-tools/#tool-guide-title`, { waitUntil: 'domcontentloaded' });
+      if (navigation === 'reload') await page.reload({ waitUntil: 'domcontentloaded' });
+      await ready(page, 'text-tools');
+      record.initial = await position(page); checkHeading(record.initial);
+      assert.equal(await page.evaluate(() => window.guideLayoutObserver.released), false, 'must test inside active correction window');
+      record.requested = await page.evaluate(y => {
+        document.documentElement.style.overflowAnchor = 'none';
+        window.scrollTo({ top: y, behavior: 'instant' });
+        return scrollY;
+      }, y);
+      record.afterScroll = await position(page);
+      assert.equal(record.afterScroll.scrollY, record.requested, 'pointerless user scroll must be preserved');
+      assert.equal(await page.evaluate(() => window.guideLayoutObserver.released), true, 'unexpected scroll must immediately disconnect');
+      await page.evaluate(() => {
+        const block = document.createElement('div'); block.style.height = '400px';
+        document.querySelector('.main-content').prepend(block);
+      });
+      record.afterLayout = await position(page);
+      assert.equal(record.afterLayout.scrollY, record.requested, 'release must survive later layout');
+      assert.equal(record.afterLayout.hash, '#tool-guide-title');
+      record.passed = true;
+    } catch (error) { record.passed = false; record.error = error.message; throw error; }
+    finally { records.push(record); await context.close(); }
+  });
+}
+
+async function trackGuideObserver(page) {
+  await page.addInitScript(() => {
+    const NativeObserver = ResizeObserver;
+    window.guideLayoutObserver = { started: false, released: false };
+    window.ResizeObserver = class extends NativeObserver {
+      observe(target, options) {
+        if (target.matches('.main-content')) { this.guide = true; window.guideLayoutObserver.started = true; }
+        super.observe(target, options);
+      }
+      disconnect() {
+        if (this.guide) window.guideLayoutObserver.released = true;
+        super.disconnect();
+      }
+    };
+  });
+}
+
+test('late reload restoration at pageshow is corrected after fonts and animation settle', { timeout: 30000 }, async () => {
+  const context = await browser.newContext({ viewport: { width: 320, height: 640 }, serviceWorkers: 'block' });
+  await blockExternal(context);
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await context.route('**/restoration-gate.svg', async route => {
+    await gate;
+    await route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>' });
+  });
+  const page = await context.newPage();
+  const record = { regression: 'pageshow-delayed-restoration' };
+  diagnostics(page, record);
+  await trackGuideObserver(page);
+  await page.addInitScript(() => {
+    window.restorationEvents = [];
+    if (performance.getEntriesByType('navigation')[0]?.type !== 'reload') return;
+    document.addEventListener('DOMContentLoaded', () => {
+      // Delay load/pageshow without moving any layout or changing app bytes.
+      const image = document.createElement('img'); image.hidden = true;
+      image.src = '/restoration-gate.svg'; document.body.append(image);
+    });
+    window.addEventListener('pageshow', event => {
+      const before = scrollY;
+      // Simulate the traversal algorithm's scroll step at its actual browser
+      // lifecycle checkpoint, rather than labelling any later scrollTo as history.
+      scrollTo({ top: 0, behavior: 'instant' });
+      window.restorationEvents.push({ trusted: event.isTrusted, before, after: scrollY, type: performance.getEntriesByType('navigation')[0].type });
+    });
+  });
+  try {
+    await page.goto(`${server.url}/ko/tools/text-tools/#tool-guide-title`, { waitUntil: 'load' });
+    await ready(page, 'text-tools'); await position(page);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await ready(page, 'text-tools');
+    record.before = await position(page); checkHeading(record.before);
+    assert.equal(await page.evaluate(() => window.restorationEvents.length), 0, 'pageshow must still be gated');
+    release();
+    await page.waitForFunction(() => window.restorationEvents.length === 1);
+    record.restoration = await page.evaluate(() => window.restorationEvents[0]);
+    assert.equal(record.restoration.trusted, true);
+    assert.equal(record.restoration.type, 'reload');
+    assert.ok(record.restoration.before > 320);
+    assert.equal(record.restoration.after, 0, 'restoration must actually overwrite the scroll');
+    record.after = await position(page); checkHeading(record.after);
+    assert.equal(await page.evaluate(() => window.guideLayoutObserver.released), false);
+    // Its one-shot exception ends at the correction paint. The same bare
+    // scrollTo(0) now represents the user and must permanently release us.
+    await page.evaluate(() => scrollTo({ top: 0, behavior: 'instant' }));
+    record.userScroll = await position(page);
+    assert.equal(record.userScroll.scrollY, 0);
+    assert.equal(await page.evaluate(() => window.guideLayoutObserver.released), true);
+    record.passed = true;
+  } catch (error) { record.passed = false; record.error = error.message; throw error; }
+  finally { release(); records.push(record); await context.close(); }
 });
 function diagnostics(page, record) {
   record.diagnostics = [];

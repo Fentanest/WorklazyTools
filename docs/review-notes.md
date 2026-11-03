@@ -1,5 +1,13 @@
 # 검토 기록 (Review Notes)
 
+## 2026-11-04 — 안내 fragment 사용자 스크롤 해제 (FIX2, Codx, 정식 재검수 대기·미배포)
+
+기준 `ab4b820c`의 scroll 리스너가 초기 10초 동안 모든 이동을 안내로 되돌리던 P3-1을 수정했다. `scrollIntoView` 직후 실제 scrollX/Y와 제목의 문서 좌표를 기록한다. 같은 목적지의 지연 scroll 이벤트는 무시하고, 제목 문서 좌표가 변한 레이아웃 이동은 계속 보정하며, 그 밖의 이동은 즉시 observer·예약 프레임·타이머·리스너를 모두 해제한다. 예약된 resize/font/load 콜백도 해제 뒤 재활성화하지 않는다.
+
+독립적인 `scrollTo(0)`은 브라우저 복원과 사용자 조작을 식별할 정보가 없다. 따라서 0이라는 좌표나 10초 타이머만으로 복원이라고 추측하지 않는다. `history.scrollRestoration`이 manual이 아니고 reload/back_forward 또는 persisted pageshow일 때 최초 pageshow부터 다음 보정 프레임까지 한 번만 복원 경합을 허용한다. [HTML 표준의 문서 재활성화·스크롤 복원 절차](https://html.spec.whatwg.org/multipage/browsing-the-web.html#restore-persisted-state)를 근거로 선택한 짧은 재조정 경계이며 모든 브라우저의 복원 시점을 보장하는 신호라고 해석하지 않는다. 그 경계 밖에서 레이아웃 변화 없는 스크롤은 사용자에게 우선권을 준다.
+
+기존의 임의 `scrollTo(0)` 복원 모사는 실제 reload에서 이미지 응답을 보류해 fonts/animation 정착 뒤 trusted pageshow를 늦추고, 해당 이벤트에서 0으로 덮어쓰는 시험으로 명확히 했다. 같은 페이지에서 다음 프레임 이후 동일한 무입력 scrollTo(0)은 유지돼야 한다. 별도의 navigate/reload × 0/320px 회귀는 최초 10초 내 observer 활성 상태에서 시작하고, 사용자 이동 직후 해제 및 후속 400px 레이아웃에도 좌표·hash 보존을 검사한다. 초기 지연 레이아웃·키보드 해제·10초 종료·한영 18조합의 좌표·확대·준비 검증은 유지한다. 실행 수치와 원시 증거는 지정 `SOL-ANCHOR-FIX2.md` 및 worktree `scratch/anchor-fix2/`로 인계한다.
+
 ## 2026-11-04 — 안내 fragment 재진입 안정화 (Codx, 정식 검수 대기·미배포)
 
 기준 `88a15656`, 전용 `fix-guide-anchor-flaky-20261104` 브랜치에서 조사했다. 단발 `useLayoutEffect` 정렬 뒤에도 셸의 smooth top 초기화와 브라우저 복원이 스크롤을 바꾸며, redactor 준비 완료가 안내 위 레이아웃을 120px(320px 한글 163.42px) 늘리는 경로를 실제 프레임 기록으로 확인했다. 실패 좌표는 추가 대기 후에도 같고 focus 이벤트가 없어 shellFocus 보정과 분리했다. 셸 초기화만 차단한 대조 실험도 18건 중 8건 실패했다.

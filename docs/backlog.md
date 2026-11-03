@@ -6,6 +6,10 @@
 
 과거 제외 경로·AdSense 콘솔 설정과 GA4 자동 History 측정, 지역별 CMP는 `docs/PUBLISHING_CHECKLIST.md`의 운영 확인 대상이다.
 
+## 안내 fragment 복원 판별 범위 (2026-11-04)
+
+- FIX2는 최초 복원 pageshow부터 다음 보정 프레임 사이의 경합만 한 번 허용한다. 레이아웃 변화·복원 시점 근거 없이 뒤늦게 발생한 스크롤은 사용자 이동으로 처리한다. Safari/Firefox의 실제 이력 복원 시점은 미검증이며, 향후 확장 시 사용자 pointerless 스크롤을 되돌리지 않는 조건을 유지한다. Chromium 회귀 및 근거는 지정 `SOL-ANCHOR-FIX2.md`. 기존 하네스의 HTTP 전달은 실제 브라우저 네트워크 스택 오류를 재현하는 검증이 아니라는 한계도 유지한다. — Codx
+
 ## 로컬 브라우저 시험 네트워크 오류 진단 (2026-11-04)
 
 - 안내 앵커 반복 중 hash 없는 최초 진입·reload의 redactor 준비 대기 실패를 별도로 관측했다. 추가 계측의 두 독립 브라우저는 동일 시점 로컬 bcmap 요청에 `net::ERR_NETWORK_CHANGED`를 기록했고 worker 시작 전 준비 실패 UI를 보였다. 제품의 앵커 위치 실패와 구분하며, 일반 반복 중 같은 준비 증상의 개별 원인 로그가 없는 건까지 네트워크 오류로 단정하지 않는다. 최종 비교는 제품·좌표 판정을 유지한 채 loopback 전용 네트워크 namespace에서 실행한다. 후속 하네스 작업 때 requestfailed/준비 상태 증거를 상시 보존할 것. 근거: anchorflaky worktree `scratch/anchorflaky/prep-diagnostic/`, `after/`, `after-isolated/`, 지정 `SOL-ANCHORFLAKY-REPORT.md`. — Codx
