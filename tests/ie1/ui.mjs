@@ -46,7 +46,7 @@ try {
       await editor.getByText('1 files selected',{exact:true}).waitFor();
       assert.equal(await p.locator('[data-testid=file-drop-target-choice]').count(),0);
     });
-    await scenario('source intake creates a forced PNG result and preserves the editing scene', async () => {
+    await scenario('source intake creates a default PNG result and preserves the editing scene', async () => {
       await fresh(); await put();
       await editor.locator('.asp-commit').click(); await p.locator('[data-testid=image-editor-result] img').waitFor();
       const result = await p.locator('[data-testid=image-editor-result] a').getAttribute('href');
@@ -150,8 +150,8 @@ try {
       await warning.getByRole('button',{name:'Flatten layers and export',exact:true}).click();
       const file=await downloading; const json=JSON.parse(await fs.readFile(await file.path(),'utf8'));
       const size = await p.evaluate(async src => { const bitmap=await createImageBitmap(await (await fetch(src)).blob());const out=[bitmap.width,bitmap.height];bitmap.close();return out; },json.objects[0].src);
-      const logical = await editor.locator('.lower-canvas').evaluate(canvas=>[Math.round(parseFloat(canvas.style.width)),Math.round(parseFloat(canvas.style.height))]);
-      assert.deepEqual(size,logical,'flatten uses logical working scene pixels, not DPR backing pixels or source-photo dimensions');
+      const {PNG}=await import('pngjs');const source=PNG.sync.read(input.buffer);
+      assert.deepEqual(size,[source.width,source.height],'flatten uses the source image pixel frame, independent of preview/DPR');
       assert.equal(json.objects.length,1); assert.match(json.objects[0].src,/^data:image\/png/); assert.notEqual(json.objects[0].aspRole,'redaction');
       p.off('download',listener);
       await p.screenshot({path:`${out}/mobile-editor.png`,fullPage:true});

@@ -1,6 +1,6 @@
 import { ImageEditor, ERROR_MESSAGES, type BeforeExportContext, type ExportDecision } from '@ascentsparksoftware/react-image-editor';
 import '@ascentsparksoftware/react-image-editor/styles.css';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileDropZone } from '../../../components/ui';
 import { Button } from '../../../components/ui/button';
@@ -11,7 +11,7 @@ import type { ImageEditorDirectHandle } from '../ImageStudioPage';
 import type { ImageDirectPreset } from '../imageDirect';
 import { ClipboardHint, filterRasterImages, RASTER_IMAGE_ACCEPT } from '../imageStudioShared';
 import { BackgroundRemovalController, BgRemovalError, messages, type BgMode, type ConsentInfo } from '../bgRemoval';
-import { actualShrinkNotice, classifyD6, draftD6Props, flattenWorkingSceneTarget } from './d6Policy';
+import { actualShrinkNotice, classifyD6, draftD6Props } from './d6Policy';
 import { prepareImage, type PreparedImage } from './prepareImage';
 import { resizeResult } from './resizeResult';
 import { useImageSend } from './useImageSend';
@@ -30,13 +30,14 @@ const FORMATS = ['png', 'jpeg', 'webp', 'pdf', 'svg', 'json'] as const;
 const localFonts = new Set(['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Verdana', 'Courier New', 'Noto Sans']);
 const fontResolver = (family: string) => localFonts.has(family) || family.includes('system-ui') ? 'local' as const : 'google' as const;
 const readThemeMode = (): 'light' | 'dark' => document.documentElement.dataset.theme?.startsWith('dark') || getComputedStyle(document.documentElement).colorScheme === 'dark' ? 'dark' : 'light';
+const resultPlanKey = (format: ImageOutputFormat, size?: PixelSize) => `${format}:${size?.width ?? 'auto'}x${size?.height ?? 'auto'}`;
 const initialTool = (preset?: ImageDirectPreset) => preset?.purpose === 'mosaic' ? 'redact' : preset?.purpose === 'watermark' ? 'text' : preset?.purpose === 'resize' ? 'resize' : 'select';
 
 export default function LibraryImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: Props) {
   const { t, i18n } = useTranslation('features');
   const { t: sendT } = useTranslation('common');
   const { preparedSend, reason: sendReason, prepareAndSend, retryPrepared, downloadPrepared, invalidatePrepared, captureSendRevision } = useImageSend();
-  const [sendFormat, setSendFormat] = useState<ImageOutputFormat>('png');
+  const [outputFormat, setOutputFormat] = useState<ImageOutputFormat>('png');
   const language = i18n.language === 'en' ? 'en' : 'ko';
   const root = useRef<HTMLDivElement>(null);
   const [source, setSource] = useState<PreparedImage>();
@@ -46,22 +47,25 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const [selectedPreset, setSelectedPreset] = useState(preset);
   const [loaded, setLoaded] = useState(false);
   const [outputSize, setOutputSize] = useState<PixelSize>();
+  const [nativeOutputSize, setNativeOutputSize] = useState<PixelSize>();
   const [ratioLocked, setRatioLocked] = useState(true);
   const documentRevision = useRef(0);
-  const pendingCommits = useRef<{ version: number; revision: number; destination: 'result' | 'batch' | 'download' | 'privacy' | 'pdf'; size?: PixelSize; sendFormat: ImageOutputFormat; sendRevision: number }[]>([]);
+  const pendingCommits = useRef<{ version: number; revision: number; destination: 'result' | 'batch' | 'download' | 'privacy' | 'pdf'; size?: PixelSize; outputFormat: ImageOutputFormat; sendRevision: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [hasHistoryInput, setHasHistoryInput] = useState(false);
   const [hasTemplateInput, setHasTemplateInput] = useState(false);
   const [error, setError] = useState('');
   const [errorCode, setErrorCode] = useState<string>();
-  const [flattenTarget, setFlattenTarget] = useState<PixelSize>();
   const [notice, setNotice] = useState('');
   const [mode, setMode] = useState<BgMode>('person');
   const modeRef = useRef(mode); modeRef.current = mode;
   const modeChosen = useRef(false);
   const [bgBusy, setBgBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [bgPhase, setBgPhase] = useState<'preparing' | 'download' | 'processing'>('preparing');
   const [result, setResult] = useState<File>();
+  const [resultPlan, setResultPlan] = useState('');
   const [resultSize, setResultSize] = useState<PixelSize>();
   const [resultUrl, setResultUrl] = useState<string>();
   const [adding, setAdding] = useState(false);
@@ -83,7 +87,11 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     primaryPointerCoarse: matchMedia('(pointer: coarse)').matches ? true : matchMedia('(pointer: fine)').matches ? false : null,
     maxTouchPoints: navigator.maxTouchPoints, screenShortEdgeCssPx: Math.min(screen.width, screen.height),
   })));
-  const labels = t('image.library.labels', { returnObjects: true }) as Record<string, string>;
+  const labels = useMemo<Record<string, string>>(() => ({
+    ...t('image.library.labels', { returnObjects: true }) as Record<string, string>,
+    'runs an AI model entirely in your browser — no upload. The model (~tens of MB) downloads once on first use, then is cached.': t(mode === 'person' ? 'image.library.personModelHelp' : 'image.library.productModelHelp'),
+  }), [t, mode]);
+  const exportFileName = `${(source?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited`;
   const labelsRef = useRef(labels); labelsRef.current = labels;
   const applyPresetRef = useRef<(next?: ImageDirectPreset) => void>(() => {});
 
@@ -112,8 +120,8 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   }, [language, dismissPending]);
   useEffect(() => { if (!active) cancel(); }, [active, cancel]);
   useEffect(() => {
-    onDirtyRef.current(!!source || hasTemplateInput || dirty || loading || bgBusy || !!result || !!preparedSend);
-  }, [source, hasTemplateInput, dirty, loading, bgBusy, result, preparedSend]);
+    onDirtyRef.current(!!source || hasTemplateInput || hasHistoryInput || dirty || loading || bgBusy || !!result || !!preparedSend);
+  }, [source, hasTemplateInput, hasHistoryInput, dirty, loading, bgBusy, result, preparedSend]);
   useEffect(() => () => { version.current++; loadedAck.current?.resolve(false); clearTimeout(batchTimer.current); onDirtyRef.current(false); }, []);
   useEffect(() => {
     if (!result) { setResultUrl(undefined); return; }
@@ -125,12 +133,12 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] }); return () => observer.disconnect();
   }, []);
 
-  useEffect(() => { invalidatePrepared(); }, [sendFormat, outputSize?.width, outputSize?.height, invalidatePrepared]);
+  useEffect(() => { invalidatePrepared(); }, [outputFormat, outputSize?.width, outputSize?.height, invalidatePrepared]);
 
   const receive = async (file: File, context?: IntakeContext) => {
     if (!filterRasterImages([file]).length || context?.signal.aborted) return false;
     cancel(); const request = version.current;
-    invalidatePrepared(); setLoading(true); setError(''); setErrorCode(undefined); setNotice(''); setResult(undefined); setOutputSize(undefined);
+    invalidatePrepared(); setLoading(true); setError(''); setErrorCode(undefined); setNotice(''); setResult(undefined); setOutputSize(undefined); setNativeOutputSize(undefined);
     const abort = () => { if (request === version.current) cancel(); };
     context?.signal.addEventListener('abort', abort, { once: true });
     try {
@@ -168,23 +176,6 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     return () => document.removeEventListener('paste', paste, true);
   }, []);
   const editorArea = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const area = editorArea.current;
-    if (!area) return;
-    const sync = () => {
-      const canvas = area.querySelector<HTMLCanvasElement>('.lower-canvas');
-      if (!canvas) return;
-      // Fabric writes logical scene pixels to inline width/height; backing width
-      // additionally contains retina scaling and must not set the export target.
-      const width = Math.round(parseFloat(canvas.style.width));
-      const height = Math.round(parseFloat(canvas.style.height));
-      const next = flattenWorkingSceneTarget({ width, height }, policy.resolutionLimits.flattenMaxPixels);
-      if (next) setFlattenTarget(old => old?.width === next.width && old.height === next.height ? old : next);
-    };
-    const observer = new MutationObserver(sync);
-    observer.observe(area, { childList: true, subtree: true, attributes: true, attributeFilter: ['width', 'height', 'style'] });
-    sync(); return () => observer.disconnect();
-  }, [generation, policy]);
   const clearWatermarkDraft = () => {
     const input = editorArea.current?.querySelector<HTMLInputElement>('#asp-text-input');
     if (!input) return;
@@ -220,7 +211,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     // Commit may apply a pending crop before this hook. Snapshot the resulting
     // revision and each request's destination/size before asynchronous encoding.
     if (path === 'commit') {
-      pendingCommits.current.push({ version: version.current, revision: documentRevision.current, destination: destination.current, size: outputSize, sendFormat, sendRevision: captureSendRevision() });
+      pendingCommits.current.push({ version: version.current, revision: documentRevision.current, destination: destination.current, size: outputSize, outputFormat, sendRevision: captureSendRevision() });
       destination.current = 'result';
     }
     if (!hasConcealment || !['svg', 'json'].includes(format)) return 'proceed';
@@ -229,13 +220,17 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   };
   const finishExport = (value: ExportDecision) => { exportPending.current?.resolve(value); exportPending.current = undefined; setExportPrompt(undefined); };
   const finishConsent = (value: boolean) => { consentPending.current?.resolve(value); consentPending.current = undefined; setConsent(undefined); };
-  const backgroundRemovalLoader = async () => ({ removeBackground: async (input: Blob | string) => {
-    const request = version.current; setBgBusy(true); setProgress(0); setError(''); setErrorCode(undefined);
+  const backgroundRemovalLoader = async () => ({ removeBackground: async (input: Blob | string, options?: { progress?: (key: string, current: number, total: number) => void }) => {
+    const request = version.current; setBgBusy(true); setProgress(0); setBgPhase('preparing'); setError(''); setErrorCode(undefined);
     try {
       const controller = bg.current;
       if (!controller || !activeRef.current) throw new BgRemovalError('ai-cancelled');
-      return await controller.removeBackground(input, { mode: modeRef.current, progress: (_key, current, total) => {
-        if (request === version.current) setProgress(total > 0 ? Math.round(current / total * 100) : 0);
+      return await controller.removeBackground(input, { mode: modeRef.current, progress: (key, current, total) => {
+        if (request === version.current) {
+          setBgPhase(key.startsWith('fetch') ? 'download' : 'processing');
+          setProgress(total > 0 ? Math.round(current / total * 100) : 0);
+          options?.progress?.(key, current, total);
+        }
       } });
     } catch (cause) {
       if (request === version.current && cause instanceof BgRemovalError && cause.code !== 'ai-cancelled') { setErrorCode(cause.code); setError(messages[language][cause.code]); }
@@ -249,37 +244,38 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
     try {
       let encoded = await resizeResult(blob, target);
       const sending = intent.destination === 'privacy' || intent.destination === 'pdf';
-      if (sending) encoded = await encodeSendImage(encoded, intent.sendFormat);
+      if (intent.destination !== 'batch') encoded = await encodeSendImage(encoded, intent.outputFormat);
       if (!activeRef.current || request !== version.current) return;
       if (revision !== documentRevision.current) { setNotice(t('image.library.resultChanged')); return; }
+      const outputChanged = intent.sendRevision !== captureSendRevision();
       const extension = encoded.type === 'image/jpeg' ? 'jpg' : encoded.type === 'image/webp' ? 'webp' : 'png';
       const file = new File([encoded], `${(sourceRef.current?.file.name || 'worklazy-image').replace(/\.[^.]+$/, '')}-edited.${extension}`, { type: encoded.type });
       if (sending) {
-        if (intent.destination === 'pdf' && intent.sendFormat === 'webp') return;
+        if (intent.destination === 'pdf' && intent.outputFormat === 'webp') return;
         const ok = prepareAndSend({ receiverId: intent.destination === 'pdf' ? 'image-to-pdf' : 'image-privacy', entryPath: intent.destination === 'pdf' ? '/tools/pdf-converter/image-to-pdf' : '/tools/image-privacy', files:[file], origin:'generated', source:'image-studio' }, intent.sendRevision);
         if (!ok) setNotice(t('image.library.resultChanged'));
       } else if (intent.destination === 'batch') onEditedResult(file);
       else {
-        setResultSize(undefined); setResult(file);
+        setResultSize(undefined); setResult(file); setResultPlan(resultPlanKey(intent.outputFormat, target));
+        if (intent.destination === 'result' && outputChanged) setNotice(t('image.library.resultChanged'));
         if (intent.destination === 'download') {
           const url = URL.createObjectURL(file), anchor = document.createElement('a');
           anchor.href = url; anchor.download = file.name; anchor.click();
           setTimeout(() => URL.revokeObjectURL(url), 30_000);
         }
       }
-    } catch { if (request === version.current) setError(t('image.library.exportFailed')); }
+    } catch (cause) { if (request === version.current) setError(t(cause instanceof Error && cause.message === 'export-format-unsupported' ? 'image.library.unsupportedFormat' : 'image.library.exportFailed')); }
     finally { if (request === version.current) { destination.current = 'result'; saving.current = false; } }
   };
   const changeOutputSize = (axis: 'width' | 'height', value: number) => {
-    const canvas = editorArea.current?.querySelector<HTMLCanvasElement>('.lower-canvas');
-    const current = outputSize ?? { width: Math.round(parseFloat(canvas?.style.width || '') || 640), height: Math.round(parseFloat(canvas?.style.height || '') || 480) };
+    const current = outputSize ?? nativeOutputSize ?? source?.decoded ?? { width: 640, height: 480 };
     const edge = policy.resolutionLimits.inputMaxDimension;
     const bounded = Math.max(1, Math.min(edge, Math.round(value) || 1));
     const other = axis === 'width' ? 'height' : 'width';
     const next = { ...current, [axis]: bounded };
     if (ratioLocked) next[other] = Math.max(1, Math.round(bounded * current[other] / current[axis]));
     if (next[other] > edge) { next[axis] = Math.max(1, Math.round(next[axis] * edge / next[other])); next[other] = edge; }
-    setOutputSize(next); setResult(undefined);
+    setOutputSize(next);
   };
   const commit = (target: 'result' | 'batch' | 'download' | 'privacy' | 'pdf') => {
     if (target === 'batch') {
@@ -289,7 +285,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       batchLock.current = true; setAdding(true);
       if (batchCount >= 50) { setNotice(t('image.handoff.limit')); return; }
     }
-    if (saving.current || !loaded || loading || bgBusy || (target === 'pdf' && sendFormat === 'webp')) return;
+    if (saving.current || !loaded || loading || bgBusy || (target === 'pdf' && outputFormat === 'webp')) return;
     destination.current = target; saving.current = true;
     // The fork's public commit action owns export hooks and forced PNG encoding.
     const button = editorArea.current?.querySelector<HTMLButtonElement>('.asp-commit');
@@ -312,16 +308,17 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           <option value="person">{t('image.library.person')}</option><option value="product">{t('image.library.product')}</option>
         </select></label>
         <Button type="button" variant="outline" onClick={() => { cancel(); void bg.current?.clearStoredModels().then(ok => { if (ok) setNotice(t('image.library.modelsCleared')); }); }}>{t('image.library.clearModels')}</Button>
-        {bgBusy && <><span role="status">{t('image.library.processing', { progress })}</span><Button type="button" variant="secondary" onClick={cancel}>{t('image.cancel')}</Button></>}
+        {bgBusy && <><span role="status">{t(bgPhase === 'download' ? 'image.library.downloadProgress' : bgPhase === 'preparing' ? 'image.library.backgroundPreparing' : 'image.library.backgroundProcessing', { progress })}</span><Button type="button" variant="secondary" onClick={cancel}>{t('image.cancel')}</Button></>}
       </div>
-      <p className="mb-3 text-sm text-muted-foreground">{t('image.library.magicWandHint')}</p>
+      <p className="mb-2 text-sm text-muted-foreground">{t('image.library.magicWandHint')}</p>
+      <p className="mb-3 text-sm text-muted-foreground">{t('image.library.templateHelp')}</p>
       <fieldset className="mb-3 rounded-xl border border-border p-3" data-testid="image-editor-png-size">
         <legend className="px-1 text-sm font-medium">{t('image.library.pngSize')}</legend>
         <p className="mb-2 text-xs text-muted-foreground">{t('image.library.pngSizeHelp')}</p>
         <div className="flex flex-wrap items-center gap-3">
-          {(['width','height'] as const).map(axis => <label key={axis} className="flex items-center gap-2 text-sm">{t(axis === 'width' ? 'image.editor.dimensionWidth' : 'image.editor.dimensionHeight')}<input className="min-h-11 w-24 rounded-lg border border-border bg-background px-2" type="number" min={1} max={policy.resolutionLimits.inputMaxDimension} placeholder="auto" value={outputSize?.[axis] ?? ''} onChange={event => changeOutputSize(axis, Number(event.target.value))} /></label>)}
+          {(['width','height'] as const).map(axis => <label key={axis} className="flex items-center gap-2 text-sm">{t(axis === 'width' ? 'image.editor.dimensionWidth' : 'image.editor.dimensionHeight')}<input className="min-h-11 w-24 rounded-lg border border-border bg-background px-2" type="number" disabled={!loaded || loading || bgBusy} min={1} max={policy.resolutionLimits.inputMaxDimension} placeholder="auto" value={outputSize?.[axis] ?? ''} onChange={event => changeOutputSize(axis, Number(event.target.value))} /></label>)}
           <label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={ratioLocked} onChange={event => setRatioLocked(event.target.checked)} />{t('image.library.keepRatio')}</label>
-          {outputSize && <Button type="button" variant="ghost" onClick={() => { setOutputSize(undefined); setResult(undefined); }}>{t('image.library.autoSize')}</Button>}
+          {outputSize && <Button type="button" variant="ghost" onClick={() => { setOutputSize(undefined); }}>{t('image.library.autoSize')}</Button>}
         </div>
       </fieldset>
       <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onChangeCapture={event => {
@@ -340,7 +337,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       }}>
         <ImageEditor key={generation} src={source?.file ?? null} mode="full" height={640} themeMode={theme} baseColor={theme === 'dark' ? '#18181b' : '#ffffff'} accentColor="#0284c7"
           exportFormats={FORMATS} exportQuality={92} jpegExportQuality={95} commitFormat="png" showCommit commitLabel={t('image.library.makeResult')}
-          resolutionLimits={policy.resolutionLimits} flattenTarget={flattenTarget} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
+          resolutionLimits={policy.resolutionLimits} exportArea="image" exportFileName={exportFileName} onCancelBackgroundRemoval={cancel} onOutputSizeChange={size => { if (generation === latestGeneration.current) setNativeOutputSize(old => old?.width === size.width && old?.height === size.height ? old : size); }} initialTool={initialTool(selectedPreset)} initialRedactMode="pixelate" fontResolver={fontResolver}
           labels={labels} onBeforeExport={beforeExport} backgroundRemovalLoader={backgroundRemovalLoader}
           onImageLoaded={() => {
             const request = version.current;
@@ -355,7 +352,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
             if (selectedPreset?.purpose === 'watermark') requestAnimationFrame(ready); else ready();
           }}
           onDirtyChange={value => { if (generation !== latestGeneration.current) return; setDirty(value); if (value) setResult(undefined); }}
-          onHistoryChange={() => { if (generation === latestGeneration.current) { documentRevision.current++; invalidatePrepared(); setResult(undefined); } }}
+          onHistoryChange={state => { if (generation === latestGeneration.current) { documentRevision.current++; setHasHistoryInput(state.length > 1); invalidatePrepared(); setResult(undefined); } }}
           onSaved={blob => { if (generation === latestGeneration.current) void saved(blob); }} suppressHandledErrorToast onError={failure => {
             if (generation !== latestGeneration.current) return true;
             saving.current = false; destination.current = 'result'; pendingCommits.current = []; loadedAck.current?.resolve(false); loadedAck.current = undefined; setLoading(false);
@@ -368,16 +365,17 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
         {batchNotice && <span role="status">{t(`image.handoff.${batchNotice}`)}</span>}
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2" data-testid="image-editor-send-actions" data-prepared-send={!!preparedSend}>
+        <p className="w-full text-sm text-muted-foreground">{t('image.library.outputFormatHelp')}</p>
         <div role="group" aria-label={t('image.editor.format')} className="flex gap-1">
-          {(['png','jpeg','webp'] as const).map(format => <Button key={format} type="button" variant={sendFormat === format ? 'secondary' : 'outline'} aria-pressed={sendFormat === format} onClick={() => setSendFormat(format)}>{format === 'jpeg' ? 'JPG' : format === 'webp' ? 'WebP' : 'PNG'}</Button>)}
+          {(['png','jpeg','webp'] as const).map(format => <Button key={format} type="button" variant={outputFormat === format ? 'secondary' : 'outline'} aria-pressed={outputFormat === format} onClick={() => setOutputFormat(format)}>{format === 'jpeg' ? 'JPG' : format === 'webp' ? 'WebP' : 'PNG'}</Button>)}
         </div>
         <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-privacy" disabled={!loaded || loading || bgBusy} onClick={() => commit('privacy')}>{sendT('sendTo.privacy')}</Button>
-        <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-pdf" disabled={sendFormat === 'webp' || !loaded || loading || bgBusy} aria-describedby={sendFormat === 'webp' ? 'image-send-webp-reason' : undefined} onClick={() => commit('pdf')}>{sendT('sendTo.imagePdf')}</Button>
-        {sendFormat === 'webp' && <p id="image-send-webp-reason" className="w-full text-sm text-muted-foreground">{sendT('sendTo.webp')}</p>}
+        <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-pdf" disabled={outputFormat === 'webp' || !loaded || loading || bgBusy} aria-describedby={outputFormat === 'webp' ? 'image-send-webp-reason' : undefined} onClick={() => commit('pdf')}>{sendT('sendTo.imagePdf')}</Button>
+        {outputFormat === 'webp' && <p id="image-send-webp-reason" className="w-full text-sm text-muted-foreground">{sendT('sendTo.webp')}</p>}
         {sendReason && preparedSend && <div role="alert" className="w-full"><p>{sendT('sendTo.failed')}</p><Button type="button" variant="outline" onClick={downloadPrepared}>{sendT('sendTo.download')}</Button><Button type="button" variant="outline" onClick={retryPrepared}>{sendT('sendTo.retry')}</Button></div>}
       </div>
       <div className="mt-3" data-testid="image-editor-export-action"><Button type="button" variant="outline" disabled={!loaded || loading || bgBusy} onClick={() => commit('download')}>{t('image.editor.download')}</Button></div>
-      {result && resultUrl && <div className="mt-3 rounded-xl border border-border p-3" data-testid="image-editor-export-result" data-width={resultSize?.width} data-height={resultSize?.height}><div data-testid="image-editor-result">
+      {result && resultUrl && resultPlan === resultPlanKey(outputFormat, outputSize) && <div className="mt-3 rounded-xl border border-border p-3" data-testid="image-editor-export-result" data-width={resultSize?.width} data-height={resultSize?.height}><div data-testid="image-editor-result">
         <img src={resultUrl} onLoad={event => { const image = event.currentTarget; if (image.currentSrc === resultUrl) setResultSize({ width: image.naturalWidth, height: image.naturalHeight }); }} alt={t('image.library.resultAlt')} className="max-h-64 max-w-full object-contain" />
         <a className="mt-2 inline-flex min-h-11 items-center text-primary underline" href={resultUrl} download={result.name}>{t('image.editor.download')}</a>
       </div></div>}

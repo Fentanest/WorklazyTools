@@ -1602,15 +1602,27 @@
         "Downloading model…": "Downloading model…",
         "Processing…": "Processing…",
         "Object": "Object",
-        "Redaction": "Redaction"
+        "Redaction": "Redaction",
+        "Preparing model and runtime…": "Preparing model and runtime…",
+        "Cancel background removal": "Cancel background removal",
+        "Background removal progress": "Background removal progress",
+        "This browser cannot encode this image format. Choose PNG or JPEG.": "This browser cannot encode this image format. Choose PNG or JPEG."
       },
       "retryPerson": "Retry portrait mode",
       "retryReady": "Portrait mode selected. Press Remove background again.",
-      "pngSize": "PNG result size",
-      "pngSizeHelp": "Applies to Create edited result, PNG download, Add to batch and Send-to. The Export menu uses the editor’s own output settings.",
+      "pngSize": "Output size",
+      "pngSizeHelp": "Applies to Create edited result, Download, Add to batch and Send-to. The Export menu uses the source pixels or the applied crop/artboard size.",
       "keepRatio": "Keep aspect ratio",
       "autoSize": "Automatic size",
-      "resultChanged": "The edit changed while the result was being prepared. Create the result again."
+      "resultChanged": "The edit changed while the result was being prepared. Create the result again.",
+      "outputFormatHelp": "The selected format applies to Create edited result, the footer download and Send-to. Add to batch always uses PNG.",
+      "personModelHelp": "The portrait model and runtime are about 41MB. Missing files download after consent and are cached. Images are processed only on this device.",
+      "productModelHelp": "The object/product model and runtime are about 127MB and require shader-f16 WebGPU. Missing files download after consent. Images stay on this device.",
+      "backgroundPreparing": "Preparing model and runtime…",
+      "backgroundProcessing": "Removing the background…",
+      "downloadProgress": "Downloading model/runtime · {{progress}}%",
+      "unsupportedFormat": "This browser cannot encode this image format. Choose PNG or JPG.",
+      "templateHelp": "To continue editing later, use Save template and Load template in the Image menu above."
     }
   },
   "video": {

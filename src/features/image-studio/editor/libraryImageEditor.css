@@ -22,3 +22,4 @@
 @container worklazy-editor (max-width: 600px) {
   .library-image-editor .asp-image-editor { height: auto !important; min-height: 0; }
 }
+.library-image-editor .asp-options-panel .asp-ai-cancel { min-height: 44px; width: 100%; }

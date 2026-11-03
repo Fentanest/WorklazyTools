@@ -49,6 +49,8 @@ export class BackgroundRemovalController {
     const ensureCurrent = () => { cancelled(abort.signal); if (runId !== this.generation) throw new BgRemovalError('ai-cancelled'); };
     let worker: Worker | undefined;
     try {
+      // Reject insecure LAN HTTP before cache planning, consent, fetch or worker creation.
+      if (!globalThis.isSecureContext || !globalThis.crypto?.subtle) throw new BgRemovalError('bg-secure-context-required');
       ensureCurrent();
       let blob = input;
       if (typeof input === 'string') {

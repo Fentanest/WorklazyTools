@@ -267,6 +267,7 @@ interface EditorHistorySnapshot {
   transparentBackground: boolean;
   baseLocked: boolean;
   outputMultiplier: number;
+  sourceFrame?: boolean;
 }
 
 function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: { onEditedResult: (file: File) => void; batchCount: number; batchNotice?: "added" | "limit"; active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>; onDirty: (dirty: boolean) => void }) {
@@ -322,6 +323,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const [hue, setHue] = useState(0);
   const [format, setFormat] = useState<ImageOutputFormat>("png");
   const [outputMultiplier, setOutputMultiplier] = useState(1);
+  const [sourceFrame, setSourceFrame] = useState(false);
   const [canvasDimensions, setCanvasDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
   const [resampleDimensions, setResampleDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
   const [canvasResizeDimensions, setCanvasResizeDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
@@ -358,8 +360,13 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   mobilePanelLayoutRef.current = mobilePanelLayout;
   const effectivePanelCollapsed = panelCollapsed && !mobilePanelLayout;
   useEffect(() => { invalidatePrepared(); }, [format, exportMode, exportDimensions.width, exportDimensions.height, exportRatioLocked, invalidatePrepared]);
-  const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
-  editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
+  const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked, sourceFrame });
+  editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked, sourceFrame };
+  const useCanvasExportFrame = useCallback(() => {
+    const changed = editorSettings.current.sourceFrame;
+    setSourceFrame(false); editorSettings.current.sourceFrame = false;
+    return changed;
+  }, []);
   cropRatioRef.current = cropRatio;
 
   const applyDirectPreset = (next?: ImageDirectPreset) => {
@@ -972,6 +979,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
 
   const acquireImage = async (next?: File, context?: IntakeContext) => {
     if (!next || !canvas.current || context?.signal.aborted) return false;
+    invalidatePrepared();
     const generation = ++intakeGeneration.current;
     editController.current?.abort();
     const controller = new AbortController();
@@ -989,7 +997,9 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
       restoringRef.current = true;
       clearRegionSelection();
       instance.clear();
-      instance.backgroundColor = transparentBackground ? "" : background;
+      // Opening a photo preserves its alpha; a canvas fill remains an explicit edit.
+      instance.backgroundColor = "";
+      setTransparentBackground(true); setSourceFrame(true);
       instance.setDimensions({ width: 900, height: 600 });
       resetViewport(instance);
       const scale = Math.min(1, 860 / image.width, 560 / image.height);
@@ -1017,6 +1027,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         if (approved.purpose === "mosaic") setRegionEffect(approved.regionEffect);
       }
       syncDimensionControls(900, 600);
+      setExportDimensions(normalizeEditorDimensions({ width: image.width, height: image.height }, EDITOR_EXPORT_MAX_DIMENSION));
+      editorSettings.current = { ...editorSettings.current, transparentBackground: true, sourceFrame: true };
       applyEditorInteractivity(instance, image, "select", true);
       instance.requestRenderAll();
       syncSelectedObject();
@@ -1052,6 +1064,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current);
     sourceUrl.current = undefined;
     setFile(undefined);
+    useCanvasExportFrame();
     updateOutputMultiplier(1);
     setEditorError("");
     setBrightness(0); setContrast(0); setHue(0); setBaseLocked(true); setInteractionMode("select"); setActivePanel("select");
@@ -1190,6 +1203,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     const selection = cropSelectionRef.current;
     const overlay = cropOverlay.current;
     if (!instance || !selection || selection.width < 10 || selection.height < 10) return;
+    useCanvasExportFrame();
     restoringRef.current = true;
     if (overlay) instance.remove(overlay);
     cropOverlay.current = undefined;
@@ -1215,7 +1229,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     restoringRef.current = false;
     pushSnapshot(true);
     window.requestAnimationFrame(syncCanvasDisplay);
-  }, [baseLocked, pushSnapshot, resetViewport, syncCanvasDisplay, syncDimensionControls, syncSelectedObject]);
+  }, [baseLocked, pushSnapshot, resetViewport, syncCanvasDisplay, syncDimensionControls, syncSelectedObject, useCanvasExportFrame]);
 
   const applyRegionEffect = useCallback(async () => {
     const instance = canvas.current;
@@ -1554,14 +1568,16 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   };
 
   const changeExportDimension = (axis: keyof EditorDimensions, value: number) => {
+    const bounds = sourceFrame && baseImage.current ? baseImage.current.getBoundingRect() : canvasDimensions;
     setExportDimensions((current) => exportRatioLocked
-      ? resizeLockedDimensions(value, axis, canvasDimensions, EDITOR_EXPORT_MAX_DIMENSION)
+      ? resizeLockedDimensions(value, axis, bounds, EDITOR_EXPORT_MAX_DIMENSION)
       : { ...current, [axis]: clampEditorDimension(value, EDITOR_EXPORT_MAX_DIMENSION) });
   };
 
   const changeExportRatioLock = (locked: boolean) => {
     setExportRatioLocked(locked);
-    if (locked) setExportDimensions((current) => resizeLockedDimensions(current.width, "width", canvasDimensions, EDITOR_EXPORT_MAX_DIMENSION));
+    const bounds = sourceFrame && baseImage.current ? baseImage.current.getBoundingRect() : canvasDimensions;
+    if (locked) setExportDimensions((current) => resizeLockedDimensions(current.width, "width", bounds, EDITOR_EXPORT_MAX_DIMENSION));
   };
 
   const applyImageResample = () => {
@@ -1569,7 +1585,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (!instance) return;
     const target = normalizeEditorDimensions(resampleDimensions, EDITOR_WORK_MAX_DIMENSION);
     const previous = { width: instance.getWidth(), height: instance.getHeight() };
-    if (target.width === previous.width && target.height === previous.height) return;
+    const frameChanged = useCanvasExportFrame();
+    if (target.width === previous.width && target.height === previous.height) { if (frameChanged) pushSnapshot(true); return; }
     restoringRef.current = true;
     setEditorError("");
     try {
@@ -1607,7 +1624,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (!instance) return;
     const target = normalizeEditorDimensions(canvasResizeDimensions, EDITOR_WORK_MAX_DIMENSION);
     const previous = { width: instance.getWidth(), height: instance.getHeight() };
-    if (target.width === previous.width && target.height === previous.height) return;
+    const frameChanged = useCanvasExportFrame();
+    if (target.width === previous.width && target.height === previous.height) { if (frameChanged) pushSnapshot(true); return; }
     restoringRef.current = true;
     setEditorError("");
     try {
@@ -1659,6 +1677,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         ?? instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage && !(object as EditorFabricObject).worklazyRole);
       setBrightness(snapshot.brightness); setContrast(snapshot.contrast); setHue(snapshot.hue);
       setBackground(snapshot.background); setTransparentBackground(snapshot.transparentBackground); setBaseLocked(snapshot.baseLocked);
+      setSourceFrame(snapshot.sourceFrame ?? false);
       updateOutputMultiplier(snapshot.outputMultiplier ?? 1);
       syncDimensionControls(snapshot.width, snapshot.height);
       editorSettings.current = {
@@ -1668,6 +1687,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         background: snapshot.background,
         transparentBackground: snapshot.transparentBackground,
         baseLocked: snapshot.baseLocked,
+        sourceFrame: snapshot.sourceFrame ?? false,
       };
       instance.backgroundColor = snapshot.transparentBackground ? "" : snapshot.background;
       if (baseImage.current) {
@@ -1715,7 +1735,9 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (effect === "blur") setRegionEffectStrength((current) => Math.max(10, current));
   };
 
-  const originalExportPlan = getOriginalQualityExportPlan(canvasDimensions, outputMultiplier, EDITOR_EXPORT_MAX_DIMENSION);
+  const originalExportBounds = sourceFrame && baseImage.current ? baseImage.current.getBoundingRect() : { left: 0, top: 0, ...canvasDimensions };
+  const originalDensity = sourceFrame && baseImage.current ? 1 / Math.max(Number.EPSILON, Math.abs(baseImage.current.scaleX)) : outputMultiplier;
+  const originalExportPlan = getOriginalQualityExportPlan(originalExportBounds, originalDensity, EDITOR_EXPORT_MAX_DIMENSION);
   const exportResultDimensions = exportMode === "original" ? originalExportPlan.dimensions : normalizeEditorDimensions(exportDimensions, EDITOR_EXPORT_MAX_DIMENSION);
 
   const exportImage = (destination: "download" | "batch" | "privacy" | "pdf" = "download") => {
@@ -1741,7 +1763,11 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     try {
       instance.setViewportTransform([...IDENTITY_VIEWPORT]);
       instance.renderAll();
-      const source = instance.toCanvasElement(exportMode === "original" ? originalExportPlan.multiplier : 1);
+      const source = instance.toCanvasElement(originalExportPlan.multiplier, {
+        left: originalExportBounds.left, top: originalExportBounds.top,
+        width: (originalExportPlan.dimensions.width + 1e-7) / originalExportPlan.multiplier,
+        height: (originalExportPlan.dimensions.height + 1e-7) / originalExportPlan.multiplier,
+      });
       const rendered = exportMode === "custom"
         ? renderEditorExportSize(source, exportResultDimensions, exportRatioLocked, format === "jpeg")
         : source;
@@ -1769,8 +1795,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         anchor.download = fileName;
         anchor.click();
       }
-    } catch {
-      setEditorError(t("image.editor.exportError"));
+    } catch (cause) {
+      setEditorError(t(cause instanceof Error && cause.message === 'export-format-unsupported' ? 'image.library.unsupportedFormat' : "image.editor.exportError"));
     } finally {
       instance.setViewportTransform(viewport);
       overlays.forEach((overlay) => {
@@ -2031,8 +2057,8 @@ function getOriginalQualityExportPlan(dimensions: EditorDimensions, multiplier: 
     multiplier: effectiveMultiplier,
     reduced: effectiveMultiplier < requestedMultiplier - 1e-9,
     dimensions: {
-      width: Math.max(1, Math.min(max, Math.floor(dimensions.width * effectiveMultiplier + 1e-6))),
-      height: Math.max(1, Math.min(max, Math.floor(dimensions.height * effectiveMultiplier + 1e-6))),
+      width: Math.max(1, Math.min(max, Math.round(dimensions.width * effectiveMultiplier))),
+      height: Math.max(1, Math.min(max, Math.round(dimensions.height * effectiveMultiplier))),
     },
   };
 }
@@ -2059,7 +2085,11 @@ function renderEditorExportSize(source: HTMLCanvasElement, dimensions: EditorDim
 }
 
 function encodeEditorExportCanvas(source: HTMLCanvasElement, format: ImageOutputFormat) {
-  if (format !== "jpeg") return source.toDataURL(`image/${format}`, 0.92);
+  if (format !== "jpeg") {
+    const encoded = source.toDataURL(`image/${format}`, 0.92);
+    if (!encoded.startsWith(`data:image/${format};`)) throw new Error('export-format-unsupported');
+    return encoded;
+  }
   const flattened = document.createElement("canvas");
   flattened.width = source.width;
   flattened.height = source.height;

@@ -1,0 +1,354 @@
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -5979,7 +5979,7 @@
+     },
+     "packages/react-image-editor": {
+       "name": "@ascentsparksoftware/react-image-editor",
+-      "version": "1.1.0",
++      "version": "1.3.0-worklazy.3",
+       "license": "MIT",
+       "dependencies": {
+         "fabric": "^7.4.0",
+--- a/packages/react-image-editor/package.json
++++ b/packages/react-image-editor/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "@ascentsparksoftware/react-image-editor",
+-  "version": "1.3.0",
+-  "description": "Standalone, themeable React 19 image editor built on Fabric.js v7 (MIT). A free, open-source alternative to commercial image editors — crop, rotate, filters, draw, text, redact, export.",
++  "version": "1.3.0-worklazy.3",
++  "description": "Standalone, themeable React 19 image editor built on Fabric.js v7 (MIT). A free, open-source alternative to commercial image editors \u2014 crop, rotate, filters, draw, text, redact, export.",
+   "keywords": [
+     "react",
+     "image-editor",
+--- a/packages/react-image-editor/src/controller/editor-controller.ts
++++ b/packages/react-image-editor/src/controller/editor-controller.ts
+@@ -306,6 +306,7 @@
+   private focusWithin = false;
+   private lastHistorySignal = '';
+   private lastDirty: boolean | undefined;
++  private lastOutputSize = '';
+   private initialToolApplied = false;
+   /** Tears down an in-flight ruler→guide drag; also called on destroy. */
+   private guideDraftCleanup: (() => void) | null = null;
+@@ -683,6 +684,9 @@
+     if (key !== this.lastHistorySignal) { this.lastHistorySignal = key; this.props.onHistoryChange?.(signal); }
+     const dirty = engine.isDirty;
+     if (dirty !== this.lastDirty) { this.lastDirty = dirty; this.props.onDirtyChange?.(dirty); }
++    const size = engine.getOutputSize();
++    const sizeKey = `${size.width}x${size.height}`;
++    if (sizeKey !== this.lastOutputSize) { this.lastOutputSize = sizeKey; this.props.onOutputSizeChange?.(size); }
+   }
+ 
+   /** Mirror the engine's zoom value and its honest slider bounds for the current interaction. */
+@@ -1189,9 +1193,10 @@
+       return;
+     }
+     this.patch({ pickerOpen: false });
++    const fileName = this.props.exportFileName ? `${this.props.exportFileName}.template.json` : 'template.json';
+     try {
+       const json = await engine.exportTemplate();
+-      triggerDownload(new Blob([json], { type: 'application/json' }), 'template.json');
++      triggerDownload(new Blob([json], { type: 'application/json' }), fileName);
+     } catch (error) {
+       this.emitError('template-save-failed', error);
+     }
+@@ -1234,15 +1239,18 @@
+       return;
+     }
+     this.patch({ exportOpen: false });
++    const format = this.state.exportFormat;
++    const quality = this.state.exportQ;
++    const fileName = `${this.props.exportFileName ?? 'image'}.${extensionFor(format)}`;
+     try {
+       const blob = await engine.exportImage(
+-        this.state.exportFormat,
+-        this.state.exportQ,
++        format,
++        quality,
+         this.props.exportFormats,
+         'download',
+       );
+       this.props.onExported?.(blob);
+-      triggerDownload(blob, `image.${extensionFor(this.state.exportFormat)}`);
++      triggerDownload(blob, fileName);
+     } catch (error) {
+       this.emitError('export-failed', error);
+     }
+@@ -1631,7 +1639,7 @@
+       return;
+     }
+     const mode = this.state.activeTool === 'selectsubject' ? 'subject' : 'replace';
+-    this.patch({ aiBusy: true, aiProgress: 0, aiStage: 'loading' });
++    this.patch({ aiBusy: true, aiProgress: 0, aiStage: 'preparing' });
+     void engine
+       .removeImageBackground(mode)
+       .then((ok) => {
+--- a/packages/react-image-editor/src/engine/editor-engine.ts
++++ b/packages/react-image-editor/src/engine/editor-engine.ts
+@@ -200,7 +200,7 @@
+ /** Progress of an in-browser AI operation (model fetch + inference). */
+ export interface AiProgress {
+   /** `'loading'` while fetching the model, `'processing'` during inference, `'done'`. */
+-  readonly stage: 'loading' | 'processing' | 'done';
++  readonly stage: 'preparing' | 'loading' | 'processing' | 'done';
+   /** 0–1 within the current stage (best-effort; some stages report no total). */
+   readonly progress: number;
+ }
+@@ -1482,14 +1482,19 @@
+     // pixels away. A centered artboard targets its preset width; a crop region
+     // recovers the source pixels beneath it, optionally capped by exportTarget.
+     const multiplier = this.exportMultiplierFor(rect);
++    const size = exportPixelSize(rect, multiplier);
++    // HTML canvas dimensions truncate fractional products (e.g.63.999999999).
++    // Keep the integer output plan; this epsilon only cancels floating-point loss.
++    const width = (size.width + 1e-7) / multiplier;
++    const height = (size.height + 1e-7) / multiplier;
+     return this.atIdentityViewport(() =>
+       this.canvas.toDataURL({
+         format,
+         quality,
+         left: rect.left,
+         top: rect.top,
+-        width: rect.width,
+-        height: rect.height,
++        width,
++        height,
+         multiplier,
+       }),
+     );
+@@ -1497,13 +1502,14 @@
+ 
+   /** The render multiplier for the current output region. */
+   private exportMultiplierFor(rect: FrameRect): number {
+-    if (!this.cropRegion) {
++    if (!this.cropRegion && (this.artboard || this.integration.exportArea !== 'image' || !this.baseImage)) {
+       return this.artboard ? this.artboard.width / rect.width : 1;
+     }
+     return exportMultiplier({
+       regionWidth: rect.width,
+       regionHeight: rect.height,
+       sourcePerScene: this.sourcePerScene(),
++      allowBelowSceneSize: this.integration.exportArea === 'image',
+       target: this.exportTarget,
+       maxPixels: this.integration.resolutionLimits?.cropMaxPixels,
+     });
+@@ -1534,10 +1540,13 @@
+ 
+   /** Pixel size of the delivered export (crop region at its export scale, else artboard preset). */
+   private outputSize(): { width: number; height: number } | null {
+-    if (this.cropRegion) {
+-      return exportPixelSize(this.cropRegion, this.exportMultiplierFor(this.cropRegion));
+-    }
+-    return this.artboard;
++    const rect = this.outputRect();
++    return rect ? exportPixelSize(rect, this.exportMultiplierFor(rect)) : null;
++  }
++
++  /** Pixel dimensions for host size controls, never CSS or retina backing dimensions. */
++  getOutputSize(): AspExportTarget {
++    return this.outputSize() ?? { width: this.canvas.getWidth(), height: this.canvas.getHeight() };
+   }
+ 
+   /**
+@@ -1548,7 +1557,7 @@
+    */
+   private drawArtboardMask(): void {
+     const cropping = this.cropFrame !== null || this.imageCropActive;
+-    const rect = this.cropFrame ? this.cropFrameRect() : this.outputRect();
++    const rect = this.cropFrame ? this.cropFrameRect() : this.cropRegion ?? this.artboardRect();
+     if (!rect) {
+       return;
+     }
+@@ -1629,7 +1638,13 @@
+     if (this.cropRegion) {
+       return this.cropRegion;
+     }
+-    return this.artboardRect();
++    const artboard = this.artboardRect();
++    if (artboard) return artboard;
++    if (this.integration.exportArea === 'image' && this.baseImage) {
++      const { left, top, width, height } = this.baseImage.getBoundingRect();
++      return { left, top, width, height };
++    }
++    return null;
+   }
+ 
+   /** The live crop frame's rectangle in scene coordinates (bakes its scale). */
+@@ -2568,7 +2583,7 @@
+           "with provideAspBackgroundRemoval(() => import('@imgly/background-removal')).",
+       );
+     }
+-    this.aiProgressListener?.({ stage: 'loading', progress: 0 });
++    this.aiProgressListener?.({ stage: 'preparing', progress: 0 });
+     const { removeBackground } = await this.bgRemovalLoader();
+     const cutoutBlob = await removeBackground(source, {
+       progress: (key: string, current: number, total: number) => {
+@@ -3115,18 +3130,21 @@
+   }
+ 
+   /** A fresh one-image scene, rendered from a detached copy; the editor is never flattened. */
+-  async flattenScene(target = { width: this.canvas.getWidth(), height: this.canvas.getHeight() }): Promise<EditorEngine> {
++  async flattenScene(target?: AspExportTarget): Promise<EditorEngine> {
++    const rect = this.integration.exportArea === 'image' ? this.outputRect() : null;
++    const region = rect ?? { left: 0, top: 0, width: this.canvas.getWidth(), height: this.canvas.getHeight() };
++    target ??= (rect ? this.outputSize() : null) ?? { width: region.width, height: region.height };
+     checkPixels(target.width, target.height, this.integration.resolutionLimits?.flattenMaxPixels);
+     const width = Math.round(target.width), height = Math.round(target.height);
+     checkPixels(width, height, this.integration.resolutionLimits?.flattenMaxPixels);
+     const copy = new this.fabric.StaticCanvas(undefined, { width: this.canvas.getWidth(), height: this.canvas.getHeight(), enableRetinaScaling: false });
+     try {
+       await copy.loadFromJSON(this.canvas.toObject());
+-      const scaleX = width / copy.getWidth(), scaleY = height / copy.getHeight();
++      const scaleX = width / region.width, scaleY = height / region.height;
+       // Render directly into the target area: a different target aspect must not
+       // allocate a much larger intermediate bitmap outside flattenMaxPixels.
+       copy.setDimensions({ width, height });
+-      copy.setViewportTransform([scaleX, 0, 0, scaleY, 0, 0]);
++      copy.setViewportTransform([scaleX, 0, 0, scaleY, -region.left * scaleX, -region.top * scaleY]);
+       copy.renderAll();
+       const src = copy.getElement().toDataURL('image/png');
+       const merged = await EditorEngine.create(document.createElement('canvas'), { width, height });
+@@ -3176,14 +3194,20 @@
+     if (cfg.kind === 'vector') {
+       // Embed the web fonts used by text so the SVG renders the true typeface in
+       // any viewer instead of falling back to a generic family.
+-      const svg = await this.embedSvgFonts(this.canvas.toSVG());
++      const rect = this.integration.exportArea === 'image' ? this.outputRect() : null;
++      const size = rect ? this.outputSize() : null;
++      const svg = await this.embedSvgFonts(this.canvas.toSVG(rect && size
++        ? { width: String(size.width), height: String(size.height), viewBox: { x: rect.left, y: rect.top, width: rect.width, height: rect.height } }
++        : undefined));
+       return new Blob([svg], { type: cfg.mimeType });
+     }
+     if (cfg.kind === 'pdf') {
+       return this.exportPdf();
+     }
+     const rasterFormat = cfg.format === 'jpeg' ? 'jpeg' : cfg.format === 'webp' ? 'webp' : 'png';
+-    return dataUrlToBlob(this.artboardDataUrl(rasterFormat, cfg.quality));
++    const blob = dataUrlToBlob(this.artboardDataUrl(rasterFormat, cfg.quality));
++    if (blob.type !== cfg.mimeType) throw new EditorOperationError('export-format-unsupported', 'This browser cannot encode this image format. Choose PNG or JPEG.');
++    return blob;
+   }
+ 
+   /**
+--- a/packages/react-image-editor/src/engine/export-scale.ts
++++ b/packages/react-image-editor/src/engine/export-scale.ts
+@@ -22,6 +22,8 @@
+   readonly regionHeight: number;
+   /** Source image pixels per scene unit — `1 / baseImage.scaleX`; 1 when unknown. */
+   readonly sourcePerScene: number;
++  /** A preview may enlarge a small source; image exports retain its real pixels. */
++  readonly allowBelowSceneSize?: boolean;
+   /** Host-requested export width in real pixels, when one was declared. */
+   readonly target?: { readonly width: number } | null;
+   /** Override the bitmap area cap (defaults to {@link MAX_EXPORT_PIXELS}). */
+@@ -46,7 +48,9 @@
+   }
+   // Floor at 1: a cropped export must never come out smaller than the region
+   // already is on screen, even when the source is a scaled-up thumbnail.
+-  const sourceLimit = isPositive(sourcePerScene) ? Math.max(1, sourcePerScene) : 1;
++  const sourceLimit = isPositive(sourcePerScene)
++    ? input.allowBelowSceneSize ? sourcePerScene : Math.max(1, sourcePerScene)
++    : 1;
+   const wanted =
+     target && isPositive(target.width)
+       ? Math.min(target.width / regionWidth, sourceLimit)
+--- a/packages/react-image-editor/src/i18n.tsx
++++ b/packages/react-image-editor/src/i18n.tsx
+@@ -8,6 +8,7 @@
+   'engine-init-failed': 'Could not initialize the editor.',
+   'load-failed': 'Could not load the image.',
+   'export-failed': 'Could not export the image.',
++  'export-format-unsupported': 'This browser cannot encode this image format. Choose PNG or JPEG.',
+   'template-save-failed': 'Could not save the template.',
+   'template-load-failed': 'Could not load the template.',
+   'template-remote-source': 'Templates may only contain data: or blob: sources.',
+--- a/packages/react-image-editor/src/styles/options-panel.css
++++ b/packages/react-image-editor/src/styles/options-panel.css
+@@ -500,3 +500,11 @@
+   background: var(--asp-accent);
+   transition: width 0.2s ease;
+ }
++.asp-options-panel .asp-ai-bar--indeterminate > span {
++  width: 40%;
++  animation: asp-ai-progress 1.2s ease-in-out infinite alternate;
++}
++@keyframes asp-ai-progress { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
++@media (prefers-reduced-motion: reduce) {
++  .asp-options-panel .asp-ai-bar--indeterminate > span { animation: none; }
++}
+--- a/packages/react-image-editor/src/types/integration.types.ts
++++ b/packages/react-image-editor/src/types/integration.types.ts
+@@ -22,6 +22,12 @@
+   readonly limitUrlInputs?: boolean;
+ }
+ export interface IntegrationOptions {
++  /** Image bounds at source pixel density, or the original full working-scene contract. */
++  readonly exportArea?: 'image' | 'scene';
++  /** Download basename without extension; captured before an asynchronous export policy. */
++  readonly exportFileName?: string;
++  readonly onOutputSizeChange?: (size: AspExportTarget) => void;
++  readonly onCancelBackgroundRemoval?: () => void;
+   readonly onBeforeExport?: (context: BeforeExportContext) => ExportDecision | Promise<ExportDecision>;
+   /** Entire scene output size for flattening; defaults to the working surface size. */
+   readonly flattenTarget?: AspExportTarget;
+--- a/packages/react-image-editor/src/ui/ImageEditor.tsx
++++ b/packages/react-image-editor/src/ui/ImageEditor.tsx
+@@ -595,6 +595,7 @@
+               aiStage={state.aiStage}
+               aiProgress={state.aiProgress}
+               onRunAi={() => controller.runAi()}
++              onCancelAi={integration.onCancelBackgroundRemoval}
+               textBold={state.textBold}
+               textItalic={state.textItalic}
+               textUnderline={state.textUnderline}
+--- a/packages/react-image-editor/src/ui/OptionsPanel.tsx
++++ b/packages/react-image-editor/src/ui/OptionsPanel.tsx
+@@ -194,6 +194,7 @@
+   readonly onApplyRedaction?: () => void;
+   readonly onMagicToleranceChange?: (value: number) => void;
+   readonly onRunAi?: () => void;
++  readonly onCancelAi?: () => void;
+   readonly onAnnotationColorChange?: (color: string) => void;
+   /** Live size change (slider drag) — apply without committing history. */
+   readonly onSizeInput?: (value: number) => void;
+@@ -290,6 +291,7 @@
+   onApplyRedaction,
+   onMagicToleranceChange,
+   onRunAi,
++  onCancelAi,
+   onAnnotationColorChange,
+   onSizeInput,
+   onSizeCommit,
+@@ -1105,22 +1107,22 @@
+             </p>
+             <button
+               type="button"
+-              className="asp-btn-accent asp-redact-apply"
+-              disabled={aiBusy}
+-              onClick={() => onRunAi?.()}
++              className={`asp-btn-accent asp-redact-apply${aiBusy && onCancelAi ? ' asp-ai-cancel' : ''}`}
++              disabled={aiBusy && !onCancelAi}
++              onClick={() => aiBusy ? onCancelAi?.() : onRunAi?.()}
+             >
+-              {aiBusy ? 'Working…' : aiActionLabel}
++              {aiBusy ? onCancelAi ? 'Cancel background removal' : 'Working…' : aiActionLabel}
+             </button>
+             {aiBusy && (
+               <div>
+                 <div className="asp-field-row">
+                   <span className="asp-field-label">
+-                    {aiStage === 'loading' ? 'Downloading model…' : 'Processing…'}
++                    {aiStage === 'loading' ? 'Downloading model…' : aiStage === 'preparing' ? 'Preparing model and runtime…' : 'Processing…'}
+                   </span>
+-                  <span className="asp-field-value">{aiPercent}%</span>
++                  {aiStage === 'loading' && <span className="asp-field-value">{aiPercent}%</span>}
+                 </div>
+-                <div className="asp-ai-bar">
+-                  <span style={{ width: `${aiProgress * 100}%` }}></span>
++                <div className={`asp-ai-bar${aiStage === 'loading' ? '' : ' asp-ai-bar--indeterminate'}`} role="progressbar" aria-label="Background removal progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={aiStage === 'loading' ? aiPercent : undefined}>
++                  <span style={aiStage === 'loading' ? { width: `${aiProgress * 100}%` } : undefined}></span>
+                 </div>
+               </div>
+             )}

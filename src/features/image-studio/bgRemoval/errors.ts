@@ -1,10 +1,11 @@
-export type BgErrorCode = 'ai-cancelled' | 'bg-model-fetch-failed' | 'bg-model-integrity' | 'bg-inference-failed' | 'bg-out-of-memory' | 'bg-unsupported';
+export type BgErrorCode = 'ai-cancelled' | 'bg-model-fetch-failed' | 'bg-model-integrity' | 'bg-inference-failed' | 'bg-out-of-memory' | 'bg-unsupported' | 'bg-secure-context-required';
 export class BgRemovalError extends Error {
   readonly code: BgErrorCode;
   constructor(code: BgErrorCode) { super(code); this.code = code; this.name = 'BgRemovalError'; }
 }
 export const messages = {
   ko: {
+    'bg-secure-context-required': '배경 제거는 HTTPS 보안 연결이 필요합니다. HTTPS 주소로 다시 접속해 주세요. 모델은 받지 않았습니다.',
     'ai-cancelled': '', 'bg-model-fetch-failed': '배경 제거 파일을 받지 못했습니다. 다시 시도해 주세요.',
     'bg-model-integrity': '배경 제거 파일을 확인하지 못했습니다. 다시 받아 주세요.',
     'bg-inference-failed': '배경을 제거하지 못했습니다. 사물·제품 모드라면 인물 모드를 별도 선택해 다시 시도할 수 있습니다.',
@@ -13,6 +14,7 @@ export const messages = {
     'cache-unavailable': '저장 공간 문제로 다음에 다시 받아야 합니다.',
   },
   en: {
+    'bg-secure-context-required': 'Background removal requires a secure HTTPS connection. Open the HTTPS address to continue. No model was downloaded.',
     'ai-cancelled': '', 'bg-model-fetch-failed': 'Could not download background removal files. Please try again.',
     'bg-model-integrity': 'Could not verify background removal files. Please download them again.',
     'bg-inference-failed': 'Could not remove the background. You can separately select portrait mode and try again.',
