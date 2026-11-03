@@ -1,0 +1,102 @@
+{
+  "pageid": 57421027,
+  "ns": 6,
+  "title": "File:Portrait photograph of Ignace Paderewski.jpg",
+  "index": 11,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 102356,
+      "width": 723,
+      "height": 882,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/8/86/Portrait_photograph_of_Ignace_Paderewski.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "thumbwidth": 1024,
+      "thumbheight": 1249,
+      "thumbattribs": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/8/86/Portrait_photograph_of_Ignace_Paderewski.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 1249
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/86/Portrait_photograph_of_Ignace_Paderewski.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Portrait_photograph_of_Ignace_Paderewski.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=57421027",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2017-03-26 16:25:39",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Portrait photograph of Ignace Paderewski",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Portrait photographs by Arnold Genthe|Portraits of Ignacy Jan Paderewski",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Title\n<pre>   Portrait photograph of Ignace Paderewski\n</pre>\n<p>Contributor Names\n</p>\n<pre>   Genthe, Arnold, 1869-1942, photographer \n</pre>\n<p>Created / Published\n</p>\n<pre>   between 1896 and 1942; from a negative taken between 1896 and 1942.\n</pre>\n<p>Subject Headings\n</p>\n<pre>   -  Paderewski, Ignace Jan,--1860-1941. \n</pre>\n<p>Format Headings\n</p>\n<pre>   Lantern slides. \n   Portrait photographs. \n</pre>\n<p>Notes\n</p>\n<pre>   -  Title devised. \n   -  Purchase; Genthe Estate; 1942 or 1943. \n   -  ID: As I remember, facing p. 119 \n</pre>\n<p>Medium\n</p>\n<pre>   1 slide : lantern ; 4 x 5 in. or smaller. \n</pre>\n<p>Call Number/Physical Location\n</p>\n    LC-G4085- 0407 [P&amp;P]",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "between 1896 and 1942<div style=\"display: none;\">date QS:P,+1500-00-00T00:00:00Z/6,P1319,+1896-00-00T00:00:00Z/9,P1326,+1942-00-00T00:00:00Z/9</div>; from a negative taken between 1896 and 1942.",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "Genthe, Arnold, 1869-1942, photographer. Arnold Genthe Collection (Library of Congress). Negatives and transparencies",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Genthe, Arnold, 1869-1942, photographer",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

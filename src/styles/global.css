@@ -249,7 +249,7 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 .sidebar-link:hover { color: var(--label); background: rgba(118, 118, 128, .08); }
 .sidebar-link:active { transform: scale(.98); }
 .sidebar-link.active { color: var(--wl-onSoft); background: var(--wl-soft); }
-.nav-icon { width: 27px; height: 27px; display: inline-grid; place-items: center; border-radius: 8px; }
+.nav-icon { flex-shrink: 0; width: 27px; height: 27px; display: inline-grid; place-items: center; border-radius: 8px; }
 .nav-icon.accent-green { color: var(--green); background: var(--green-soft); }
 .nav-icon.accent-blue { color: var(--color-blue-700); background: var(--blue-soft); }
 .nav-icon.accent-violet { color: var(--violet); background: var(--violet-soft); }
@@ -672,6 +672,7 @@ select.ui-language-switcher.ui-compact { min-height: 30px; padding: 0 5px; font-
 .ui-tool-guide-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 17px; padding: 0 5px; }
 .ui-tool-guide-heading > div { max-width: 720px; }
 .ui-tool-guide-heading h2 { margin: 0; font-size: 25px; letter-spacing: -.045em; }
+#tool-guide-title { scroll-margin-block-start: calc(var(--wl-header-height, 64px) + 3rem); }
 .ui-tool-guide-heading > div > p:last-child { margin: 8px 0 0; color: var(--label-secondary); font-size: 15px; line-height: 1.6; }
 .ui-tool-guide-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .ui-tool-guide-grid article { padding: 19px; border: 1px solid var(--separator); border-radius: 17px; background: rgba(255,255,255,.32); }

@@ -1,0 +1,25 @@
+.library-image-editor { min-width: 0; }
+.library-image-editor .asp-image-editor { max-width: 100%; }
+.library-image-editor .asp-image-editor button:focus-visible,
+.library-image-editor .asp-image-editor label:focus-within { outline: 2px solid var(--color-sky-600); outline-offset: 2px; }
+@media (max-width: 639px) {
+  .library-image-editor .asp-image-editor { height: auto !important; min-height: 0; }
+}
+/* The fork's keyboard region fields inherit the host's form scale and theme. */
+.library-image-editor .asp-options-panel fieldset { padding: 8px; border: 1px solid var(--asp-line); border-radius: 8px; }
+.library-image-editor .asp-options-panel fieldset legend { font-size: 12px; padding: 0 4px; }
+.library-image-editor .asp-options-panel fieldset label { display: flex !important; justify-content: space-between; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 4px; }
+.library-image-editor .asp-options-panel fieldset input { min-height: 36px; max-width: 95px; border: 1px solid var(--asp-line); border-radius: 6px; padding: 4px 6px; color: inherit; background: var(--asp-surface); }
+
+@container aspeditor (max-width: 600px) {
+  .library-image-editor .asp-workspace { height: auto; }
+  .library-image-editor .asp-workspace__panel { max-height: none; overflow: visible; }
+  .library-image-editor .asp-options-panel { flex: none; }
+}
+[data-testid="image-background-controls"] select { min-width: 0; max-width: 100%; }
+[data-testid="image-background-controls"] label { min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.library-image-editor { container-type: inline-size; container-name: worklazy-editor; }
+@container worklazy-editor (max-width: 600px) {
+  .library-image-editor .asp-image-editor { height: auto !important; min-height: 0; }
+}
+.library-image-editor .asp-options-panel .asp-ai-cancel { min-height: 44px; width: 100%; }

@@ -1,0 +1,106 @@
+{
+  "pageid": 146212393,
+  "ns": 6,
+  "title": "File:Abdullkadir KAPLAN DUDAYEV.jpg",
+  "index": 6,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 833966,
+      "width": 5120,
+      "height": 3413,
+      "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Abdullkadir_KAPLAN_DUDAYEV.jpg/1280px-Abdullkadir_KAPLAN_DUDAYEV.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "thumbwidth": 1024,
+      "thumbheight": 683,
+      "responsiveUrls": {
+        "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Abdullkadir_KAPLAN_DUDAYEV.jpg/3840px-Abdullkadir_KAPLAN_DUDAYEV.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "thumbattribs": {
+        "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Abdullkadir_KAPLAN_DUDAYEV.jpg/1280px-Abdullkadir_KAPLAN_DUDAYEV.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 683,
+        "srcset": "https://thumb.wikimedia.org/wikipedia/commons/thumb/8/85/Abdullkadir_KAPLAN_DUDAYEV.jpg/3840px-Abdullkadir_KAPLAN_DUDAYEV.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail 2x"
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/85/Abdullkadir_KAPLAN_DUDAYEV.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Abdullkadir_KAPLAN_DUDAYEV.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=146212393",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2024-03-09 13:06:21",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Abdullkadir KAPLAN DUDAYEV",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Portrait photography|CC-Zero|Self-published work",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Abdulkadir KAPLAN DUDAYEV portrait photo",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2024-03-07",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:BerzanOner&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:BerzanOner (page does not exist)\">BerzanOner</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+import { isLibraryImageEditor, runLibraryImageSmoke } from './image-editor-library-smoke.mjs';
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import path from 'node:path';import {chromium} from 'playwright';
 const base=process.env.TEST_BASE_URL||'http://127.0.0.1:4199',out=process.env.DIRECT_ENTRY_OUTPUT||'/tmp/worklazy-u9-core/feature-final';const b=await chromium.launch({executablePath:'/usr/bin/google-chrome',args:['--no-sandbox']});const c=await b.newContext();await c.addInitScript(()=>{localStorage.setItem('worklazy_privacy_consent_v2','denied');const d=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src');window.__holdRestore=false;window.__heldRestore=0;Object.defineProperty(HTMLImageElement.prototype,'src',{...d,set(value){if(window.__holdRestore&&String(value).startsWith('blob:')){window.__holdRestore=false;window.__heldRestore++;return;}d.set.call(this,value);}});});await c.route('**/*',route=>{const url=route.request().url();return url.startsWith(base)||url.startsWith('blob:')||url.startsWith('data:')?route.continue():route.abort();});const p=await c.newPage();p.setDefaultTimeout(30000);const acceptNativeDialog=dialog=>dialog.accept();p.on('dialog',acceptNativeDialog);const errors=[];p.on('pageerror',e=>errors.push(e.message));
 // Synthetic popstate also reaches AppShell's Back sentinel. Close its stay
@@ -7,7 +8,9 @@ const settleSyntheticBack = async () => {
  if(await p.locator('[data-testid=unsaved-work-dialog][open]').count()) await stay.click();
 };
 try{
- if(process.env.TEST_W2 === "1") { await testW2(p); assert.deepEqual(errors,[]); } else {
+ await p.goto(`${base}/en/tools/image-studio/`);
+ if(await isLibraryImageEditor(p)) { await runLibraryImageSmoke(base,out); assert.deepEqual(errors,[]); }
+ else if(process.env.TEST_W2 === "1") { await testW2(p); assert.deepEqual(errors,[]); } else {
  await fs.mkdir(out,{recursive:true});const {PNG}=await import('pngjs');const fixture=new PNG({width:320,height:200});fixture.data.fill(255);await fs.writeFile(path.join(out,'input.png'),PNG.sync.write(fixture));
  await p.goto(`${base}/en/tools/image-studio/resize/`);await p.locator('[data-testid=image-editor-panel-text]').click();await p.locator('[data-testid=image-editor-text-input]').fill('Options only');await p.evaluate(()=>{history.pushState({},'','/en/tools/image-studio/mosaic/');dispatchEvent(new PopStateEvent('popstate'));});await p.locator('[data-testid=image-editor-options-panel][data-panel=effect]').waitFor();assert.equal(await p.locator('[data-testid=direct-entry-confirm][open]').count(),0);
  await p.locator('[data-testid=image-editor-panel-text]').click();await p.locator('[data-testid=image-editor-text-input]').fill('HistoryOnly');await p.locator('[data-testid=image-editor-add-text]').click();await p.waitForFunction(()=>!document.querySelector('[data-testid=image-editor-undo]').disabled);await p.locator('[data-testid=image-editor-undo]').click();await p.waitForFunction(()=>!document.querySelector('[data-testid=image-editor-redo]').disabled&&document.querySelector('[data-testid=image-editor-undo]').disabled);assert.equal(await p.locator('input[type=file]').first().evaluate(e=>e.files.length),0);
@@ -73,8 +76,13 @@ async function testW2(page) {
     await fresh();await tab('batch');await tab('editor');await add.scrollIntoViewIfNeeded();
     if(process.env.TEST_EXPECT_DEV==='1'){const source=await (await page.request.get(`${base}/src/main.tsx`)).text();assert.match(source,/StrictMode/);assert.ok(await page.locator('script[src*="vite"]').count());}
     await add.evaluate(button=>{
-     window.__w2TrustedClicks=[];window.__w2TrustedKeys=[];
-     button.addEventListener('click',event=>window.__w2TrustedClicks.push({trusted:event.isTrusted,time:event.timeStamp,detail:event.detail}),{capture:true});
+     window.__w2TrustedClicks=[];window.__w2TrustedKeys=[];window.__w2Quiet450=undefined;window.__w2Quiet700=undefined;
+     button.addEventListener('click',event=>{
+      window.__w2TrustedClicks.push({trusted:event.isTrusted,time:event.timeStamp,detail:event.detail});
+      clearTimeout(window.__w2Probe450);clearTimeout(window.__w2Probe700);
+      window.__w2Probe450=setTimeout(()=>{window.__w2Quiet450={aria:button.getAttribute('aria-disabled'),disabled:button.disabled,opacity:Number(getComputedStyle(button).opacity),elapsed:performance.now()-event.timeStamp}},450);
+      window.__w2Probe700=setTimeout(()=>{window.__w2Quiet700={aria:button.getAttribute('aria-disabled'),elapsed:performance.now()-event.timeStamp}},700);
+     },{capture:true});
      button.addEventListener('keydown',event=>window.__w2TrustedKeys.push({trusted:event.isTrusted,key:event.key,repeat:event.repeat}),{capture:true});
     });
     const box=await add.boundingBox();assert.ok(box);
@@ -93,13 +101,12 @@ async function testW2(page) {
     assert.equal(inputs.clicks.length,10);assert.ok(inputs.clicks.every(event=>event.trusted));
     if(mode!=='mouse')assert.ok(inputs.keys.every(event=>event.trusted));
     if(mode==='Enter')assert.ok(inputs.keys.some(event=>event.repeat));
-    assert.equal(await add.getAttribute('aria-disabled'),'true');
-    assert.equal(await add.evaluate(button=>button.disabled),false);
-    assert.ok(await add.evaluate(button=>Number(getComputedStyle(button).opacity)<1));
-    await new Promise(resolve=>setTimeout(resolve,450));
-    assert.equal(await add.getAttribute('aria-disabled'),'true');
-    await new Promise(resolve=>setTimeout(resolve,250));
-    assert.equal(await add.getAttribute('aria-disabled'),'false');
+    // Sample relative to the last trusted click in the browser. Node/CDP
+    // round trips must not consume the 450-to-600ms observation margin.
+    await page.waitForFunction(()=>window.__w2Quiet700!==undefined);
+    const quiet=await page.evaluate(()=>({at450:window.__w2Quiet450,at700:window.__w2Quiet700}));
+    assert.equal(quiet.at450.aria,'true');assert.equal(quiet.at450.disabled,false);assert.ok(quiet.at450.opacity<1);
+    assert.equal(quiet.at700.aria,'false');
     await mouseClick();
     await page.waitForFunction(()=>document.querySelector('[data-testid=image-batch-list]').dataset.count==='2');
     await count(2);

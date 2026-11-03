@@ -168,3 +168,28 @@ async function copyPdfJsAssets() {
   await fs.cp(path.join(source, "wasm"), path.join(destination, "wasm"), { recursive: true });
   await fs.cp(path.join(source, "image_decoders"), path.join(destination, "image_decoders"), { recursive: true });
 }
+
+// Expected hashes were committed from lock-integrity-verified ORT 1.31.1, not learned here.
+await copyBackgroundRemovalRuntimes();
+async function copyBackgroundRemovalRuntimes() {
+  const { createHash } = await import('node:crypto');
+  const manifest = JSON.parse(await fs.readFile(path.join(projectRoot, 'src/features/image-studio/bgRemoval/model.manifest.json'), 'utf8'));
+  const lock = JSON.parse(await fs.readFile(path.join(projectRoot, 'package-lock.json'), 'utf8'));
+  const installed = JSON.parse(await fs.readFile(path.join(projectRoot, 'node_modules/onnxruntime-web/package.json'), 'utf8'));
+  const selected = manifest.runtimes.filter(asset => process.env.BG_REMOVAL_MODELS !== 'person' || asset.id === 'wasm');
+  const destination = path.join(projectRoot, 'public/vendor/onnxruntime-web', manifest.ortVersion);
+  await fs.mkdir(destination, { recursive: true });
+  // Drop obsolete variants, including the superseded jsep file, before copying only pinned runtimes.
+  for (const name of await fs.readdir(destination)) {
+    if (!selected.some(asset => asset.file === name)) await fs.rm(path.join(destination, name), { force: true });
+  }
+  for (const asset of selected) {
+    if (installed.version !== manifest.ortVersion || lock.packages['node_modules/onnxruntime-web'].integrity !== asset.packageIntegrity)
+      throw new Error('ORT package version/integrity contract changed');
+    const bytes = await fs.readFile(path.join(projectRoot, 'node_modules/onnxruntime-web/dist', asset.file));
+    if (bytes.length !== asset.bytes || createHash('sha256').update(bytes).digest('hex') !== asset.sha256)
+      throw new Error(`Pinned ORT runtime mismatch: ${asset.file}`);
+    const target = path.join(projectRoot, 'public', asset.url);
+    await fs.mkdir(path.dirname(target), { recursive: true }); await fs.writeFile(target, bytes);
+  }
+}

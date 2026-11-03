@@ -1,0 +1,102 @@
+{
+  "pageid": 154136867,
+  "ns": 6,
+  "title": "File:Masha Priven's Portrait.jpg",
+  "index": 11,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 1812856,
+      "width": 1259,
+      "height": 1258,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Masha_Priven%27s_Portrait.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "thumbwidth": 1024,
+      "thumbheight": 1023,
+      "thumbattribs": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Masha_Priven%27s_Portrait.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 1023
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/2/2d/Masha_Priven%27s_Portrait.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Masha_Priven%27s_Portrait.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=154136867",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2024-10-21 13:19:03",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Masha Priven's Portrait",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Portraits|CC-Zero|Self-published work",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Masha Priven's Portrait",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2023-07-02",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Jamyswiki&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Jamyswiki (page does not exist)\">Jamyswiki</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

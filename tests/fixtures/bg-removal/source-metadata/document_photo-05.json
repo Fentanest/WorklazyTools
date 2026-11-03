@@ -1,0 +1,102 @@
+{
+  "pageid": 153409514,
+  "ns": 6,
+  "title": "File:Wikipedia Receipt For Food.jpg",
+  "index": 4,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 42754,
+      "width": 656,
+      "height": 1007,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/5/56/Wikipedia_Receipt_For_Food.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "thumbwidth": 1024,
+      "thumbheight": 1572,
+      "thumbattribs": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/5/56/Wikipedia_Receipt_For_Food.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 1572
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/5/56/Wikipedia_Receipt_For_Food.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Wikipedia_Receipt_For_Food.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=153409514",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2024-09-30 23:34:27",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Wikipedia Receipt For Food",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Self-published work|Receipts of Nigeria",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Payment Slip",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2024-09-06",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Wilhelmmarvel&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Wilhelmmarvel (page does not exist)\">Wilhelmmarvel</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

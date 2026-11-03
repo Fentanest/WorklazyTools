@@ -80,7 +80,9 @@
         "title": "4. Self-hosted editing and processing components",
         "paragraphs": [
           "Official rhwp JavaScript, WebAssembly, UI and fonts are bundled as pinned static assets. HWP files move to the same-site editor iframe through an in-browser MessageChannel, not an upload request.",
-          "Word comparison, PDF OCR, FFmpeg and LibreOffice-based editor files are served from this GitHub Pages deployment. Office editor files are a pinned snapshot whose size and SHA-256 are verified at build time. A first offline visit cannot start features whose required files are not yet cached."
+          "Word comparison, PDF OCR, FFmpeg and LibreOffice-based editor files are served from this GitHub Pages deployment. Office editor files are a pinned snapshot whose size and SHA-256 are verified at build time. A first offline visit cannot start features whose required files are not yet cached.",
+          "Choosing a Google font in the image editor may send a font request and ordinary connection information to Google Fonts. Images and entered text are not sent. Default and system fonts do not require external requests.",
+          "Background removal shows the size of missing model and runtime files before you choose Download from this site (about 41 MB for portraits or 127 MB for objects and products). Verified assets may be kept in Cache Storage (worklazy-models-v1). Use Delete saved models in the editor or clear browser site data to remove them. If storage is unavailable, processing still uses the downloaded files and they must be downloaded again next time. Your images and results are never stored in this cache."
         ]
       },
       {

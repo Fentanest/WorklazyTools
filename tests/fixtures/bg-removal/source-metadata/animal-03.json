@@ -1,0 +1,106 @@
+{
+  "pageid": 163979822,
+  "ns": 6,
+  "title": "File:Boxer dog posing on the grass.jpg",
+  "index": 6,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 50394949,
+      "width": 12000,
+      "height": 8000,
+      "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Boxer_dog_posing_on_the_grass.jpg/1280px-Boxer_dog_posing_on_the_grass.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "thumbwidth": 1024,
+      "thumbheight": 683,
+      "responsiveUrls": {
+        "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Boxer_dog_posing_on_the_grass.jpg/3840px-Boxer_dog_posing_on_the_grass.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "thumbattribs": {
+        "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Boxer_dog_posing_on_the_grass.jpg/1280px-Boxer_dog_posing_on_the_grass.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 683,
+        "srcset": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/07/Boxer_dog_posing_on_the_grass.jpg/3840px-Boxer_dog_posing_on_the_grass.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail 2x"
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/0/07/Boxer_dog_posing_on_the_grass.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Boxer_dog_posing_on_the_grass.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=163979822",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2025-04-22 20:24:16",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Boxer dog posing on the grass",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Boxer (dog)|Images with watermarks|Male dogs|Self-published work|Fawn and white dogs|Irish spotted dogs|Dogs on green background|1 dog|Dogs facing right|1 male organism|Standing dogs|Dogs on grass|Dogs with collars|Dogs with facial greying|Photographs taken on 2025-04-22",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Boxer dog posing on the grass",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2025-04-22 11:30:18",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Joselodos&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Joselodos (page does not exist)\">Joselodos</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

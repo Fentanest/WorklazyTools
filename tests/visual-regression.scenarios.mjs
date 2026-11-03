@@ -1,3 +1,4 @@
+import { IMAGE_EDITOR_ENGINE } from "../src/app/publicServiceConfig.mjs";
 import { availableToolRoutes } from "./tool-registry-routes.mjs";
 
 const profile = (locale, theme, viewport) => Object.freeze({ locale, theme, viewport });
@@ -89,6 +90,7 @@ const OFFICE_EDITOR_SELECTOR = "[data-tool-page='office-editor-app']";
 const readySelectorFor = (route, contentSelector) => contentSelector
   ?? (route.toolId === "foliotrace" ? ".foliotrace-page" : null)
   ?? (route.toolId === "office-editor" ? OFFICE_EDITOR_SELECTOR : null)
+  ?? (route.toolId === "image-studio" && IMAGE_EDITOR_ENGINE === "library" ? ".library-image-editor .lower-canvas" : null)
   ?? (migratedToolIds.has(route.toolId) ? `[data-tool-page='${route.toolId}']` : DEFAULT_READY_SELECTOR);
 
 const scenario = (definition) => Object.freeze({
@@ -502,6 +504,55 @@ const interactionDefinitions = Object.freeze({
     }),
   ]),
   "image-studio": Object.freeze([
+    ...(IMAGE_EDITOR_ENGINE === "library" ? [
+      Object.freeze({
+        stateId: "interaction-canvas-loaded",
+        fixture: { kind: "generated-png", fileName: "visual-editor.png", width: 640, height: 420 },
+        actions: [
+          { type: "upload", selector: "[data-image-owner='editor'] input[type='file']" },
+          { type: "wait-canvas", selector: ".library-image-editor .lower-canvas" },
+          { type: "scroll-into-view", selector: ".library-image-editor", offset: -72 },
+        ],
+        assertSelector: ".library-image-editor .lower-canvas",
+      }),
+      Object.freeze({
+        stateId: "interaction-size-panel",
+        fixture: { kind: "generated-png", fileName: "visual-panel.png", width: 640, height: 420 },
+        actions: [
+          { type: "upload", selector: "[data-image-owner='editor'] input[type='file']" },
+          { type: "wait-canvas", selector: ".library-image-editor .lower-canvas" },
+          { type: "click", selector: ".asp-tool-rail button", elementIndex: 1 },
+          { type: "scroll-into-view", selector: ".asp-options-panel", offset: -72 },
+        ],
+        assertSelector: ".asp-options-panel",
+      }),
+      Object.freeze({
+        stateId: "interaction-layers-panel",
+        fixture: { kind: "generated-png", fileName: "visual-layer.png", width: 900, height: 160 },
+        actions: [
+          { type: "upload", selector: "[data-image-owner='editor'] input[type='file']" },
+          { type: "wait-canvas", selector: ".library-image-editor .lower-canvas" },
+          { type: "click", selector: ".asp-tool-rail button", elementIndex: 7 },
+          { type: "replace-text", selector: "#asp-text-input", value: "Layer name long enough to verify ellipsis in the image editor layer list" },
+          { type: "click", selector: ".asp-text-add .asp-btn-accent" },
+          { type: "click", selector: ".asp-tool-rail button", elementIndex: 6 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "click", selector: ".asp-shape-grid button", elementIndex: 4 },
+          { type: "wait", selector: ".asp-layers__row:nth-child(11)" },
+          { type: "assert-scroll-overflow", selector: ".asp-layers__scroll", axis: "y" },
+          { type: "scroll-into-view", selector: ".asp-layer-list", offset: -72 },
+        ],
+        assertSelector: ".asp-layer-list",
+      }),
+    ] : [
+
     Object.freeze({
       stateId: "interaction-canvas-loaded",
       fixture: { kind: "generated-png", fileName: "visual-editor.png", width: 640, height: 420 },
@@ -557,6 +608,7 @@ const interactionDefinitions = Object.freeze({
       ],
       assertSelector: "[data-testid='image-editor-options-panel'][data-panel='layers']",
     }),
+    ]),
     Object.freeze({
       stateId: "interaction-batch-mode",
       actions: [

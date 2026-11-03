@@ -1,3 +1,4 @@
+import { ToolGuideWrapper } from "../../components/ToolGuideWrapper";
 import { ToolGuideLink } from "../../components/ToolGuideLink";
 import { DocumentFieldNotes } from "../document-compare/DocumentFieldNotes";
 import type { ScreenManifest } from "../document-compare/screenResult";
@@ -90,6 +91,7 @@ export function DocumentCompareResultPage({
           <p className="mt-2 mb-4 max-w-lg text-sm leading-relaxed text-muted-foreground">{L("페이지를 새로고침했거나 탭을 다시 연 경우, 문서 보호를 위해 이전 비교 내용은 남아 있지 않습니다.", "After a reload or reopened tab, the previous comparison is discarded to protect your documents.")} <ToolGuideLink /></p>
           <Button render={<Link to={localizedBasePath} />} variant="secondary" className="rounded-xl font-bold"><ArrowLeft size={15} /> {L(`${toolLabel}로 돌아가기`, `Back to ${toolLabel}`)}</Button>
         </Card>
+        <ToolGuideWrapper slug="documentCompare" />
       </UtilityPage>
     );
   }

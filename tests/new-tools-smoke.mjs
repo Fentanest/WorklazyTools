@@ -1,3 +1,4 @@
+import { isLibraryImageEditor, runLibraryImageSmoke } from './image-editor-library-smoke.mjs';
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -63,20 +64,29 @@ try {
     } else if (onlyImageMobile) {
       console.log("[1/1] Image studio mobile interactions");
       await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
-      await testImageStudioMobile(page);
+      await page.goto(`${baseUrl}/en/tools/image-studio/`);
+      if (await isLibraryImageEditor(page)) await runLibraryImageSmoke(baseUrl,path.join(tempDirectory,'library'),{deviceScaleFactor:2});
+      else await testImageStudioMobile(page);
     } else if (onlyImageAccessibility) {
       console.log("[1/1] Image studio accessibility alternatives");
-      await testImageStudioAccessibility(page);
+      await page.goto(`${baseUrl}/en/tools/image-studio/`);
+      if (await isLibraryImageEditor(page)) await runLibraryImageSmoke(baseUrl,path.join(tempDirectory,'library'),{deviceScaleFactor:2});
+      else await testImageStudioAccessibility(page);
     } else if (onlyImageSizing) {
       console.log("[1/1] Image studio sizing and panel");
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
-      await testImageStudioSizingAndPanel(page);
+      await page.goto(`${baseUrl}/en/tools/image-studio/`);
+      if (await isLibraryImageEditor(page)) await runLibraryImageSmoke(baseUrl,path.join(tempDirectory,'library'),{deviceScaleFactor:2});
+      else await testImageStudioSizingAndPanel(page);
     } else if (!onlyVideo && !onlyAudio) {
       if (!onlyImage) {
         console.log("[1/4] HWP editor");
         await testHwpEditor(page, fixtures.hwpFiles, fixtures.wordDocx, fixtures.editorHwp);
       }
     console.log("[2/4] Image studio");
+    await page.goto(`${baseUrl}/en/tools/image-studio/`);
+    if (await isLibraryImageEditor(page)) await runLibraryImageSmoke(baseUrl,path.join(tempDirectory,'library'),{deviceScaleFactor:2});
+    else {
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
     await testImageStudio(page, fixtures.images);
     await testImageStudioLayersAndSelection(page);
@@ -99,6 +109,7 @@ try {
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor });
       for (const zoom of [1, 2]) await testImageStudioEffectStrength(page, deviceScaleFactor, zoom);
     }
+      }
       await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 1 });
     }
     if (!onlyHwp && !onlyVideo && !onlyImage) {

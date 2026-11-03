@@ -13,3 +13,11 @@ export function comparisonToolForPath(pathname){
  const id=['word-compare','hwp-compare'].includes(parts[0])?'document-compare':parts[0];return COMPARISON_TOOL_IDS.includes(id)?id:null;
 }
 export function isComparisonPathPublished(pathname,enabled=COMPARISON_PORT_PUBLIC){const id=comparisonToolForPath(pathname);return id===null||isComparisonToolPublished(id,enabled);}
+
+// Build-time editor rollback. Both implementations remain available for one release cycle.
+const configuredImageEditor = typeof __IMAGE_EDITOR_ENGINE__ !== "undefined"
+  ? __IMAGE_EDITOR_ENGINE__ : (typeof process !== "undefined" ? process.env.IMAGE_EDITOR_ENGINE : undefined);
+if (configuredImageEditor && !["legacy", "library"].includes(configuredImageEditor)) {
+  throw new Error("IMAGE_EDITOR_ENGINE must be legacy or library");
+}
+export const IMAGE_EDITOR_ENGINE = configuredImageEditor || "library";

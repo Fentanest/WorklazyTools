@@ -1,0 +1,102 @@
+{
+  "pageid": 57424518,
+  "ns": 6,
+  "title": "File:Portrait photograph of Isadora Duncan.jpg",
+  "index": 1,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 48890,
+      "width": 277,
+      "height": 335,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/9/98/Portrait_photograph_of_Isadora_Duncan.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "thumbwidth": 1024,
+      "thumbheight": 1238,
+      "thumbattribs": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/9/98/Portrait_photograph_of_Isadora_Duncan.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 1238
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/98/Portrait_photograph_of_Isadora_Duncan.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Portrait_photograph_of_Isadora_Duncan.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=57424518",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2017-03-26 18:33:50",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Portrait photograph of Isadora Duncan",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "Isadora Duncan|CC-Zero|Images from the Library of Congress|Black and white photographs of women looking at viewer|Black and white photographs by Arnold Genthe|Media supported by WikiProject Women in Red - 2017",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Title\n<pre>   Portrait photograph of Isadora Duncan\n</pre>\n<p>Contributor Names\n</p>\n<pre>   Genthe, Arnold, 1869-1942, photographer \n</pre>\n<p>Created / Published\n</p>\n<pre>   between 1916 and 1942; from a negative taken between 1916 and 1918.\n</pre>\n<p>Subject Headings\n</p>\n<pre>   -  Duncan, Isadora,--1877-1927. \n</pre>\n<p>Format Headings\n</p>\n<pre>   Lantern slides. \n   Portrait photographs. \n</pre>\n<p>Notes\n</p>\n<pre>   -  Title devised. \n   -  Purchase; Genthe Estate; 1942 or 1943. \n   -  ID: LC-G432-1476-N; between 1916 and 1918 \n</pre>\n<p>Medium\n</p>\n<pre>   1 slide : lantern ; 4 x 5 in. or smaller. \n</pre>\n<p>Call Number/Physical Location\n</p>\n    LC-G4085- 0394 [P&amp;P]",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "between 1916 and 1942<div style=\"display: none;\">date QS:P,+1950-00-00T00:00:00Z/7,P1319,+1916-00-00T00:00:00Z/9,P1326,+1942-00-00T00:00:00Z/9</div>; from a negative taken between 1916 and 1918.",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "This image  is available from the United States <a href=\"//commons.wikimedia.org/wiki/Library_of_Congress\" title=\"Library of Congress\">Library of Congress</a>'s <a rel=\"nofollow\" class=\"external text\" href=\"//www.loc.gov/rr/print/\">Prints and Photographs division</a><br> under the digital ID <a rel=\"nofollow\" class=\"external text\" href=\"https://hdl.loc.gov/loc.pnp/agc.7a15062\">agc.7a15062</a>.<br><small>This tag does not indicate the copyright status of the attached work. <span style=\"white-space:nowrap\">A normal <a href=\"//commons.wikimedia.org/wiki/Special:MyLanguage/Commons:Copyright_tags\" title=\"Special:MyLanguage/Commons:Copyright tags\">copyright tag</a> is still required.</span> <span style=\"white-space:nowrap\">See <a href=\"//commons.wikimedia.org/wiki/Special:MyLanguage/Commons:Licensing\" title=\"Special:MyLanguage/Commons:Licensing\">Commons:Licensing</a>.</span></small>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Genthe, Arnold, 1869-1942, photographer",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

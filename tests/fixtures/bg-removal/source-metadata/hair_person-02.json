@@ -1,0 +1,102 @@
+{
+  "pageid": 21961759,
+  "ns": 6,
+  "title": "File:Woman with hair straightener.jpg",
+  "index": 6,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 111790,
+      "width": 1280,
+      "height": 853,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/5/59/Woman_with_hair_straightener.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "thumbwidth": 1024,
+      "thumbheight": 682,
+      "thumbattribs": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/5/59/Woman_with_hair_straightener.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 682
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/5/59/Woman_with_hair_straightener.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Woman_with_hair_straightener.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=21961759",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2012-10-08 05:23:10",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Woman with hair straightener",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Files from external sources with reviewed licenses|Hair irons|Young women with long brown hair|Women holding objects|Lissage",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "young woman using her hair straightener isolated on white background",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2012-10-08 10:51:49",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external free\" href=\"http://www.publicdomainpictures.net/view-image.php?image=5558&amp;picture=woman-with-hair-straightener&amp;large=1\">http://www.publicdomainpictures.net/view-image.php?image=5558&amp;picture=woman-with-hair-straightener&amp;large=1</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "Petr Kratochvil",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

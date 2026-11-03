@@ -42,23 +42,27 @@ export function useMemoryHandoff() {
   const language = useAppLanguage();
   const [reason, setReason] = useState<string | null>(null);
   const busy = useRef(false);
-  const send = (input: HandoffInput) => {
+  const send = (input: HandoffInput, options?: { isCurrent?: () => boolean; onDispatched?: () => void }) => {
     const isolated = document.querySelector('meta[name="worklazy-office-isolation"], meta[name="worklazy-excel-preserve-isolation"], meta[name="worklazy-video-isolation"]') || isRedactorDocument();
     const invalid = isolated ? "destination" : validateHandoff(input);
     setReason(invalid);
-    if (invalid || busy.current) return;
+    if (invalid || options?.isCurrent?.() === false) return;
+    if (busy.current) { setReason("busy"); return; }
     const to = localizedPath(language, input.entryPath);
     request(to, async () => {
-      if (busy.current) return false;
+      if (busy.current || options?.isCurrent?.() === false) return false;
       busy.current = true;
       const releaseHold = input.origin === "generated" ? acquireGeneratedHold() : undefined;
       const sourcePath = `${window.location.pathname}${window.location.search}`;
       let token: ReturnType<typeof stageHandoff> | undefined;
       try {
         if (input.origin === "generated") await preloadReceiver(input.receiverId);
-        if (`${window.location.pathname}${window.location.search}` !== sourcePath) return false;
+        if (`${window.location.pathname}${window.location.search}` !== sourcePath || options?.isCurrent?.() === false) return false;
         token = stageHandoff(input);
         navigate(to, { state: { wlHandoff: token } });
+        // Dispatch owns the bytes now (the destination also retains failures).
+        // This is not an acknowledgment of conversion/inspection success.
+        setReason(null); options?.onDispatched?.();
         return true;
       } catch {
         if (token) cancelStagedHandoff(token);

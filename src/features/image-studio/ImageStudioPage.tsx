@@ -1,9 +1,9 @@
 import { ToolGuideLink } from "../../components/ToolGuideLink";
-import { useMemoryHandoff } from "../../components/AppShell";
 import type { HandoffInput } from "../../app/memoryHandoff";
+import { useImageSend } from "./editor/useImageSend";
 import { AlertTriangle, Download, ImageIcon, Images, LayoutGrid, Sparkles } from "lucide-react";
 import { ActiveSelection, Canvas, Circle, Control, FabricImage, FabricObject, IText, Line, PencilBrush, Point, Rect, controlsUtils, filters, util, type TMat2D, type TPointerEvent, type Transform } from "fabric";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState, type DragEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { useHandoffReceiver } from "../../app/useHandoffReceiver";
 import { acceptsFile } from "../../app/fileAccepts";
@@ -49,6 +49,9 @@ import {
 } from "./regionEffectTransform";
 import type { ImageOutputFormat } from "./types";
 
+import { IMAGE_EDITOR_ENGINE } from "../../app/publicServiceConfig.mjs";
+const LibraryImageEditor = lazy(() => import("./editor/LibraryImageEditor"));
+
 type StudioTab = "editor" | "batch" | "collage" | "gif";
 
 const EDITOR_MIN_ZOOM = 0.25;
@@ -63,7 +66,7 @@ import { setUnsavedWork, useUnsavedWorkGuard } from "../../app/toolState";
 import { DirectEntryConfirmation, DirectEntryNotice } from "../../components/DirectEntryNotice";
 import { imageDirectDirty, type ImageDirectPreset } from "./imageDirect";
 import { useImageDirect } from "./imageDirectLifecycle";
-interface ImageEditorDirectHandle {
+export interface ImageEditorDirectHandle {
   apply: (preset?: ImageDirectPreset) => void;
   cancel: () => void;
   receive: (file: File, context: IntakeContext) => Promise<boolean>;
@@ -129,8 +132,12 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
     receive: async (entry, context) => {
       setTab("editor");
       const file = entry.files[0];
+      // The library chunk can still be loading when H1 first delivers its token.
+      while (!editorHandle.current && !context.signal.aborted) {
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      }
       const accepted = file && acceptsFile("image-edit", file) && filterRasterImages([file]).length
-        && await editorHandle.current?.receive(file, context) ? [file] : [];
+        && !context.signal.aborted && await editorHandle.current?.receive(file, context) ? [file] : [];
       return imageIntakeResult(entry.files, accepted);
     },
   });
@@ -175,7 +182,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
     <UtilityPage toolId="image-studio" className="image-studio-page">
       <DirectEntryConfirmation open={direct.pending} onAccept={direct.accept} onReject={direct.reject} />
       {direct.acceptedPreset && <DirectEntryNotice purpose={direct.acceptedPreset.purpose} title={language === "ko" ? ({ resize: "이미지 크기 조정", mosaic: "이미지 모자이크", watermark: "이미지 워터마크" })[direct.acceptedPreset.purpose] : ({ resize: "Resize an image", mosaic: "Mosaic an image", watermark: "Watermark an image" })[direct.acceptedPreset.purpose]} description={language === "ko" ? ({ resize: "이미지를 넣고 크기 패널에서 치수를 조정하세요.", mosaic: "이미지를 넣고 효과를 적용할 영역을 지정하세요.", watermark: "이미지를 넣고 텍스트를 입력한 뒤 직접 추가하세요. 자동으로 삽입하지 않습니다." })[direct.acceptedPreset.purpose] : ({ resize: "Add an image and adjust its dimensions in the size panel.", mosaic: "Add an image and select the area for the mosaic effect.", watermark: "Add an image, enter text, and add it when ready. Text is not inserted automatically." })[direct.acceptedPreset.purpose]} />}
-      <PageHeader eyebrow="IMAGE STUDIO" title={t("image.title")} description={t("image.description")}>
+      <PageHeader eyebrow="IMAGE EDITOR" title={t("image.title")} description={t("image.description")}>
         <PrivacyBanner compact />
       </PageHeader>
       <Card as="nav" className="studio-tabs mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0 max-[620px]:grid-cols-2" aria-label={t("image.tabs.label")} data-testid="image-studio-tabs">
@@ -197,7 +204,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
         </div>
       </UtilityNotice>}
       <div ref={pageElement}>
-      <div hidden={tab !== "editor"} data-image-owner="editor"><ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} /></div>
+      <div hidden={tab !== "editor"} data-image-owner="editor">{IMAGE_EDITOR_ENGINE === "library" ? <Suspense fallback={<p role="status">{t("image.library.loading")}</p>}><LibraryImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} /></Suspense> : <ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} />}</div>
       {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel inputFiles={batchQueue.inputFiles} handoffFiles={batchQueue.handoffFiles} onFiles={appendBatchFiles} onRemove={removeBatchFile} limitReached={batchNotice === "limit"} progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("collage") && <div hidden={tab !== "collage"} data-image-owner="collage"><CollagePanel progress={progress} controllerRef={activeController} active={tab === "collage"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("gif") && <div hidden={tab !== "gif"} data-image-owner="gif"><GifPanel progress={progress} controllerRef={activeController} active={tab === "gif"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
@@ -261,15 +268,12 @@ interface EditorHistorySnapshot {
   transparentBackground: boolean;
   baseLocked: boolean;
   outputMultiplier: number;
+  sourceFrame?: boolean;
 }
 
 function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batchCount, batchNotice }: { onEditedResult: (file: File) => void; batchCount: number; batchNotice?: "added" | "limit"; active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>; onDirty: (dirty: boolean) => void }) {
-  const sender = useMemoryHandoff();
   const { t: sendT } = useTranslation("common");
-  const [preparedSend, setPreparedSend] = useState<HandoffInput>();
-  const downloadPrepared = () => {
-    for (const file of preparedSend?.files ?? []) { const url = URL.createObjectURL(file); const anchor = document.createElement("a"); anchor.href = url; anchor.download = file.name; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
-  };
+  const { preparedSend, reason: sendReason, prepareAndSend, retryPrepared, downloadPrepared, invalidatePrepared } = useImageSend();
   const batchAddLock = useRef(false);
   const batchAddTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [addingToBatch, setAddingToBatch] = useState(false);
@@ -320,6 +324,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const [hue, setHue] = useState(0);
   const [format, setFormat] = useState<ImageOutputFormat>("png");
   const [outputMultiplier, setOutputMultiplier] = useState(1);
+  const [sourceFrame, setSourceFrame] = useState(false);
   const [canvasDimensions, setCanvasDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
   const [resampleDimensions, setResampleDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
   const [canvasResizeDimensions, setCanvasResizeDimensions] = useState<EditorDimensions>({ width: 900, height: 600 });
@@ -343,6 +348,14 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const [minibarPosition, setMinibarPosition] = useState<EditorMinibarPosition>();
   const [contextMenu, setContextMenu] = useState<EditorContextMenuState>();
   const [editorError, setEditorError] = useState("");
+  useEffect(() => {
+    if (!editorError) return;
+    const frame = requestAnimationFrame(() => {
+      const heading = canvasElement.current?.closest('[data-image-owner="editor"]')?.querySelector<HTMLElement>('[data-testid="image-editor-error"]');
+      heading?.focus({ preventScroll: true }); heading?.scrollIntoView({ block: 'center' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [editorError]);
   const [cropSelection, setCropSelection] = useState<RegionSelection>();
   const [cropRatio, setCropRatio] = useState<CropRatio>(undefined);
   const [effectSelection, setEffectSelection] = useState<RegionSelection>();
@@ -355,8 +368,14 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   const mobilePanelLayout = useEditorMobilePanelLayout();
   mobilePanelLayoutRef.current = mobilePanelLayout;
   const effectivePanelCollapsed = panelCollapsed && !mobilePanelLayout;
-  const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked });
-  editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked };
+  useEffect(() => { invalidatePrepared(); }, [format, exportMode, exportDimensions.width, exportDimensions.height, exportRatioLocked, invalidatePrepared]);
+  const editorSettings = useRef({ brightness, contrast, hue, background, transparentBackground, baseLocked, sourceFrame });
+  editorSettings.current = { brightness, contrast, hue, background, transparentBackground, baseLocked, sourceFrame };
+  const useCanvasExportFrame = useCallback(() => {
+    const changed = editorSettings.current.sourceFrame;
+    setSourceFrame(false); editorSettings.current.sourceFrame = false;
+    return changed;
+  }, []);
   cropRatioRef.current = cropRatio;
 
   const applyDirectPreset = (next?: ImageDirectPreset) => {
@@ -535,6 +554,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   }, [updateFloatingOverlays]);
 
   const pushSnapshot = useCallback((immediate = false, reset = false) => {
+    invalidatePrepared();
     const save = () => {
       const instance = canvas.current;
       if (!instance || restoringRef.current) return;
@@ -565,7 +585,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     window.clearTimeout(snapshotTimerRef.current);
     if (immediate) save();
     else snapshotTimerRef.current = window.setTimeout(save, 80);
-  }, []);
+  }, [invalidatePrepared]);
 
   const syncSelectedObject = useCallback((object?: FabricObject) => {
     const role = object && (object as EditorFabricObject).worklazyRole;
@@ -968,6 +988,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
 
   const acquireImage = async (next?: File, context?: IntakeContext) => {
     if (!next || !canvas.current || context?.signal.aborted) return false;
+    invalidatePrepared();
     const generation = ++intakeGeneration.current;
     editController.current?.abort();
     const controller = new AbortController();
@@ -985,7 +1006,9 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
       restoringRef.current = true;
       clearRegionSelection();
       instance.clear();
-      instance.backgroundColor = transparentBackground ? "" : background;
+      // Opening a photo preserves its alpha; a canvas fill remains an explicit edit.
+      instance.backgroundColor = "";
+      setTransparentBackground(true); setSourceFrame(true);
       instance.setDimensions({ width: 900, height: 600 });
       resetViewport(instance);
       const scale = Math.min(1, 860 / image.width, 560 / image.height);
@@ -1013,6 +1036,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         if (approved.purpose === "mosaic") setRegionEffect(approved.regionEffect);
       }
       syncDimensionControls(900, 600);
+      setExportDimensions(normalizeEditorDimensions({ width: image.width, height: image.height }, EDITOR_EXPORT_MAX_DIMENSION));
+      editorSettings.current = { ...editorSettings.current, transparentBackground: true, sourceFrame: true };
       applyEditorInteractivity(instance, image, "select", true);
       instance.requestRenderAll();
       syncSelectedObject();
@@ -1048,6 +1073,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (sourceUrl.current) URL.revokeObjectURL(sourceUrl.current);
     sourceUrl.current = undefined;
     setFile(undefined);
+    useCanvasExportFrame();
     updateOutputMultiplier(1);
     setEditorError("");
     setBrightness(0); setContrast(0); setHue(0); setBaseLocked(true); setInteractionMode("select"); setActivePanel("select");
@@ -1186,6 +1212,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     const selection = cropSelectionRef.current;
     const overlay = cropOverlay.current;
     if (!instance || !selection || selection.width < 10 || selection.height < 10) return;
+    useCanvasExportFrame();
     restoringRef.current = true;
     if (overlay) instance.remove(overlay);
     cropOverlay.current = undefined;
@@ -1211,7 +1238,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     restoringRef.current = false;
     pushSnapshot(true);
     window.requestAnimationFrame(syncCanvasDisplay);
-  }, [baseLocked, pushSnapshot, resetViewport, syncCanvasDisplay, syncDimensionControls, syncSelectedObject]);
+  }, [baseLocked, pushSnapshot, resetViewport, syncCanvasDisplay, syncDimensionControls, syncSelectedObject, useCanvasExportFrame]);
 
   const applyRegionEffect = useCallback(async () => {
     const instance = canvas.current;
@@ -1550,14 +1577,16 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   };
 
   const changeExportDimension = (axis: keyof EditorDimensions, value: number) => {
+    const bounds = sourceFrame && baseImage.current ? baseImage.current.getBoundingRect() : canvasDimensions;
     setExportDimensions((current) => exportRatioLocked
-      ? resizeLockedDimensions(value, axis, canvasDimensions, EDITOR_EXPORT_MAX_DIMENSION)
+      ? resizeLockedDimensions(value, axis, bounds, EDITOR_EXPORT_MAX_DIMENSION)
       : { ...current, [axis]: clampEditorDimension(value, EDITOR_EXPORT_MAX_DIMENSION) });
   };
 
   const changeExportRatioLock = (locked: boolean) => {
     setExportRatioLocked(locked);
-    if (locked) setExportDimensions((current) => resizeLockedDimensions(current.width, "width", canvasDimensions, EDITOR_EXPORT_MAX_DIMENSION));
+    const bounds = sourceFrame && baseImage.current ? baseImage.current.getBoundingRect() : canvasDimensions;
+    if (locked) setExportDimensions((current) => resizeLockedDimensions(current.width, "width", bounds, EDITOR_EXPORT_MAX_DIMENSION));
   };
 
   const applyImageResample = () => {
@@ -1565,7 +1594,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (!instance) return;
     const target = normalizeEditorDimensions(resampleDimensions, EDITOR_WORK_MAX_DIMENSION);
     const previous = { width: instance.getWidth(), height: instance.getHeight() };
-    if (target.width === previous.width && target.height === previous.height) return;
+    const frameChanged = useCanvasExportFrame();
+    if (target.width === previous.width && target.height === previous.height) { if (frameChanged) pushSnapshot(true); return; }
     restoringRef.current = true;
     setEditorError("");
     try {
@@ -1603,7 +1633,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (!instance) return;
     const target = normalizeEditorDimensions(canvasResizeDimensions, EDITOR_WORK_MAX_DIMENSION);
     const previous = { width: instance.getWidth(), height: instance.getHeight() };
-    if (target.width === previous.width && target.height === previous.height) return;
+    const frameChanged = useCanvasExportFrame();
+    if (target.width === previous.width && target.height === previous.height) { if (frameChanged) pushSnapshot(true); return; }
     restoringRef.current = true;
     setEditorError("");
     try {
@@ -1635,6 +1666,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   };
 
   const restore = async (index: number) => {
+    invalidatePrepared();
     const instance = canvas.current;
     const serialized = historyRef.current[index];
     if (!instance || !serialized) return;
@@ -1654,6 +1686,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         ?? instance.getObjects().find((object): object is FabricImage => object instanceof FabricImage && !(object as EditorFabricObject).worklazyRole);
       setBrightness(snapshot.brightness); setContrast(snapshot.contrast); setHue(snapshot.hue);
       setBackground(snapshot.background); setTransparentBackground(snapshot.transparentBackground); setBaseLocked(snapshot.baseLocked);
+      setSourceFrame(snapshot.sourceFrame ?? false);
       updateOutputMultiplier(snapshot.outputMultiplier ?? 1);
       syncDimensionControls(snapshot.width, snapshot.height);
       editorSettings.current = {
@@ -1663,6 +1696,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         background: snapshot.background,
         transparentBackground: snapshot.transparentBackground,
         baseLocked: snapshot.baseLocked,
+        sourceFrame: snapshot.sourceFrame ?? false,
       };
       instance.backgroundColor = snapshot.transparentBackground ? "" : snapshot.background;
       if (baseImage.current) {
@@ -1710,7 +1744,9 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     if (effect === "blur") setRegionEffectStrength((current) => Math.max(10, current));
   };
 
-  const originalExportPlan = getOriginalQualityExportPlan(canvasDimensions, outputMultiplier, EDITOR_EXPORT_MAX_DIMENSION);
+  const originalExportBounds = sourceFrame && baseImage.current ? baseImage.current.getBoundingRect() : { left: 0, top: 0, ...canvasDimensions };
+  const originalDensity = sourceFrame && baseImage.current ? 1 / Math.max(Number.EPSILON, Math.abs(baseImage.current.scaleX)) : outputMultiplier;
+  const originalExportPlan = getOriginalQualityExportPlan(originalExportBounds, originalDensity, EDITOR_EXPORT_MAX_DIMENSION);
   const exportResultDimensions = exportMode === "original" ? originalExportPlan.dimensions : normalizeEditorDimensions(exportDimensions, EDITOR_EXPORT_MAX_DIMENSION);
 
   const exportImage = (destination: "download" | "batch" | "privacy" | "pdf" = "download") => {
@@ -1736,7 +1772,11 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
     try {
       instance.setViewportTransform([...IDENTITY_VIEWPORT]);
       instance.renderAll();
-      const source = instance.toCanvasElement(exportMode === "original" ? originalExportPlan.multiplier : 1);
+      const source = instance.toCanvasElement(originalExportPlan.multiplier, {
+        left: originalExportBounds.left, top: originalExportBounds.top,
+        width: (originalExportPlan.dimensions.width + 1e-7) / originalExportPlan.multiplier,
+        height: (originalExportPlan.dimensions.height + 1e-7) / originalExportPlan.multiplier,
+      });
       const rendered = exportMode === "custom"
         ? renderEditorExportSize(source, exportResultDimensions, exportRatioLocked, format === "jpeg")
         : source;
@@ -1756,7 +1796,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         else {
           if (destination === "pdf" && actualFormat === "webp") return;
           const input: HandoffInput = { receiverId: destination === "pdf" ? "image-to-pdf" : "image-privacy", entryPath: destination === "pdf" ? "/tools/pdf-converter/image-to-pdf" : "/tools/image-privacy", files: [output], origin: "generated", source: "image-studio" };
-          setPreparedSend(input); protectImageInput(); sender.send(input);
+          prepareAndSend(input);
         }
       } else {
         const anchor = document.createElement("a");
@@ -1764,8 +1804,8 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         anchor.download = fileName;
         anchor.click();
       }
-    } catch {
-      setEditorError(t("image.editor.exportError"));
+    } catch (cause) {
+      setEditorError(t(cause instanceof Error && cause.message === 'export-format-unsupported' ? 'image.library.unsupportedFormat' : "image.editor.exportError"));
     } finally {
       instance.setViewportTransform(viewport);
       overlays.forEach((overlay) => {
@@ -1783,7 +1823,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   return (
     <UtilitySectionCard title={t("image.editor.title")} description={t("image.editor.description")}>
       <FileDropZone disabled={loadingImage || regionEffectBusy || stickerBusy} files={file ? [file] : []} onFiles={(files) => void loadFile(filterRasterImages(files).at(-1))} accept={RASTER_IMAGE_ACCEPT} hint={t("image.editor.hint")} accent="sky" />
-      {editorError && <UtilityNotice kind="error" role="alert" className="mt-3">{editorError}</UtilityNotice>}
+      {editorError && <div className="mt-3"><h3 tabIndex={-1} data-testid="image-editor-error" className="mb-1 text-sm font-medium">{t("image.library.operationErrorTitle")}</h3><UtilityNotice kind="error" role="alert">{editorError}</UtilityNotice></div>}
       <ClipboardHint mode="replace" />
       <div className="editor-source-actions mt-2 flex items-center justify-between gap-2.5"><Button type="button" className="rounded-xl" variant="secondary" onClick={() => newBlankCanvas()}><ImageIcon size={16} /> {t("image.editor.blank")}</Button>{file && <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] text-muted-foreground">{t("image.editor.editing", { name: file.name })}</span>}</div>
       <ImageEditorToolbar
@@ -1938,11 +1978,11 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
         <Button type="button" variant="outline" className={cn("min-h-11 rounded-xl", addingToBatch && "opacity-60")} data-testid="image-editor-add-to-batch" aria-disabled={addingToBatch} disabled={loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("batch")}>{t("image.handoff.add", { count: batchCount })}</Button>
         <span role="status" data-testid="image-batch-notice" className="text-sm text-muted-foreground">{batchNotice ? t(`image.handoff.${batchNotice}`, { max: 50 }) : ""}</span>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2" data-testid="image-editor-send-actions">
+      <div className="mt-3 flex flex-wrap gap-2" data-testid="image-editor-send-actions" data-prepared-send={!!preparedSend}>
         <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-privacy" disabled={loadingImage || regionEffectBusy || stickerBusy} onClick={() => exportImage("privacy")}>{sendT("sendTo.privacy")}</Button>
         <Button type="button" className="h-auto min-h-11 whitespace-normal" data-testid="image-send-to-pdf" disabled={format === "webp" || loadingImage || regionEffectBusy || stickerBusy} aria-describedby={format === "webp" ? "image-send-webp-reason" : undefined} onClick={() => exportImage("pdf")}>{sendT("sendTo.imagePdf")}</Button>
         {format === "webp" && <p id="image-send-webp-reason" className="w-full text-sm text-muted-foreground">{sendT("sendTo.webp")}</p>}
-        {sender.reason && preparedSend && <div role="alert" className="w-full"><p>{sendT("sendTo.failed")}</p><Button type="button" variant="outline" onClick={downloadPrepared}>{sendT("sendTo.download")}</Button><Button type="button" variant="outline" onClick={() => sender.send(preparedSend)}>{sendT("sendTo.retry")}</Button></div>}
+        {sendReason && preparedSend && <div role="alert" className="w-full"><p>{sendT("sendTo.failed")}</p><Button type="button" variant="outline" onClick={downloadPrepared}>{sendT("sendTo.download")}</Button><Button type="button" variant="outline" onClick={retryPrepared}>{sendT("sendTo.retry")}</Button></div>}
       </div>
       <div className="export-row image-editor-export-row mt-3.5 grid grid-cols-[minmax(260px,1fr)_minmax(230px,310px)] items-end gap-3 max-[620px]:grid-cols-1">
         <div className="image-editor-export-settings grid min-w-0 gap-3">
@@ -2026,8 +2066,8 @@ function getOriginalQualityExportPlan(dimensions: EditorDimensions, multiplier: 
     multiplier: effectiveMultiplier,
     reduced: effectiveMultiplier < requestedMultiplier - 1e-9,
     dimensions: {
-      width: Math.max(1, Math.min(max, Math.floor(dimensions.width * effectiveMultiplier + 1e-6))),
-      height: Math.max(1, Math.min(max, Math.floor(dimensions.height * effectiveMultiplier + 1e-6))),
+      width: Math.max(1, Math.min(max, Math.round(dimensions.width * effectiveMultiplier))),
+      height: Math.max(1, Math.min(max, Math.round(dimensions.height * effectiveMultiplier))),
     },
   };
 }
@@ -2054,7 +2094,11 @@ function renderEditorExportSize(source: HTMLCanvasElement, dimensions: EditorDim
 }
 
 function encodeEditorExportCanvas(source: HTMLCanvasElement, format: ImageOutputFormat) {
-  if (format !== "jpeg") return source.toDataURL(`image/${format}`, 0.92);
+  if (format !== "jpeg") {
+    const encoded = source.toDataURL(`image/${format}`, 0.92);
+    if (!encoded.startsWith(`data:image/${format};`)) throw new Error('export-format-unsupported');
+    return encoded;
+  }
   const flattened = document.createElement("canvas");
   flattened.width = source.width;
   flattened.height = source.height;

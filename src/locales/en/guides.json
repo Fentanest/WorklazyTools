@@ -1039,13 +1039,13 @@
       {
         "title": "Integrated Image Editing",
         "paragraphs": [
-          "Open a photo or start with a blank canvas to use adjustments, drawing, text, shapes, and searchable stickers within one work history. You can change the entire content or canvas size separately and specify the export pixel size. Zoom in with the mouse wheel, drag while pressing Space to move, and use two fingers to zoom and move on mobile."
+          "Open a JPG, PNG or WebP image to crop, resize, draw, add text and shapes, and edit layers. Resize, mosaic and watermark entry URLs open their corresponding tools. Use the editing history to undo and redo."
         ]
       },
       {
         "title": "Area Mosaic / Blur",
         "paragraphs": [
-          "You can drag areas to obscure in the photo and adjust the effect intensity. The effect applies based on the original photo, so if areas overlap, the last effect is visible. It does not apply to separately drawn lines or text. For sensitive information, a strong mosaic is recommended over a low-intensity blur. Before downloading, zoom in to check the obscured state."
+          "Select the area and apply solid, blur or pixelated concealment. Blur and pixelation do not guarantee irreversible concealment; use solid redaction for sensitive information. SVG, JSON and templates may retain the original and show a warning. Flatten layers and export combines the entire working scene into one image and preserves the editing scene."
         ]
       },
       {
@@ -1070,7 +1070,7 @@
       {
         "title": "Examples and Selection Help",
         "paragraphs": [
-          "Shrinking a 1600px photo to 800px changes the image itself, while adding margins to a square canvas keeps the photo and changes its surroundings. This tool supports cropping and region effects, but it does not automatically crop subjects or remove backgrounds."
+          "Choose portrait or object and product background removal. Review the size and choose Download to get the model and process on this device. Object and product mode requires supported graphics capabilities. You can also erase solid backgrounds with the magic wand."
         ]
       }
     ],
@@ -1085,11 +1085,11 @@
       },
       "faq_2": {
         "q": "Can I recover contents obscured by mosaic or blur?",
-        "a": "For downloaded PNG, JPG, or WebP files, the effects are embedded into the original photo pixels, leaving no previous pixels of the obscured areas. However, during the editing session before downloading, you can revert to the pre-effect state using Undo."
+        "a": "Blur and pixelation do not guarantee irreversible concealment. Use solid redaction for sensitive information and inspect the result. SVG, JSON and templates may retain the original; flatten layers or save as PNG. Undo remains available while editing."
       },
       "faq_3": {
         "q": "What formats are supported?",
-        "a": "Inputs are JPG, PNG, and WebP; HEIC and HEIF are not supported. Outputs are PNG, JPG, WebP, and GIF."
+        "a": "Inputs are JPG, PNG and WebP. The editor exports PNG, JPG, WebP, PDF, SVG and JSON, and saves templates. Create GIFs in the separate GIF tab. HEIC and HEIF are not supported."
       },
       "faq_4": {
         "q": "Can I keep the transparent background?",
@@ -1101,7 +1101,7 @@
       },
       "faq_6": {
         "q": "Can I save at an exact pixel size?",
-        "a": "Yes. Set the pixel size in the size panel, then save."
+        "a": "Enter the pixels in PNG result size and choose Create edited result to download a PNG or add it to the batch list. The Export menu uses the editor’s own output settings."
       },
       "faq_7": {
         "q": "Does this screen open the size panel directly?",
@@ -1129,7 +1129,7 @@
       },
       "new_faq_13": {
         "q": "Is all personal information safe just by applying a mosaic?",
-        "a": "You must manually verify the intensity of the effect and the covered area. If your goal is to clearly obscure text in a document, consider the Personal Information Redaction tool and its result verification procedure."
+        "a": "No. Blur and pixelation do not guarantee irreversible concealment. Use solid redaction and inspect the result. SVG, JSON and templates may retain the original, so flatten layers or save as PNG."
       },
       "new_faq_14": {
         "q": "Does smaller size mean a smaller file?",

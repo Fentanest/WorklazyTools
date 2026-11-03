@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "name": "@ascentsparksoftware/react-image-editor",
+  "version": "1.3.0-worklazy.3",
+  "upstreamCommit": "125ae084c4f68dc516702440e4e0d20ab17e581c",
+  "forkCommit": "263b8cfc347c822ff1bf4d2d85b5a95c0efe51d4",
+  "license": "MIT",
+  "files": [
+    {
+      "file": "ascentsparksoftware-react-image-editor-1.3.0-worklazy.3.tgz",
+      "bytes": 278595,
+      "sha256": "a386cd1dd5ebc3d51129d23792f488e09bac258ea500548d4d1a659ac9a928c9"
+    },
+    {
+      "file": "source-263b8cf.tar.gz",
+      "bytes": 3128112,
+      "sha256": "86530b51ad5c71ad21b623038cdca6de74dde5cd79bb48012b58fa4ddeca0a14"
+    },
+    {
+      "file": "ie1-safari-fixes.patch",
+      "bytes": 17018,
+      "sha256": "b5e0ebe31c904d26a023819dff90cbcfad89179ffe630dd23327dfecd501de34"
+    }
+  ],
+  "packageFile": "ascentsparksoftware-react-image-editor-1.3.0-worklazy.3.tgz",
+  "sourcePatch": "ie1-safari-fixes.patch",
+  "sourceDescription": "Base fork263b8cf plus the pinned local source patch; built in this worktree, unpublished."
+}

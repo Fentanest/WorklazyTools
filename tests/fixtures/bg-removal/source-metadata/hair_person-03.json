@@ -1,0 +1,106 @@
+{
+  "pageid": 51439657,
+  "ns": 6,
+  "title": "File:Fashion-woman-model-portrait (24300464886).jpg",
+  "index": 11,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 5024125,
+      "width": 5981,
+      "height": 3992,
+      "thumburl": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Fashion-woman-model-portrait_%2824300464886%29.jpg/1280px-Fashion-woman-model-portrait_%2824300464886%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+      "thumbwidth": 1024,
+      "thumbheight": 683,
+      "responsiveUrls": {
+        "2": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Fashion-woman-model-portrait_%2824300464886%29.jpg/3840px-Fashion-woman-model-portrait_%2824300464886%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail"
+      },
+      "thumbattribs": {
+        "src": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Fashion-woman-model-portrait_%2824300464886%29.jpg/1280px-Fashion-woman-model-portrait_%2824300464886%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 683,
+        "srcset": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ae/Fashion-woman-model-portrait_%2824300464886%29.jpg/3840px-Fashion-woman-model-portrait_%2824300464886%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail 2x"
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Fashion-woman-model-portrait_%2824300464886%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Fashion-woman-model-portrait_(24300464886).jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=51439657",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2016-09-16 04:56:55",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Fashion-woman-model-portrait (24300464886)",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Portraits of women|Flickr images reviewed by FlickreviewR|Fashion photography of unidentified female models",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "fashion-woman-model-portrait",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2013-03-17 13:33",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.flickr.com/photos/137643065@N06/24300464886/\">fashion-woman-model-portrait</a>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.flickr.com/people/137643065@N06\">www.Pixel.la Free Stock Photos</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}

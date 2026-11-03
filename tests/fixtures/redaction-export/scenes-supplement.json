@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "size": {
+    "width": 640,
+    "height": 480
+  },
+  "region": {
+    "left": 140,
+    "top": 170,
+    "width": 360,
+    "height": 120
+  },
+  "outputResolution": {
+    "width": 640,
+    "height": 480
+  },
+  "quality": 0.92,
+  "reference": "Independent canvas.toCanvasElement at identity viewport; entire scene, same size.",
+  "criteria": {
+    "lossless": {
+      "fractionChannelDeltaLE1": 0.9999,
+      "maxChannelDelta": 8
+    },
+    "lossy": {
+      "minimumPSNRdB": 38
+    },
+    "solid": {
+      "inset": 2,
+      "pngMaxDelta": 0,
+      "lossyFractionDeltaLE6": 0.995,
+      "lossyMaxDelta": 16
+    },
+    "payload": "one data/blob base src; no original src or history keys"
+  },
+  "scenes": [
+    {
+      "id": "actual-photo-solid",
+      "input": "real-photo.png",
+      "sha256": "7271dc1c1731679b2fede2140f6a200b75485da91a50fdb74b66f01a5c40a5a5",
+      "mode": "solid",
+      "nested": false,
+      "requiresIEBG": false
+    },
+    {
+      "id": "actual-screen-solid",
+      "input": "captured-screen.png",
+      "sha256": "c90c0e2a738d0e773d15d790f238dac33b661cd52c5dbb69cd9a42bec1f41255",
+      "mode": "solid",
+      "nested": false,
+      "requiresIEBG": false
+    },
+    {
+      "id": "actual-photo-blur",
+      "input": "real-photo.png",
+      "sha256": "7271dc1c1731679b2fede2140f6a200b75485da91a50fdb74b66f01a5c40a5a5",
+      "mode": "blur",
+      "nested": false,
+      "requiresIEBG": false
+    },
+    {
+      "id": "actual-screen-pixelate",
+      "input": "captured-screen.png",
+      "sha256": "c90c0e2a738d0e773d15d790f238dac33b661cd52c5dbb69cd9a42bec1f41255",
+      "mode": "pixelate",
+      "nested": false,
+      "requiresIEBG": false
+    },
+    {
+      "id": "actual-nested-group",
+      "input": "real-photo.png",
+      "sha256": "7271dc1c1731679b2fede2140f6a200b75485da91a50fdb74b66f01a5c40a5a5",
+      "mode": "solid",
+      "nested": true,
+      "requiresIEBG": false
+    },
+    {
+      "id": "actual-background-removal",
+      "input": "real-photo.png",
+      "sha256": "7271dc1c1731679b2fede2140f6a200b75485da91a50fdb74b66f01a5c40a5a5",
+      "mode": "solid",
+      "nested": false,
+      "requiresIEBG": true
+    }
+  ],
+  "supplement": "Actual photo and captured screen fixtures; original manifest remains unchanged.",
+  "photoSource": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.19.3/skimage/data/astronaut.png (NASA astronaut Eileen Collins, public domain; source preserved locally)"
+}

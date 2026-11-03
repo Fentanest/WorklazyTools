@@ -39,3 +39,6 @@ public/data/foliotrace/
 # Rebuilt from pinned vendor/comparison sources.
 /public/vendor/opencv/
 /public/vendor/comparison/
+
+/public/vendor/bg-removal/
+/public/vendor/onnxruntime-web/

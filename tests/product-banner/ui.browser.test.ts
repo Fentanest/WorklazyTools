@@ -67,7 +67,7 @@ after(async () => {
 
 async function pageFor(language: string, width = 1440, theme = "light-coral") {
   const page = await browser.newPage({ viewport: { width, height: 1000 } });
-  await page.addInitScript((theme) => { localStorage.setItem("worklazy-theme", theme); (window as any).__WORKLAZY_MOCK_PROVIDERS__ = true; }, theme);
+  await page.addInitScript((theme) => { if (window.top !== window) return; localStorage.setItem("worklazy-theme", theme); (window as any).__WORKLAZY_MOCK_PROVIDERS__ = true; }, theme);
   await page.route("**/*", async (route) => {
     const url = route.request().url();
     if (url.startsWith(base) || !/^https?:/u.test(url)) return route.continue();

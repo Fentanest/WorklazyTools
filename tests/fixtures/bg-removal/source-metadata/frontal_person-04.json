@@ -1,0 +1,102 @@
+{
+  "pageid": 65170544,
+  "ns": 6,
+  "title": "File:Devin R. Berg portrait.jpg",
+  "index": 7,
+  "imagerepository": "local",
+  "imageinfo": [
+    {
+      "size": 599581,
+      "width": 1200,
+      "height": 1800,
+      "thumburl": "https://upload.wikimedia.org/wikipedia/commons/1/17/Devin_R._Berg_portrait.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+      "thumbwidth": 1024,
+      "thumbheight": 1536,
+      "thumbattribs": {
+        "src": "https://upload.wikimedia.org/wikipedia/commons/1/17/Devin_R._Berg_portrait.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled",
+        "decoding": "async",
+        "loading": "lazy",
+        "width": 1024,
+        "height": 1536
+      },
+      "url": "https://upload.wikimedia.org/wikipedia/commons/1/17/Devin_R._Berg_portrait.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Devin_R._Berg_portrait.jpg",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=65170544",
+      "extmetadata": {
+        "DateTime": {
+          "value": "2018-01-01 04:00:08",
+          "source": "mediawiki-metadata",
+          "hidden": ""
+        },
+        "ObjectName": {
+          "value": "Devin R. Berg portrait",
+          "source": "mediawiki-metadata"
+        },
+        "CommonsMetadataExtension": {
+          "value": 1.2,
+          "source": "extension",
+          "hidden": ""
+        },
+        "Categories": {
+          "value": "CC-Zero|Self-published work|Portrait photographs of men with gray background",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "Assessments": {
+          "value": "",
+          "source": "commons-categories",
+          "hidden": ""
+        },
+        "ImageDescription": {
+          "value": "Devin Berg, faculty, portrait, Summer 2012",
+          "source": "commons-desc-page"
+        },
+        "DateTimeOriginal": {
+          "value": "2012-09-04",
+          "source": "commons-desc-page"
+        },
+        "Credit": {
+          "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+          "source": "commons-desc-page"
+        },
+        "Artist": {
+          "value": "<a href=\"//commons.wikimedia.org/w/index.php?title=User:Devinberg&amp;action=edit&amp;redlink=1\" class=\"new\" title=\"User:Devinberg (page does not exist)\">Devinberg</a>",
+          "source": "commons-desc-page"
+        },
+        "LicenseShortName": {
+          "value": "CC0",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "UsageTerms": {
+          "value": "Creative Commons Zero, Public Domain Dedication",
+          "source": "commons-desc-page"
+        },
+        "AttributionRequired": {
+          "value": "false",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "LicenseUrl": {
+          "value": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+          "source": "commons-desc-page"
+        },
+        "Copyrighted": {
+          "value": "True",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "Restrictions": {
+          "value": "",
+          "source": "commons-desc-page",
+          "hidden": ""
+        },
+        "License": {
+          "value": "cc0",
+          "source": "commons-templates",
+          "hidden": ""
+        }
+      }
+    }
+  ]
+}
