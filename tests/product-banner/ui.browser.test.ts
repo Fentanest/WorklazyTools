@@ -1,6 +1,8 @@
 import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { PNG } from "pngjs";
 import { createHash } from "node:crypto";
 import { chromium, type Browser, type Page } from "playwright";
@@ -12,7 +14,7 @@ import { BANNER_SANDBOX } from "../../src/features/product-banner/exporter.ts";
 
 let base = process.env.TEST_BASE_URL || "";
 let server: Awaited<ReturnType<typeof startRecoveryServer>> | undefined;
-const shots = process.env.PB_T5_SHOT_DIR || "docs/jobs/todo/product-banner/work/shots-T5";
+const shots = process.env.PB_T5_SHOT_DIR || await mkdtemp(join(tmpdir(), "worklazy-product-banner-ui-"));
 const captures: string[] = [];
 const bitmap = new PNG({ width: 200, height: 140 });
 for (let y = 0; y < 140; y++) for (let x = 0; x < 200; x++) {
@@ -23,7 +25,8 @@ const image = PNG.sync.write(bitmap);
 let browser: Browser;
 let externalAttempts = 0;
 before(async () => {
-  await mkdir(shots, { recursive: false });
+  await mkdir(shots, { recursive: true });
+  console.log(`UI screenshots: ${shots}`);
   if (!base) { server = await startRecoveryServer({ root: process.env.PB_DIST || "dist", port: 0 }); base = server.url; }
   browser = await chromium.launch({ executablePath: process.env.PB_UI_CHROMIUM_PATH, args: ["--no-sandbox"] });
   console.log(`Browser ${browser.version()}`);
