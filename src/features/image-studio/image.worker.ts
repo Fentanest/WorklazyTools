@@ -141,7 +141,7 @@ async function createGif(inputs: ImageWorkerInput[], options: GifOptions, fileNa
     canvas.width = 1;
     canvas.height = 1;
     progress(100, local("GIF 애니메이션 생성 완료", "Animated GIF created"));
-    return binaryResult(bytes, ensureExtension(fileName, "gif"), "image/gif", [local("GIF는 최대 256색 팔레트를 사용하므로 사진의 색상 그라데이션이 단순화될 수 있습니다.", "GIF uses a palette of at most 256 colors, so photo gradients may be simplified.")]);
+    return binaryResult(bytes, ensureExtension(fileName, "gif"), "image/gif", [local("GIF는 최대 256색 팔레트를 사용하므로 이미지의 색상 그라데이션이 단순화될 수 있습니다.", "GIF uses a palette of at most 256 colors, so photo gradients may be simplified.")]);
   } finally {
     bitmaps.forEach((bitmap) => bitmap.close());
   }
