@@ -1,5 +1,9 @@
 # 검토 기록 (Review Notes)
 
+## 2026-11-03 — 이미지 편집 하위 랜딩 명칭 통일 (정식 검수 대기·미배포)
+
+사용자 11/3 결정 2.B에 따라 resize·mosaic·watermark의 한국어 제목을 ‘이미지 크기 줄이기’, ‘이미지 모자이크’, ‘이미지 워터마크 넣기’로 정리했다. SEO 정본에서 static h1·OG/Twitter·RSS·허브·관련 링크가 파생되며, 앱의 한국어 하위 페이지 h1도 같은 정본을 쓴다. 영어 정본과 URL·canonical·sitemap loc은 유지한다. 옛 사진 검색어는 ko 도구 카탈로그의 비노출 synonyms에 보존한다. 공유 그림은 이미 이미지인 mosaic은 그대로 두고 제목이 바뀐 resize·watermark 슬러그만 재생성한다. 검사·소스 근거·직접 열람 캡처는 SOL-IMAGE-SUBPAGES-REPORT.md와 연결 증거에 보존한다. — Codx
+
 ## 2026-11-03 — 이미지 편집 명칭·분류 순서·사이드바 열 정렬 (정식 검수 대기·미배포)
 
 `fdc9d01d`의 직접 사용자 요청이다. 카탈로그의 한영 title/shortTitle, 기능 페이지 h1/eyebrow, 지연 로딩 안내, SEO title/description·WebApplication 이름, 소셜 생성 입력과 이미지에 이미지 편집/Image Editor를 반영한다. 공용 registry와 정적 허브의 같은 도구를 media 첫 위치로 이동하며, 기존 경로와 다른 도구 상대 순서는 유지한다. ‘사진’/‘photo editor’ 검색은 별칭으로 계속 찾을 수 있고 사진 메타데이터 도구 등 별도 도구는 바꾸지 않는다.
