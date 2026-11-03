@@ -26,8 +26,27 @@ try {
   });
 
   const results = [];
-  for (const action of ["navigate", "replace", "cancel", "save-error"]) {
-    const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, serviceWorkers: "block" });
+  const saveMessages = {
+    en: "The result PDF could not be created. The file may be too large or memory may be low. Reduce the number of files or the page range and try again.",
+    ko: "결과 PDF를 만들지 못했습니다. 파일이 크거나 메모리가 부족할 수 있습니다. 파일 수나 페이지 범위를 줄여 다시 시도해 주세요.",
+  };
+  const partialMessages = {
+    en: "Results already completed can be downloaded below.",
+    ko: "이미 완료된 결과는 아래에서 내려받을 수 있습니다.",
+  };
+  const processingMessages = {
+    en: "A problem occurred while processing the PDF. Please try again.",
+    ko: "PDF 처리 중 문제가 발생했습니다. 다시 시도해 주세요.",
+  };
+  const scenarios = [
+    ...["navigate", "replace", "cancel"].map((action) => ({ action, language: "en", single: false })),
+    ...["en", "ko"].flatMap((language) => [false, true].map((single) => ({ action: "save-error", language, single }))),
+    ...["en", "ko"].flatMap((language) => [false, true].map((single) => ({ action: "processing-error", language, single }))),
+    ...["en", "ko"].map((language) => ({ action: "zip-error", language, single: false })),
+    { action: "zip-cancel", language: "en", single: false },
+  ];
+  for (const { action, language, single } of scenarios) {
+    const context = await browser.newContext({ viewport: single ? { width: 390, height: 844 } : { width: 1280, height: 900 }, serviceWorkers: "block" });
     const page = await context.newPage();
     page.setDefaultTimeout(60_000);
     let replacements = 0;
@@ -38,16 +57,32 @@ try {
       assert.ok(body.includes(boundary), "the lifecycle smoke no longer pauses at the second-file ownership boundary");
       body = body.replace(boundary, `if (fileIndex === 1 && globalThis.__finishLifecyclePause) await globalThis.__finishLifecyclePause();\n      ${boundary}`);
       if (action === "save-error") {
-        const save = 'let bytes = await document.save({ updateFieldAppearances: false });';
+        const save = 'return await document.save({ updateFieldAppearances: false });';
         assert.ok(body.includes(save), "the lifecycle smoke no longer injects at the serialization boundary");
-        body = body.replace(save, `if (fileIndex === 1) throw new RangeError("injected PDF serialization allocation failure");\n      ${save}`);
+        body = body.replace(save, `if (++globalThis.__finishSaveCalls === ${single ? 1 : 2}) throw new RangeError("injected PDF serialization allocation failure");\n      ${save}`);
+      }
+      if (action === "processing-error") {
+        const decorate = "await decorateDocument(input, analyzed.plans, analyzed.warnings, completed, total);";
+        assert.ok(body.includes(decorate), "the lifecycle smoke no longer injects before decoration");
+        body = body.replace(decorate, `if (fileIndex === ${single ? 0 : 1}) throw new RangeError("injected processing allocation failure");\n      ${decorate}`);
       }
       replacements += 1;
       await route.fulfill({ response, body });
     });
+    if (action.startsWith("zip-")) {
+      await context.route("**/src/utils/zipArchive.ts*", async (route) => {
+        const response = await route.fetch();
+        const body = await response.text();
+        const boundary = "const zipWriter = createIncrementalZipArchiveWriter(writable, signal, options);";
+        assert.ok(body.includes(boundary), "the lifecycle smoke no longer injects inside writeZipArchive");
+        const failure = action === "zip-cancel" ? 'new DOMException("injected ZIP cancellation", "AbortError")' : 'new RangeError("injected ZIP allocation failure")';
+        await route.fulfill({ response, body: body.replace(boundary, `globalThis.__finishZipInjected = true; throw ${failure};\n  ${boundary}`) });
+      });
+    }
     await context.addInitScript(() => {
       localStorage.setItem("worklazy_privacy_consent_v2", "granted");
       globalThis.__finishUrlEvents = [];
+      globalThis.__finishSaveCalls = 0;
       globalThis.__finishLifecyclePause = () => new Promise((resolve) => {
         globalThis.__finishBatchPaused = true;
         globalThis.__finishReleaseBatch = resolve;
@@ -65,17 +100,18 @@ try {
       };
     });
 
-    await page.goto(`${baseUrl}/en/tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
+    await page.goto(`${baseUrl}/${language === "en" ? "en/" : ""}tools/pdf-editor/finish/`, { waitUntil: "networkidle" });
     await page.locator("[data-testid='pdf-finish-ready'] input[type='file']").setInputFiles([
       { name: "A.pdf", mimeType: "application/pdf", buffer: fixture },
-      { name: "B.pdf", mimeType: "application/pdf", buffer: fixture },
+      ...(single ? [] : [{ name: "B.pdf", mimeType: "application/pdf", buffer: fixture }]),
     ]);
     await page.waitForFunction(() => document.querySelector("[data-testid='pdf-finish-ready']")?.getAttribute("data-preflight-status") === "ready");
     await page.locator("[data-testid='pdf-finish-ready'] [data-ui-component='primary-button']").click();
-    await page.waitForFunction(() => globalThis.__finishBatchPaused === true);
+    if (single) await page.locator("[data-testid='pdf-error']").waitFor({ state: "visible" });
+    else await page.waitForFunction(() => globalThis.__finishBatchPaused === true);
 
     const before = await inspectPage(page);
-    assert.equal(before.resultFiles.length, 1, `${action}: the first completed output was not retained before the ownership transition`);
+    assert.equal(before.resultFiles.length, single ? 0 : 1, `${action}: the first completed output was not retained before the ownership transition`);
     if (action === "navigate") {
       await page.locator("[data-pdf-nav-mode='organize']").click();
       // W1: unsaved finish work must ask before leaving (pdf-finish guard).
@@ -88,29 +124,44 @@ try {
     } else if (action === "cancel") {
       await page.locator("[data-testid='pdf-finish-cancel']").click();
     }
-    await page.evaluate(() => globalThis.__finishReleaseBatch());
+    if (!single) await page.evaluate(() => globalThis.__finishReleaseBatch());
     await page.waitForTimeout(900);
     const after = await inspectPage(page);
 
-    if (action === "cancel" || action === "save-error") {
-      if (action === "save-error") {
+    const failed = action.endsWith("-error") || action === "zip-cancel";
+    const expectedCount = single ? 0 : action.startsWith("zip-") ? 2 : 1;
+    const expectedMessage = action === "processing-error" ? processingMessages[language] : action === "zip-cancel" ? "The operation was canceled. Check the settings and start again." : saveMessages[language];
+    if (action === "cancel" || failed) {
+      let message;
+      if (failed) {
         await page.locator("[data-testid='pdf-error']").waitFor({ state: "visible" });
-        assert.equal(await page.locator("[data-testid='pdf-error'] span").innerText(), "The PDF could not be read. Check the file and choose it again.");
+        message = await page.locator("[data-testid='pdf-error'] span").innerText();
+        assert.equal(message, expectedMessage);
+        if (action.startsWith("zip-")) assert.equal(await page.evaluate(() => globalThis.__finishZipInjected), true);
+        assert.equal(await page.locator("[data-testid='pdf-finish-partial-results']").count(), single ? 0 : 1);
+        if (!single) assert.equal(await page.locator("[data-testid='pdf-finish-partial-results']").innerText(), partialMessages[language]);
+        const capturePath = path.join(path.dirname(reportPath), `${action}-${language}-${single ? "single-mobile" : "batch-desktop"}.png`);
+        await fs.mkdir(path.dirname(capturePath), { recursive: true });
+        await page.screenshot({ path: capturePath, fullPage: true });
         assert.equal(await page.locator("[data-ui-component='operation-progress'].ui-status-error").count(), 1);
         assert.equal(await page.locator("[data-ui-component='operation-progress'].ui-status-success").count(), 0);
-        const [download] = await Promise.all([
-          page.waitForEvent("download"),
-          page.locator("[data-testid='pdf-download']").click(),
-        ]);
-        assert.equal(download.suggestedFilename(), "A-finished.pdf");
-        const saved = await fs.readFile(await download.path());
-        assert.equal((await PDFDocument.load(saved)).getPageCount(), 1);
+        if (!single) {
+          for (let index = 0; index < expectedCount; index += 1) {
+            const [download] = await Promise.all([
+              page.waitForEvent("download"),
+              page.locator("[data-testid='pdf-download']").nth(index).click(),
+            ]);
+            assert.equal(download.suggestedFilename(), `${index === 0 ? "A" : "B"}-${language === "en" ? "finished" : "마무리"}.pdf`);
+            const saved = await fs.readFile(await download.path());
+            assert.equal((await PDFDocument.load(saved)).getPageCount(), 1);
+          }
+        }
       }
       assert.equal(after.finishMounted, true, "partial result unexpectedly released the panel ownership");
-      assert.equal(after.downloads, 1, "partial result must preserve the completed output");
-      assert.equal(after.resultFiles.length, 1, "partial result disposed the completed OPFS output");
-      assert.equal(after.pdfUrls.length, 1, "partial result did not register the completed PDF URL");
-      assert.equal(after.pdfUrls[0].revoked, false, "partial result revoked the visible partial result");
+      assert.equal(after.downloads, expectedCount, "partial result must preserve all completed PDFs without a failed ZIP");
+      assert.equal(after.resultFiles.length, expectedCount, "partial result disposed a completed OPFS output");
+      assert.equal(after.pdfUrls.length, expectedCount, "partial result did not register every completed PDF URL");
+      assert.ok(after.pdfUrls.every(({ revoked }) => !revoked), "partial result revoked a visible PDF");
       await page.locator("[data-pdf-nav-mode='organize']").click();
       // Saved results do not block leaving; unsaved work would show the dialog.
       await page.waitForFunction(() => {
@@ -125,8 +176,8 @@ try {
       await page.waitForTimeout(400);
       const afterLeave = await inspectPage(page);
       assert.deepEqual(afterLeave.resultFiles, [], "leaving after partial failure did not dispose the preserved OPFS output");
-      assert.equal(afterLeave.pdfUrls[0]?.revoked, true, "leaving after partial failure did not revoke the visible PDF URL");
-      results.push({ action, replacements, before, after, afterLeave });
+      assert.ok(afterLeave.pdfUrls.every(({ revoked }) => revoked), "leaving after partial failure did not revoke every PDF URL");
+      results.push({ action, language, single, replacements, message, before, after, afterLeave });
     } else {
       assert.equal(after.downloads, 0, `${action}: an ownerless result reached the download UI`);
       assert.deepEqual(after.resultFiles, [], `${action}: an ownerless OPFS result was not disposed`);
@@ -137,9 +188,17 @@ try {
     await context.close();
   }
 
+  for (const language of ["en", "ko"]) {
+    const messages = results.filter((result) => result.action === "processing-error" && result.language === language).map(({ message }) => message);
+    assert.deepEqual(messages, [processingMessages[language], processingMessages[language]], "the same unclassified failure must show the same message with and without results");
+  }
+
   await fs.mkdir(path.dirname(reportPath), { recursive: true });
   await fs.writeFile(reportPath, `${JSON.stringify(results, null, 2)}\n`);
-  console.log("PDF finish ownership lifecycle passed: navigation and file replacement dispose ownerless outputs; cancellation and save failure preserve one downloadable completed output.");
+  console.log(`1..${results.length}`);
+  console.log(`# tests ${results.length}`);
+  results.forEach(({ action, language, single }, index) => console.log(`ok ${index + 1} - ${action} ${language ?? "en"} ${single ? "single" : "batch"}`));
+  console.log("PDF finish ownership lifecycle passed: save/ZIP failures and cancellation preserve completed PDFs; unknown failures show the same neutral message with or without results.");
 } finally {
   await browser?.close();
   await stopServer(server);

@@ -216,6 +216,7 @@ interface FinishCopy {
   retry: string;
   cancel: string;
   canceled: string;
+  partialResultsAvailable: string;
   backToOrganize: string;
   suggestionTitle: string;
   suggestionInsert: string;
@@ -915,7 +916,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
         if (!controller.signal.aborted) setPreflight({ status: "ready", ...result, failure: "" });
       }).catch((reason) => {
         if (reason instanceof Error && reason.name === "AbortError") return;
-        const code = reason instanceof PdfFinishEngineError ? reason.code : "unreadable-document";
+        const code = reason instanceof PdfFinishEngineError ? reason.code : "processing-failed";
         if (!controller.signal.aborted) setPreflight({ status: "ready", errors: [], warnings: [], embeddedFontOutputCount: 0, failure: code });
       });
     }, 120);
@@ -936,7 +937,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
     watermark: firstPreflightError?.field === "watermark" ? preflightErrorText : "",
   };
   const fieldError = combinedFieldError || (firstPreflightError ? preflightErrorText : "");
-  const preflightFailure = preflight.failure ? copy.errors[preflight.failure] ?? copy.errors["unreadable-document"] : "";
+  const preflightFailure = preflight.failure ? copy.errors[preflight.failure] ?? copy.errors["processing-failed"] : "";
   const riskWarnings = preflight.warnings.filter((warning) => warning.startsWith("risky-"));
   const preflightBlocked = preflight.status !== "ready" || preflight.errors.length > 0 || !!preflight.failure || riskWarnings.length > 0 && !riskAccepted;
 
@@ -976,13 +977,19 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
       }));
       if (outputs.length > 1) {
         operation.update(97, copy.packing, "zip");
-        const [{ BlobWriter }, { createSafeZipArchiveSources, writeZipArchive }] = await Promise.all([
-          import("@zip.js/zip.js"), import("../../utils/zipArchive.ts"),
-        ]);
-        const writer = new BlobWriter("application/zip");
-        await writeZipArchive(createSafeZipArchiveSources(outputs), writer, controller.signal);
-        const blob = await writer.getData();
-        items.push({ blob, fileName: copy.archiveFileName, warnings: [] });
+        try {
+          const [{ BlobWriter }, { createSafeZipArchiveSources, writeZipArchive }] = await Promise.all([
+            import("@zip.js/zip.js"), import("../../utils/zipArchive.ts"),
+          ]);
+          const writer = new BlobWriter("application/zip");
+          await writeZipArchive(createSafeZipArchiveSources(outputs), writer, controller.signal);
+          const blob = await writer.getData();
+          items.push({ blob, fileName: copy.archiveFileName, warnings: [] });
+        } catch (reason) {
+          if (reason instanceof Error && reason.name === "AbortError") throw reason;
+          if (reason instanceof PdfFinishEngineError) throw reason;
+          throw new PdfFinishEngineError("save-failed", {}, reason);
+        }
       }
       if (!ownsResults()) {
         await disposeFinishOutputs(outputs);
@@ -1011,9 +1018,9 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
           handedOff = true;
         }
       }
-      const canceled = reason instanceof DOMException && reason.name === "AbortError";
-      const code = reason instanceof PdfFinishEngineError ? reason.code : "unreadable-document";
-      const message = canceled ? copy.canceled : copy.errors[code] ?? copy.errors["unreadable-document"];
+      const canceled = reason instanceof Error && reason.name === "AbortError";
+      const code = reason instanceof PdfFinishEngineError ? reason.code : "processing-failed";
+      const message = canceled ? copy.canceled : copy.errors[code] ?? copy.errors["processing-failed"];
       setError(message);
       operation.fail(message);
     } finally {
@@ -1191,6 +1198,7 @@ export function PdfFinishPanel({ preset, handoffIntake, onHandoffAccepted, onHan
                   {operation.status === "running" && <Button type="button" variant="outline" className="mt-2 min-h-11 w-full rounded-xl text-destructive" data-testid="pdf-finish-cancel" onClick={() => controllerRef.current?.abort()}><X size={17} />{copy.cancel}</Button>}
                 </div>
                 <OperationProgress {...operation} compact accent="coral" title={copy.progressTitle} />
+                {operation.status === "error" && download.results.length > 0 && <UtilityNotice className="mt-3" kind="warning" role="status" data-testid="pdf-finish-partial-results">{copy.partialResultsAvailable}</UtilityNotice>}
                 {download.results.map((result) => <PdfDownloadCard key={result.url} compact result={result} title={copy.ready} onSaved={() => markResultSaved(result.url)} />)}
               </Card>
             </aside>
