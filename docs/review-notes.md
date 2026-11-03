@@ -1,5 +1,11 @@
 # 검토 기록 (Review Notes)
 
+## 2026-11-03 — 배경 제거 iOS 경고와 제한 안내 수명 (정식 검수 대기·미배포)
+
+iPhone 11 한 대의 탭 종료를 iOS 전체 차단으로 확대하지 말라는 사용자 결정이다. low-memory만 restriction으로 남기고 iOS WebKit은 별도 warning으로 분리한다. 선택은 허용하되 controller가 캐시·다운로드 동의 전에 사용자 위험 선택을 받고, 취소·늦은 승인·새 입력/비활성화는 기존 세대/AbortSignal로 종료한다. 기존 다운로드 동의와 모델 해시·GPU·HTTPS 검사는 유지한다.
+
+IE1 P3 clearFeedback은 status 안내만 정리하여 restriction error가 모드 변경 후 남았다. 제한 오류만 순수 functional updater로 정리하고, 성공 완료는 현재 입력 버전에만 적용한다. 다른 새 오류와 취소·지연 완료는 숨기지 않는다. UA/기능 모의 및 제어된 worker 회귀와 실제 iPhone 모델 추론/메모리 계측을 구분한다. 근거·실행·전후 재현은 SOL-BG-NOTICE-REPORT.md에 남긴다. — Codx
+
 ## 2026-11-03 — 시간대 지도 SVG 계측 시점·정착 대기 수리 (정식 재검수 대기)
 
 `6de64be`의 재검수 간헐 실패를 기존 빌드로 재현했다. 다섯 번째 입력에서 pin baseVal/라벨 DOM transform은 `(72,-16.67)`인데 `getScreenCTM()`으로 읽은 라벨 이동량은 네 번째 입력 `(57.6,-13.33)`이었다. 검사기가 서로 다른 SVG 갱신 시점을 섞어 Berlin–Casablanca 거리를 잘못 계산한 사례다. pin과 leader 양쪽을 비변경 SVG transform baseVal 체인으로 같은 좌표계에서 읽고, 검사 중 consolidate()로 DOM을 바꾸지 않는다. 배치 완료도 paint 전에 한 번 확인하고 끝내지 않고 view/route/text/viewport가 두 번 연속 동일하고 pending이 해제됐는지 프레임마다 확인한다. 드래그 중에는 paint만 기다리고 해제 후 정착을 별도로 기다린다.

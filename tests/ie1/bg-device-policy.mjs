@@ -13,8 +13,8 @@ const browser = await chromium.launch({ executablePath: '/usr/bin/google-chrome'
 const image = new PNG({ width: 64, height: 48 }); image.data.fill(255);
 const buffer = PNG.sync.write(image), records = [];
 const devices = [
-  { id: 'iphone', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1', platform: 'iPhone', touch: 5, memory: null, blocked: true },
-  { id: 'ipad-desktop', ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15', platform: 'MacIntel', touch: 5, memory: null, blocked: true },
+  { id: 'iphone', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile/15E148 Safari/604.1', platform: 'iPhone', touch: 5, memory: null, blocked: false, initialMode: 'person' },
+  { id: 'ipad-desktop', ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15', platform: 'MacIntel', touch: 5, memory: null, blocked: false, initialMode: 'person' },
   { id: 'android-4', ua: 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/138.0 Mobile Safari/537.36', platform: 'Linux armv8l', touch: 5, memory: 4, blocked: true },
   { id: 'desktop-8', ua: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/138.0 Safari/537.36', platform: 'Linux x86_64', touch: 0, memory: 8, blocked: false },
   { id: 'touch-laptop', ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/138.0 Safari/537.36', platform: 'Win32', touch: 10, coarse: false, mobile: false, memory: 8, blocked: false },
@@ -62,7 +62,7 @@ try {
       const editor = page.getByTestId('library-image-editor');
       await editor.locator('.lower-canvas').waitFor();
       const select = page.getByTestId('image-background-controls').locator('select');
-      await page.waitForFunction(blocked => document.querySelector('[data-testid=image-background-controls] select').value === (blocked ? 'person' : 'product'), device.blocked);
+      await page.waitForFunction(blocked => document.querySelector('[data-testid=image-background-controls] select').value === (blocked.initialMode || (blocked.blocked ? 'person' : 'product')), device);
       assert.deepEqual(await select.locator('option[value=product]').evaluate(option => ({ disabled: option.disabled, selector: option.matches(':disabled') })),
         { disabled: device.blocked, selector: device.blocked }, 'native option state (the locator enabled helper retargets option to its select)');
       assert.equal(await page.getByTestId('image-background-product-restriction').count(), device.blocked ? 1 : 0);

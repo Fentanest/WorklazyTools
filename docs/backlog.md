@@ -6,11 +6,11 @@
 
 과거 제외 경로·AdSense 콘솔 설정과 GA4 자동 History 측정, 지역별 CMP는 `docs/PUBLISHING_CHECKLIST.md`의 운영 확인 대상이다.
 
-## 사물·제품 배경 제거 제한 해제 (2026-11-03)
+## 사물·제품 배경 제거: iOS 경고·보고된 저메모리 제한 (2026-11-03)
 
-- **완화 조치 유지** — iPhone 11 Safari에서 사물 모드가 2/2 탭 종료된 QA를 근거로 `0b5bc129`에서 iOS/iPadOS WebKit 및 `deviceMemory ≤ 4`의 사물 모드를 캐시·동의·다운로드 전에 막았다. 인물 모드/수동 지우개는 대안이다. 실제 kill이 세션 생성·첫 추론 중 어느 단계인지와 기기 측 peak는 미확정이며, 이 제한은 근본 메모리 최적화가 아니다. 근거: `IE1-IPHONE-QA.md` ③, `SOL-IOS-BG-REPORT.md`, `REVIEWER-SONNET-IOSBG.md` P3-3·4. — Codx
-- **해제 조건** — 더 작은 사물 모델 채택 **또는 검증된 메모리 절감**을 마련하고, iPhone 11급 4GB·iPadOS·제한 대상 저메모리 Android 실기기에서 세션 생성/첫 추론의 기기 측 peak와 cold/warm 반복 완료·취소/재실행을 측정한다. 화질·원본 출력·모델 무결성/라이선스와 다운로드 전 보호 회귀를 보존해야 한다. Chromium UA/기능 모의·shader-f16 지원만으로 제한을 해제하지 않는다. 변경·실측 후 별도 검수로 해제 범위를 판단하며, 이번 후속은 차단 임계값이나 기기 정책을 변경하지 않는다. — Codx
-- **의도된 보수적 판별 / 6GB급 포함** — Chrome의 `deviceMemory`는 실제 여유 RAM이 아니라 근사 bucket이다. **6GB급 Android·터치 노트북도 4로 내려 보고될 수 있어 사물 모드가 차단된다.** [Chromium 구현](https://chromium.googlesource.com/chromium/src/+/9cee804e398ba5b88ea9abf8116e5708cfabce1b/third_party/blink/common/device_memory/approximated_device_memory.cc)은 두 거듭제곱 중 가까운 값을 고르고 동률이면 낮은 값(6GiB→4)을 택하므로, 모든 용량이 항상 내림된다고 일반화하지 않는다. 실제 4GB 이하만 제한하는 정밀 판별로 소개하지 않는다. Safari의 RAM 신호 부재는 4GB로 해석하지 않으며 iOS/iPadOS WebKit은 기기군 전체를 보수적으로 제한한다. 근거: 검수 P3-1. — Codx
+- **사용자 결정: iOS 전면 차단 → 선택 가능한 경고** — 확인된 크래시는 iPhone 11 4GB 한 대의 QA다. 이를 최신 iPhone·M칩 iPad 전체의 실행 불가로 일반화하지 않는다. iOS/iPadOS WebKit은 사물·제품 선택을 허용하고, 실행 때 탭 종료 위험과 인물 모드·수동 지우개 대안을 먼저 안내한다. 사용자가 ‘그래도 진행’을 골라야 기존 다운로드 동의로 넘어간다. 인물 기본 추천, HTTPS·GPU 기능 확인, 모델 무결성은 유지한다. 이전 `0b5bc129`의 기기군 전체 차단을 이 결정으로 대체한다. — Codx
+- **보고된 deviceMemory ≤ 4 차단 유지** — 유한한 양수 메모리 구간이 4 이하이면 iOS 여부보다 먼저 차단한다. 문구도 ‘브라우저가 보고한 구간’임을 명시한다. RAM 미보고는 4GB로 간주하지 않는다. 근사 bucket이므로 6GB급 기기도 4로 보고될 수 있고, 실제 여유 RAM을 정밀 측정하는 정책이 아니다. 근거: `SOL-IOS-BG-REPORT.md`, `REVIEWER-SONNET-IOSBG.md` P3-1. — Codx
+- **계속 남길 후속** — 더 작은 사물 모델 또는 메모리 절감과 iPhone 11급·iPadOS·저메모리 Android의 실제 세션 생성/첫 추론 peak, cold/warm 완료·취소/재실행을 계측한다. 경고 후 진행 허용은 메모리 문제 해결이나 모든 iOS 기기의 성공 보증이 아니다. UA/기능 모의와 실기기 판정을 구별하고 화질·무결성·라이선스·다운로드 전 보호를 보존한다. 보고된 저메모리 차단 자체의 완화는 별도 결정/검수 대상이다. — Codx
 
 ## 시간대 지도 프레임 간격·확대 계측 (2026-11-03)
 
