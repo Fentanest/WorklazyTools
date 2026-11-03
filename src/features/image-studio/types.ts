@@ -7,11 +7,20 @@ export interface ImageWorkerInput {
   buffer: ArrayBuffer;
 }
 
+/** Encoded output shared with the ZIP; never a preview or a re-encode. */
+export interface BatchImageResult {
+  blob: Blob;
+  fileName: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface ImageWorkerResult {
   buffer: ArrayBuffer;
   fileName: string;
   mimeType: string;
   warnings: string[];
+  images?: BatchImageResult[];
 }
 
 export interface BatchImageOptions {

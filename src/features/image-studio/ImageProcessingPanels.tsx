@@ -1,4 +1,4 @@
-import { ArrowDownToLine, ArrowUpToLine, Download, GripVertical, ImageIcon, LayoutGrid, Sparkles, Trash2 } from "lucide-react";
+import { ArrowDownToLine, ArrowUpToLine, Download, Pencil, GripVertical, ImageIcon, LayoutGrid, Sparkles, Trash2 } from "lucide-react";
 import Sortable from "sortablejs";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,9 +28,9 @@ import {
   type ProcessPanelProps,
   useClipboardImages,
 } from "./imageStudioShared";
-import type { CollageOptions, ImageOutputFormat, WatermarkPosition } from "./types";
+import type { BatchImageResult, CollageOptions, ImageOutputFormat, WatermarkPosition } from "./types";
 
-export function BatchImagePanel({ progress, controllerRef, active = true, onDirty, resetResults, inputFiles, handoffFiles, onFiles, onRemove, limitReached }: ProcessPanelProps & { inputFiles: File[]; handoffFiles: File[]; onFiles: (files: File[]) => void; onRemove: (index: number) => void; limitReached: boolean }) {
+export function BatchImagePanel({ progress, controllerRef, active = true, onDirty, resetResults, inputFiles, handoffFiles, onFiles, onRemove, limitReached, onOpenResult }: ProcessPanelProps & { inputFiles: File[]; handoffFiles: File[]; onFiles: (files: File[]) => void; onRemove: (index: number) => void; limitReached: boolean; onOpenResult: (file: File) => void }) {
   const { t, i18n } = useTranslation("features");
   const { t: commonT } = useTranslation("common");
   const files = [...inputFiles, ...handoffFiles];
@@ -44,19 +44,23 @@ export function BatchImagePanel({ progress, controllerRef, active = true, onDirt
   const [watermarkFile, setWatermarkFile] = useState<File>();
   const [watermarkPosition, setWatermarkPosition] = useState<WatermarkPosition>("bottom-right");
   const [watermarkOpacity, setWatermarkOpacity] = useState(0.7);
-  useLayoutEffect(() => onDirty?.("batch", files.length > 0 || Boolean(watermarkFile)), [files.length, watermarkFile, onDirty]);
-  void resetResults;
+  const [results, setResults] = useState<BatchImageResult[]>([]);
+  // Keep Blobs only. Result rows create no persistent object URLs, even for 50 files.
+  useEffect(() => setResults([]), [resetResults]);
+  useLayoutEffect(() => onDirty?.("batch", files.length > 0 || Boolean(watermarkFile) || results.length > 0), [files.length, watermarkFile, results.length, onDirty]);
 
   useClipboardImages(onFiles, active);
 
   const execute = async () => {
     if (!files.length) return;
     const controller = new AbortController(); controllerRef.current = controller;
+    setResults([]);
     progress.start(t("image.batch.prepare"));
     try {
       const watermarkImage = await serializeWatermark(watermarkFile);
       const result = await batchProcessImages(files, { mode, width, height, format, quality, background: transparentBackground ? "transparent" : "#ffffff", watermarkText, watermarkPosition, watermarkOpacity, watermarkImage }, t("image.batch.archive"), progress.update, controller.signal, i18n.language === "en" ? "en" : "ko");
       if (controller.signal.aborted) return;
+      setResults(result.images ?? []);
       downloadWorkerResult(result);
       progress.succeed(t("image.batch.done", { count: files.length }));
     } catch (error) { if (controller.signal.aborted) return; progress.fail(normalizePanelError(error, t)); }
@@ -77,6 +81,20 @@ export function BatchImagePanel({ progress, controllerRef, active = true, onDirt
     <TransparencyControl checked={transparentBackground} onChange={setTransparentBackground} format={format} />
     <Card className="watermark-settings mt-3 grid grid-cols-2 gap-2.5 rounded-2xl border border-sky-200 bg-sky-50/70 p-3 py-3 shadow-none ring-0 max-[620px]:grid-cols-1 dark:border-sky-900 dark:bg-sky-950/35"><UtilityField><span>{t("image.batch.watermarkText")}</span><UtilityInput value={watermarkText} onChange={(event) => setWatermarkText(event.target.value)} placeholder={t("image.batch.watermarkPlaceholder")} /></UtilityField><UtilityField><span>{t("image.batch.watermarkImage")}</span><UtilityInput className="cursor-pointer px-2 py-1.5 file:mr-2 file:rounded-lg file:border-0 file:bg-muted file:px-2 file:py-1 file:text-xs file:font-bold" type="file" disabled={progress.status === "running"} accept={RASTER_IMAGE_ACCEPT} onChange={(event) => setWatermarkFile(filterRasterImages(Array.from(event.target.files || []))[0])} /></UtilityField><UtilityField><span>{t("image.batch.position")}</span><UtilitySelect value={watermarkPosition} onChange={(event) => setWatermarkPosition(event.target.value as WatermarkPosition)}><option value="top-left">{t("image.batch.topLeft")}</option><option value="top-right">{t("image.batch.topRight")}</option><option value="center">{t("image.batch.center")}</option><option value="bottom-left">{t("image.batch.bottomLeft")}</option><option value="bottom-right">{t("image.batch.bottomRight")}</option></UtilitySelect></UtilityField><RangeField label={t("image.batch.opacity")} value={watermarkOpacity} min={0.1} max={1} step={0.05} onChange={setWatermarkOpacity} /></Card>
     <div className="mt-4 flex justify-end max-[620px]:block" data-testid="image-batch-action"><div className="w-full max-w-[310px] max-[620px]:max-w-none"><PrimaryButton accent="sky" disabled={!files.length} loading={progress.status === "running"} onClick={() => void execute()}><Download size={18} /> {t("image.batch.download")}</PrimaryButton></div></div>
+    {results.length > 0 && <section className="mt-4" aria-label={t("image.batch.results")} data-testid="image-batch-results">
+      <h3 className="mb-2 font-bold">{t("image.batch.results")}</h3>
+      <ul className="grid gap-2">
+        {results.map((result, index) => <li key={index} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-3" data-testid="image-batch-result">
+          <div className="min-w-0 flex-1 basis-40">
+            <strong className="block break-all text-sm">{result.fileName}</strong>
+            <span className="text-xs text-muted-foreground">{result.mimeType} · {result.size.toLocaleString(i18n.language)} {t("image.batch.bytes")}</span>
+          </div>
+          <Button type="button" variant="outline" className="min-h-11 whitespace-normal rounded-xl" onClick={() => onOpenResult(new File([result.blob], result.fileName, { type: result.mimeType }))} aria-label={t("image.batch.openNamed", { name: result.fileName })}>
+            <Pencil size={17} aria-hidden="true" />{t("image.batch.openEditor")}
+          </Button>
+        </li>)}
+      </ul>
+    </section>}
   </UtilitySectionCard>;
 }
 export function CollagePanel({ progress, controllerRef, active = true, onDirty, resetResults }: ProcessPanelProps) {

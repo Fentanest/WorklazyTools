@@ -70,7 +70,7 @@ import { useImageDirect } from "./imageDirectLifecycle";
 export interface ImageEditorDirectHandle {
   apply: (preset?: ImageDirectPreset) => void;
   cancel: () => void;
-  receive: (file: File, context: IntakeContext) => Promise<boolean>;
+  receive: (file: File, context: IntakeContext, preserveOutputFormat?: boolean) => Promise<boolean>;
   invalidate: () => void;
 }
 function imageIntakeResult(files: File[], accepted: File[]): DeliveryResult {
@@ -127,6 +127,27 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
     setBatchNotice(undefined);
   };
   const editorHandle = useRef<ImageEditorDirectHandle | undefined>(undefined);
+  const batchEditorIntake = useRef<AbortController | undefined>(undefined);
+  const openBatchResult = async (file: File) => {
+    if (batchEditorIntake.current) return;
+    if (editorDirty && !window.confirm(t("image.editor.confirm"))) return;
+    const controller = new AbortController();
+    batchEditorIntake.current = controller;
+    setTab("editor");
+    progress.reset();
+    try {
+      // Commit the visible editor before its intake checks the active flag.
+      do { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); }
+      while (!editorHandle.current && !controller.signal.aborted);
+      if (!controller.signal.aborted) {
+        const accepted = await editorHandle.current?.receive(file, { signal: controller.signal }, true);
+        if (accepted && !controller.signal.aborted) pageElement.current?.querySelector<HTMLElement>('[data-image-owner="editor"]')?.focus();
+      }
+    } finally {
+      if (batchEditorIntake.current === controller) batchEditorIntake.current = undefined;
+    }
+  };
+  useEffect(() => () => batchEditorIntake.current?.abort(), []);
   const editHandoff = useHandoffReceiver("image-edit", {
     kind: "inspection",
     invalidate: () => editorHandle.current?.invalidate(),
@@ -190,7 +211,7 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
       <Card as="nav" className="studio-tabs mb-3 grid grid-cols-4 gap-1 rounded-2xl border border-border bg-muted p-1.5 py-1.5 shadow-none ring-0 max-[620px]:grid-cols-2" aria-label={t("image.tabs.label")} data-testid="image-studio-tabs">
         {([
           ["editor", t("image.tabs.editor"), ImageIcon], ["batch", t("image.tabs.batch"), Images], ["collage", t("image.tabs.collage"), LayoutGrid], ["gif", t("image.tabs.gif"), Sparkles],
-        ] as const).map(([value, label, Icon]) => <Button type="button" variant="ghost" className={cn("min-h-11 rounded-xl text-muted-foreground hover:bg-card hover:text-foreground", tab === value && "active bg-card text-sky-700 shadow-sm hover:bg-card dark:text-sky-300")} aria-pressed={tab === value} data-state={tab === value ? "active" : "inactive"} onClick={() => { activeController.current?.abort(); activeController.current = undefined; editorHandle.current?.cancel(); setVisited(current => new Set([...current, value])); setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></Button>)}
+        ] as const).map(([value, label, Icon]) => <Button type="button" variant="ghost" className={cn("min-h-11 rounded-xl text-muted-foreground hover:bg-card hover:text-foreground", tab === value && "active bg-card text-sky-700 shadow-sm hover:bg-card dark:text-sky-300")} aria-pressed={tab === value} data-state={tab === value ? "active" : "inactive"} onClick={() => { batchEditorIntake.current?.abort(); activeController.current?.abort(); activeController.current = undefined; editorHandle.current?.cancel(); setVisited(current => new Set([...current, value])); setTab(value); progress.reset(); }} key={value}><Icon size={17} /><span>{label}</span></Button>)}
       </Card>
 
       <UtilityNotice className="image-format-notice mb-2">{t("image.heic")}</UtilityNotice>
@@ -206,8 +227,8 @@ export function ImageStudioPage({ preset }: { preset?: ImageDirectPreset }) {
         </div>
       </UtilityNotice>}
       <div ref={pageElement}>
-      <div hidden={tab !== "editor"} data-image-owner="editor">{IMAGE_EDITOR_ENGINE === "library" ? <Suspense fallback={<p role="status">{t("image.library.loading")}</p>}><LibraryImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} /></Suspense> : <ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} />}</div>
-      {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel inputFiles={batchQueue.inputFiles} handoffFiles={batchQueue.handoffFiles} onFiles={appendBatchFiles} onRemove={removeBatchFile} limitReached={batchNotice === "limit"} progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
+      <div hidden={tab !== "editor"} data-image-owner="editor" role="region" aria-label={t("image.tabs.editor")} tabIndex={-1}>{IMAGE_EDITOR_ENGINE === "library" ? <Suspense fallback={<p role="status">{t("image.library.loading")}</p>}><LibraryImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} /></Suspense> : <ImageEditor active={tab === "editor"} preset={direct.acceptedPreset} handleRef={editorHandle} onDirty={setEditorDirty} onEditedResult={onEditedResult} batchCount={batchCount} batchNotice={batchNotice} />}</div>
+      {visited.has("batch") && <div hidden={tab !== "batch"} data-image-owner="batch"><BatchImagePanel onOpenResult={file => void openBatchResult(file)} inputFiles={batchQueue.inputFiles} handoffFiles={batchQueue.handoffFiles} onFiles={appendBatchFiles} onRemove={removeBatchFile} limitReached={batchNotice === "limit"} progress={progress} controllerRef={activeController} active={tab === "batch"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("collage") && <div hidden={tab !== "collage"} data-image-owner="collage"><CollagePanel progress={progress} controllerRef={activeController} active={tab === "collage"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
       {visited.has("gif") && <div hidden={tab !== "gif"} data-image-owner="gif"><GifPanel progress={progress} controllerRef={activeController} active={tab === "gif"} onDirty={reportOtherDirty} resetResults={resultReset} /></div>}
 
@@ -1092,7 +1113,7 @@ function ImageEditor({ active, preset, handleRef, onDirty, onEditedResult, batch
   handleRef.current = {
     apply: applyDirectPreset,
     cancel: () => { editController.current?.abort(); setLoadingImage(false); setRegionEffectBusy(false); regionEffectBusyRef.current = false; setStickerBusy(false); },
-    receive: (file, context) => { const task = acquireImage(file, context); loadImageTask.current = task; return task; },
+    receive: (file, context, preserveOutputFormat) => { if (preserveOutputFormat && ["image/png", "image/jpeg", "image/webp"].includes(file.type)) setFormat(file.type.slice(6) as ImageOutputFormat); const task = acquireImage(file, context); loadImageTask.current = task; return task; },
     invalidate: () => {
       ++intakeGeneration.current;
       ++resumeImageGeneration.current;

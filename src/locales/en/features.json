@@ -1269,6 +1269,10 @@
       "download": "Download image"
     },
     "batch": {
+      "results": "Batch results",
+      "bytes": "bytes",
+      "openEditor": "Open in editor",
+      "openNamed": "Open {{name}} in editor",
       "prepare": "Preparing image files…",
       "archive": "worklazy-batch-images.zip",
       "done": "Batch processed {{count}} images",

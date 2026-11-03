@@ -76,7 +76,10 @@ async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptio
       undefined,
       { level: 6 },
     );
-    return binaryResult(await archive.arrayBuffer(), ensureExtension(archiveName, "zip"), "application/zip", []);
+    return {
+      ...binaryResult(await archive.arrayBuffer(), ensureExtension(archiveName, "zip"), "application/zip", []),
+      images: archiveFiles.map(({ fileName, blob }) => ({ fileName, blob, mimeType: blob.type, size: blob.size })),
+    };
   } finally {
     watermark?.close();
   }
