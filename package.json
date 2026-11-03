@@ -41,6 +41,7 @@
     "test:new-tools": "node tests/new-tools-smoke.mjs",
     "test:video-hybrid": "node tests/video-hybrid-smoke.mjs",
     "test:utilities": "node tests/utility-tools-smoke.mjs",
+    "test:timezone-map": "node --test tests/timezone-map-smoke.mjs",
     "test:visual": "node tests/visual-regression.mjs",
     "test:visual:qa": "VISUAL_QA_CAPTURE_ONLY=1 node tests/visual-regression.mjs",
     "test:visual-bottom-negative": "node tests/mobile-bottom-negative-control.mjs",
