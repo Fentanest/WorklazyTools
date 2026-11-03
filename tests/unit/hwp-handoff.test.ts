@@ -20,7 +20,8 @@ async function fixture(run:(f:{adapter:()=>HandoffAdapter; select:(files:File[])
  const ready=deferred<void>(),load=deferred<void>(),hml=deferred<void>();
  let adapter:HandoffAdapter,select:(files:File[])=>void,protectedInput=false;
  const editors:any[]=[];
- const noop=()=>{},t=(key:string,options?:Record<string,unknown>)=>key+(options?.name?':'+options.name:'');
+ const labels={ko:JSON.parse(readFileSync(new URL("../../src/locales/ko/features.json",import.meta.url),"utf8")).hwpEditor.documentInputLabel,en:JSON.parse(readFileSync(new URL("../../src/locales/en/features.json",import.meta.url),"utf8")).hwpEditor.documentInputLabel};
+ const noop=()=>{},t=(key:string,options?:Record<string,unknown>)=>key.endsWith("hwpEditor.documentInputLabel")?labels[options?.lng==="ko"?"ko":language]:key+(options?.name?':'+options.name:'');
  const i18n={t,resolvedLanguage:language};
  const progress={status:"idle",message:"",logs:[],start:noop,succeed:noop,fail:noop,reset:noop};
  const box=({children,...props}:any)=>React.createElement("div",Object.fromEntries(Object.entries(props).filter(([key])=>key.startsWith('data-'))),children);
@@ -43,6 +44,11 @@ async function fixture(run:(f:{adapter:()=>HandoffAdapter; select:(files:File[])
     destroy(){this.destroyed=true;},
     async loadFile(){this.calls++;if(index===0&&block==='load')await load.promise;if(block==='fail')throw Error('corrupt');return {pageCount:2};},
     async getHmlSaveState(){if(index===0&&block==='hml')await hml.promise;return {hmlSavable:true,blockers:[]};}};
+   const frame=dom.window.document.implementation.createHTMLDocument('Studio');
+   const input=frame.createElement('textarea');input.setAttribute('aria-label',labels.ko);
+   const other=frame.createElement('input');other.setAttribute('aria-label','Find document');frame.body.append(input,other);
+   Object.defineProperty(editor.element,'contentDocument',{value:frame});
+   Object.assign(editor,{imeInput:input,otherInput:other});
    editors.push(editor);if(index===0&&block==='ready')await ready.promise;return editor;
   }};
   if(id==='../../components/ui')return {SectionCard:box,PageHeader:box,PrimaryButton:box,FileList:()=>null,FileDropZone:({onFiles}:any)=>{select=onFiles;return null;}};
@@ -122,3 +128,8 @@ test('P3b HWP second handoff cannot cancel an already pending manual open',async
 for(const language of ['ko','en'] as const)test(`HWP initial Studio uses the ${language} route locale`,async()=>fixture(async f=>{
  assert.equal(f.editors[0].studioUrl,`/studio?lang=${language}`);
 },'none',language));
+
+test('English HWP bootstrap localizes only the embedded IME input accessible name',async()=>fixture(async f=>{
+ assert.equal(f.editors[0].imeInput.getAttribute('aria-label'),'Document editing input');
+ assert.equal(f.editors[0].otherInput.getAttribute('aria-label'),'Find document');
+},'none','en'));

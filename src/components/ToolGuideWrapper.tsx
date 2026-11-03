@@ -82,7 +82,7 @@ export function ToolGuideWrapper({ slug, children }: { slug: string; children?: 
   return (
     <GuideErrorBoundary fallback={
       <Card as="section" className="ui-tool-guide gap-0 overflow-visible rounded-none bg-destructive/10 p-5 shadow-none ring-0">
-        <p className="text-destructive font-bold">{t("errors.guideFailed", "가이드 정보를 불러올 수 없습니다. 작업을 중단합니다.")}</p>
+        <p className="text-destructive font-bold">{t("recovery.guideFailed")}</p>
       </Card>
     }>
       <InnerToolGuide slug={slug}>{children}</InnerToolGuide>
