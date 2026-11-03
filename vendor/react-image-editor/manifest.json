@@ -1,15 +1,15 @@
 {
   "schemaVersion": 1,
   "name": "@ascentsparksoftware/react-image-editor",
-  "version": "1.3.0-worklazy.3",
+  "version": "1.3.0-worklazy.4",
   "upstreamCommit": "125ae084c4f68dc516702440e4e0d20ab17e581c",
   "forkCommit": "263b8cfc347c822ff1bf4d2d85b5a95c0efe51d4",
   "license": "MIT",
   "files": [
     {
-      "file": "ascentsparksoftware-react-image-editor-1.3.0-worklazy.3.tgz",
-      "bytes": 278595,
-      "sha256": "a386cd1dd5ebc3d51129d23792f488e09bac258ea500548d4d1a659ac9a928c9"
+      "file": "ascentsparksoftware-react-image-editor-1.3.0-worklazy.4.tgz",
+      "bytes": 280737,
+      "sha256": "6b84bda9294d8d3025485605eda3b143035baafb3f4aec7de249688bfb79c591"
     },
     {
       "file": "source-263b8cf.tar.gz",
@@ -18,11 +18,11 @@
     },
     {
       "file": "ie1-safari-fixes.patch",
-      "bytes": 17018,
-      "sha256": "b5e0ebe31c904d26a023819dff90cbcfad89179ffe630dd23327dfecd501de34"
+      "bytes": 26021,
+      "sha256": "886b5ace8e5044d3765d769badafd961dec0fb76d24e4c805eb5efb51222d29d"
     }
   ],
-  "packageFile": "ascentsparksoftware-react-image-editor-1.3.0-worklazy.3.tgz",
+  "packageFile": "ascentsparksoftware-react-image-editor-1.3.0-worklazy.4.tgz",
   "sourcePatch": "ie1-safari-fixes.patch",
-  "sourceDescription": "Base fork263b8cf plus the pinned local source patch; built in this worktree, unpublished."
+  "sourceDescription": "Base fork263b8cf plus pinned Safari/output fixes and transparent-sample/compositing-eraser source patch; privately built, unpublished."
 }
