@@ -19,6 +19,7 @@ import { encodeSendImage } from './encodeSendImage';
 import type { ImageOutputFormat } from '../types';
 import type { PixelSize } from './d6Policy';
 import './libraryImageEditor.css';
+import { useMobileImageRail } from './useMobileImageRail';
 
 interface Props {
   active: boolean; preset?: ImageDirectPreset; handleRef: React.MutableRefObject<ImageEditorDirectHandle | undefined>;
@@ -49,6 +50,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const root = useRef<HTMLDivElement>(null);
   const [source, setSource] = useState<PreparedImage>();
   const [generation, setGeneration] = useState(0);
+  useMobileImageRail(root, generation, active);
   const latestGeneration = useRef(generation); latestGeneration.current = generation;
   const lastStableSource = useRef<PreparedImage | undefined>(undefined);
   const [selectedPreset, setSelectedPreset] = useState(preset);
@@ -362,6 +364,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
           {outputSize && <Button type="button" variant="ghost" onClick={() => { setOutputSize(undefined); }}>{t('image.library.autoSize')}</Button>}
         </div>
       </fieldset>
+      <p id="image-mobile-rail-hint" className="mobile-image-rail-hint text-xs text-muted-foreground">{t('image.library.mobileRailHint')}</p>
       <div ref={editorArea} className="library-image-editor" data-testid="image-editor-workspace" onClickCapture={event => {
         // Opening tools or touching the canvas is not a new operation. Native
         // format selection is; actual edits are observed below and in history.

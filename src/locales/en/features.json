@@ -1631,7 +1631,8 @@
       "templateHelp": "To continue editing later, use Save template and Load template in the Image menu above.",
       "operationErrorTitle": "The operation could not be completed.",
       "cancelled": "Cancelled.",
-      "httpsHint": "Background removal requires a secure HTTPS connection. Open the HTTPS address before running it."
+      "httpsHint": "Background removal requires a secure HTTPS connection. Open the HTTPS address before running it.",
+      "mobileRailHint": "Swipe sideways to choose a tool, or use Tab on a keyboard."
     }
   },
   "video": {

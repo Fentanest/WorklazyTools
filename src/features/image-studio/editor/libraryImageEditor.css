@@ -27,3 +27,20 @@
 /* Page-level sticky rail shares the shell header's clearance. The package
    determines when the rail becomes sticky; desktop static rails keep layout. */
 .library-image-editor .asp-workspace__rail { top: var(--wl-sticky-top, 80px); }
+
+.mobile-image-rail-hint { display: none; }
+@media (max-width: 620px) {
+  .mobile-image-rail-hint { display: block; margin: 0 0 6px; }
+  .library-image-editor .asp-workspace__rail {
+    flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: thin; overscroll-behavior-x: contain;
+  }
+  .library-image-editor .asp-workspace__rail .asp-rail__slot { flex: 0 0 80px; min-width: 80px; max-width: 80px; }
+  .library-image-editor .asp-workspace__rail .asp-rail__label { white-space: nowrap; }
+  .library-image-editor .asp-workspace__rail.is-outside-safe-viewport { opacity: 0; pointer-events: none; }
+  .library-image-editor .asp-rail__flyout[popover] {
+    margin: 0; right: auto; bottom: auto;
+    max-height: calc(100dvh - var(--wl-rail-menu-top, 80px) - var(--wl-rail-bottom-clearance, 89px));
+    overflow-y: auto;
+  }
+}
