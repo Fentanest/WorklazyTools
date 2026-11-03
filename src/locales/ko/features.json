@@ -1262,6 +1262,10 @@
       "download": "이미지 다운로드"
     },
     "batch": {
+      "results": "일괄 처리 결과",
+      "bytes": "바이트",
+      "openEditor": "편집기에서 열기",
+      "openNamed": "{{name}} 편집기에서 열기",
       "prepare": "이미지 파일을 준비하는 중…",
       "archive": "worklazy-일괄이미지.zip",
       "done": "{{count}}개 이미지 일괄 처리 완료",

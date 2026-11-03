@@ -177,7 +177,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
 
   useEffect(() => { invalidatePrepared(); clearFeedback(); }, [outputFormat, outputSize?.width, outputSize?.height, invalidatePrepared, clearFeedback]);
 
-  const receive = async (file: File, context?: IntakeContext) => {
+  const receive = async (file: File, context?: IntakeContext, preserveOutputFormat = false) => {
     if (!filterRasterImages([file]).length || context?.signal.aborted) return false;
     setRecoveryNotice(false); cancel(); const request = version.current;
     invalidatePrepared(); setLoading(true); setError(''); setErrorCode(undefined); clearFeedback(); setResult(undefined); setOutputSize(undefined); setNativeOutputSize(undefined);
@@ -187,6 +187,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
       const prepared = await prepareImage(file, policy.resolutionLimits.inputMaxDimension);
       if (request !== version.current || context?.signal.aborted) return false;
       setUnsavedWork('image-studio', { hasWork: true, kind: 'files', scopePath: '/tools/image-studio' });
+      if (preserveOutputFormat && ['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) setOutputFormat(file.type.slice(6) as ImageOutputFormat);
       setLoaded(false); setHasTemplateInput(false); setSource(prepared); setGeneration(value => value + 1);
       return await new Promise<boolean>(resolve => { loadedAck.current = { resolve, version: request }; });
     } catch {
@@ -200,7 +201,7 @@ export default function LibraryImageEditor({ active, preset, handleRef, onDirty,
   const receiveRef = useRef(receive); receiveRef.current = receive;
   useEffect(() => {
     const handle: ImageEditorDirectHandle = {
-      receive: (file, context) => receiveRef.current(file, context), cancel,
+      receive: (file, context, preserveOutputFormat) => receiveRef.current(file, context, preserveOutputFormat), cancel,
       invalidate: cancel,
       apply: next => applyPresetRef.current(next),
     };
