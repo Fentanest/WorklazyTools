@@ -3421,3 +3421,10 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - 복사 버튼/보관본 details는 native 키보드 동작을 사용하며, 공식 한국어 원문을 lang=ko와 data-mcal-original로 표시한다. 영어 UI의 일반 명령어는 계속 한국어 누출 검사 대상으로 두고 공식 원문만 구분했다. 날짜 설명의 내부 메모 금지 단언은 유지했다.
 - 배포 복사는 새 두 파일을 SHA/세대 검증 후 함께 싣고, 없거나 잘못되면 발췌만 숨긴다. 기존 달력 checkout 실패 시 이전 배포본을 복구하는 동작은 유지했다. 사이트를 먼저 배포해 ①을 제공할 수 있고 다음 정상 market-calendar 발행부터 ②가 활성화된다.
 - 테스트·두 저장소 커밋·규정명/소비자 호환 근거·화면·정확한 실행 범위는 SOL-KRXRULE-REPORT.md에 보존한다. merge·push·운영 서비스 실행 및 .team 갱신은 하지 않았다.
+
+
+## 2026-11-03 — KRXRULE FIX1 / 사이트 P3 (Codx, 재검수 대기)
+
+- MC source-excerpts.schema.json과 바이트 동일한 계약 사본을 실제 로더가 읽는다. 현재 계약의 type/required/additionalProperties/format/크기·개수·패턴 제약을 CSP eval 없이 적용하며, 지원 밖 검증 키워드는 허용하지 않는다. 잘못된 실제 날짜·timezone 누락도 거부하고 기존 id/bookid·조문 문맥 검사는 유지했다. 새 의존성은 추가하지 않았다.
+- 일반 GET 출처의 링크 이름에 sourceNumber를 적용해 같은 날짜의 링크를 구분한다. 보관 사본 제목은 enclosing SectionCard h2 다음 h3로 표시한다. 휴장일(거래 시간 h3가 없는 경우)과 복수 일반 링크를 브라우저 fixture로 검사했다.
+- 단위 1,332건·i18n·build·static 및 근거 브라우저 5건 통과. 올바른 SHA를 가진 schema-invalid 자료도 보관본만 숨기고 달력/안내를 유지했다. 상세 근거와 MC 보완 결과는 SOL-KRXRULE-FIX1.md에 보존한다.

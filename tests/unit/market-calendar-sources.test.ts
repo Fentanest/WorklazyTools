@@ -34,3 +34,31 @@ test('missing or corrupt optional provenance leaves the calendar reader independ
     assert.deepEqual(await loadSourceExcerpts('/', 'fixture'), catalog)
   } finally { globalThis.fetch = original }
 })
+
+test('the checked-in shared schema rejects structural, date and count violations', () => {
+  const clone = () => structuredClone(catalog)
+  assert.equal(validCatalog({ schema_version: 1, generation_id: 'fixture', sources: [{}] }, 'fixture'), false)
+  const variants: unknown[] = []
+  variants.push({ ...clone(), extra: true })
+  const sourceExtra = clone(); Object.assign(sourceExtra.sources[0], { extra: true }); variants.push(sourceExtra)
+  const excerptExtra = clone(); Object.assign(excerptExtra.sources[0].excerpts[0], { extra: true }); variants.push(excerptExtra)
+  const missing = clone(); delete (missing.sources[0].excerpts[0] as { text?: string }).text; variants.push(missing)
+  const wrongType = clone(); Object.assign(wrongType.sources[0], { bookid: 123 }); variants.push(wrongType)
+  const badDate = clone(); badDate.sources[0].fetched_at = '2026-02-30T00:00:00Z'; variants.push(badDate)
+  const noTimezone = clone(); noTimezone.sources[0].fetched_at = '2026-11-03T01:00:00'; variants.push(noTimezone)
+  const tooManySources = clone(); tooManySources.sources = Array.from({ length: 65 }, (_, i) => ({ ...clone().sources[0], id: `krx-rule-${i}`, bookid: String(i) })); variants.push(tooManySources)
+  const tooManyArticles = clone(); tooManyArticles.sources[0].excerpts = Array.from({ length: 33 }, (_, i) => ({ article: `제${i + 1}조(test)`, text: `제${i + 1}조(test)\nBody` })); variants.push(tooManyArticles)
+  for (const value of variants) assert.equal(validCatalog(value, 'fixture'), false)
+  const boundary = clone(); boundary.sources = Array.from({ length: 64 }, (_, i) => ({ ...clone().sources[0], id: `krx-rule-${i}`, bookid: String(i), excerpts: Array.from({ length: 32 }, (_, n) => ({ article: `제${n + 1}조(test)`, text: `제${n + 1}조(test)\nBody` })) }))
+  assert.equal(validCatalog(boundary, 'fixture'), true)
+  const leap = clone(); leap.sources[0].fetched_at = '2024-02-29t01:00:00z'; assert.equal(validCatalog(leap, 'fixture'), true)
+})
+test('schema-invalid optional bytes with a correct SHA are hidden by the actual loader', async () => {
+  const original = globalThis.fetch
+  try {
+    const raw = JSON.stringify({ ...catalog, sources: [{}] })
+    const checksum = Buffer.from(await webcrypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))).toString('hex')
+    globalThis.fetch = async input => new Response(String(input).endsWith('.sha256') ? checksum : raw)
+    assert.equal(await loadSourceExcerpts('/', 'fixture'), null)
+  } finally { globalThis.fetch = original }
+})

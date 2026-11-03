@@ -40,17 +40,17 @@ function RuleSource({ source, catalog }: { source: ReturnType<typeof groupSource
         </dl>
         {saved.representation === 'session_redacted' && <p className="text-sm text-muted-foreground">{text('redactedCopy')}</p>}
         {excerpts.map(excerpt => <section key={excerpt.article}>
-          <h4 lang="ko" data-mcal-original="true" className="font-semibold">{excerpt.article}</h4>
+          <h3 lang="ko" data-mcal-original="true" className="font-semibold">{excerpt.article}</h3>
           <pre lang="ko" data-mcal-original="true" className="whitespace-pre-wrap break-words text-sm font-sans">{excerpt.text}</pre>
         </section>)}
       </div>
     </details>}
   </div>
 }
-function NormalSource({ source }: { source: ReturnType<typeof officialSources>[number] }) {
+function NormalSource({ source, number }: { source: ReturnType<typeof officialSources>[number]; number: number }) {
   const text = useSourceText()
   return <div>
-    <a href={source.url} target="_blank" rel="noopener noreferrer">{text('sources')} ↗</a>
+    <a href={source.url} target="_blank" rel="noopener noreferrer">{text('sourceNumber', { number })} ↗</a>
     <details><summary>{text('quote')}</summary><blockquote data-mcal-original="true">{source.quotes[0]}</blockquote></details>
   </div>
 }
@@ -60,7 +60,7 @@ export function CalendarSources({ sources, catalog }: { sources: CalendarRow['so
   const normal = officialSources(sources.filter(source => !isKrxRule(source.url)))
   const items = [
     ...rules.map(source => <RuleSource key={source.id} source={source} catalog={catalog} />),
-    ...normal.map(source => <NormalSource key={source.url} source={source} />),
+    ...normal.map((source, index) => <NormalSource key={source.url} source={source} number={rules.length + index + 1} />),
   ]
   if (!items.length) return null
   return <div className="mcal-sources space-y-3">
