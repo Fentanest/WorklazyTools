@@ -81,6 +81,7 @@ export type PdfFinishEngineErrorCode =
   | "protected-document"
   | "unreadable-document"
   | "save-failed"
+  | "processing-failed"
   | "invalid-field"
   | "control-character"
   | "date-format"
@@ -1053,8 +1054,9 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
   const completed = { value: 0 };
   const resources = createBatchFontResources(input);
   const outputs: PdfFinishOutput[] = [];
-  const resultStore = input.resultStore ?? await createPdfFinishResultStore();
+  let resultStore = input.resultStore;
   try {
+    resultStore ??= await createPdfFinishResultStore();
     for (const [fileIndex, source] of input.files.entries()) {
       throwIfAborted(input.signal);
       await yieldToEventLoop();
@@ -1139,13 +1141,15 @@ export async function finishPdfFiles(input: PdfFinishEngineInput): Promise<PdfFi
       throw new PdfFinishCanceledError(error.message, outputs);
     }
     if (outputs.length > 0 && !(error instanceof PdfFinishPartialError)) {
-      // Keep classified failures and completed results together. Unclassified
-      // failures before saving retain the existing input-error fallback.
-      const code = error instanceof PdfFinishEngineError ? error.code : "unreadable-document";
+      // Only the read/save boundaries can attribute a failure to those stages.
+      // Unknown processing failures use the same code with or without results.
+      const code = error instanceof PdfFinishEngineError ? error.code : "processing-failed";
       throw new PdfFinishPartialError(code, outputs, error);
     }
-    if (outputs.length === 0) await resultStore.dispose();
-    throw error;
+    if (outputs.length === 0) await resultStore?.dispose();
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    if (error instanceof PdfFinishEngineError) throw error;
+    throw new PdfFinishEngineError("processing-failed", {}, error);
   }
   return outputs;
 }

@@ -425,6 +425,48 @@ test("finish input read failures retain unreadable-document even for allocation 
   });
 });
 
+test("unclassified analysis and decoration failures use processing-failed with or without completed results", async (t) => {
+  const failure = new RangeError("injected processing allocation failure");
+  for (const stage of ["analysis", "decoration"] as const) {
+    for (const failAt of [1, 2]) {
+      await t.test(`${stage}, file ${failAt}`, async () => {
+        const files = await Promise.all([fixture("first.pdf"), fixture("second.pdf")]);
+        const { PDFPage } = await import("pdf-lib");
+        const target = stage === "analysis" ? PDFDocument.prototype : PDFPage.prototype;
+        const method = stage === "analysis" ? "getPages" : "drawText";
+        const original = (target as any)[method];
+        let currentFile = 0;
+        let partial: PdfFinishPartialError | undefined;
+        (target as any)[method] = function (...args: unknown[]) {
+          if (currentFile === failAt) throw failure;
+          return original.apply(this, args);
+        };
+        try {
+          await assert.rejects(finishPdfFiles({
+            files: files.map((file, index) => ({ key: `${index}`, file, selection: selection(3, "1") })),
+            options: { template: "{page}", region: "bottom-center", fontSize: 10, color: "#34343a", margin: 24, startNumber: 1, startPage: 1, excludeCover: false },
+            locale: "en-US",
+            onProgress: ({ phase, completed }) => { if (phase === "reading") currentFile = completed + 1; },
+          }), (error: unknown) => {
+            assert.ok(error instanceof PdfFinishEngineError);
+            assert.equal(error.code, "processing-failed");
+            assert.equal(error.cause, failure);
+            assert.equal(error instanceof PdfFinishPartialError, failAt === 2);
+            if (error instanceof PdfFinishPartialError) {
+              partial = error;
+              assert.deepEqual(error.partialResults.map(({ key }) => key), ["0"]);
+            }
+            return true;
+          });
+        } finally {
+          (target as any)[method] = original;
+          for (const output of partial?.partialResults ?? []) await output.dispose();
+        }
+      });
+    }
+  }
+});
+
 test("finish Blob allocation failure exposes completed outputs and never starts the next file", async () => {
   const files = await Promise.all(["first", "second", "third"].map((name) => fixture(`${name}.pdf`)));
   const originalThirdRead = files[2].arrayBuffer.bind(files[2]);
