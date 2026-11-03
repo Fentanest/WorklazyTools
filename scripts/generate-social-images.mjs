@@ -47,7 +47,7 @@ const tools = [
   tool("office-editor", "#7554d8", "브라우저 오피스", "워드·엑셀·PPT 온라인 편집", "설치 없이 열기 · 브라우저 저장", "Browser office", "Office Editor", "Writer · Calc · Impress · local saving"),
   tool("video-studio", "#d8468f", "미디어", "비디오 스튜디오", "영상 자르기 · 이어붙이기 · 음원 추출", "Media", "Video Studio", "Trim · join · extract audio"),
   tool("audio-studio", "#7554d8", "미디어", "오디오 스튜디오", "파형 편집 · 구간 자르기 · 피치 조절", "Media", "Audio Studio", "Waveform editing · trimming · pitch"),
-  tool("image-studio", "#0b91c9", "미디어", "이미지 스튜디오", "사진 편집 · 모자이크 · 콜라주 · GIF", "Media", "Image Studio", "Photo editing · mosaic · collage · GIF"),
+  tool("image-studio", "#0b91c9", "미디어", "이미지 편집", "이미지 편집 · 모자이크 · 콜라주 · GIF", "Media", "Image Editor", "Image editing · mosaic · collage · GIF"),
   tool("text-merger", "#0879d9", "텍스트·데이터", "텍스트 병합", "직접 입력 · TXT 파일 · 통합 순서 변경", "Text & data", "Text Merger", "Pasted text · TXT files · unified ordering"),
   tool("text-tools", "#0879d9", "텍스트·데이터", "텍스트 정돈", "공백 · 줄바꿈 · 중복 줄 · 케이스 변환", "Text & data", "Text Cleanup", "Whitespace · lines · duplicates · letter case"),
   tool("code-formatter", "#7554d8", "텍스트·데이터", "코드 포맷터", "JSON · SQL · XML · 문법 검사", "Text & data", "Code Formatter", "JSON · SQL · XML · syntax validation"),

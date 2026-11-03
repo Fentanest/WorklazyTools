@@ -19,7 +19,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
     ko: {
       "/tools/video-studio": "온라인 동영상 편집 - 자르기·합치기·변환 | Worklazy Tools",
       "/tools/audio-studio": "온라인 오디오 편집 - 음소거·피치 조절 | Worklazy Tools",
-      "/tools/image-studio": "온라인 사진 편집 - 자르기·그리기·콜라주 | Worklazy Tools",
+      "/tools/image-studio": "온라인 이미지 편집 - 자르기·그리기·콜라주 | Worklazy Tools",
       "/tools/image-privacy": "사진 위치정보·메타데이터(EXIF) 삭제 | Worklazy Tools",
       "/tools/qr-studio": "QR 코드 만들기·읽기 - 로고 삽입·사진 스캔 | Worklazy Tools",
       "/tools/qr-studio/bulk": "QR 코드 일괄 생성 - 엑셀·CSV로 대량 생성 | Worklazy Tools",
@@ -35,7 +35,7 @@ test("tool metadata keeps a distinct identity in Korean and English", () => {
     en: {
       "/tools/video-studio": "Online Video Editor - Trim, Merge & Convert | Worklazy Tools",
       "/tools/audio-studio": "Online Audio Editor - Mute, Trim & Pitch Shift | Worklazy Tools",
-      "/tools/image-studio": "Online Photo Editor - Crop, Draw & Collage | Worklazy Tools",
+      "/tools/image-studio": "Online Image Editor - Crop, Draw & Collage | Worklazy Tools",
       "/tools/image-privacy": "Remove Photo Location - Delete EXIF & GPS Data | Worklazy Tools",
       "/tools/qr-studio": "QR Code Generator & Scanner - Add Logo | Worklazy Tools",
       "/tools/qr-studio/bulk": "Bulk QR Code Generator - Excel & CSV | Worklazy Tools",
