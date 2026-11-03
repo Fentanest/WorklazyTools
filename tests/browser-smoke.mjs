@@ -29,6 +29,7 @@ try {
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
 
+  const completedScopes = [];
   try {
     const page = await browser.newPage();
     page.setDefaultTimeout(180_000);
@@ -55,6 +56,7 @@ try {
 
     if (process.env.TEST_SCOPE === "pdf") {
       await testPdfTools(page, fixtures, tempDir);
+      completedScopes.push("PDF edit/range split and PDF conversion");
     } else if (process.env.TEST_SCOPE === "excel") {
       await testEncryptedExcelMerge(page, fixtures, tempDir);
       await testExcelThemeColors(page, fixtures, tempDir);
@@ -62,8 +64,10 @@ try {
       await testExcelSheetSelection(page, fixtures, tempDir);
       await testExcelSheetGridLayout(page, fixtures);
       await testExcelSheetTrim(page, fixtures, tempDir);
+      completedScopes.push("Excel");
     } else if (process.env.TEST_SCOPE === "word") {
       await testWordCompare(page, fixtures, tempDir);
+      completedScopes.push("Word comparison");
     } else {
       await testEncryptedExcelMerge(page, fixtures, tempDir);
       await testExcelThemeColors(page, fixtures, tempDir);
@@ -71,8 +75,11 @@ try {
       await testExcelSheetSelection(page, fixtures, tempDir);
       await testExcelSheetGridLayout(page, fixtures);
       await testExcelSheetTrim(page, fixtures, tempDir);
+      completedScopes.push("Excel");
       await testWordCompare(page, fixtures, tempDir);
+      completedScopes.push("Word comparison");
       await testPdfTools(page, fixtures, tempDir);
+      completedScopes.push("PDF edit/range split and PDF conversion");
     }
 
     if (pageErrors.length) throw new Error(`Browser errors:\n${pageErrors.join("\n")}`);
@@ -81,7 +88,7 @@ try {
     await browser.close();
   }
 
-  console.log("Browser smoke tests passed: Excel, Word comparison, PDF edit/range split and PDF conversion.");
+  console.log(`Browser smoke tests passed: ${completedScopes.join(", ")}.`);
 } finally {
   await fs.rm(tempDir, { recursive: true, force: true });
 }
