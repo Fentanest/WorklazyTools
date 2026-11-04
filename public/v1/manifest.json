@@ -1,20 +1,20 @@
 {
   "schema_version": 1,
-  "generation_id": "20261103T210000.517338Z",
-  "created_at": "2026-11-03T21:03:22.775825+00:00",
-  "source_manifest_sha256": "d4993b8adcacce1b08c4ab7c0d305d9ce0163efdd7a0fe6709bfebe131c1b4d3",
+  "generation_id": "20261104T210000.504699Z",
+  "created_at": "2026-11-04T21:32:18.447077+00:00",
+  "source_manifest_sha256": "44932db74967d812ba98db879f3dc5ef0e07819cb143cfe778d6f7163a15d6cb",
   "files": [
     {
       "path": "calendar-2026.json",
       "year": 2026,
-      "sha256": "6ee4e276b271c5f7e82f42cbd2d4a1a6c57522c66dc49931a97504e16785135a",
-      "source_sha256": "d3d41ec24214a3a14d6957cefc73ec5396144e87d8d68060871a9e85fad260ee"
+      "sha256": "211adddfddf644d01488517fb0ecf171e794d6bf750cd5f5e9b23ddacc8430f8",
+      "source_sha256": "9179de6c2cee5b0c6c82ad7fc179f58342ce0fa18d5b77dc2b8288a98c24cf96"
     },
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "f4bef0bfebe4c57f92f45670868fcf2491581617a115f33f5d5c3c16ca8a5118",
-      "source_sha256": "86d574e112c81f7338e936bafb5f09fbd03b43dac77caf9c524c5ee30420a952"
+      "sha256": "897e3039e4f42473710bfe803ad73374484f68bf764dadd3cd3e27fbc18f01f4",
+      "source_sha256": "95bb036079bec716edfa1164bf73198e9d4cc3046bce2c5884e15dec3fbd9802"
     }
   ],
   "scopes": [
@@ -23,7 +23,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "e96cc3716433e15b59cc2f0b9e5de6832ba3a6d8cdb1b6c8c14d416b9357fcb7",
-      "last_checked_at": "2026-11-03T21:03:18.670608+00:00",
+      "last_checked_at": "2026-11-04T21:02:34.186687+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -34,7 +34,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "7638ec018fa03360a52509bb2d5b92bc2ebac5119bef7888cf5dccdab63de075",
-      "last_checked_at": "2026-11-03T21:03:18.670608+00:00",
+      "last_checked_at": "2026-11-04T21:02:34.186687+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -45,7 +45,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "2280e8a2581c1e4577e9a9300593fa0cad57b51e4c32102b39b338ff3270085e",
-      "last_checked_at": "2026-11-03T21:03:18.670608+00:00",
+      "last_checked_at": "2026-11-04T21:02:34.186687+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -56,7 +56,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "c3dc345f2bf23cd37d290c7437e2298ac42752ae53044edf4e466c4aaccc743f",
-      "last_checked_at": "2026-11-03T21:03:18.670608+00:00",
+      "last_checked_at": "2026-11-04T21:02:34.186687+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -67,7 +67,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "7901a67ba8ec5e9c7148551eb5cc1735bedeb9cf70ad1d74fbfe369e7c9c76b8",
-      "last_checked_at": "2026-11-03T21:03:18.670608+00:00",
+      "last_checked_at": "2026-11-04T21:02:34.186687+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -78,15 +78,15 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-11-03T21:03:18.670608+00:00",
+      "last_checked_at": "2026-11-04T21:02:34.186687+00:00",
       "validity": "held",
       "reason": "nasdaq-2027-annual",
       "unpublished": true,
       "unpublished_evidence": [
         {
           "source_id": "nasdaq-holiday-schedule",
-          "fetched_at": "2026-11-03T21:01:03.604404+00:00",
-          "raw_sha256": "68d67d5923478f84e71cead8ef0f687234637f1736b53810f2749ab7a9a80cf2",
+          "fetched_at": "2026-11-04T21:00:57.018982+00:00",
+          "raw_sha256": "a31c11ba93df0627c7a8a554b6007d431609cd083defa4fa554fe2a602c22cd3",
           "rule": "D12-nasdaq-holiday-schedule-year-absent-v1"
         }
       ]
@@ -96,7 +96,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-11-03T21:03:18.670608+00:00",
+      "last_checked_at": "2026-11-04T21:02:34.186687+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -107,7 +107,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "c3dc345f2bf23cd37d290c7437e2298ac42752ae53044edf4e466c4aaccc743f",
-      "last_checked_at": "2026-11-03T21:03:18.670608+00:00",
+      "last_checked_at": "2026-11-04T21:02:34.186687+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,

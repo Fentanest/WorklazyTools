@@ -117,12 +117,12 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "New Year’s Day",
+    "special": "New Year's Day",
     "sources": [
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "New Year’s DayThursday, January 1Friday, January 1—*"
+        "quote": "New Year’s DayThursday, January 1"
       }
     ],
     "reason": null,
@@ -3105,7 +3105,7 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Martin Luther King, Jr. DayMonday, January 19Monday, January 18Monday, January 17"
+        "quote": "Martin Luther King, Jr. DayMonday, January 19"
       }
     ],
     "reason": null,
@@ -7882,7 +7882,7 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Washington's BirthdayMonday, February 16Monday, February 15Monday, February 21"
+        "quote": "Washington's BirthdayMonday, February 16"
       }
     ],
     "reason": null,
@@ -15809,7 +15809,7 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Good FridayFriday, April 3Friday, March 26Friday, April 14"
+        "quote": "Good FridayFriday, April 3"
       }
     ],
     "reason": null,
@@ -24448,7 +24448,7 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Memorial DayMonday, May 25Monday, May 31Monday, May 29"
+        "quote": "Memorial DayMonday, May 25"
       }
     ],
     "reason": null,
@@ -28891,7 +28891,7 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Juneteenth National Independence DayFriday, June 19Friday, June 18 (Juneteenth National Independence Day observed)Monday, June 19"
+        "quote": "Juneteenth National Independence DayFriday, June 19"
       }
     ],
     "reason": null,
@@ -31304,12 +31304,12 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "Independence Day (observed)",
+    "special": "Independence Day (Observed)",
     "sources": [
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Independence DayFriday, July 3 (Independence Day observed) Monday, July 5 (Independence Day observed) Tuesday, July 4**"
+        "quote": "Independence DayFriday, July 3 (Independence Day observed)"
       }
     ],
     "reason": null,
@@ -42554,7 +42554,7 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Labor DayMonday, September 7Monday, September 6Monday, September 4"
+        "quote": "Labor DayMonday, September 7"
       }
     ],
     "reason": null,
@@ -56143,7 +56143,7 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Thanksgiving DayThursday, November 26***Thursday, November 25***Thursday, November 23***"
+        "quote": "Thanksgiving DayThursday, November 26***"
       }
     ],
     "reason": null,
@@ -56368,16 +56368,11 @@
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "*** Each market will close early at 1:00 p.m. (1:15 p.m. for eligible options) on Friday, November 27, 2026, Friday, November 26, 2027, and Friday, November 24, 2028 (the day after Thanksgiving). NYSE American Equities, NYSE Arca Equities, NYSE National, and NYSE Texas late trading sessions will close at 5:00 p.m. All times are Eastern Time."
-      },
-      {
-        "id": "nyse-hours-calendars",
-        "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
     "reason": null,
     "notes": [
-      "조기폐장"
+      "Day after Thanksgiving early close"
     ]
   },
   {
@@ -60995,16 +60990,11 @@
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "**** Each market will close early at 1:00 p.m. (1:15 p.m. for eligible options) on Thursday, December 24, 2026. NYSE American Equities, NYSE Arca Equities, NYSE National, and NYSE Texas late trading sessions will close at 5:00 p.m. All times are Eastern Time."
-      },
-      {
-        "id": "nyse-hours-calendars",
-        "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
     "reason": null,
     "notes": [
-      "조기폐장"
+      "Christmas Eve early close"
     ]
   },
   {
@@ -61127,7 +61117,7 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Christmas DayFriday, December 25****Friday, December 24 (Christmas Day observed)Monday, December 25"
+        "quote": "Christmas DayFriday, December 25****"
       }
     ],
     "reason": null,

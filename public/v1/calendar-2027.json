@@ -86,7 +86,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "New Year’s Day",
+    "special": "New Year's Day",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -361,6 +361,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -557,6 +562,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -759,6 +769,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -958,6 +973,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -1154,6 +1174,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -1460,6 +1485,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -1656,6 +1686,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -1858,6 +1893,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -2057,6 +2097,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -2253,6 +2298,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -2756,6 +2806,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -2952,6 +3007,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -3154,6 +3214,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -3350,6 +3415,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -3656,6 +3726,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -3852,6 +3927,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -4054,6 +4134,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -4253,6 +4338,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -4449,6 +4539,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -4755,6 +4850,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -4951,6 +5051,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -5153,6 +5258,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -5352,6 +5462,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -5548,6 +5663,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -5760,6 +5880,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -5865,6 +5990,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -6061,6 +6191,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -6263,6 +6398,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -6459,6 +6599,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -6962,6 +7107,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -7158,6 +7308,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -7360,6 +7515,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -7556,6 +7716,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -7862,6 +8027,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -8058,6 +8228,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -8260,6 +8435,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -8459,6 +8639,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -8655,6 +8840,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -8867,6 +9057,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -9063,6 +9258,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -9265,6 +9465,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -9464,6 +9669,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -9660,6 +9870,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -9966,6 +10181,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -10162,6 +10382,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -10364,6 +10589,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -10563,6 +10793,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -10759,6 +10994,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -11065,6 +11305,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -11261,6 +11506,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -11463,6 +11713,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -11662,6 +11917,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -11858,6 +12118,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -12164,6 +12429,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -12360,6 +12630,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -12562,6 +12837,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -12758,6 +13038,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -13261,6 +13546,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -13457,6 +13747,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -13659,6 +13954,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -13858,6 +14158,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -14054,6 +14359,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -14360,6 +14670,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -14556,6 +14871,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -14758,6 +15078,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -14957,6 +15282,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -15153,6 +15483,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -15459,6 +15794,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -15655,6 +15995,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -15857,6 +16202,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -16056,6 +16406,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -16252,6 +16607,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -16558,6 +16918,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -16754,6 +17119,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -16956,6 +17326,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -17155,6 +17530,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -17351,6 +17731,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -17657,6 +18042,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -17853,6 +18243,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -18055,6 +18450,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -18254,6 +18654,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -18450,6 +18855,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -18662,6 +19072,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -18858,6 +19273,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -18966,6 +19386,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -19165,6 +19590,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -19361,6 +19791,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -19667,6 +20102,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -19866,6 +20306,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -20062,6 +20507,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -20170,6 +20620,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -20366,6 +20821,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -20672,6 +21132,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -20868,6 +21333,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -21070,6 +21540,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -21269,6 +21744,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -21465,6 +21945,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -21771,6 +22256,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -21967,6 +22457,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -22169,6 +22664,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -22368,6 +22868,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -22564,6 +23069,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -23067,6 +23577,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -23263,6 +23778,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -23465,6 +23985,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -23661,6 +24186,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -23967,6 +24497,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -24163,6 +24698,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -24365,6 +24905,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -24564,6 +25109,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -24760,6 +25310,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -25066,6 +25621,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -25262,6 +25822,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -25464,6 +26029,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -25660,6 +26230,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -25850,7 +26425,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "Juneteenth National Independence Day (observed)",
+    "special": "Juneteenth National Independence Day (Observed)",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -26163,6 +26738,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -26359,6 +26939,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -26561,6 +27146,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -26760,6 +27350,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -26956,6 +27551,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -27262,6 +27862,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -27458,6 +28063,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -27660,6 +28270,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -27859,6 +28474,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -28055,6 +28675,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -28349,7 +28974,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "Independence Day (observed)",
+    "special": "Independence Day (Observed)",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -28558,6 +29183,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -28754,6 +29384,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -28956,6 +29591,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -29152,6 +29792,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -29458,6 +30103,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -29654,6 +30304,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -29856,6 +30511,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -30055,6 +30715,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -30251,6 +30916,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -30463,6 +31133,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -30659,6 +31334,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -30861,6 +31541,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -31060,6 +31745,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -31256,6 +31946,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -31562,6 +32257,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -31758,6 +32458,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -31960,6 +32665,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -32159,6 +32869,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -32355,6 +33070,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -32661,6 +33381,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -32857,6 +33582,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -33059,6 +33789,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -33258,6 +33993,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -33454,6 +34194,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -33760,6 +34505,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -33956,6 +34706,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -34158,6 +34913,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -34357,6 +35117,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -34553,6 +35318,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -34765,6 +35535,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -34961,6 +35736,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -35163,6 +35943,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -35362,6 +36147,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -35558,6 +36348,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -35864,6 +36659,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -36060,6 +36860,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -36262,6 +37067,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -36461,6 +37271,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -36657,6 +37472,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -36963,6 +37783,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -37159,6 +37984,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -37361,6 +38191,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -37560,6 +38395,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -37756,6 +38596,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -38259,6 +39104,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -38455,6 +39305,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -38657,6 +39512,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -38853,6 +39713,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -39156,6 +40021,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -39264,6 +40134,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -39366,6 +40241,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -39474,6 +40354,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -39670,6 +40555,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -39976,6 +40866,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -40172,6 +41067,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -40374,6 +41274,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -40573,6 +41478,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -40769,6 +41679,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -41075,6 +41990,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -41271,6 +42191,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -41473,6 +42398,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -41672,6 +42602,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -41868,6 +42803,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -42080,6 +43020,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -42276,6 +43221,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -42478,6 +43428,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -42677,6 +43632,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -42873,6 +43833,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -43085,6 +44050,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -43281,6 +44251,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -43483,6 +44458,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -43682,6 +44662,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -43878,6 +44863,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -44184,6 +45174,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -44380,6 +45375,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -44582,6 +45582,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -44781,6 +45786,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -44977,6 +45987,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -45283,6 +46298,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -45479,6 +46499,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -45681,6 +46706,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -45880,6 +46910,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -46076,6 +47111,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -46382,6 +47422,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -46578,6 +47623,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -46780,6 +47830,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -46979,6 +48034,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -47175,6 +48235,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -47481,6 +48546,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -47677,6 +48747,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -47879,6 +48954,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -48078,6 +49158,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -48274,6 +49359,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -48580,6 +49670,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -48779,6 +49874,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -48975,6 +50075,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -49139,6 +50244,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -49335,6 +50445,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -49641,6 +50756,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -49840,6 +50960,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -50036,6 +51161,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -50435,13 +51565,16 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "Each market will close early at 1:00 p.m. (1:15 p.m. for eligible options) on Friday, November 27, 2026, Friday, November 26, 2027, and Friday, November 24, 2028 (the day after Thanksgiving)."
+        "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "*** Each market will close early at 1:00 p.m. (1:15 p.m. for eligible options) on Friday, November 27, 2026, Friday, November 26, 2027, and Friday, November 24, 2028 (the day after Thanksgiving). NYSE American Equities, NYSE Arca Equities, NYSE National, and NYSE Texas late trading sessions will close at 5:00 p.m. All times are Eastern Time."
       }
     ],
     "reason": null,
-    "notes": [
-      "Early Close 13:00"
-    ]
+    "notes": []
   },
   {
     "date": "20271127",
@@ -50740,6 +51873,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -50936,6 +52074,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -51138,6 +52281,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -51337,6 +52485,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -51533,6 +52686,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -51839,6 +52997,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -52035,6 +53198,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -52237,6 +53405,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -52436,6 +53609,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -52632,6 +53810,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -52938,6 +54121,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -53134,6 +54322,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -53336,6 +54529,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -53535,6 +54733,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -53731,6 +54934,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -54037,6 +55245,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -54233,6 +55446,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -54435,6 +55653,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -54631,6 +55854,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -54821,7 +56049,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "Christmas Day (observed)",
+    "special": "Christmas Day (Observed)",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -55040,6 +56268,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -55239,6 +56472,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -55435,6 +56673,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -55599,6 +56842,11 @@
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
@@ -55686,6 +56934,11 @@
     ],
     "special": null,
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "All NYSE markets observe U.S. holidays as listed below for 2026, 2027, and 2028."
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
