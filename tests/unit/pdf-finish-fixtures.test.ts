@@ -32,6 +32,7 @@ function legacyOracleWorkerSource(source: Buffer | string) {
   return source.toString()
     .replace(/^import JSZip from "jszip";\n/m, "")
     .replace(/^import \{ createZipArchiveBlob \} from "\.\.\/\.\.\/utils\/zipArchive\.ts";\n/m, "")
+    .replace(/^import \{ createResultDownload \} from "\.\.\/\.\.\/utils\/resultDownload\.ts";\n/m, "")
     .replace(/\nasync function exportGroups[\s\S]*?(?=\nasync function decoratePdf)/u, "")
     // Image conversion has its own final-PDF byte, orientation and layout oracle.
     // Keep every legacy merge/decorate/save statement pinned independently.

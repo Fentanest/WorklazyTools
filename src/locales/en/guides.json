@@ -2436,7 +2436,7 @@
       {
         "title": "Convert images to PDF or PDF to images",
         "paragraphs": [
-          "Arrange JPG or PNG images and choose A4 fit or original image size. For PDF → Image, choose PNG or JPG, resolution and pages, then download the page images as a ZIP."
+          "Arrange JPG or PNG images and choose A4 fit or original image size. For PDF → Image, choose PNG or JPG, resolution and pages, then download one image directly or multiple images in one ZIP."
         ]
       },
       {
@@ -2506,7 +2506,7 @@
       },
       "10": {
         "q": "Should I save the images as PNG or JPG?",
-        "a": "In PDF to Image, choose PNG or JPG, resolution and pages, then download the page images as a ZIP. Pick what fits your use."
+        "a": "In PDF to Image, choose PNG or JPG, resolution and pages, then download one image directly or multiple images in one ZIP. Pick what fits your use."
       },
       "11": {
         "q": "Does higher resolution make images clearer?",

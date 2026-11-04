@@ -1270,7 +1270,7 @@
       "archive": "worklazy-일괄이미지.zip",
       "done": "{{count}}개 이미지 일괄 처리 완료",
       "title": "이미지 일괄 편집",
-      "description": "같은 크기와 워터마크 설정을 여러 이미지에 적용하고 ZIP으로 받습니다.",
+      "description": "같은 크기와 워터마크 설정을 적용합니다. 결과가 한 장이면 이미지로, 여러 장이면 ZIP 하나로 받습니다.",
       "hint": "JPG·PNG·WebP · 여러 번 추가·Ctrl/⌘+V 가능",
       "resize": "리사이즈 방식",
       "fitWidth": "가로폭 맞춤",
@@ -1290,7 +1290,7 @@
       "bottomLeft": "왼쪽 아래",
       "bottomRight": "오른쪽 아래",
       "opacity": "불투명도",
-      "download": "ZIP으로 일괄 다운로드"
+      "download": "결과 다운로드"
     },
     "collage": {
       "file": "worklazy-콜라주",
@@ -2040,7 +2040,7 @@
         "unableToReadThePdf": "PDF를 읽지 못했습니다.",
         "startingPdfPageImageConversion": "PDF 페이지 이미지 변환을 시작합니다.",
         "morePagesAndHigherResolutionIncreaseConversionTime": "페이지 수와 해상도가 높을수록 변환 시간과 메모리 사용량이 커집니다.",
-        "createdAZipContainingPageImages": "{{p0}}개 페이지 이미지를 ZIP으로 만들었습니다.",
+        "createdAZipContainingPageImages": "{{p0}}개 페이지 이미지를 만들었습니다.",
         "unableToConvertThePdfToImages": "PDF를 이미지로 변환하지 못했습니다.",
         "chooseAPdf": "PDF 선택",
         "convertEveryPageToAHighResolutionPng": "각 페이지를 고해상도 PNG 또는 JPG 이미지로 변환합니다.",
@@ -2061,7 +2061,7 @@
         "all": "전체",
         "pages": "페이지",
         "output": "출력",
-        "createImageZip": "이미지 ZIP 만들기",
+        "createImageZip": "이미지 만들기",
         "pdfImageConversionLog": "PDF 이미지 변환 로그",
         "reorderImage": "{{p0}}번 이미지 순서 변경",
         "remove": "{{p0}} 제거"
@@ -2196,7 +2196,7 @@
         "createdOnePdfFromSelectedPages": "{{p0}}개 선택 페이지를 하나의 PDF로 생성했습니다.",
         "checkTheFileNamesAndPageRanges": "여러 범위의 파일명과 페이지 범위를 확인해 주세요.",
         "selectPagesToSaveAsSeparatePdfs": "페이지별 PDF로 저장할 페이지를 선택해 주세요.",
-        "createdPdfsAndPackedThemIntoAZip": "{{p0}}개 PDF를 만들어 ZIP으로 묶었습니다.",
+        "createdPdfsAndPackedThemIntoAZip": "{{p0}}개 PDF를 만들었습니다.",
         "unableToCreateThePdfOutput": "PDF를 생성하지 못했습니다.",
         "checkThePageRangeToSelect": "선택할 페이지 범위를 확인해 주세요.",
         "addPdfs": "PDF 추가",
@@ -2240,9 +2240,9 @@
         "onePdf": "하나의 PDF",
         "saveSelectedPagesInCurrentOrder": "선택 페이지를 현재 순서로 저장",
         "onePdfPerRange": "여러 범위별 PDF",
-        "createEachRowAsAPdfInA": "입력 행마다 PDF를 만들어 ZIP 저장",
+        "createEachRowAsAPdfInA": "입력 행마다 PDF 생성 · 여러 결과는 ZIP",
         "onePdfPerPage": "페이지별 PDF",
-        "splitSelectedPagesIntoAZip": "선택 페이지를 각각 나눠 ZIP 저장",
+        "splitSelectedPagesIntoAZip": "선택 페이지별 PDF 생성 · 여러 결과는 ZIP",
         "sourceFiles": "원본 파일",
         "pagesInRanges": "범위 포함 페이지",
         "selectedPages": "선택 페이지",
@@ -2636,7 +2636,7 @@
         "pdf-to-image": {
           "eyebrow": "PDF TO IMAGE",
           "title": "PDF를 이미지로 변환",
-          "description": "PDF의 모든 페이지를 PNG 또는 JPG로 렌더링하고 하나의 ZIP으로 내려받으세요."
+          "description": "PDF 페이지를 PNG 또는 JPG로 변환하세요. 한 장은 이미지로, 여러 장은 ZIP 하나로 받습니다."
         },
         "convert": {
           "eyebrow": "PDF OCR & CONVERT",

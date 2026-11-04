@@ -9,7 +9,7 @@ import type {
 } from "./types";
 import { ensurePdfExtension as ensureExtension, normalizePdfRotation as normalizeRotation, pdfBinaryResult as binaryResult, sanitizePdfFileName as sanitizeFileName } from "./pdfShared";
 import { workerMessage as featureMessage } from "../../i18n/workerMessages";
-import { createZipArchiveBlob } from "../../utils/zipArchive.ts";
+import { createResultDownload } from "../../utils/resultDownload.ts";
 
 const worker = self as unknown as DedicatedWorkerGlobalScope;
 let currentLanguage: "ko" | "en" = "ko";
@@ -81,18 +81,17 @@ async function exportGroups(data: {
       blob: new Blob([await output.save({ useObjectStreams: true })], { type: "application/pdf" }),
     });
   }
-  progress(88, featureMessage(currentLanguage, "pdf.messages.pdf.packingPdfsIntoAZip", { p0: data.groups.length }));
-  const archive = await createZipArchiveBlob(
-    archiveFiles,
+  if (archiveFiles.length > 1) progress(88, featureMessage(currentLanguage, "pdf.messages.pdf.packingPdfsIntoAZip", { p0: data.groups.length }));
+  const output = await createResultDownload(
+    archiveFiles, ensureExtension(data.archiveName, "zip"),
     undefined,
     ({ loadedBytes, totalBytes }) => {
       const percent = (loadedBytes / totalBytes) * 100;
       progress(88 + percent * 0.1, featureMessage(currentLanguage, "pdf.messages.pdf.compressingZip", { p0: Math.round(percent) }));
     },
-    undefined,
     { level: 6 },
   );
-  return binaryResult(await archive.arrayBuffer(), ensureExtension(data.archiveName, "zip"), "application/zip", [
+  return binaryResult(await output.blob.arrayBuffer(), output.fileName, output.blob.type, [
     featureMessage(currentLanguage, "pdf.messages.pdf.editingAPdfInvalidatesItsDigitalSignatures"),
     featureMessage(currentLanguage, "pdf.messages.pdf.formsBookmarksAttachmentsAndSomeAdvancedPdfObjects"),
   ]);

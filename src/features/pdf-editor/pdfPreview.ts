@@ -12,7 +12,7 @@ import { throwIfAborted, yieldBeforeResultRegistration, yieldToEventLoop } from 
 import { waitWithAbort, settleOwnedPdfLoad } from "../../utils/pdfOwnedDocument.ts";
 import { waitForPdfRender } from "./pdfRenderLifecycle";
 import { getPdfWorkerOptions, withImageDecodeCheck } from "./pdfConfig";
-import { createZipArchiveBlob } from "../../utils/zipArchive.ts";
+import { createResultDownload } from "../../utils/resultDownload.ts";
 import { PdfConversionError } from "./pdfConversionErrors";
 
 type PdfDisplayModule = typeof import("pdfjs-dist");
@@ -397,13 +397,13 @@ export async function pdfToImageArchive(
     throwIfAborted(signal);
   }
   throwIfAborted(signal);
-  onProgress?.(88, featureMessage(language, "pdf.messages.pdfPreview.compressingConvertedImagesIntoAZipFile"));
-  const blob = await createZipArchiveBlob(archiveFiles, signal, ({ loadedBytes, totalBytes }) => {
+  if (archiveFiles.length > 1) onProgress?.(88, featureMessage(language, "pdf.messages.pdfPreview.compressingConvertedImagesIntoAZipFile"));
+  const output = await createResultDownload(archiveFiles, `${baseName}-${format === "jpeg" ? "jpg" : "png"}.zip`, signal, ({ loadedBytes, totalBytes }) => {
     const percent = (loadedBytes / totalBytes) * 100;
     onProgress?.(88 + percent * 0.1, featureMessage(language, "pdf.messages.pdfPreview.compressingZip", { p0: Math.round(percent) }));
-  }, undefined, { level: 6 });
+  }, { level: 6 });
   if (signal) await yieldBeforeResultRegistration(signal);
-  return { blob, fileName: `${baseName}-${format === "jpeg" ? "jpg" : "png"}.zip` };
+  return output;
 }
 
 export async function renderPdfPageAsJpeg(file: File, pageIndex: number, additionalRotation: number, language: AppLanguage = "ko", signal?: AbortSignal) {

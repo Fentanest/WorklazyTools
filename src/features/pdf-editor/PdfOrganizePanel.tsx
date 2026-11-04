@@ -307,6 +307,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   const rangesValid = evaluatedRanges.length > 0 && evaluatedRanges.every((row) => !row.error);
   const rangePageCount = groupMembership.size;
   const resultFileCount = outputMode === "merged" ? (selectedPages.length ? 1 : 0) : outputMode === "ranges" ? (rangesValid ? rangeRows.length : 0) : selectedPages.length;
+  const singleFileOutput = outputMode === "merged" || resultFileCount === 1;
 
   const acquireInput = async (nextFiles: File[], context?: IntakeContext): Promise<DeliveryResult | undefined> => {
     const incoming = nextFiles.filter((file) => !sources.some((source) => source.file === file));
@@ -685,10 +686,10 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   };
   const exportDisabled = !pages.length || !resultFileCount || inspecting || operation.status === "running" || quickSplitOpen;
   const includedPageCount = outputMode === "ranges" ? rangePageCount : selectedPages.length;
-  const createLabel = outputMode === "merged"
+  const createLabel = singleFileOutput
     ? featureMessage(language, "pdf.messages.PdfOrganizePanel.createPdf")
     : featureMessage(language, "pdf.messages.PdfOrganizePanel.createPdfZip");
-  const creatingLabel = featureMessage(language, outputMode === "merged"
+  const creatingLabel = featureMessage(language, singleFileOutput
     ? "pdf.messages.PdfOrganizePanel.creatingPdf"
     : "pdf.messages.PdfOrganizePanel.creatingPdfZip", { p0: operation.progress });
 
@@ -829,7 +830,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
                   <SummaryRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.outputPdfs")} value={resultFileCount} />
                   <SummaryRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.rotatedPages")} value={pages.filter((page) => page.rotation).length} />
                 </dl>
-                <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName2") : featureMessage(language, "pdf.messages.PdfOrganizePanel.zipFileName")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={outputName} disabled={locked} onChange={(event) => { setOutputName(event.target.value); invalidateResult(); }} /><small className="text-xs text-muted-foreground">.{outputMode === "merged" ? "pdf" : "zip"}</small></label>
+                <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{singleFileOutput ? featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName2") : featureMessage(language, "pdf.messages.PdfOrganizePanel.zipFileName")}</span><UtilityInput className="h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={outputName} disabled={locked} onChange={(event) => { setOutputName(event.target.value); invalidateResult(); }} /><small className="text-xs text-muted-foreground">.{singleFileOutput ? "pdf" : "zip"}</small></label>
                 <label className="pdf-output-field mb-3 grid min-h-[43px] grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-muted px-2.5 py-1.5 text-primary "><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.watermarkTextOptional")}</span><UtilityInput className="col-span-2 h-8 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0" value={watermarkText} disabled={locked} maxLength={120} onChange={(event) => { setWatermarkText(event.target.value); invalidateResult(); }} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eGInternalReview")} /></label>
                 <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.addPageNumbers")} description={featureMessage(language, "pdf.messages.PdfOrganizePanel.numberEachOutputPdfFrom1AtThe")} checked={pageNumbers} onChange={(checked) => { setPageNumbers(checked); invalidateResult(); }} disabled={locked} />
                 <ToggleRow label={featureMessage(language, "pdf.messages.PdfOrganizePanel.imageBasedCompression")} description={outputMode === "merged" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.redrawPagesAs144DpiJpegToReduce") : featureMessage(language, "pdf.messages.PdfOrganizePanel.availableOnlyWhenCreatingOnePdf")} checked={imageCompression && outputMode === "merged"} onChange={(checked) => { setImageCompression(checked); invalidateResult(); }} disabled={locked || outputMode !== "merged"} />

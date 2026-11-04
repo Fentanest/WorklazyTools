@@ -434,6 +434,11 @@ export function VideoStudioPage({ preset }: { preset?: VideoDirectPreset }) {
 
   const createZipArchive = async () => {
     if (!videoOutputsRef.current.length) return;
+    if (videoOutputsRef.current.length === 1) {
+      const output = videoOutputsRef.current[0];
+      downloadBlob(output.blob, output.fileName);
+      return;
+    }
     const controller = new AbortController();
     activeController.current = controller;
     progress.start(featureMessage(language, "video.messages.VideoStudioPage.creatingAZipFromTheSelectedResults"));
@@ -871,7 +876,7 @@ export function VideoStudioPage({ preset }: { preset?: VideoDirectPreset }) {
           <div className="video-result-actions mt-3 flex flex-wrap gap-2 max-[620px]:grid max-[620px]:grid-cols-1" data-testid="video-result-actions">
             <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={downloadAllOutputs}><Download size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.downloadAllIndividually")}</Button>
             {directorySaveAvailable && <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => void saveOutputsToFolder()}><FolderDown size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.saveToFolder")}</Button>}
-            <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => void createZipArchive()}><Archive size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.createZip")}</Button>
+            {videoOutputs.length > 1 && <Button type="button" variant="secondary" className="min-h-[39px] max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => void createZipArchive()}><Archive size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.createZip")}</Button>}
             <Button type="button" variant="destructive" className="ml-auto min-h-[39px] max-[620px]:ml-0 max-[620px]:w-full" disabled={progress.status === "running"} onClick={() => { clearVideoOutputs(); setLastResult(""); progress.reset(); }}><Trash2 size={17} /> {featureMessage(language, "video.messages.VideoStudioPage.clearResults")}</Button>
           </div>
           <UtilityNotice kind="warning" className="video-download-guidance mt-[11px]">
