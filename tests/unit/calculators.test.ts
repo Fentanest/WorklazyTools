@@ -48,17 +48,18 @@ test("payroll formulas preserve statutory thresholds and tax credit structure", 
   assert.equal(severance.severance, 0);
 });
 
-test("monthly payroll keeps exact official-rate mapping outputs", () => {
+test("monthly payroll keeps exact configured-rate outputs", () => {
   assert.equal(estimateMonthlyIncomeTax(3_000_000, 1, 0), 55_333.333333333336);
   assert.deepEqual(calculateNetPay(3_000_000, 1, 0), {
     pension: 142_500,
     health: 107_850,
     longTermCare: 14_170,
-    employment: 26_990,
+    // 3,000,000 × 9 / 1,000 = 27,000 exactly; no 10-won loss.
+    employment: 27_000,
     incomeTax: 55_330,
     localTax: 5_530,
-    deductions: 352_370,
-    net: 2_647_630,
+    deductions: 352_380,
+    net: 2_647_620,
   });
 });
 

@@ -1,60 +1,87 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
+import { amount } from "./payrollAmount.ts";
+
+// All rate numerators share this denominator; floating rates below are display-only.
+const RATE_SCALE = 100_000;
+const RATE = { pension: 4_750, health: 3_595, longTermCare: 13_140, employment: 900 } as const;
 
 export const PAYROLL_STANDARD = {
   effectiveDate: "2026-07-01",
-  pensionEmployeeRate: 0.0475,
+  pensionEmployeeRate: RATE.pension / RATE_SCALE,
   pensionMinBase: 410_000,
   pensionMaxBase: 6_590_000,
-  healthEmployeeRate: 0.03595,
-  longTermCareToHealthRate: 0.1314,
-  employmentEmployeeRate: 0.009,
+  healthEmployeeRate: RATE.health / RATE_SCALE,
+  longTermCareToHealthRate: RATE.longTermCare / RATE_SCALE,
+  employmentEmployeeRate: RATE.employment / RATE_SCALE,
 } as const;
 
 export function calculateWeeklyAllowance(weeklyHours: number, hourlyWage: number) {
   const eligible = weeklyHours >= 15;
-  const paidHours = eligible ? Math.min(weeklyHours / 40, 1) * 8 : 0;
-  return { eligible, paidHours, allowance: Math.round(paidHours * hourlyWage) };
+  const paidHours = amount(eligible ? Math.min(weeklyHours, 40) : 0).multiply(8, 40);
+  return { eligible, paidHours: paidHours.toNumber(), allowance: paidHours.multiply(hourlyWage).round() };
 }
 
 export function calculateNetPay(monthlySalary: number, dependents: number, children: number) {
-  const pensionBase = Math.min(PAYROLL_STANDARD.pensionMaxBase, Math.max(PAYROLL_STANDARD.pensionMinBase, monthlySalary));
-  const pension = round10(pensionBase * PAYROLL_STANDARD.pensionEmployeeRate);
-  const health = round10(monthlySalary * PAYROLL_STANDARD.healthEmployeeRate);
-  const longTermCare = round10(health * PAYROLL_STANDARD.longTermCareToHealthRate);
-  const employment = round10(monthlySalary * PAYROLL_STANDARD.employmentEmployeeRate);
-  const incomeTax = round10(estimateMonthlyIncomeTax(monthlySalary, Math.max(1, dependents), children));
-  const localTax = Math.floor(incomeTax * 0.1 / 10) * 10;
+  const salary = amount(monthlySalary);
+  const pension = pensionBase(monthlySalary).multiply(RATE.pension, RATE_SCALE).floor(10);
+  const health = salary.multiply(RATE.health, RATE_SCALE).floor(10);
+  // Care insurance uses the already truncated health premium, not the raw premium.
+  const longTermCare = amount(health).multiply(RATE.longTermCare, RATE_SCALE).floor(10);
+  const employment = salary.multiply(RATE.employment, RATE_SCALE).floor(10);
+  const incomeTax = monthlyIncomeTax(monthlySalary, Math.max(1, dependents), children).floor(10);
+  const localTax = amount(incomeTax).multiply(1, 10).floor(10);
   const deductions = pension + health + longTermCare + employment + incomeTax + localTax;
-  return { pension, health, longTermCare, employment, incomeTax, localTax, deductions, net: Math.max(0, monthlySalary - deductions) };
+  return { pension, health, longTermCare, employment, incomeTax, localTax, deductions, net: salary.subtract(deductions).max(0).toNumber() };
 }
 
 export function estimateMonthlyIncomeTax(monthly: number, dependents: number, children: number) {
-  const gross = monthly * 12;
-  const earnedDeduction = Math.min(20_000_000, gross <= 5_000_000 ? gross * 0.7 : gross <= 15_000_000 ? 3_500_000 + (gross - 5_000_000) * 0.4 : gross <= 45_000_000 ? 7_500_000 + (gross - 15_000_000) * 0.15 : gross <= 100_000_000 ? 12_000_000 + (gross - 45_000_000) * 0.05 : 14_750_000 + (gross - 100_000_000) * 0.02);
-  const personal = dependents * 1_500_000;
-  const pensionDeduction = Math.min(PAYROLL_STANDARD.pensionMaxBase, Math.max(PAYROLL_STANDARD.pensionMinBase, monthly)) * PAYROLL_STANDARD.pensionEmployeeRate * 12;
-  const simplifiedSpecial = dependents === 1 ? 3_100_000 + gross * 0.04 : dependents === 2 ? 3_600_000 + gross * 0.04 : 5_000_000 + gross * 0.07;
-  const base = Math.max(0, gross - earnedDeduction - personal - pensionDeduction - simplifiedSpecial);
-  const calculated = progressiveTax(base);
-  const calculatedCredit = calculated <= 1_300_000 ? calculated * 0.55 : 715_000 + (calculated - 1_300_000) * 0.3;
-  const creditCap = gross <= 33_000_000 ? 740_000 : gross <= 70_000_000 ? Math.max(660_000, 740_000 - (gross - 33_000_000) * 0.008) : Math.max(500_000, 660_000 - (gross - 70_000_000) * 0.005);
-  const childCredit = children <= 0 ? 0 : children === 1 ? 250_000 : children === 2 ? 550_000 : 550_000 + (children - 2) * 400_000;
-  return Math.max(0, calculated - Math.min(calculatedCredit, creditCap) - childCredit) / 12;
+  return monthlyIncomeTax(monthly, dependents, children).toNumber();
 }
 
-function progressiveTax(base: number) {
-  const brackets = [[14_000_000, 0.06], [50_000_000, 0.15], [88_000_000, 0.24], [150_000_000, 0.35], [300_000_000, 0.38], [500_000_000, 0.4], [1_000_000_000, 0.42], [Infinity, 0.45]] as const;
-  let remaining = base; let previous = 0; let tax = 0;
-  for (const [limit, rate] of brackets) { const amount = Math.min(remaining, limit - previous); if (amount <= 0) break; tax += amount * rate; remaining -= amount; previous = limit; }
+function pensionBase(monthly: number) {
+  return amount(monthly).max(PAYROLL_STANDARD.pensionMinBase).min(PAYROLL_STANDARD.pensionMaxBase);
+}
+
+function monthlyIncomeTax(monthly: number, dependents: number, children: number) {
+  const gross = amount(monthly).multiply(12);
+  const earnedDeduction = (gross.lessThanOrEqual(5_000_000) ? gross.multiply(70, 100)
+    : gross.lessThanOrEqual(15_000_000) ? gross.subtract(5_000_000).multiply(40, 100).add(3_500_000)
+    : gross.lessThanOrEqual(45_000_000) ? gross.subtract(15_000_000).multiply(15, 100).add(7_500_000)
+    : gross.lessThanOrEqual(100_000_000) ? gross.subtract(45_000_000).multiply(5, 100).add(12_000_000)
+    : gross.subtract(100_000_000).multiply(2, 100).add(14_750_000)).min(20_000_000);
+  const personal = amount(dependents).multiply(1_500_000);
+  // Preserve the estimator's untruncated annual pension deduction.
+  const pensionDeduction = pensionBase(monthly).multiply(RATE.pension, RATE_SCALE).multiply(12);
+  const simplifiedSpecial = dependents === 1 ? gross.multiply(4, 100).add(3_100_000)
+    : dependents === 2 ? gross.multiply(4, 100).add(3_600_000) : gross.multiply(7, 100).add(5_000_000);
+  const base = gross.subtract(earnedDeduction).subtract(personal).subtract(pensionDeduction).subtract(simplifiedSpecial).max(0);
+  const calculated = progressiveTax(base);
+  const calculatedCredit = calculated.lessThanOrEqual(1_300_000) ? calculated.multiply(55, 100) : calculated.subtract(1_300_000).multiply(30, 100).add(715_000);
+  const creditCap = gross.lessThanOrEqual(33_000_000) ? amount(740_000)
+    : gross.lessThanOrEqual(70_000_000) ? amount(740_000).subtract(gross.subtract(33_000_000).multiply(8, 1_000)).max(660_000)
+    : amount(660_000).subtract(gross.subtract(70_000_000).multiply(5, 1_000)).max(500_000);
+  const childCredit = children <= 0 ? amount(0) : children === 1 ? amount(250_000) : children === 2 ? amount(550_000) : amount(children).subtract(2).multiply(400_000).add(550_000);
+  return calculated.subtract(calculatedCredit.min(creditCap)).subtract(childCredit).max(0).multiply(1, 12);
+}
+
+function progressiveTax(base: ReturnType<typeof amount>) {
+  const brackets = [[14_000_000, 6], [50_000_000, 15], [88_000_000, 24], [150_000_000, 35], [300_000_000, 38], [500_000_000, 40], [1_000_000_000, 42]] as const;
+  let remaining = base; let previous = 0; let tax = amount(0);
+  for (const [limit, rate] of brackets) {
+    const taxable = remaining.min(limit - previous);
+    if (taxable.lessThanOrEqual(0)) return tax;
+    tax = tax.add(taxable.multiply(rate, 100));
+    remaining = remaining.subtract(taxable);
+    previous = limit;
+  }
+  tax = tax.add(remaining.multiply(45, 100));
   return tax;
 }
 
 export function calculateSeverance(input: { hireDate: string; retirementDate: string; wagesThreeMonths: number; annualBonus: number; annualLeavePay: number; periodDays: number; weeklyHours: number }) {
   const serviceDays = differenceInCalendarDays(parseISO(input.retirementDate), parseISO(input.hireDate)) + 1;
   const eligible = serviceDays >= 365 && input.weeklyHours >= 15;
-  const includedExtra = (input.annualBonus + input.annualLeavePay) * 3 / 12;
-  const averageDailyWage = input.periodDays > 0 ? (input.wagesThreeMonths + includedExtra) / input.periodDays : 0;
-  return { eligible, serviceDays, includedExtra, averageDailyWage, severance: eligible ? averageDailyWage * 30 * serviceDays / 365 : 0 };
+  const includedExtra = amount(input.annualBonus).add(input.annualLeavePay).multiply(3, 12);
+  const averageDailyWage = input.periodDays > 0 ? amount(input.wagesThreeMonths).add(includedExtra).multiply(1, input.periodDays) : amount(0);
+  return { eligible, serviceDays, includedExtra: includedExtra.toNumber(), averageDailyWage: averageDailyWage.toNumber(), severance: eligible ? averageDailyWage.multiply(30).multiply(serviceDays, 365).toNumber() : 0 };
 }
-
-function round10(value: number) { return Math.floor(value / 10) * 10; }
