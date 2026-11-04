@@ -438,6 +438,14 @@
   font-size: 13.5px;
   font-weight: 800;
 }
+:root[data-theme="light-coral"] .wl-hero-badge,
+:root[data-theme="light-mint"] .wl-hero-badge {
+  color: var(--label);
+}
+:root[data-theme="light-coral"] .wl-hero-badge > svg,
+:root[data-theme="light-mint"] .wl-hero-badge > svg {
+  color: var(--brand-on-bg);
+}
 .wl-hero h1 {
   margin: 0;
   font-size: clamp(30px, 3.2vw, 44px);
@@ -474,6 +482,14 @@
 :root[data-theme="dark-coral"] .wl-cta,
 :root[data-theme="dark-mint"] .wl-cta {
   background: var(--brand);
+}
+:root[data-theme="light-coral"] .wl-cta,
+:root[data-theme="light-mint"] .wl-cta {
+  color: var(--color-black);
+}
+:root[data-theme="light-coral"] .wl-cta > svg,
+:root[data-theme="light-mint"] .wl-cta > svg {
+  color: var(--brand-ink);
 }
 .wl-hero-assure {
   display: inline-flex;
