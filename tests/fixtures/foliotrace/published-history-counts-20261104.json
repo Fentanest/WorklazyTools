@@ -1,0 +1,58 @@
+[
+  {
+    "tradeDate": "2026-10-23",
+    "estimatedValue": "350016593930338",
+    "datasetVersion": "8b39a4bd75ec7eda9b653d821198a65e16a4ed22c3519302596e94c4e5d513b3",
+    "trackedCount": 1192,
+    "pricedCount": 1175,
+    "unvaluedCount": 17
+  },
+  {
+    "tradeDate": "2026-10-26",
+    "estimatedValue": "344648536484713",
+    "datasetVersion": "08756eb4a90eb9112d52a8afb32a0173dd58bf39fcca41b71f435b0237191f0c",
+    "trackedCount": 1192,
+    "pricedCount": 1175,
+    "unvaluedCount": 17
+  },
+  {
+    "tradeDate": "2026-10-27",
+    "estimatedValue": "355610586883349",
+    "datasetVersion": "0bf155b43de0589666a7f282747c628b2d6663bb88387fa8ad50940807578786",
+    "trackedCount": 1192,
+    "pricedCount": 1174,
+    "unvaluedCount": 18
+  },
+  {
+    "tradeDate": "2026-10-28",
+    "estimatedValue": "379726252607836",
+    "datasetVersion": "28bbd58b22031f1acb80c05bf50921e3a0811be316a0eb597137b55643a64001",
+    "trackedCount": 1192,
+    "pricedCount": 1173,
+    "unvaluedCount": 19
+  },
+  {
+    "tradeDate": "2026-10-29",
+    "estimatedValue": "375053642866907",
+    "datasetVersion": "3beaf37da370196b9ccfbd3cc3daecfa5fa6e40d817ec7843f731daa47dae40a",
+    "trackedCount": 1192,
+    "pricedCount": 1173,
+    "unvaluedCount": 19
+  },
+  {
+    "tradeDate": "2026-10-30",
+    "estimatedValue": "361235809293306",
+    "datasetVersion": "b1e872d992b55d10c363306785ec9f0885b87f214646e509ae51ba4a7ccd87bb",
+    "trackedCount": 1192,
+    "pricedCount": 1173,
+    "unvaluedCount": 19
+  },
+  {
+    "tradeDate": "2026-11-02",
+    "estimatedValue": "369286224850488",
+    "datasetVersion": "61c89664a356224b403e940500205358ed8ed33a9f012d769727674f5c93805a",
+    "trackedCount": 1192,
+    "pricedCount": 1173,
+    "unvaluedCount": 19
+  }
+]

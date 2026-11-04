@@ -17,6 +17,8 @@ const counterexamples: Array<[string, (snapshot: any) => void]> = [
   ['1001 public history points', s => { s.history = Array.from({ length: 1001 }, () => s.history[0]); }],
   ['reversed public history', s => { s.history.reverse(); }],
   ['malformed history row', s => { s.history[0].estimatedValue = null; }],
+  ['partial published counts', s => { s.history[0].trackedCount = 1192; }],
+  ['inconsistent published counts', s => { Object.assign(s.history[0], { trackedCount: 1192, pricedCount: 1175, unvaluedCount: 0 }); }],
   ['non-array public history', s => { s.history = null; }],
   ['wrongly typed extension origin', s => { s.valuationSeries.points[0].quantityOrigin = ['stored-assembly']; }],
 ];
