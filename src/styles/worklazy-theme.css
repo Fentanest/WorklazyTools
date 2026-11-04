@@ -485,7 +485,13 @@
 }
 :root[data-theme="light-coral"] .wl-cta,
 :root[data-theme="light-mint"] .wl-cta {
-  color: var(--color-black);
+  color: var(--brand-ink);
+}
+:root[data-theme="light-coral"] .wl-cta {
+  background: linear-gradient(135deg, #d1482a, var(--brand-strong));
+}
+:root[data-theme="light-mint"] .wl-cta {
+  background: linear-gradient(135deg, #0b8a60, var(--brand-strong));
 }
 :root[data-theme="light-coral"] .wl-cta > svg,
 :root[data-theme="light-mint"] .wl-cta > svg {
