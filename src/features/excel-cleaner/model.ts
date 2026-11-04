@@ -156,6 +156,7 @@ function consumeCell(source: SpreadsheetCellData, downgradeFormulas: boolean): C
 
 function cloneCell(source: SpreadsheetCellData, downgradeFormulas: boolean): CleanerCell {
   return {
+    type: source.type,
     value: cloneScalar(source.value), formula: source.formula, cachedValue: cloneScalar(source.cachedValue), cacheState: source.cacheState,
     formulaType: source.formulaType, formulaRef: source.formulaRef, sharedFormulaMaster: source.sharedFormulaMaster,
     numberFormat: source.numberFormat, style: source.style ? structuredClone(source.style) : undefined,

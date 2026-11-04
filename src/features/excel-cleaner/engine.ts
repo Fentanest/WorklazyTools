@@ -248,7 +248,7 @@ function transformText(sheet: CleanerSheetModel, ids: string[] | undefined, tran
   forCells(sheet, ids, (current) => {
     if (current.formula || typeof current.value !== "string") return;
     const next = transform(current.value);
-    if (next !== current.value) { current.value = next; stats.changedCells += 1; }
+    if (next !== current.value) { current.value = next; current.type = "string"; stats.changedCells += 1; }
   });
 }
 
@@ -311,6 +311,7 @@ function convertNumbers(sheet: CleanerSheetModel, ids: string[] | undefined, sta
     const number = Number(raw.replace(/,/gu, ""));
     if (!Number.isFinite(number)) { conversionFailure(sheet, row, rule, current, stats, issues); return; }
     current.value = number;
+    current.type = "number";
     stats.changedCells += 1;
   });
 }
@@ -321,6 +322,7 @@ function unifyDates(sheet: CleanerSheetModel, ids: string[], outputFormat: strin
     const parsed = parseDate(current.value, inputHint, date1904);
     if (!parsed) { conversionFailure(sheet, row, rule, current, stats, issues); return; }
     current.value = parsed;
+    current.type = "date";
     current.numberFormat = outputFormat;
     stats.changedCells += 1;
   });
@@ -334,7 +336,7 @@ function formatIdentifiers(sheet: CleanerSheetModel, ids: string[], kind: "phone
     if (kind === "business" && digits.length === 10) next = style === "dash" ? `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}` : digits;
     if (kind === "phone" && /^0\d{8,10}$/u.test(digits)) next = style === "none" ? digits : phoneWithDashes(digits);
     if (!next) { conversionFailure(sheet, row, rule, current, stats, issues); return; }
-    if (next !== current.value) { current.value = next; current.numberFormat = "@"; stats.changedCells += 1; }
+    if (next !== current.value) { current.value = next; current.type = "string"; current.numberFormat = "@"; stats.changedCells += 1; }
   });
 }
 

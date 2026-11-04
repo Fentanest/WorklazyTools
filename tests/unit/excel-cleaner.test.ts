@@ -247,6 +247,82 @@ test("XLSX output appends four reports, reopens formulas, and CSV modes warn or 
   assert.equal(shiftedWorkbook.getWorksheet("Data")!.getCell("D2").formula, "B2+C2");
 });
 
+for (const consumeSource of [false, true]) for (const downgradeFormulas of [false, true]) {
+  test(`cleaner preserves raw XLSX errors separately from literals and formula caches (consumeSource=${consumeSource}, downgradeFormulas=${downgradeFormulas})`, async () => {
+    const errors: ExcelJS.CellErrorValue["error"][] = ["#DIV/0!", "#N/A", "#VALUE!", "#REF!", "#NAME?", "#NUM!", "#NULL!"];
+    const input = new ExcelJS.Workbook();
+    const sheet = input.addWorksheet("Data");
+    sheet.addRow(["Raw error", "Literal", "Formula error cache", "Formula string cache"]);
+    errors.forEach((error) => sheet.addRow([{ error }, error, { formula: "1/0", result: { error } }, { formula: `\"${error}\"`, result: error }]));
+    const parsed = await parseSpreadsheetInput("errors.xlsx", await input.xlsx.writeBuffer() as unknown as ArrayBuffer);
+    const selections = [{ sheetName: "Data", headerRow: 1 }];
+    assert.equal(preflightExcelCleaner(parsed, selections, pipeline([])).downgradeFormulas, false);
+    errors.forEach((error, index) => {
+      const cells = parsed.sheets[0].cells.filter(({ row }) => row === index + 2);
+      assert.deepEqual(cells.map(({ type, value }) => [type, value]), [["error", error], ["string", error], ["error", error], ["string", error]]);
+    });
+    const models = createCleanerSheetModels(parsed, selections, downgradeFormulas, { consumeSource });
+    assert.equal(parsed.sheets[0].cells.length === 0, consumeSource);
+    const rules = pipeline([{ type: "trim-whitespace", id: rid(80) }]);
+    const result = runExcelCleanerPipeline(models, rules);
+    const outputs = await buildExcelCleanerOutputs(result, { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: false }, "both");
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(outputs[0].buffer);
+    const cleaned = reopened.getWorksheet("Data")!;
+    errors.forEach((error, index) => {
+      const row = index + 2;
+      assert.equal(cleaned.getCell(`A${row}`).type, ExcelJS.ValueType.Error);
+      assert.deepEqual(cleaned.getCell(`A${row}`).value, { error });
+      assert.equal(cleaned.getCell(`B${row}`).type, ExcelJS.ValueType.String);
+      assert.equal(cleaned.getCell(`B${row}`).value, error);
+      for (const [column, formula] of [["C", "1/0"], ["D", `\"${error}\"`]]) {
+        const cell = cleaned.getCell(`${column}${row}`);
+        assert.equal(cell.type, downgradeFormulas ? ExcelJS.ValueType.String : ExcelJS.ValueType.Formula);
+        if (downgradeFormulas) assert.equal(cell.value, error);
+        else {
+          assert.equal(cell.formula, formula);
+          assert.equal(cell.result, error);
+          assert.equal(cell.effectiveType, ExcelJS.ValueType.String);
+        }
+      }
+    });
+    const expectedCsv = ["Raw error,Literal,Formula error cache,Formula string cache", ...errors.map((error) => [error, error, error, error].join(","))].join("\r\n");
+    assert.equal(new TextDecoder().decode(outputs[1].buffer), expectedCsv);
+    assert.equal(outputs[1].csvRiskCount, 0);
+    const safeCsv = await buildExcelCleanerOutputs(result, { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: true }, "csv");
+    assert.equal(new TextDecoder().decode(safeCsv[0].buffer), expectedCsv);
+  });
+}
+
+for (const consumeSource of [false, true]) {
+  test(`cleaner carries raw errors through fill/reorder and writes replacements and constants as strings (consumeSource=${consumeSource})`, async () => {
+    const input = new ExcelJS.Workbook();
+    const sheet = input.addWorksheet("Data");
+    sheet.addRows([["Raw error", "Literal"], [{ error: "#DIV/0!" }, "#N/A"], [{ error: "#REF!" }, "plain"], [null, "filled"]]);
+    const parsed = await parseSpreadsheetInput("errors.xlsx", await input.xlsx.writeBuffer() as unknown as ArrayBuffer);
+    const models = createCleanerSheetModels(parsed, [{ sheetName: "Data", headerRow: 1 }], false, { consumeSource });
+    const rules = pipeline([
+      { type: "fill-empty-cells", id: rid(81), columnIds: ["column:1"], source: "above" },
+      { type: "find-replace", id: rid(82), columnIds: ["column:1"], find: "#DIV/0!", replace: "#N/A" },
+      { type: "find-replace", id: rid(83), columnIds: ["column:2"], find: "plain", replace: "#REF!" },
+      { type: "reorder-columns", id: rid(84), order: ["column:2", "column:1"] },
+      { type: "add-constant-column", id: rid(85), value: "#NULL!", outputColumnId: "constant", outputName: "Constant" },
+    ]);
+    const outputs = await buildExcelCleanerOutputs(runExcelCleanerPipeline(models, rules), { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: false }, "xlsx");
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(outputs[0].buffer);
+    const cleaned = reopened.getWorksheet("Data")!;
+    assert.equal(cleaned.getCell("A2").value, "#N/A");
+    assert.equal(cleaned.getCell("A3").value, "#REF!");
+    assert.equal(cleaned.getCell("B2").value, "#N/A");
+    for (const address of ["A2", "A3", "B2", "C2", "C3", "C4"]) assert.equal(cleaned.getCell(address).type, ExcelJS.ValueType.String);
+    for (const address of ["B3", "B4"]) {
+      assert.equal(cleaned.getCell(address).type, ExcelJS.ValueType.Error);
+      assert.deepEqual(cleaned.getCell(address).value, { error: "#REF!" });
+    }
+  });
+}
+
 test("XLSX cleaner output replaces disallowed text in sheet names, values, and formulas", async () => {
   const sheet = model([["A\u0000B", "ignored"]]);
   sheet.name = "Data\uFFFF";

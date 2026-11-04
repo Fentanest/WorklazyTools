@@ -61,6 +61,9 @@ function writeCleanedSheet(workbook: ExcelJS.Workbook, model: CleanerSheetModel)
 function writeCleanedCell(target: ExcelJS.Cell, source: CleanerCell) {
   if (source.formula && !source.formulaDegraded) {
     target.value = { formula: sanitizeXlsxText(source.formula), result: formulaResult(source.cachedValue) };
+  } else if (!source.formula && source.type === "error" && typeof source.value === "string") {
+    // Only raw errors use this path; formula caches keep their existing policy.
+    target.value = { error: sanitizeXlsxText(source.value) as ExcelJS.CellErrorValue["error"] };
   } else target.value = excelValue(source.formula ? source.cachedValue : source.value);
   if (source.style) {
     const style = structuredClone(source.style) as Partial<ExcelJS.Style>;

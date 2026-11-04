@@ -77,6 +77,7 @@ export interface ExcelCleanerInspection {
 export interface CleanerCell extends Pick<SpreadsheetCellData,
   "value" | "formula" | "cachedValue" | "cacheState" | "formulaType" | "formulaRef" | "sharedFormulaMaster" | "numberFormat" | "style"
 > {
+  type?: SpreadsheetCellData["type"];
   sourceRow?: number;
   sourceColumn?: number;
   formulaDegraded?: boolean;
