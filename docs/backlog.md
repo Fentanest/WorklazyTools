@@ -6,6 +6,10 @@
 
 과거 제외 경로·AdSense 콘솔 설정과 GA4 자동 History 측정, 지역별 CMP는 `docs/PUBLISHING_CHECKLIST.md`의 운영 확인 대상이다.
 
+## 홈 CTA 4.5:1 종결 범위 결정 (2026-11-04)
+
+- 히어로 글자색만 보강한 `fix-hero-cta-contrast-20261104`의 라이트 민트 KO 데스크톱 CTA는 normal/hover/focus 모두 순검정에서도 4.469276:1이다. 실제 글자 뒤 어두운 배경은 4.5를 위해 음수 전경 휘도를 요구하고, 밝은 배경은 밝은 전경 휘도 1 초과를 요구하므로 단색 글자색만으로 종결할 수 없다. 배경·배치 등 기존 승인 밖 범위의 결정을 받은 후 수리해야 한다. 근거: `evidence/herocta/cta-feasibility.json`, 전후192측정과 지정 `SOL-HEROCTA-REPORT.md`; 목표 미달을 완료·검수 통과로 표시하지 않는다. — Codx
+
 ## 안내 fragment 복원 판별 범위 (2026-11-04)
 
 - FIX2는 최초 복원 pageshow부터 다음 보정 프레임 사이의 경합만 한 번 허용한다. 레이아웃 변화·복원 시점 근거 없이 뒤늦게 발생한 스크롤은 사용자 이동으로 처리한다. Safari/Firefox의 실제 이력 복원 시점은 미검증이며, 향후 확장 시 사용자 pointerless 스크롤을 되돌리지 않는 조건을 유지한다. Chromium 회귀 및 근거는 지정 `SOL-ANCHOR-FIX2.md`. 기존 하네스의 HTTP 전달은 실제 브라우저 네트워크 스택 오류를 재현하는 검증이 아니라는 한계도 유지한다. — Codx
