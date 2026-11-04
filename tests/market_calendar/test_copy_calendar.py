@@ -55,7 +55,7 @@ class CopyCalendarTest(unittest.TestCase):
         (self.source / 'calendar-2026.json').write_bytes(b'corrupt')
         result, request, log = self.prepare()
         self.assertEqual(result, 'restored-published')
-        self.assertEqual(request.call_count, 2)
+        self.assertEqual(request.call_count, 3)  # Optional checksum is absent on the old deployment.
         self.assertIn('hash mismatch', log)
         self.assert_published()
 
@@ -96,6 +96,42 @@ class CopyCalendarTest(unittest.TestCase):
         self.assertEqual(result, 'unavailable')
         self.assertEqual(request.call_count, 1)
         self.assertFalse(self.target.exists())
+
+
+    def add_sources(self, generation='fixture'):
+        manifest = json.loads(self.published['manifest.json'])
+        manifest['generation_id'] = 'fixture'
+        self.published['manifest.json'] = json.dumps(manifest).encode()
+        raw = json.dumps({'schema_version': 1, 'generation_id': generation, 'sources': []}).encode()
+        self.published[calendar.SOURCES] = raw
+        self.published[calendar.SOURCES_SHA] = hashlib.sha256(raw).hexdigest().encode() + b'\n'
+        for name, raw in self.published.items():
+            (self.source / name).write_bytes(raw)
+
+    def test_verified_optional_pair_is_copied_with_core(self):
+        self.add_sources()
+        self.assertEqual(self.prepare()[0], 'copied')
+        self.assert_published()
+
+    def test_corrupt_optional_pair_hides_excerpts_without_rolling_back_calendar(self):
+        self.add_sources()
+        (self.source / calendar.SOURCES).write_bytes(b'corrupt')
+        result, request, _ = self.prepare()
+        self.assertEqual(result, 'copied')
+        request.assert_not_called()
+        self.assertFalse((self.target / calendar.SOURCES).exists())
+        self.assertTrue((self.target / 'calendar-2026.json').exists())
+
+    def test_stale_generation_optional_pair_is_not_carried_forward(self):
+        self.add_sources('old-generation')
+        self.assertEqual(self.prepare()[0], 'copied')
+        self.assertFalse((self.target / calendar.SOURCES).exists())
+
+    def test_fallback_carries_the_verified_optional_pair(self):
+        self.add_sources()
+        (self.source / 'calendar-2026.json').write_bytes(b'bad checkout')
+        self.assertEqual(self.prepare()[0], 'restored-published')
+        self.assert_published()
 
     def test_workflow_always_runs_recovery_after_optional_checkout(self):
         name = 'deploy-site.yml'

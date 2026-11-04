@@ -3389,7 +3389,21 @@
     "chuseokHoliday": "Chuseok",
     "hangulHoliday": "Hangul Day",
     "hangulObserved": "Hangul Day (observed)",
-    "weekend": "Weekend"
+    "weekend": "Weekend",
+    "krxService": "KRX Rules Service",
+    "krxFind": "Search the rules service for the rule name and article below.",
+    "copyReference": "Copy rule and article",
+    "copyReferenceLabel": "Copy {{reference}}",
+    "referenceCopied": "Rule name and article copied.",
+    "referenceCopyFailed": "Could not copy. Select and copy the rule name and article above.",
+    "savedCopy": "View saved excerpt",
+    "collectedAt": "Collected",
+    "savedHash": "Saved source SHA-256",
+    "redactedCopy": "This hash identifies the saved copy with session values removed.",
+    "originalText": "Excerpt in the original Korean. Check the current rules on the KRX Rules Service.",
+    "revisionReference": "Revision and effective date",
+    "unknownRuleName": "KRX rule",
+    "bookId": "KRX document number"
   },
   "textCompare": {
     "movedTo": "Moved to line {{line}}",

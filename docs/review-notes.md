@@ -3591,3 +3591,17 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - HTTP 전달 보완 뒤 9회 207건 중 en text-tools 200% reload 위치 실패 1건을 추가 발견해 보존했다(`scratch/anchor-fix1/pre-scroll/run-09/`). 별도 30건 계측은 모두 통과했지만 scrollIntoView 뒤 browser scroll이 다시 바뀌고 후속 animationend가 수습하는 경쟁 순서를 확인했다. 실패 1건 자체의 이벤트 trace는 없어 세부 순서는 소급 확정하지 않는다. 레이아웃/폰트/애니메이션 완료 뒤 scroll만 변경하는 단위·브라우저 음성 대조가 각각 수정 전 실패했다. 초기 10초 동안 scroll 이벤트도 보정하고 입력/시한 종료 시 함께 해제하도록 수리했다. 만료 뒤 programmatic scroll·자동 결과는 계속 보정하지 않아야 한다.
 - 다음 병렬 묶음 6회 138건 중 언어 전환 표본 1건이 top 위치 단언에 실패했다. 추가 발주를 멈추고 이미 시작한 4~6회는 완료·영수증을 회수했다(`pre-language/`, `parallel-stop.json`). 시험이 URL만 기다리던 공백을 보완해 실제 문서 언어·번역된 안내 제목·폰트·애니메이션 준비 후 geometry를 재도록 했다. 별도 30건 계측은 통과했으나 top 호출 때 URL은 ko, 안내 제목은 아직 영어인 중간 상태를 확인했다. 실패 1건의 상세 순서는 소급 확정하지 않는다. scrollY=0 대기는 넣지 않았으며 top 호출만 막은 유효한 음성 대조 4건은 모두 최종 위치 단언 실패를 검출했다. 최초 잘못된 wrapper 대조는 별도 보존하고 근거에서 제외했다.
 - 최종 소스/동일 dist의 비격리 반복 10회는 최대 3개 동시 실행하되 브라우저·서버 포트·프로필·출력·영수증 task를 분리했다. 23×10=230건 전부 통과, 준비/HTTP/pageerror 0건이다. 기존 안내 180건의 클릭·reload 각180 위치, 새 비안내 이동40·지연 복원10·무입력 자동 결과10, 기존 초기 layout/키보드 해제 각10을 확인했다. unit 1,492+36=1,528(fail/skip/cancel0)·build(112 localized 페이지)·static 종료0이다. 마지막 변경은 build가 소비하지 않는 browser smoke의 실제 번역 준비 조건뿐이며 제품·생성기·의존성 입력과 dist 1,209파일 해시 일치를 확인해 build만 재사용했다. unit/static/최종 반복은 마지막 시험 소스로 실행했다. 1,860입력 해시와 원본 로그·재사용 근거·최종 판정 수치는 `scratch/anchor-fix1/final-proof.json`, `verification.json`, `check-reuse.json`에 있다. push·merge·배포는 수행하지 않았다.
+## 2026-11-03 — KRX 규정 근거 보관 발췌·법규서비스 안내 (Codx, 검수 대기)
+
+- 사용자 승인 ①+②: 외부 GET으로 열리지 않는 rule.krx 규정 popup만 법규서비스 첫 화면 안내와 실제 한국어 규정명·조문 복사로 교체했다. GET 가능한 KIND 등 다른 출처 링크는 보존했다. 동일 popup URL인 서로 다른 bookid를 합치지 않는다.
+- 별도 sources-v1.json/sha256을 기존 달력 manifest와 같은 세대일 때만 사용한다. 기존 manifest·calendar-YYYY.json은 같은 입력에서 바이트 불변이다. metadata/발췌는 SHA 확인을 마친 저장 자료에서 생성하며, redacted 원문 해시임을 구분하고 조문 외 본문은 배포하지 않는다.
+- 복사 버튼/보관본 details는 native 키보드 동작을 사용하며, 공식 한국어 원문을 lang=ko와 data-mcal-original로 표시한다. 영어 UI의 일반 명령어는 계속 한국어 누출 검사 대상으로 두고 공식 원문만 구분했다. 날짜 설명의 내부 메모 금지 단언은 유지했다.
+- 배포 복사는 새 두 파일을 SHA/세대 검증 후 함께 싣고, 없거나 잘못되면 발췌만 숨긴다. 기존 달력 checkout 실패 시 이전 배포본을 복구하는 동작은 유지했다. 사이트를 먼저 배포해 ①을 제공할 수 있고 다음 정상 market-calendar 발행부터 ②가 활성화된다.
+- 테스트·두 저장소 커밋·규정명/소비자 호환 근거·화면·정확한 실행 범위는 SOL-KRXRULE-REPORT.md에 보존한다. merge·push·운영 서비스 실행 및 .team 갱신은 하지 않았다.
+
+
+## 2026-11-03 — KRXRULE FIX1 / 사이트 P3 (Codx, 재검수 대기)
+
+- MC source-excerpts.schema.json과 바이트 동일한 계약 사본을 실제 로더가 읽는다. 현재 계약의 type/required/additionalProperties/format/크기·개수·패턴 제약을 CSP eval 없이 적용하며, 지원 밖 검증 키워드는 허용하지 않는다. 잘못된 실제 날짜·timezone 누락도 거부하고 기존 id/bookid·조문 문맥 검사는 유지했다. 새 의존성은 추가하지 않았다.
+- 일반 GET 출처의 링크 이름에 sourceNumber를 적용해 같은 날짜의 링크를 구분한다. 보관 사본 제목은 enclosing SectionCard h2 다음 h3로 표시한다. 휴장일(거래 시간 h3가 없는 경우)과 복수 일반 링크를 브라우저 fixture로 검사했다.
+- 단위 1,332건·i18n·build·static 및 근거 브라우저 5건 통과. 올바른 SHA를 가진 schema-invalid 자료도 보관본만 숨기고 달력/안내를 유지했다. 상세 근거와 MC 보완 결과는 SOL-KRXRULE-FIX1.md에 보존한다.

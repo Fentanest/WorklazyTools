@@ -164,6 +164,8 @@ jobs:
         # Also runs after checkout failure. The script records failures and
         # verifies the current site's copy before restoring it into fresh dist.
         # With no valid publication, the page displays its no-data state.
+        # Also copies optional sources-v1.json + sources-v1.sha256 after SHA/generation
+        # verification; an absent or corrupt pair only hides saved KRX excerpts.
         run: python3 scripts/copy-market-calendar.py market-calendar-state/public/v1 dist/data/market-calendar/v1 --fallback-published
 
       - name: Run unit tests
