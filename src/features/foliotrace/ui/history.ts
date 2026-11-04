@@ -1,4 +1,5 @@
 import type { Snapshot } from '../contracts';
+import { validHistoryCounts } from '../data/valuationSeries.ts';
 import type { ReconstructedValuationSeries } from '../valuationSeriesContract';
 import type { Lang } from './holdings';
 import { formatKrw } from './holdings.ts';
@@ -27,13 +28,19 @@ function chartCoordinate(value: string | null): number | null {
 export function chartHistory(history: Snapshot['history'], extension?: ReconstructedValuationSeries,
   current?: Pick<Snapshot, 'datasetVersion' | 'valuationTradeDate' | 'trackedCount' | 'pricedCount'>) {
   const publicDays = new Set(history.map(point => point.tradeDate));
-  const published: ChartHistoryPoint[] = history.map(point => ({
-    tradeDate: point.tradeDate, estimatedValue: point.estimatedValue, origin: 'published', plotValue: chartCoordinate(point.estimatedValue),
-    ...(current && current.datasetVersion === point.datasetVersion && current.valuationTradeDate === point.tradeDate &&
-      current.pricedCount >= 0 && current.pricedCount <= current.trackedCount ? {
+  const published: ChartHistoryPoint[] = history.map(point => {
+    // Published history owns its counts. Only a legacy point can use the identical current revision.
+    const counts = validHistoryCounts(point) ? point : current && current.datasetVersion === point.datasetVersion &&
+      current.valuationTradeDate === point.tradeDate ? {
         trackedCount: current.trackedCount, pricedCount: current.pricedCount, unvaluedCount: current.trackedCount - current.pricedCount,
+      } : undefined;
+    return {
+      tradeDate: point.tradeDate, estimatedValue: point.estimatedValue, origin: 'published', plotValue: chartCoordinate(point.estimatedValue),
+      ...(counts && validHistoryCounts(counts) ? {
+        trackedCount: counts.trackedCount, pricedCount: counts.pricedCount, unvaluedCount: counts.unvaluedCount,
       } : {}),
-  }));
+    };
+  });
   // Latest user decision: public dates win. Keep the full extension unchanged;
   // only its 12 non-overlapping dates enter the display projection.
   const reconstructed: ChartHistoryPoint[] = (extension?.points ?? []).filter(point => !publicDays.has(point.tradeDate)).map(point => ({

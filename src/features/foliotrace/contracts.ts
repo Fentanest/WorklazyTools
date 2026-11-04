@@ -241,7 +241,9 @@ export interface Snapshot {
     kind: 'nps_share_decrease_amount_unreported'
     references: Array<{ receiptNo: string; filingUrl: string }>
   }>
-  history: Array<{ tradeDate: IsoDate; estimatedValue: DecimalString; datasetVersion: string }>
+  /** Counts describe the holdings used for this published point; all three are present or all absent. */
+  history: Array<{ tradeDate: IsoDate; estimatedValue: DecimalString; datasetVersion: string;
+    trackedCount?: number; pricedCount?: number; unvaluedCount?: number }>
   /** Optional independent reconstruction; overlapping dates remain available in the source data. */
   valuationSeries?: ReconstructedValuationSeries
 }

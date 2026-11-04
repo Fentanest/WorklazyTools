@@ -114,3 +114,14 @@
 
 차트 좌표에서만 유한 Number를 사용하고 원화 레이블/차이는 원본 십진 문자열·BigInt로 유지한다.
 1~2개 유효 값에는 추이 선 대신 기록 부족 상태와 날짜별 대체 기록을 제공한다.
+
+
+## F9 공개 history 종목 수 (2026-11-04)
+
+`history[*]`에 `trackedCount`, `pricedCount`, `unvaluedCount`를 선택적으로 제공한다.
+세 값은 모두 없거나 모두 있어야 하며 각각 0~10,000 정수이고 `trackedCount = pricedCount + unvaluedCount`다.
+0은 제공된 값이며 누락과 다르다. 잘못된 묶음은 기존 차트 격리 규칙에 따라 처리한다.
+
+과거 공개점은 해당 평가에 사용한 holdings의 검증된 수를 표시한다. 값이 없는 기존 payload도 그대로 허용한다.
+검증된 공개 history 수가 우선하며, 누락된 점만 동일 datasetVersion·valuationTradeDate의 현재 최상위 수로 보완한다.
+같은 날짜의 재구성점 수를 공개점에 붙이지 않는다. 공개값의 날짜·금액·출처는 유지한다.

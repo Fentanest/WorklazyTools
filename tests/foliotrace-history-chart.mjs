@@ -9,6 +9,10 @@ const base = process.env.TEST_BASE_URL || 'http://127.0.0.1:49386';
 assert.ok(process.env.F6_OUTPUT, 'Set F6_OUTPUT to an explicit artifact directory');
 const out = process.env.F6_OUTPUT; await fs.mkdir(out, { recursive: true });
 const original = JSON.parse(await fs.readFile(new URL('./fixtures/foliotrace/chart-snapshot-20261103.json', import.meta.url)));
+const recovered = JSON.parse(await fs.readFile(new URL('./fixtures/foliotrace/published-history-counts-20261104.json', import.meta.url)));
+const countText = (point, lang) => lang === 'ko'
+  ? `평가 ${point.pricedCount.toLocaleString('en-US')}/${point.trackedCount.toLocaleString('en-US')}종목 · 제외 ${point.unvaluedCount}종목`
+  : `${point.pricedCount.toLocaleString('en-US')}/${point.trackedCount.toLocaleString('en-US')} securities priced · ${point.unvaluedCount} excluded`;
 const reconstruction = JSON.parse(await fs.readFile(new URL('./fixtures/foliotrace/valuation-series-20261103.json', import.meta.url)));
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
 const facts = [];
@@ -44,8 +48,8 @@ async function setup(lang, theme, mobile, data) {
 try {
   for (const lang of ['ko', 'en']) for (const theme of ['light-coral', 'dark-coral']) for (const mobile of [false, true]) {
     const id = `${lang}-${theme}-${mobile ? 'mobile' : 'desktop'}`;
-    await test(`F6 chart ${id}`, async () => {
-      const { page, context, errors } = await setup(lang, theme, mobile, { ...original, valuationSeries: reconstruction });
+    await test(`F9 recovered published counts ${id}`, async () => {
+      const { page, context, errors } = await setup(lang, theme, mobile, { ...original, history: recovered, valuationSeries: reconstruction });
       try {
         await page.locator('#foliotrace-events li').first().waitFor();
         assert.equal(await page.getByTestId('foliotrace-history-chart').count(), 1);
@@ -68,6 +72,12 @@ try {
         assert.equal(await region.locator('tbody tr').count(), 19);
         assert.equal(await region.locator('tr[data-record-origin=reconstructed]').count(), 12);
         assert.equal(await region.locator('tr[data-record-origin=published]').count(), 7);
+        for (const point of recovered.slice(0, 6)) {
+          const row = region.locator('tbody tr').filter({ has: page.locator(`time[datetime="${point.tradeDate}"]`) });
+          assert.equal(await row.getAttribute('data-record-origin'), 'published');
+          assert.ok((await row.innerText()).includes(countText(point, lang)));
+        }
+        await region.locator('details').screenshot({ path: path.join(out, `${id}-published-count-table.png`) });
         const last = region.locator('tbody tr').filter({ has: page.locator('time[datetime="2026-11-02"]') });
         assert.ok((await last.innerText()).includes(money(original.history.at(-1).estimatedValue)));
         assert.ok(!(await last.innerText()).includes(money(reconstruction.points.at(-1).estimatedValue)));
@@ -93,6 +103,7 @@ try {
         await region.locator('[role=tooltip][data-origin=published]').waitFor();
         const publishedDay = await tooltip.locator('time').getAttribute('datetime');
         assert.equal(await tooltip.locator('strong').innerText(), money(original.history.find(point => point.tradeDate === publishedDay).estimatedValue));
+        assert.ok((await tooltip.innerText()).includes(countText(recovered.find(point => point.tradeDate === publishedDay), lang)));
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
         await page.mouse.move(0, 0);
         await tooltip.waitFor({ state: 'hidden' });
@@ -110,7 +121,20 @@ try {
       await page.locator('[data-chart-ready=true]').waitFor();
       assert.equal(await page.getByTestId('foliotrace-history-chart').getAttribute('data-point-count'), '7');
       assert.equal(await page.locator('[data-history-origin=reconstructed]').count(), 0);
+      await page.locator('.foliotrace-trend details > summary').click();
+      assert.equal(await page.locator('.foliotrace-trend tbody tr').filter({ hasText: 'Counts not provided' }).count(), 6);
       await page.locator('.foliotrace-trend').screenshot({ path: path.join(out, 'legacy-seven.png') });
+    } finally { await context.close(); }
+  });
+  for (const lang of ['ko', 'en']) await test(`zero published counts stay visible ${lang}`, async () => {
+    const history = structuredClone(recovered);
+    Object.assign(history[0], { trackedCount: 0, pricedCount: 0, unvaluedCount: 0 });
+    const { page, context } = await setup(lang, 'light-coral', true, { ...original, history });
+    try {
+      await page.locator('[data-chart-ready=true]').waitFor();
+      await page.locator('.foliotrace-trend details > summary').click();
+      const row = page.locator('.foliotrace-trend tbody tr').filter({ has: page.locator(`time[datetime="${history[0].tradeDate}"]`) });
+      assert.ok((await row.innerText()).includes(countText(history[0], lang)));
     } finally { await context.close(); }
   });
   for (const count of [0, 1, 2]) await test(`history with ${count} points has an accessible empty state`, async () => {
@@ -135,6 +159,8 @@ try {
     ['reversed extension', data => { data.valuationSeries.points.reverse(); }],
     ['duplicate extension', data => { data.valuationSeries.points[1].tradeDate = data.valuationSeries.points[0].tradeDate; }],
     ['1001 extension points', data => { data.valuationSeries.points = Array.from({ length: 1001 }, () => data.valuationSeries.points[0]); }],
+    ['partial public counts', data => { data.history[0].trackedCount = 1192; }],
+    ['wrong public count sum', data => { Object.assign(data.history[0], recovered[0], { unvaluedCount: 0 }); }],
     ['inconsistent counts', data => { data.valuationSeries.points[0].pricedCount++; }],
     ['duplicate public history', data => { data.history[1].tradeDate = data.history[0].tradeDate; }],
     ['1001 public points', data => { data.history = Array.from({ length: 1001 }, () => data.history[0]); }],

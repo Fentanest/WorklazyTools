@@ -16,13 +16,21 @@ export function validTradeDate(value: unknown): value is string {
   return Number.isFinite(time) && new Date(time).toISOString().slice(0, 10) === value;
 }
 
+/** A zero count is provided data. Partial, non-integer or inconsistent groups are invalid. */
+export function validHistoryCounts<T extends { trackedCount?: unknown; pricedCount?: unknown; unvaluedCount?: unknown }>(value: T):
+  value is T & { trackedCount: number; pricedCount: number; unvaluedCount: number } {
+  return count(value.trackedCount) && count(value.pricedCount) && count(value.unvaluedCount) &&
+    value.pricedCount + value.unvaluedCount === value.trackedCount;
+}
+
 export function validPublishedHistory(value: unknown): boolean {
   if (!Array.isArray(value) || value.length > MAX_VALUATION_POINTS) return false;
   let previous = '';
   for (const point of value) {
     if (!record(point) || !validTradeDate(point.tradeDate) || point.tradeDate <= previous ||
       typeof point.estimatedValue !== 'string' || !LEGACY_AMOUNT.test(point.estimatedValue) ||
-      typeof point.datasetVersion !== 'string' || !HASH.test(point.datasetVersion)) return false;
+      typeof point.datasetVersion !== 'string' || !HASH.test(point.datasetVersion) ||
+      (['trackedCount', 'pricedCount', 'unvaluedCount'].some(key => key in point) && !validHistoryCounts(point))) return false;
     previous = point.tradeDate;
   }
   return true;
