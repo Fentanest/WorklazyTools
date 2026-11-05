@@ -86,7 +86,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "New Year's Day",
+    "special": "New Year’s Day",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -51560,7 +51560,7 @@
         "tz": "America/New_York"
       }
     ],
-    "special": "Early Close",
+    "special": "Day after Thanksgiving",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -51574,7 +51574,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "the day after Thanksgiving: early close at 1:00 p.m."
+    ]
   },
   {
     "date": "20271127",
