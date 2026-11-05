@@ -54,7 +54,7 @@ const server = await createServer({
             const result = runExcelCleanerPipeline(models, pipeline, { previewRows: 20, date1904: false });
             heap("engine-complete", samples);
             const counts = { errors: result.errors.length, excluded: result.excluded.length, errorTruncated: result.summary.errorRowsTruncated, excludedTruncated: result.summary.excludedRowsTruncated };
-            const outputs = await buildExcelCleanerOutputs(result, { fileName: "heap.csv", language: "en", pipeline, csvSafeMode: false }, "xlsx");
+            const outputs = await buildExcelCleanerOutputs(result, { fileName: "heap.csv", language: "en", pipeline, csvSafeMode: false, confirmFormulaDowngrade: false }, "xlsx");
             heap("report-serialized", samples);
             const outputBytes = outputs.reduce((sum, item) => sum + item.byteLength, 0);
             result.sheets.length = 0;

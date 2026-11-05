@@ -67,7 +67,7 @@ async function handle(request: Request) {
       onProgress: (rule, index, count) => progress(15 + Math.round((index + 1) / Math.max(1, count) * 55), rule.type, rule.id),
     });
     engine.warnings.push(...preflight.warnings);
-    const outputs = request.type === "run" ? await buildExcelCleanerOutputs(engine, { fileName: request.fileName, language: request.language, pipeline, csvSafeMode: request.options.csvSafeMode }, request.options.output) : [];
+    const outputs = request.type === "run" ? await buildExcelCleanerOutputs(engine, { fileName: request.fileName, language: request.language, pipeline, csvSafeMode: request.options.csvSafeMode, confirmFormulaDowngrade: request.options.confirmFormulaDowngrade }, request.options.output) : [];
     progress(request.type === "run" ? 96 : 90, request.type === "run" ? "WRITING_OUTPUT" : "PREVIEW_READY");
     const result: ExcelCleanerResult = { fileName: request.fileName, format, warnings: engine.warnings, summary: engine.summary, stages: engine.stages, outputs };
     engine.sheets = [];

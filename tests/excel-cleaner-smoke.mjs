@@ -92,6 +92,7 @@ try {
     if (initial.title !== "Excel 데이터 정리" || initial.rules !== 28 || initial.fileInputs !== 1 || !initial.ads || initial.isolated) throw new Error(`Initial UI or ad boundary failed: ${JSON.stringify(initial)}`);
 
     const recipeChecks = await verifyRecipes(page);
+    const errorToggleChecks = await verifyErrorToggle(page, client);
 
     await upload(page, path.join(temporaryDirectory, "formula.xlsx"), 1);
     await page.click("[data-testid='excel-cleaner-add-rule'] button");
@@ -267,15 +268,59 @@ try {
       damagedMessage,
       csv: { rawRiskWarning: true, safePrefix: true },
       formulaFailure,
+      errorToggleChecks,
       regexWatchdog: watchdogFailure,
       cancellationAndRerun: "passed",
       inputUnchanged: true,
       mobile,
     }, null, 2));
-    console.log("# tests 7\n# pass 7\n# fail 0");
+    console.log("# tests 8\n# pass 8\n# fail 0");
   } finally { await browser.close(); }
 } finally {
   await fs.rm(temporaryDirectory, { recursive: true, force: true });
+}
+
+async function verifyErrorToggle(page, client) {
+  const input = new ExcelJS.Workbook();
+  const sheet = input.addWorksheet("Data");
+  sheet.addRow(["A", "B", "C", "Raw", "Literal", "Formula error", "Formula literal", "Degraded error", "Degraded literal"]);
+  sheet.addRow([1, 2, 3, { error: "#DIV/0!" }, "#DIV/0!", { formula: "1/0", result: { error: "#DIV/0!" } }, { formula: '"#DIV/0!"', result: "#DIV/0!" }, { formula: "SUM(A2:B2)", result: { error: "#DIV/0!" } }, { formula: 'IF(SUM(A2:B2),"#DIV/0!","#DIV/0!")', result: "#DIV/0!" }]);
+  const inputPath = path.join(temporaryDirectory, "error-toggle.xlsx");
+  await fs.writeFile(inputPath, await input.xlsx.writeBuffer());
+  const checks = [];
+  for (const consent of [false, true]) {
+    await openCleaner(page);
+    const toggle = '[data-ui-component="toggle-row"] button[role="switch"]';
+    const setting = await page.$eval('[data-ui-component="toggle-row"]', (row) => ({ text: row.textContent, checked: row.querySelector('button[role="switch"]').getAttribute("aria-checked") }));
+    if (setting.checked !== "false" || !setting.text.includes("지원 밖 수식을 저장된 계산값으로 바꾸는 데 동의")) throw new Error(`Existing formula consent setting changed: ${JSON.stringify(setting)}`);
+    if (consent) await page.click(toggle);
+    await upload(page, inputPath, 1);
+    await page.select("[data-testid='excel-cleaner-add-rule'] select", "reorder-columns");
+    await page.click("[data-testid='excel-cleaner-add-rule'] button");
+    await replaceTextarea(page, "[data-testid='excel-cleaner-rule'] textarea", JSON.stringify({ type: "reorder-columns", id: "00000000-0000-4000-8000-000000000097", order: ["column:1", "column:3", "column:2", "column:4", "column:5", "column:6", "column:7", "column:8", "column:9"] }));
+    await page.click("[data-testid='excel-cleaner-actions'] [data-ui-component='primary-button']");
+    await page.waitForSelector(".ui-operation-progress.ui-status-success");
+    const [download] = await downloadLinks(page, client, downloads, `error-toggle-${consent}`);
+    const archive = await JSZip.loadAsync(download.bytes);
+    const xml = await archive.file("xl/worksheets/sheet1.xml").async("string");
+    const otherReader = XLSX.read(download.bytes, { type: "buffer" }).Sheets.Data;
+    for (const column of ["D", "E", "F", "G", "H", "I"]) {
+      const address = `${column}2`;
+      const error = column === "D" || column === "F" || column === "H" && !consent;
+      const cellXml = xml.match(new RegExp(`<c\\b[^>]*\\br="${address}"[^>]*>.*?</c>`, "u"))?.[0];
+      if (!cellXml || /\bt="e"/u.test(cellXml) !== error || otherReader[address].t !== (error ? "e" : "s") || otherReader[address].v !== (error ? 7 : "#DIV/0!")) throw new Error(`Error consent output mismatch: ${JSON.stringify({ consent, address, cellXml, cell: otherReader[address] })}`);
+      const formula = column === "F" ? "1/0" : column === "G" ? '"#DIV/0!"' : undefined;
+      if (otherReader[address].f !== formula) throw new Error(`Error consent formula mismatch: ${address}`);
+    }
+    if (artifactDirectory) {
+      await fs.writeFile(path.join(artifactDirectory, `error-toggle-${consent}.xlsx`), download.bytes);
+      await fs.writeFile(path.join(artifactDirectory, `error-toggle-${consent}-sheet1.xml`), xml);
+    }
+    checks.push({ consent, rawError: "e", preservedFormulaError: "e", degradedError: consent ? "s" : "e", literal: "s" });
+  }
+  console.log("ok 7 - existing formula consent toggle controls only degraded error caches");
+  await openCleaner(page);
+  return checks;
 }
 
 async function openCleaner(page) {

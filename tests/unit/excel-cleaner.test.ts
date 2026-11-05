@@ -223,7 +223,7 @@ test("XLSX output appends four reports, reopens formulas, and CSV modes warn or 
   sheet.name = "Change Summary";
   sheet.rows[1].cells["column:2"] = { value: 2, formula: "1+1", cachedValue: 2, cacheState: "present", formulaType: "normal" };
   const engine = runExcelCleanerPipeline([sheet], pipeline([]));
-  const raw = await buildExcelCleanerOutputs(engine, { fileName: "input.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: false }, "both");
+  const raw = await buildExcelCleanerOutputs(engine, { fileName: "input.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: false, confirmFormulaDowngrade: false }, "both");
   assert.equal(raw.length, 2);
   assert.equal(raw[1].csvRiskCount, 2);
   const workbook = new ExcelJS.Workbook();
@@ -232,7 +232,7 @@ test("XLSX output appends four reports, reopens formulas, and CSV modes warn or 
   assert.equal(workbook.worksheets[0].name, "Change Summary");
   assert.equal(workbook.worksheets[1].name, "Change Summary (2)");
   assert.equal(workbook.worksheets[0].getCell("B3").formula, "1+1");
-  const safe = await buildExcelCleanerOutputs(engine, { fileName: "input.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: true }, "csv");
+  const safe = await buildExcelCleanerOutputs(engine, { fileName: "input.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: true, confirmFormulaDowngrade: false }, "csv");
   const csv = new TextDecoder().decode(safe[0].buffer);
   assert.match(csv, /'=1\+1/u);
   assert.equal(hasCsvInjectionRisk("\tcmd"), true);
@@ -241,14 +241,14 @@ test("XLSX output appends four reports, reopens formulas, and CSV modes warn or 
   const shifted = model([["remove", 1, 2, null], ["keep", 3, 4, null]]);
   shifted.rows[1].cells["column:4"] = { value: 7, formula: "B3+C3", cachedValue: 7, cacheState: "present", formulaType: "normal" };
   const shiftedResult = runExcelCleanerPipeline([shifted], pipeline([{ type: "filter-rows", id: rid(70), mode: "delete", columnId: "column:1", operator: "equals", value: "remove" }]));
-  const shiftedOutput = await buildExcelCleanerOutputs(shiftedResult, { fileName: "shifted.xlsx", language: "en", pipeline: pipeline([{ type: "filter-rows", id: rid(70), mode: "delete", columnId: "column:1", operator: "equals", value: "remove" }]), csvSafeMode: false }, "xlsx");
+  const shiftedOutput = await buildExcelCleanerOutputs(shiftedResult, { fileName: "shifted.xlsx", language: "en", pipeline: pipeline([{ type: "filter-rows", id: rid(70), mode: "delete", columnId: "column:1", operator: "equals", value: "remove" }]), csvSafeMode: false, confirmFormulaDowngrade: false }, "xlsx");
   const shiftedWorkbook = new ExcelJS.Workbook();
   await shiftedWorkbook.xlsx.load(shiftedOutput[0].buffer);
   assert.equal(shiftedWorkbook.getWorksheet("Data")!.getCell("D2").formula, "B2+C2");
 });
 
-for (const consumeSource of [false, true]) for (const downgradeFormulas of [false, true]) {
-  test(`cleaner preserves raw and formula XLSX errors separately from literals (consumeSource=${consumeSource}, downgradeFormulas=${downgradeFormulas})`, async () => {
+for (const consumeSource of [false, true]) for (const downgradeFormulas of [false, true]) for (const confirmFormulaDowngrade of [false, true]) {
+  test(`cleaner preserves raw and formula XLSX errors separately from literals (consumeSource=${consumeSource}, downgradeFormulas=${downgradeFormulas}, confirmFormulaDowngrade=${confirmFormulaDowngrade})`, async () => {
     const errors: ExcelJS.CellErrorValue["error"][] = ["#DIV/0!", "#N/A", "#VALUE!", "#REF!", "#NAME?", "#NUM!", "#NULL!"];
     const input = new ExcelJS.Workbook();
     const sheet = input.addWorksheet("Data");
@@ -265,7 +265,7 @@ for (const consumeSource of [false, true]) for (const downgradeFormulas of [fals
     assert.equal(parsed.sheets[0].cells.length === 0, consumeSource);
     const rules = pipeline([{ type: "trim-whitespace", id: rid(80) }]);
     const result = runExcelCleanerPipeline(models, rules);
-    const outputs = await buildExcelCleanerOutputs(result, { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: false }, "both");
+    const outputs = await buildExcelCleanerOutputs(result, { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: false, confirmFormulaDowngrade }, "both");
     const reopened = new ExcelJS.Workbook();
     await reopened.xlsx.load(outputs[0].buffer);
     const cleaned = reopened.getWorksheet("Data")!;
@@ -281,8 +281,10 @@ for (const consumeSource of [false, true]) for (const downgradeFormulas of [fals
       assert.equal(cleaned.getCell(`B${row}`).value, error);
       for (const [column, formula] of [["C", "1/0"], ["D", `\"${error}\"`]]) {
         const cell = cleaned.getCell(`${column}${row}`);
-        assert.equal(cell.type, downgradeFormulas ? ExcelJS.ValueType.String : ExcelJS.ValueType.Formula);
-        if (downgradeFormulas) assert.equal(cell.value, error);
+        // Latest user decision: only consented, degraded error caches become text.
+        const errorValue = column === "C" && !confirmFormulaDowngrade;
+        assert.equal(cell.type, downgradeFormulas ? errorValue ? ExcelJS.ValueType.Error : ExcelJS.ValueType.String : ExcelJS.ValueType.Formula);
+        if (downgradeFormulas) assert.deepEqual(cell.value, errorValue ? { error } : error);
         else {
           assert.equal(cell.formula, formula);
           assert.deepEqual(cell.result, column === "C" ? { error } : error);
@@ -291,7 +293,7 @@ for (const consumeSource of [false, true]) for (const downgradeFormulas of [fals
       }
       for (const column of ["A", "B", "C", "D"]) {
         const address = `${column}${row}`;
-        const isError = column === "A" || column === "C" && !downgradeFormulas;
+        const isError = column === "A" || column === "C" && (!downgradeFormulas || !confirmFormulaDowngrade);
         const cellXml = xml.match(new RegExp(`<c\\b[^>]*\\br="${address}"[^>]*>.*?</c>`, "u"))?.[0];
         assert.ok(cellXml, address);
         assert.equal(/\bt="e"/u.test(cellXml), isError, cellXml);
@@ -304,13 +306,46 @@ for (const consumeSource of [false, true]) for (const downgradeFormulas of [fals
     const expectedCsv = ["Raw error,Literal,Formula error cache,Formula string cache", ...errors.map((error) => [error, error, error, error].join(","))].join("\r\n");
     assert.equal(new TextDecoder().decode(outputs[1].buffer), expectedCsv);
     assert.equal(outputs[1].csvRiskCount, 0);
-    const safeCsv = await buildExcelCleanerOutputs(result, { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: true }, "csv");
+    const safeCsv = await buildExcelCleanerOutputs(result, { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: true, confirmFormulaDowngrade }, "csv");
     assert.equal(new TextDecoder().decode(safeCsv[0].buffer), expectedCsv);
   });
 }
 
-for (const consumeSource of [false, true]) {
-  test(`cleaner keeps scalar and nonstandard error formula caches unchanged (consumeSource=${consumeSource})`, async () => {
+for (const consumeSource of [false, true]) for (const phase of ["projection", "rule"] as const) for (const confirmFormulaDowngrade of [false, true]) {
+  test(`cleaner applies consent to actual formula degradation (consumeSource=${consumeSource}, phase=${phase}, confirmFormulaDowngrade=${confirmFormulaDowngrade})`, async () => {
+    const input = new ExcelJS.Workbook();
+    if (phase === "projection") input.addWorksheet("Template").addRow(["A", "B", "C", "Error cache", "Literal cache"]);
+    const sheet = input.addWorksheet("Data");
+    sheet.addRow(phase === "projection" ? ["A", "C", "B", "Error cache", "Literal cache"] : ["A", "B", "C", "Error cache", "Literal cache"]);
+    sheet.addRow([1, 2, 3, { formula: "SUM(A2:B2)", result: { error: "#DIV/0!" } }, { formula: 'IF(SUM(A2:B2),"#DIV/0!","#DIV/0!")', result: "#DIV/0!" }]);
+    const parsed = await parseSpreadsheetInput("degraded.xlsx", await input.xlsx.writeBuffer() as unknown as ArrayBuffer);
+    const selections = parsed.sheets.map((sheet) => ({ sheetName: sheet.name, headerRow: 1 }));
+    const rules = pipeline(phase === "rule" ? [{ type: "reorder-columns", id: rid(86), order: ["column:1", "column:3", "column:2", "column:4", "column:5"] }] : []);
+    const checked = preflightExcelCleaner(parsed, selections, rules);
+    assert.equal(checked.downgradeFormulas, false);
+    const result = runExcelCleanerPipeline(createCleanerSheetModels(parsed, selections, checked.downgradeFormulas, { consumeSource }), rules);
+    const row = result.sheets.find(({ name }) => name === "Data")!.rows[0];
+    for (const id of ["column:4", "column:5"]) assert.equal(row.cells[id].formulaDegraded, true);
+    const [output] = await buildExcelCleanerOutputs(result, { fileName: "degraded.xlsx", language: "en", pipeline: rules, csvSafeMode: false, confirmFormulaDowngrade }, "xlsx");
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(output.buffer);
+    assert.deepEqual(reopened.getWorksheet("Data")!.getCell("D2").value, confirmFormulaDowngrade ? "#DIV/0!" : { error: "#DIV/0!" });
+    assert.equal(reopened.getWorksheet("Data")!.getCell("E2").value, "#DIV/0!");
+    const archive = await JSZip.loadAsync(output.buffer);
+    const xml = await archive.file(`xl/worksheets/sheet${phase === "projection" ? 2 : 1}.xml`)!.async("string");
+    const cellXml = xml.match(/<c\b[^>]*\br="D2"[^>]*>.*?<\/c>/u)?.[0];
+    assert.ok(cellXml);
+    assert.equal(/\bt="e"/u.test(cellXml), !confirmFormulaDowngrade);
+    if (!confirmFormulaDowngrade) assert.ok(cellXml.includes("<v>#DIV/0!</v>"));
+    assert.doesNotMatch(xml, /<f\b/u);
+    const otherReader = XLSX.read(output.buffer, { type: "array" }).Sheets.Data;
+    assert.deepEqual([otherReader.D2.t, otherReader.D2.v, otherReader.D2.f], confirmFormulaDowngrade ? ["s", "#DIV/0!", undefined] : ["e", 7, undefined]);
+    assert.deepEqual([otherReader.E2.t, otherReader.E2.v, otherReader.E2.f], ["s", "#DIV/0!", undefined]);
+  });
+}
+
+for (const consumeSource of [false, true]) for (const downgradeFormulas of [false, true]) for (const confirmFormulaDowngrade of [false, true]) {
+  test(`cleaner keeps scalar and nonstandard error formula caches unchanged (consumeSource=${consumeSource}, downgradeFormulas=${downgradeFormulas}, confirmFormulaDowngrade=${confirmFormulaDowngrade})`, async () => {
     const input = new ExcelJS.Workbook();
     const sheet = input.addWorksheet("Data");
     sheet.addRow(["Cache"]);
@@ -327,9 +362,9 @@ for (const consumeSource of [false, true]) {
       cell.value = cell.cachedValue = error;
     });
     const rules = pipeline([]);
-    const models = createCleanerSheetModels(parsed, [{ sheetName: "Data", headerRow: 1 }], false, { consumeSource });
+    const models = createCleanerSheetModels(parsed, [{ sheetName: "Data", headerRow: 1 }], downgradeFormulas, { consumeSource });
     assert.equal(parsed.sheets[0].cells.length === 0, consumeSource);
-    const outputs = await buildExcelCleanerOutputs(runExcelCleanerPipeline(models, rules), { fileName: "caches.xlsx", language: "en", pipeline: rules, csvSafeMode: false }, "xlsx");
+    const outputs = await buildExcelCleanerOutputs(runExcelCleanerPipeline(models, rules), { fileName: "caches.xlsx", language: "en", pipeline: rules, csvSafeMode: false, confirmFormulaDowngrade }, "xlsx");
     const reopened = new ExcelJS.Workbook();
     await reopened.xlsx.load(outputs[0].buffer);
     const otherReader = XLSX.read(outputs[0].buffer, { type: "array" }).Sheets.Data;
@@ -339,8 +374,8 @@ for (const consumeSource of [false, true]) {
     [...scalars, ...nonstandardErrors].forEach((value, index) => {
       const address = `A${index + 2}`;
       const cell = reopened.getWorksheet("Data")!.getCell(address);
-      assert.equal(cell.formula, index < scalars.length ? "1+1" : "1/0");
-      assert.equal(cell.result, value, address);
+      assert.equal(cell.formula, downgradeFormulas ? undefined : index < scalars.length ? "1+1" : "1/0");
+      assert.equal(downgradeFormulas ? cell.value : cell.result, value, address);
       assert.equal(otherReader[address].v, value, address);
       assert.equal(otherReader[address].t, typeof value === "string" ? "s" : typeof value === "boolean" ? "b" : "n", address);
     });
@@ -361,7 +396,7 @@ for (const consumeSource of [false, true]) {
       { type: "reorder-columns", id: rid(84), order: ["column:2", "column:1"] },
       { type: "add-constant-column", id: rid(85), value: "#NULL!", outputColumnId: "constant", outputName: "Constant" },
     ]);
-    const outputs = await buildExcelCleanerOutputs(runExcelCleanerPipeline(models, rules), { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: false }, "xlsx");
+    const outputs = await buildExcelCleanerOutputs(runExcelCleanerPipeline(models, rules), { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: false, confirmFormulaDowngrade: false }, "xlsx");
     const reopened = new ExcelJS.Workbook();
     await reopened.xlsx.load(outputs[0].buffer);
     const cleaned = reopened.getWorksheet("Data")!;
@@ -390,7 +425,7 @@ test("XLSX cleaner output replaces disallowed text in sheet names, values, and f
   const engine = runExcelCleanerPipeline([sheet], pipeline([]));
   const outputs = await buildExcelCleanerOutputs(
     engine,
-    { fileName: "input.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: false },
+    { fileName: "input.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: false, confirmFormulaDowngrade: false },
     "xlsx",
   );
   const workbook = new ExcelJS.Workbook();
@@ -421,7 +456,7 @@ test("XLSX cleaner output sanitizes preserved number formats without changing sa
 
   const preflight = preflightExcelCleaner(parsed, [{ sheetName: "Data", headerRow: 1 }], pipeline([]));
   const result = runExcelCleanerPipeline(createCleanerSheetModels(parsed, [{ sheetName: "Data", headerRow: 1 }], preflight.downgradeFormulas), pipeline([]));
-  const outputs = await buildExcelCleanerOutputs(result, { fileName: "formats.xls", language: "en", pipeline: pipeline([]), csvSafeMode: false }, "xlsx");
+  const outputs = await buildExcelCleanerOutputs(result, { fileName: "formats.xls", language: "en", pipeline: pipeline([]), csvSafeMode: false, confirmFormulaDowngrade: false }, "xlsx");
   const reopened = new ExcelJS.Workbook();
   await reopened.xlsx.load(outputs[0].buffer);
   const cleaned = reopened.getWorksheet("Data")!;
@@ -443,7 +478,7 @@ test("XLSX cleaner output sanitizes preserved number formats without changing sa
   styleOnly.rows[0].cells["column:1"].style = { numFmt: `0\"style\uFFFEvalue\"` };
   const styleOutput = await buildExcelCleanerOutputs(
     runExcelCleanerPipeline([styleOnly], pipeline([])),
-    { fileName: "style.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: false },
+    { fileName: "style.xlsx", language: "en", pipeline: pipeline([]), csvSafeMode: false, confirmFormulaDowngrade: false },
     "xlsx",
   );
   const styleReopened = new ExcelJS.Workbook();
