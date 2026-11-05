@@ -18,9 +18,11 @@ export interface ExcelCleanerOutputContext {
   language: "ko" | "en";
   pipeline: ExcelCleanerPipeline;
   csvSafeMode: boolean;
+  confirmFormulaDowngrade: boolean;
 }
 
 const CSV_RISK = /^[=+\-@\t\r\n ]/u;
+const FORMULA_ERRORS = new Set<ExcelJS.CellErrorValue["error"]>(["#N/A", "#REF!", "#NAME?", "#DIV/0!", "#NULL!", "#VALUE!", "#NUM!"]);
 
 export async function buildExcelCleanerOutputs(result: ExcelCleanerEngineResult, context: ExcelCleanerOutputContext, output: "xlsx" | "csv" | "both") {
   const outputs: ExcelCleanerOutput[] = [];
@@ -36,13 +38,13 @@ async function buildXlsx(result: ExcelCleanerEngineResult, context: ExcelCleaner
   workbook.creator = "Worklazy Tools";
   workbook.created = new Date();
   workbook.modified = new Date();
-  result.sheets.forEach((model) => writeCleanedSheet(workbook, model));
+  result.sheets.forEach((model) => writeCleanedSheet(workbook, model, context.confirmFormulaDowngrade));
   appendXlsxReportSheets(workbook, reportSheets(result, context));
   const buffer = transferable(await writeXlsxWorkbook(workbook));
   return { kind: "xlsx", suggestedName: `${fileStem(context.fileName)}-cleaned.xlsx`, byteLength: buffer.byteLength, buffer };
 }
 
-function writeCleanedSheet(workbook: ExcelJS.Workbook, model: CleanerSheetModel) {
+function writeCleanedSheet(workbook: ExcelJS.Workbook, model: CleanerSheetModel, confirmFormulaDowngrade: boolean) {
   const sheet = workbook.addWorksheet(uniqueWorksheetName(workbook, model.name, "Sheet"));
   const header = sheet.getRow(model.headerRow);
   model.columns.forEach((column, index) => writeUntrustedText(header.getCell(index + 1), column.name));
@@ -51,20 +53,23 @@ function writeCleanedSheet(workbook: ExcelJS.Workbook, model: CleanerSheetModel)
     const source = row.cells[column.id];
     if (!source) return;
     const target = sheet.getCell(model.headerRow + rowIndex + 1, columnIndex + 1);
-    writeCleanedCell(target, source);
+    writeCleanedCell(target, source, confirmFormulaDowngrade);
   }));
   model.merges.forEach((range) => { try { sheet.mergeCells(range); } catch { /* Preflight keeps unsupported merge topology out of structural runs. */ } });
   sheet.views = [{ state: "frozen", ySplit: model.headerRow }];
   model.columns.forEach((_column, index) => { sheet.getColumn(index + 1).width = 16; });
 }
 
-function writeCleanedCell(target: ExcelJS.Cell, source: CleanerCell) {
+function writeCleanedCell(target: ExcelJS.Cell, source: CleanerCell, confirmFormulaDowngrade: boolean) {
   if (source.formula && !source.formulaDegraded) {
-    target.value = { formula: sanitizeXlsxText(source.formula), result: formulaResult(source.cachedValue) };
+    target.value = { formula: sanitizeXlsxText(source.formula), result: formulaResult(source) };
+  } else if (source.formula) {
+    // The existing consent toggle affects only formulas actually downgraded.
+    // With consent, write displayed error text; otherwise preserve its type.
+    target.value = (!confirmFormulaDowngrade ? formulaErrorValue(source) : undefined) ?? excelValue(source.cachedValue);
   } else if (!source.formula && source.type === "error" && typeof source.value === "string") {
-    // Only raw errors use this path; formula caches keep their existing policy.
     target.value = { error: sanitizeXlsxText(source.value) as ExcelJS.CellErrorValue["error"] };
-  } else target.value = excelValue(source.formula ? source.cachedValue : source.value);
+  } else target.value = excelValue(source.value);
   if (source.style) {
     const style = structuredClone(source.style) as Partial<ExcelJS.Style>;
     if (typeof style.numFmt === "string") style.numFmt = sanitizeXlsxText(style.numFmt);
@@ -110,7 +115,19 @@ export function protectCsvValue(value: unknown) { const text = scalarText(value)
 function decisionValue(value: CleanerCell | undefined) { return value?.formula ? value.cachedValue : value?.value; }
 function scalarText(value: unknown) { return value instanceof Date ? value.toISOString() : value === null || value === undefined ? "" : String(value); }
 function excelValue(value: SpreadsheetScalar | undefined): ExcelJS.CellValue { return typeof value === "string" ? sanitizeXlsxText(value) : value ?? null; }
-function formulaResult(value: SpreadsheetScalar | undefined): ExcelJS.CellFormulaValue["result"] { return typeof value === "string" ? sanitizeXlsxText(value) : value ?? ""; }
+function formulaResult(source: CleanerCell): ExcelJS.CellFormulaValue["result"] {
+  const value = source.cachedValue;
+  return formulaErrorValue(source) ?? (typeof value === "string" ? sanitizeXlsxText(value) : value ?? "");
+}
+function formulaErrorValue(source: CleanerCell): ExcelJS.CellErrorValue | undefined {
+  const value = source.cachedValue;
+  // Match the adapter's cache type, not error-looking text. ExcelJS's typed
+  // error contract covers these seven codes; other caches keep scalar output.
+  if (source.type === "error" && typeof value === "string" && FORMULA_ERRORS.has(value as ExcelJS.CellErrorValue["error"])) {
+    return { error: value as ExcelJS.CellErrorValue["error"] };
+  }
+  return undefined;
+}
 function fileStem(value: string) { return value.replace(/\.[^.]+$/u, ""); }
 function transferable(value: ExcelJS.Buffer) {
   if (value instanceof ArrayBuffer) return value;
