@@ -248,7 +248,7 @@ test("XLSX output appends four reports, reopens formulas, and CSV modes warn or 
 });
 
 for (const consumeSource of [false, true]) for (const downgradeFormulas of [false, true]) {
-  test(`cleaner preserves raw XLSX errors separately from literals and formula caches (consumeSource=${consumeSource}, downgradeFormulas=${downgradeFormulas})`, async () => {
+  test(`cleaner preserves raw and formula XLSX errors separately from literals (consumeSource=${consumeSource}, downgradeFormulas=${downgradeFormulas})`, async () => {
     const errors: ExcelJS.CellErrorValue["error"][] = ["#DIV/0!", "#N/A", "#VALUE!", "#REF!", "#NAME?", "#NUM!", "#NULL!"];
     const input = new ExcelJS.Workbook();
     const sheet = input.addWorksheet("Data");
@@ -269,6 +269,10 @@ for (const consumeSource of [false, true]) for (const downgradeFormulas of [fals
     const reopened = new ExcelJS.Workbook();
     await reopened.xlsx.load(outputs[0].buffer);
     const cleaned = reopened.getWorksheet("Data")!;
+    const archive = await JSZip.loadAsync(outputs[0].buffer);
+    const xml = await archive.file("xl/worksheets/sheet1.xml")!.async("string");
+    const otherReader = XLSX.read(outputs[0].buffer, { type: "array" }).Sheets.Data;
+    const errorCodes = [7, 42, 15, 23, 29, 36, 0];
     errors.forEach((error, index) => {
       const row = index + 2;
       assert.equal(cleaned.getCell(`A${row}`).type, ExcelJS.ValueType.Error);
@@ -281,9 +285,20 @@ for (const consumeSource of [false, true]) for (const downgradeFormulas of [fals
         if (downgradeFormulas) assert.equal(cell.value, error);
         else {
           assert.equal(cell.formula, formula);
-          assert.equal(cell.result, error);
-          assert.equal(cell.effectiveType, ExcelJS.ValueType.String);
+          assert.deepEqual(cell.result, column === "C" ? { error } : error);
+          if (column === "D") assert.equal(cell.effectiveType, ExcelJS.ValueType.String);
         }
+      }
+      for (const column of ["A", "B", "C", "D"]) {
+        const address = `${column}${row}`;
+        const isError = column === "A" || column === "C" && !downgradeFormulas;
+        const cellXml = xml.match(new RegExp(`<c\\b[^>]*\\br="${address}"[^>]*>.*?</c>`, "u"))?.[0];
+        assert.ok(cellXml, address);
+        assert.equal(/\bt="e"/u.test(cellXml), isError, cellXml);
+        if (isError) assert.ok(cellXml.includes(`<v>${error}</v>`), cellXml);
+        assert.equal(otherReader[address].t, isError ? "e" : "s", address);
+        assert.equal(otherReader[address].v, isError ? errorCodes[index] : error, address);
+        assert.equal(otherReader[address].f, !downgradeFormulas && (column === "C" || column === "D") ? column === "C" ? "1/0" : `"${error}"` : undefined);
       }
     });
     const expectedCsv = ["Raw error,Literal,Formula error cache,Formula string cache", ...errors.map((error) => [error, error, error, error].join(","))].join("\r\n");
@@ -291,6 +306,44 @@ for (const consumeSource of [false, true]) for (const downgradeFormulas of [fals
     assert.equal(outputs[1].csvRiskCount, 0);
     const safeCsv = await buildExcelCleanerOutputs(result, { fileName: "errors.xlsx", language: "en", pipeline: rules, csvSafeMode: true }, "csv");
     assert.equal(new TextDecoder().decode(safeCsv[0].buffer), expectedCsv);
+  });
+}
+
+for (const consumeSource of [false, true]) {
+  test(`cleaner keeps scalar and nonstandard error formula caches unchanged (consumeSource=${consumeSource})`, async () => {
+    const input = new ExcelJS.Workbook();
+    const sheet = input.addWorksheet("Data");
+    sheet.addRow(["Cache"]);
+    const scalars = [0, 42, true, false, "text", "#DIV/0!"];
+    scalars.forEach((result) => sheet.addRow([{ formula: "1+1", result }]));
+    const nonstandardErrors = ["#GETTING_DATA", "#SPILL!", "#CUSTOM!", "#div/0!", "#DIV/0! "];
+    nonstandardErrors.forEach(() => sheet.addRow([{ formula: "1/0", result: { error: "#DIV/0!" } }]));
+    const parsed = await parseSpreadsheetInput("caches.xlsx", await input.xlsx.writeBuffer() as unknown as ArrayBuffer);
+    // Inject adapter-level values: extensions outside ExcelJS's seven-code
+    // union must retain the existing formula-cache string fallback.
+    nonstandardErrors.forEach((error, index) => {
+      const cell = parsed.sheets[0].cells.find(({ row }) => row === scalars.length + index + 2)!;
+      assert.equal(cell.type, "error");
+      cell.value = cell.cachedValue = error;
+    });
+    const rules = pipeline([]);
+    const models = createCleanerSheetModels(parsed, [{ sheetName: "Data", headerRow: 1 }], false, { consumeSource });
+    assert.equal(parsed.sheets[0].cells.length === 0, consumeSource);
+    const outputs = await buildExcelCleanerOutputs(runExcelCleanerPipeline(models, rules), { fileName: "caches.xlsx", language: "en", pipeline: rules, csvSafeMode: false }, "xlsx");
+    const reopened = new ExcelJS.Workbook();
+    await reopened.xlsx.load(outputs[0].buffer);
+    const otherReader = XLSX.read(outputs[0].buffer, { type: "array" }).Sheets.Data;
+    const archive = await JSZip.loadAsync(outputs[0].buffer);
+    const xml = await archive.file("xl/worksheets/sheet1.xml")!.async("string");
+    assert.doesNotMatch(xml, /\bt="e"/u);
+    [...scalars, ...nonstandardErrors].forEach((value, index) => {
+      const address = `A${index + 2}`;
+      const cell = reopened.getWorksheet("Data")!.getCell(address);
+      assert.equal(cell.formula, index < scalars.length ? "1+1" : "1/0");
+      assert.equal(cell.result, value, address);
+      assert.equal(otherReader[address].v, value, address);
+      assert.equal(otherReader[address].t, typeof value === "string" ? "s" : typeof value === "boolean" ? "b" : "n", address);
+    });
   });
 }
 

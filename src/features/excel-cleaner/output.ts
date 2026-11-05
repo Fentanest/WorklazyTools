@@ -21,6 +21,7 @@ export interface ExcelCleanerOutputContext {
 }
 
 const CSV_RISK = /^[=+\-@\t\r\n ]/u;
+const FORMULA_ERRORS = new Set<ExcelJS.CellErrorValue["error"]>(["#N/A", "#REF!", "#NAME?", "#DIV/0!", "#NULL!", "#VALUE!", "#NUM!"]);
 
 export async function buildExcelCleanerOutputs(result: ExcelCleanerEngineResult, context: ExcelCleanerOutputContext, output: "xlsx" | "csv" | "both") {
   const outputs: ExcelCleanerOutput[] = [];
@@ -60,9 +61,8 @@ function writeCleanedSheet(workbook: ExcelJS.Workbook, model: CleanerSheetModel)
 
 function writeCleanedCell(target: ExcelJS.Cell, source: CleanerCell) {
   if (source.formula && !source.formulaDegraded) {
-    target.value = { formula: sanitizeXlsxText(source.formula), result: formulaResult(source.cachedValue) };
+    target.value = { formula: sanitizeXlsxText(source.formula), result: formulaResult(source) };
   } else if (!source.formula && source.type === "error" && typeof source.value === "string") {
-    // Only raw errors use this path; formula caches keep their existing policy.
     target.value = { error: sanitizeXlsxText(source.value) as ExcelJS.CellErrorValue["error"] };
   } else target.value = excelValue(source.formula ? source.cachedValue : source.value);
   if (source.style) {
@@ -110,7 +110,15 @@ export function protectCsvValue(value: unknown) { const text = scalarText(value)
 function decisionValue(value: CleanerCell | undefined) { return value?.formula ? value.cachedValue : value?.value; }
 function scalarText(value: unknown) { return value instanceof Date ? value.toISOString() : value === null || value === undefined ? "" : String(value); }
 function excelValue(value: SpreadsheetScalar | undefined): ExcelJS.CellValue { return typeof value === "string" ? sanitizeXlsxText(value) : value ?? null; }
-function formulaResult(value: SpreadsheetScalar | undefined): ExcelJS.CellFormulaValue["result"] { return typeof value === "string" ? sanitizeXlsxText(value) : value ?? ""; }
+function formulaResult(source: CleanerCell): ExcelJS.CellFormulaValue["result"] {
+  const value = source.cachedValue;
+  // Match the adapter's cache type, not error-looking text. ExcelJS's typed
+  // error contract covers these seven codes; other caches keep scalar output.
+  if (source.type === "error" && typeof value === "string" && FORMULA_ERRORS.has(value as ExcelJS.CellErrorValue["error"])) {
+    return { error: value as ExcelJS.CellErrorValue["error"] };
+  }
+  return typeof value === "string" ? sanitizeXlsxText(value) : value ?? "";
+}
 function fileStem(value: string) { return value.replace(/\.[^.]+$/u, ""); }
 function transferable(value: ExcelJS.Buffer) {
   if (value instanceof ArrayBuffer) return value;
