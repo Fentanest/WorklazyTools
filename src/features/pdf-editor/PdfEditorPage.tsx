@@ -322,7 +322,7 @@ function OrganizeHandoffHost({ organizePreset }: { organizePreset?: PdfOrganizeP
 
   const requestHandoff = useCallback(() => {
     const current = retainedRef.current;
-    if (!current || current.outputMode !== "merged") return;
+    if (!current || current.blob.type !== "application/pdf") return;
     cancelPendingTeardown();
     handoffSlot = { ...current, inFlight: true, auto: true, attempt: (handoffSlot?.attempt ?? 0) + 1 };
     acquireHold();
@@ -359,7 +359,7 @@ function OrganizeHandoffHost({ organizePreset }: { organizePreset?: PdfOrganizeP
             >
               {featureMessage(language, "pdf.messages.PdfEditorPage.retainedDownload")}
             </button>
-            {retained.outputMode === "merged" ? (
+            {retained.blob.type === "application/pdf" ? (
               <Button type="button" variant="secondary" className="min-h-10 rounded-xl text-xs font-bold" data-testid="pdf-retained-send-to-finish" onClick={requestHandoff}>
                 {featureMessage(language, "pdf.messages.PdfEditorPage.sendToFinish")}
               </Button>
@@ -478,9 +478,9 @@ function FinishHandoffHost({ preset }: { preset: PdfFinishPreset }) {
     const slot = handoffSlot;
     if (!slot) return;
     slot.inFlight = false;
-    // Only a merged single-PDF result can enter finish; a ZIP stays a
+    // Only a single PDF result can enter finish; a ZIP stays a
     // download in organize (R6/N2 wording matches this fact).
-    if (slot.outputMode !== "merged") {
+    if (slot.blob.type !== "application/pdf") {
       handoffSlot = null;
       setSlotTick((tick) => tick + 1);
       return undefined;

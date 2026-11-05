@@ -63,7 +63,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   onResultInvalidated: () => void;
   /** Download anchor click or completed share (best-effort saved signal). */
   onResultSaved: () => void;
-  /** [② 마무리로 넘기기] (merged + current result only; parent checks). */
+  /** [② 마무리로 넘기기] (single PDF + current result only; parent checks). */
   onHandoffRequest: () => void;
   /** Files handed back from finish via [① 정리로 돌아가기]; consumed once. */
   initialFiles?: File[] | null;
@@ -128,16 +128,38 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     onResultInvalidated();
   }, [download, onResultInvalidated]);
 
+  const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length, language), [rangeRows, pages.length, language]);
+  const groupMembership = useMemo(() => {
+    const membership = new Map<string, number[]>();
+    evaluatedRanges.forEach((row, groupIndex) => {
+      if (row.error) return;
+      row.indexes.forEach((pageIndex) => {
+        const pageId = pages[pageIndex]?.id;
+        if (pageId) membership.set(pageId, [...(membership.get(pageId) ?? []), groupIndex + 1]);
+      });
+    });
+    return membership;
+  }, [evaluatedRanges, pages]);
+  const selectedPages = pages.filter((page) => selectedPageIds.has(page.id));
+  const activeRange = evaluatedRanges.find((row) => row.id === activeRangeId) ?? evaluatedRanges[0];
+  let activeIndexes: number[] = [];
+  try { if (activeRange) activeIndexes = parsePageRange(activeRange.range, pages.length, language); } catch { /* 입력 중인 범위는 아직 선택으로 표시하지 않습니다. */ }
+  const activeRangeIndexes = new Set(activeIndexes);
+  const rangesValid = evaluatedRanges.length > 0 && evaluatedRanges.every((row) => !row.error);
+  const rangePageCount = groupMembership.size;
+  const resultFileCount = outputMode === "merged" ? (selectedPages.length ? 1 : 0) : outputMode === "ranges" ? (rangesValid ? rangeRows.length : 0) : selectedPages.length;
+  const singleFileOutput = outputMode === "merged" || resultFileCount === 1;
+
   // W1 pdf-organize protection (plan §4.1 T1, R6): sources present. Safe only
   // on the five organize paths (exact set, no scope-prefix OR). The wording
-  // is format-aware and true for every guarded destination: a merged result
+  // is format-aware and true for every guarded destination: a single PDF result
   // survives only via the finish handoff, a ZIP result never does.
   useUnsavedWorkGuard("pdf-organize", sources.length > 0 || inspecting, {
     kind: "files",
     scopePath: "/tools/pdf-editor",
     safePaths: [...PDF_ORGANIZE_SAFE_PATHS],
     messageKey: download.result
-      ? outputMode === "merged"
+      ? singleFileOutput
         ? "pdf.messages.PdfEditorPage.unsavedOrganizeWithResult"
         : "pdf.messages.PdfEditorPage.unsavedOrganizeWithZipResult"
       : "pdf.messages.PdfEditorPage.unsavedOrganize",
@@ -286,28 +308,6 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
     });
     return () => sortable.destroy();
   }, [invalidateResult, locked, pages.length, quickSplitOpen, groupByFile]);
-
-  const evaluatedRanges = useMemo(() => evaluateRangeRows(rangeRows, pages.length, language), [rangeRows, pages.length, language]);
-  const groupMembership = useMemo(() => {
-    const membership = new Map<string, number[]>();
-    evaluatedRanges.forEach((row, groupIndex) => {
-      if (row.error) return;
-      row.indexes.forEach((pageIndex) => {
-        const pageId = pages[pageIndex]?.id;
-        if (pageId) membership.set(pageId, [...(membership.get(pageId) ?? []), groupIndex + 1]);
-      });
-    });
-    return membership;
-  }, [evaluatedRanges, pages]);
-  const selectedPages = pages.filter((page) => selectedPageIds.has(page.id));
-  const activeRange = evaluatedRanges.find((row) => row.id === activeRangeId) ?? evaluatedRanges[0];
-  let activeIndexes: number[] = [];
-  try { if (activeRange) activeIndexes = parsePageRange(activeRange.range, pages.length, language); } catch { /* 입력 중인 범위는 아직 선택으로 표시하지 않습니다. */ }
-  const activeRangeIndexes = new Set(activeIndexes);
-  const rangesValid = evaluatedRanges.length > 0 && evaluatedRanges.every((row) => !row.error);
-  const rangePageCount = groupMembership.size;
-  const resultFileCount = outputMode === "merged" ? (selectedPages.length ? 1 : 0) : outputMode === "ranges" ? (rangesValid ? rangeRows.length : 0) : selectedPages.length;
-  const singleFileOutput = outputMode === "merged" || resultFileCount === 1;
 
   const acquireInput = async (nextFiles: File[], context?: IntakeContext): Promise<DeliveryResult | undefined> => {
     const incoming = nextFiles.filter((file) => !sources.some((source) => source.file === file));
@@ -468,9 +468,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
           : await mergePdfPages(sourceFiles, selectedPages.map(toPagePlan), archiveName, update, language, { watermarkText, pageNumbers }, controller.signal);
         if (controller.signal.aborted) return;
         download.makeResult(output);
-        // W1: the parent keeps this Blob for the finish handoff (merged only
-        // the parent can hand off, but every produced result is reported so
-        // the guard wording matches what actually exists).
+        // The parent keeps the original PDF Blob for the finish handoff.
         onResultProduced({ blob: new Blob([output.buffer], { type: output.mimeType }), name: output.fileName, outputMode });
         operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.createdOnePdfFromSelectedPages", { p0: selectedPages.length }));
         return;
@@ -487,9 +485,10 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
           return { fileName: `${archiveName}-${String(position).padStart(3, "0")}`, pages: [toPagePlan(page)] };
         });
       }
+      if (groups.length === 1) groups[0].fileName = archiveName;
       const output = await exportPdfGroups(sourceFiles, groups, archiveName, update, language, { watermarkText, pageNumbers }, controller.signal);
       if (controller.signal.aborted) return;
-        download.makeResult(output);
+      download.makeResult(output);
       onResultProduced({ blob: new Blob([output.buffer], { type: output.mimeType }), name: output.fileName, outputMode });
       operation.succeed(featureMessage(language, "pdf.messages.PdfOrganizePanel.createdPdfsAndPackedThemIntoAZip", { p0: groups.length }));
     } catch (reason) {
@@ -675,12 +674,12 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
   const latestResult = useRef(download.result); latestResult.current = download.result;
   const sendResult = async (receiverId: "pdf-to-document" | "pdf-to-image") => {
     const result = download.result;
-    if (!result || outputMode !== "merged") return;
+    if (!result || !singleFileOutput) return;
     const generation = ++sendGeneration.current;
     setSendError(false);
     try {
       const blob = await (await fetch(result.url)).blob();
-      if (latestResult.current !== result || generation !== sendGeneration.current) return;
+      if (blob.type !== "application/pdf" || latestResult.current !== result || generation !== sendGeneration.current) return;
       sender.send({ receiverId, entryPath: `/tools/pdf-converter/${receiverId}`, files: [new File([blob], result.fileName, { type: "application/pdf" })], origin: "generated", source: "pdf-organize" });
     } catch { if (generation === sendGeneration.current) setSendError(true); }
   };
@@ -814,7 +813,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
                     <div className="pdf-range-groups grid max-h-[min(36dvh,330px)] gap-2 overflow-y-auto pr-1 [overscroll-behavior:contain] [scrollbar-gutter:stable]">
                       {evaluatedRanges.map((row, index) => { const active = row.id === activeRange?.id; return <div className={cn("pdf-range-group grid grid-cols-[minmax(0,1fr)_32px] items-center gap-2 rounded-xl border border-transparent bg-card p-2", active && "border-primary ring-2 ring-primary/20", row.error && "border-destructive/30")} data-active={active || undefined} data-invalid={row.error ? "true" : undefined} key={row.id}>
                         <Button type="button" className="pdf-range-activate col-start-1 row-start-1 w-fit justify-self-start rounded-lg p-1 text-[10px] font-bold text-muted-foreground" variant="ghost" size="sm" onClick={() => setActiveRangeId(row.id)} aria-pressed={active} disabled={locked || quickSplitOpen}><b className="grid size-[25px] place-items-center rounded-lg bg-primary text-[13px] text-primary-foreground">{index + 1}</b><span>{featureMessage(language, active ? "pdf.messages.PdfOrganizePanel.editing" : "pdf.messages.PdfOrganizePanel.editWithChecks")}</span></Button>
-                        <label className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-card px-2 py-1.5"><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName")}</span><UtilityInput className="h-7 border-0 bg-transparent px-0 text-[13px] focus-visible:ring-0" value={row.name} disabled={locked || quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "name", event.target.value)} placeholder={`${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index + 1).padStart(2, "0")}`} /><small className="text-xs text-muted-foreground">.pdf</small></label>
+                        {rangeRows.length > 1 && <label className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-card px-2 py-1.5"><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.outputFileName")}</span><UtilityInput className="h-7 border-0 bg-transparent px-0 text-[13px] focus-visible:ring-0" value={row.name} disabled={locked || quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "name", event.target.value)} placeholder={`${featureMessage(language, "pdf.messages.PdfOrganizePanel.split")}-${String(index + 1).padStart(2, "0")}`} /><small className="text-xs text-muted-foreground">.pdf</small></label>}
                         <label className="col-span-2 grid grid-cols-[minmax(0,1fr)_auto] items-center rounded-xl border border-border bg-card px-2 py-1.5"><span className="col-span-2 text-xs font-bold text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.pageRangeInCurrentOrder")}</span><UtilityInput className="h-7 border-0 bg-transparent px-0 text-[13px] focus-visible:ring-0" value={row.range} disabled={locked || quickSplitOpen} onFocus={() => setActiveRangeId(row.id)} onChange={(event) => updateRangeRow(row.id, "range", event.target.value)} placeholder={featureMessage(language, "pdf.messages.PdfOrganizePanel.eG135")} /></label>
                         <Button type="button" className="col-start-2 row-start-1 size-8 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20" variant="ghost" size="icon-sm" onClick={() => removeRange(row.id)} disabled={locked || rangeRows.length === 1 || quickSplitOpen} aria-label={featureMessage(language, "pdf.messages.PdfOrganizePanel.deleteRange", { p0: index + 1 })}><Trash2 size={16} /></Button>
                         {row.error && <em className="col-span-2 text-xs text-destructive not-italic">{row.error}</em>}
@@ -838,7 +837,7 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
 
               <div className="pdf-output-action-zone max-h-[min(58dvh,540px)] shrink-0 overflow-y-auto border-t border-border bg-primary/5 px-[18px] pt-3.5 pb-[18px] [scrollbar-gutter:stable] max-[820px]:pb-[calc(18px+env(safe-area-inset-bottom))]">
                 <PrimaryButton accent="violet" disabled={exportDisabled} loading={operation.status === "running"} onClick={exportPdf}>
-                  {operation.status !== "running" && (outputMode === "merged" ? <FileCheck2 size={18} /> : <FileArchive size={18} />)}
+                  {operation.status !== "running" && (singleFileOutput ? <FileCheck2 size={18} /> : <FileArchive size={18} />)}
                   {operation.status === "running" ? creatingLabel : operation.status === "error" ? featureMessage(language, "pdf.messages.PdfOrganizePanel.retryOutput") : createLabel}
                 </PrimaryButton>
                 <p className="mx-0.5 mt-3 text-center text-sm leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfOrganizePanel.passwordProtectedPdfsRequireAnUnlockedCopy")}</p>
@@ -846,12 +845,12 @@ export function PdfOrganizePanel({ preset, initialFiles, onInitialFilesConsumed,
                 <PdfError message={error} />
                 {download.result && <div ref={downloadResultRef}>
                   <PdfDownloadCard result={download.result} compact onSaved={onResultSaved} />
-                  {outputMode === "merged" && <div className="mt-2 grid gap-2" data-testid="pdf-organize-send-actions"><Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={locked} data-testid="pdf-send-to-document" onClick={() => void sendResult("pdf-to-document")}>{sender.reason || sendError ? `${t("sendTo.retry")} · ` : ""}{t("sendTo.pdfDocument")}</Button><Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={locked} data-testid="pdf-send-to-images" onClick={() => void sendResult("pdf-to-image")}>{sender.reason || sendError ? `${t("sendTo.retry")} · ` : ""}{t("sendTo.pdfImages")}</Button>{(sender.reason || sendError) && <p role="alert">{t("sendTo.failed")}</p>}</div>}
-                  {/* W1 [② 마무리로 넘기기] (plan §4.1): merged + current result only. */}
-                  <Button type="button" className="mt-2 min-h-11 w-full rounded-xl" variant="secondary" data-testid="pdf-organize-send-to-finish" disabled={locked || outputMode !== "merged"} onClick={onHandoffRequest}>
+                  {singleFileOutput && <div className="mt-2 grid gap-2" data-testid="pdf-organize-send-actions"><Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={locked} data-testid="pdf-send-to-document" onClick={() => void sendResult("pdf-to-document")}>{sender.reason || sendError ? `${t("sendTo.retry")} · ` : ""}{t("sendTo.pdfDocument")}</Button><Button type="button" variant="outline" className="h-auto min-h-11 whitespace-normal" disabled={locked} data-testid="pdf-send-to-images" onClick={() => void sendResult("pdf-to-image")}>{sender.reason || sendError ? `${t("sendTo.retry")} · ` : ""}{t("sendTo.pdfImages")}</Button>{(sender.reason || sendError) && <p role="alert">{t("sendTo.failed")}</p>}</div>}
+                  {/* W1 [② 마무리로 넘기기] (plan §4.1): single PDF + current result only. */}
+                  <Button type="button" className="mt-2 min-h-11 w-full rounded-xl" variant="secondary" data-testid="pdf-organize-send-to-finish" disabled={locked || !singleFileOutput} onClick={onHandoffRequest}>
                     {featureMessage(language, "pdf.messages.PdfEditorPage.sendToFinish")}
                   </Button>
-                  {outputMode === "merged" ? (
+                  {singleFileOutput ? (
                     <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{featureMessage(language, "pdf.messages.PdfEditorPage.handoffHint")}</p>
                   ) : (
                     <p className="mt-2 text-xs leading-relaxed text-muted-foreground" role="note">{featureMessage(language, "pdf.messages.PdfOrganizePanel.multiFileHandoffBlocked")}</p>
@@ -897,7 +896,7 @@ function evaluateRangeRows(rows: RangeRow[], pageCount: number, language: AppLan
   return rows.map((row, index) => {
     let indexes: number[] = [];
     let error = "";
-    if (!row.name.trim()) error = featureMessage(language, "pdf.messages.PdfOrganizePanel.enterAnOutputFileName");
+    if (rows.length > 1 && !row.name.trim()) error = featureMessage(language, "pdf.messages.PdfOrganizePanel.enterAnOutputFileName");
     else if (normalizedNames.filter((name) => name === normalizedNames[index]).length > 1) error = featureMessage(language, "pdf.messages.PdfOrganizePanel.thisFileNameDuplicatesAnotherRange");
     else {
       try { indexes = parsePageRange(row.range, pageCount, language); }

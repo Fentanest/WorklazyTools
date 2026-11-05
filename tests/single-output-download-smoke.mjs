@@ -23,6 +23,7 @@ await context.route('**/*', route => {
 });
 const page = await context.newPage();
 page.setDefaultTimeout(60000);
+page.on('dialog', dialog => dialog.accept());
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
 page.on('response', response => { if (response.status() >= 400) console.error('HTTP', response.status(), response.url()); });
@@ -145,5 +146,98 @@ try {
     assert.match(await page.getByTestId('pdf-images-send-to-studio').innerText(), /편집/);
     await page.screenshot({ path: path.join(evidence, 'single-ko-mobile.png'), fullPage: true });
   });
+  // ZIP FIX1: exercise actual worker output, both handoff receivers and guards.
+  const startOrganize = async (language, mode, multiple = false) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await page.goto(`${base}/${language}/tools/pdf-editor/`);
+    await page.locator('.pdf-tool-page input[type=file]').first().setInputFiles({
+      name: '입력.pdf', mimeType: 'application/pdf', buffer: Buffer.from(mode === 'ranges' || multiple ? pdfBytes : oneBytes),
+    });
+    await page.waitForFunction(count => document.querySelectorAll('.pdf-page-card').length === count, mode === 'ranges' || multiple ? 2 : 1);
+    await page.getByRole('radio').nth(mode === 'ranges' ? 1 : 2).click();
+    if (mode === 'ranges' && multiple) {
+      await page.locator('.pdf-multi-range-actions button').nth(1).click();
+      const groups = page.locator('.pdf-range-group');
+      await groups.nth(0).locator('input').nth(0).fill('첫 파일');
+      await groups.nth(0).locator('input').nth(1).fill('1');
+      await groups.nth(1).locator('input').nth(0).fill('둘째 파일');
+      await groups.nth(1).locator('input').nth(1).fill('2');
+    }
+    const output = page.getByTestId('pdf-output-card');
+    await output.locator('.pdf-output-field input').first().fill('사용자 출력');
+    if (mode === 'ranges' && !multiple) assert.equal(await page.locator('.pdf-range-group input').count(), 1, 'Only page range input remains; output filename is edited once');
+    const create = output.locator('.pdf-output-action-zone [data-ui-component=primary-button]');
+    assert.equal(await create.locator('svg.lucide-file-check2').count(), multiple ? 0 : 1);
+    assert.equal(await create.locator('svg.lucide-file-archive').count(), multiple ? 1 : 0);
+    await create.click();
+    await page.getByTestId('pdf-download').waitFor();
+    return output;
+  };
+  const guardText = async () => {
+    await page.locator('[data-pdf-nav-mode=finish]').click();
+    const dialog = page.getByTestId('unsaved-work-dialog');
+    await dialog.waitFor({ state: 'visible' });
+    const text = await dialog.innerText();
+    await dialog.getByRole('button').first().click();
+    await dialog.waitFor({ state: 'hidden' });
+    return text;
+  };
+  for (const language of ['ko', 'en']) for (const mode of ['ranges', 'separate']) {
+    for (const target of ['document', 'finish']) await test(`single split ${mode} ${language}: filename, PDF guard and ${target} handoff`, async () => {
+      const output = await startOrganize(language, mode);
+      const expectedPages = mode === 'ranges' ? 2 : 1;
+      const link = page.getByTestId('pdf-download');
+      assert.equal(await link.getAttribute('download'), '사용자 출력.pdf');
+      const bytes = await link.evaluate(async node => {
+        const blob = await (await fetch(node.href)).blob();
+        return { type: blob.type, bytes: [...new Uint8Array(await blob.arrayBuffer())] };
+      });
+      assert.equal(bytes.type, 'application/pdf');
+      assert.equal((await PDFDocument.load(Uint8Array.from(bytes.bytes))).getPageCount(), expectedPages);
+      assert.equal(await page.getByTestId('pdf-organize-send-to-finish').isEnabled(), true);
+      assert.equal(await page.getByTestId('pdf-retained-send-to-finish').isEnabled(), true);
+      assert.equal(await output.locator('[role=note]').count(), 0);
+      assert.match(await guardText(), language === 'ko' ? /결과 PDF/ : /result PDF/);
+      assert.doesNotMatch(await output.innerText(), /Multi-file results|여러 파일 결과/);
+      await page.screenshot({ path: path.join(evidence, `single-split-${mode}-${language}-${target}.png`), fullPage: true });
+      if (target === 'document') {
+        await page.getByTestId('pdf-send-to-document').click();
+        const dialog = page.getByTestId('unsaved-work-dialog');
+        await dialog.waitFor({ state: 'visible' });
+        await page.getByTestId('unsaved-leave').click();
+        await page.waitForURL('**/pdf-converter/pdf-to-document');
+        await page.waitForFunction(count => document.querySelectorAll('[data-pdf-mode=pdf-to-document] .pdf-page-card').length === count, expectedPages);
+        assert.match(await page.locator('[data-pdf-mode=pdf-to-document]').innerText(), /사용자 출력.pdf/);
+      } else {
+        // Both panel and retained-card buttons must request the same Blob.
+        await page.getByTestId(mode === 'ranges' ? 'pdf-organize-send-to-finish' : 'pdf-retained-send-to-finish').click();
+        await page.getByTestId('pdf-finish-ready').waitFor();
+        await page.waitForFunction(() => globalThis.__wlPdfHandoffTestHooks?.__peekPdfHandoffSlotForTests() === null);
+        assert.match(await page.getByTestId('pdf-finish-ready').innerText(), /사용자 출력.pdf/);
+        // A return trip inspects the accepted PDF again, proving pages survived intake.
+        await page.getByTestId('pdf-finish-back-to-organize').click();
+        const dialog = page.getByTestId('unsaved-work-dialog');
+        if (await dialog.isVisible()) await page.getByTestId('unsaved-leave').click();
+        await page.waitForFunction(count => document.querySelectorAll('.pdf-page-card').length === count, expectedPages);
+      }
+      await page.screenshot({ path: path.join(evidence, `split-${mode}-${language}-${target}.png`), fullPage: true });
+    });
+    await test(`multiple split ${mode} ${language}: ZIP guard and both handoffs remain blocked`, async () => {
+      const output = await startOrganize(language, mode, true);
+      assert.equal(await page.getByTestId('pdf-organize-send-to-finish').isDisabled(), true);
+      assert.equal(await page.getByTestId('pdf-retained-send-to-finish').isDisabled(), true);
+      assert.equal(await page.getByTestId('pdf-send-to-document').count(), 0);
+      assert.match(await output.locator('[role=note]').innerText(), language === 'ko' ? /여러 파일 결과/ : /Multi-file results/);
+      const text = await guardText(); assert.match(text, /ZIP/);
+      assert.match(text, language === 'ko' ? /먼저 내려받으세요/ : /download them first/);
+      const bytes = await page.getByTestId('pdf-download').evaluate(async node => [...new Uint8Array(await (await fetch(node.href)).arrayBuffer())]);
+      const { names } = await unpack(bytes); assert.equal(names.length, 2);
+      if (mode === 'ranges') assert.deepEqual(names, ['첫 파일.pdf', '둘째 파일.pdf']);
+      await page.locator('[data-pdf-nav-mode=finish]').click();
+      await page.getByTestId('unsaved-leave').click();
+      await page.getByTestId('pdf-finish-ready').waitFor();
+      assert.equal(await page.getByTestId('pdf-handoff-chip').count(), 0);
+    });
+  }
   assert.deepEqual(errors, []);
 } finally { await browser.close(); await server.close(); await fs.rm(cacheDir, { recursive: true, force: true }); }
