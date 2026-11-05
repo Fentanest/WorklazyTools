@@ -8,7 +8,7 @@ import { FileDropZone, PrimaryButton, SectionCard, formatBytes } from "../../com
 import { Button } from "../../components/ui/button";
 import { featureMessage } from "../../i18n/featureMessages";
 import { useAppLanguage } from "../../i18n/routing";
-import { createZipArchiveBlob } from "../../utils/zipArchive";
+import { combineResultDownloads } from "../../utils/resultDownload";
 import { HwpPdfPanel } from "../pdf-converter/HwpPdfPanel";
 import { BATCH_LIMITS, BatchQueue, type BatchError, type BatchStatus } from "./batchQueue";
 import { batchProcessor, defaultBatchOptions, validateBatchFile, type BatchMode, type BatchOptions } from "./batchProcessors";
@@ -29,6 +29,7 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
   const [admissionError, setAdmissionError] = useState(false);
   const [printing, setPrinting] = useState<number>();
   const [zipUrl, setZipUrl] = useState("");
+  const [combinedName, setCombinedName] = useState("");
   const [zipBusy, setZipBusy] = useState(false);
   const [zipError, setZipError] = useState(false);
   const zipTask = useRef<AbortController | undefined>(undefined);
@@ -91,8 +92,8 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
     const controller = new AbortController(); zipTask.current = controller;
     setZipBusy(true); setZipError(false);
     try {
-      const blob = await createZipArchiveBlob(outputs, controller.signal);
-      if (!controller.signal.aborted) setZipUrl(URL.createObjectURL(blob));
+      const result = await combineResultDownloads(outputs.map(output => ({ ...output, archive: mode === "pdf-images" && output.blob.type === "application/zip" })), "worklazy-converted.zip", controller.signal, BATCH_LIMITS.zipBytes);
+      if (!controller.signal.aborted) { setCombinedName(result.fileName); setZipUrl(URL.createObjectURL(result.blob)); }
     } catch { if (!controller.signal.aborted) setZipError(true); }
     finally { if (zipTask.current === controller) { zipTask.current = undefined; setZipBusy(false); } }
   };
@@ -105,7 +106,7 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
     <UtilityNotice kind="info">{L("변환 결과는 합계 128 MiB까지 보관하고, 전체 ZIP은 결과 합계 64 MiB까지 만듭니다. 변환 중 메모리는 파일 용량보다 커질 수 있습니다. 큰 문서는 작은 묶음으로 처리하세요.", "Up to 128 MiB of results are retained. A combined ZIP is available for results totaling up to 64 MiB. Conversion may use much more memory than the input size. Process large documents in smaller groups.")}</UtilityNotice>
     {mode === "document-pdf" && <UtilityNotice kind="info">{L("워드·엑셀·PPT는 변환 후 ZIP으로 받을 수 있습니다. HWP·HWPX는 파일마다 브라우저 인쇄에서 PDF로 저장해야 하며 ZIP에 포함되지 않습니다. 첫 변환은 준비 시간이 더 걸릴 수 있습니다.", "Word, Excel and PowerPoint results can be downloaded together as a ZIP. HWP and HWPX need Save as PDF in the print dialog for each file and are not included in the ZIP. The first conversion may take longer to prepare.")}</UtilityNotice>}
     {mode === "markdown" && <UtilityNotice kind="info">{L("문서의 제목·문단·표를 Markdown으로 저장합니다. 원본 서식과 수식은 유지되지 않으며 스캔 PDF의 글자는 인식하지 않습니다.", "Save headings, paragraphs and tables as Markdown. Original formatting and formulas are not kept, and text in scanned PDFs is not recognized.")}</UtilityNotice>}
-    {mode === "pdf-images" && <UtilityNotice kind="info">{L("PDF마다 페이지 이미지 ZIP을 만듭니다. 전체 다운로드 ZIP에는 이 문서별 ZIP들이 들어갑니다.", "Each PDF produces a ZIP of page images. The combined download contains these per-document ZIPs.")}</UtilityNotice>}
+    {mode === "pdf-images" && <UtilityNotice kind="info">{L("이미지가 한 장이면 이미지 파일로, 여러 장이면 ZIP 하나로 받습니다. 전체 받기는 문서별 접두로 이미지를 구분합니다.", "One image downloads directly; multiple images share one ZIP. Download all distinguishes documents with filename prefixes.")}</UtilityNotice>}
     {mode === "pdf-document" && <UtilityNotice kind="info">{L("편집 가능한 내용과 페이지 모양 유지 중 선택하세요. 스캔 페이지의 글자를 편집하려면 OCR을 사용하고, 결과의 숫자·표·읽기 순서를 원본과 비교하세요.", "Choose editable content or preserve page appearance. Use OCR for editable text from scans, then compare numbers, tables and reading order with the original.")}</UtilityNotice>}
     {(mode === "pdf-document" || mode === "pdf-images") && <SectionCard step={2} title={L("공통 변환 설정", "Shared conversion settings")} description={L("이후 시작·재시도하는 파일에 적용합니다. 완료된 결과는 유지합니다.", "Applies to files started or retried next. Existing results are kept.")}>
       <fieldset disabled={busy} className="grid gap-3 sm:grid-cols-2">
@@ -151,9 +152,9 @@ export function BatchConversionPanel({ mode, files, initialOptions, onFilesChang
     {selectedPrint && <div className="space-y-3"><HwpPdfPanel key={selectedPrint.id} file={selectedPrint.file} onClear={() => setPrinting(undefined)} /><Button variant="outline" onClick={() => { queue?.reviewed(selectedPrint.id); setPrinting(undefined); }}>{L("인쇄 확인을 마치고 목록으로", "Finish print review and return to list")}</Button><p className="text-sm">{L("이 버튼은 PDF 저장을 확인하지 않습니다.", "This button does not confirm that a PDF was saved.")}</p></div>}
     {!!outputs.length && <SectionCard step={3} title={L("전체 다운로드", "Download all")} description={L("변환에 성공한 다운로드 파일만 포함합니다. 같은 파일명은 번호로 구분합니다.", "Includes successfully converted downloadable files. Duplicate names receive a number.")}>
       <div className="flex flex-wrap gap-2">
-        <Button disabled={busy || outputs.reduce((sum, output) => sum + output.blob.size, 0) > BATCH_LIMITS.zipBytes} onClick={() => void buildZip()}>{L("전체 ZIP 만들기", "Create combined ZIP")}</Button>
+        <Button disabled={busy || outputs.reduce((sum, output) => sum + output.blob.size, 0) > BATCH_LIMITS.zipBytes} onClick={() => void buildZip()}>{L("전체 다운로드 준비", "Prepare download all")}</Button>
         {zipBusy && <Button variant="outline" onClick={() => zipTask.current?.abort()}>{L("ZIP 취소", "Cancel ZIP")}</Button>}
-        {zipUrl && <Button render={<a data-testid="batch-zip-download" href={zipUrl} download="worklazy-converted.zip" onClick={() => outputs.forEach(output => queue?.saved(output.id))} />}><Download size={16} />{L("전체 ZIP 다운로드", "Download combined ZIP")}</Button>}
+        {zipUrl && <Button render={<a data-testid="batch-zip-download" href={zipUrl} download={combinedName} onClick={() => outputs.forEach(output => queue?.saved(output.id))} />}><Download size={16} />{L("전체 다운로드", "Download all")}</Button>}
       </div>
       {outputs.reduce((sum, output) => sum + output.blob.size, 0) > BATCH_LIMITS.zipBytes && <p className="mt-2 text-sm">{L("결과 합계가 64 MiB를 넘었습니다. 개별 다운로드를 사용하세요.", "Results exceed 64 MiB. Use the individual downloads.")}</p>}
       {zipError && <UtilityNotice kind="error" role="alert">{L("ZIP을 만들지 못했습니다. 개별 다운로드를 사용하거나 다시 시도하세요.", "Could not create the ZIP. Use individual downloads or retry.")}</UtilityNotice>}

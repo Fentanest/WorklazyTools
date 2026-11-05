@@ -1277,7 +1277,7 @@
       "archive": "worklazy-batch-images.zip",
       "done": "Batch processed {{count}} images",
       "title": "Batch image editing",
-      "description": "Apply the same size and watermark settings to several images and download a ZIP.",
+      "description": "Apply the same size and watermark settings. Download one image directly or multiple images in one ZIP.",
       "hint": "JPG, PNG or WebP · add repeatedly or paste with Ctrl/⌘+V",
       "resize": "Resize mode",
       "fitWidth": "Fit width",
@@ -1297,7 +1297,7 @@
       "bottomLeft": "Bottom left",
       "bottomRight": "Bottom right",
       "opacity": "Opacity",
-      "download": "Batch download ZIP"
+      "download": "Download results"
     },
     "collage": {
       "file": "worklazy-collage",
@@ -2047,7 +2047,7 @@
         "unableToReadThePdf": "Unable to read the PDF.",
         "startingPdfPageImageConversion": "Starting PDF page image conversion.",
         "morePagesAndHigherResolutionIncreaseConversionTime": "More pages and higher resolution increase conversion time and memory use.",
-        "createdAZipContainingPageImages": "Created a ZIP containing {{p0}} page images.",
+        "createdAZipContainingPageImages": "Created {{p0}} page images.",
         "unableToConvertThePdfToImages": "Unable to convert the PDF to images.",
         "chooseAPdf": "Choose a PDF",
         "convertEveryPageToAHighResolutionPng": "Convert every page to a high-resolution PNG or JPG image.",
@@ -2068,7 +2068,7 @@
         "all": "All",
         "pages": "Pages",
         "output": "Output",
-        "createImageZip": "Create image ZIP",
+        "createImageZip": "Create images",
         "pdfImageConversionLog": "PDF image conversion log",
         "reorderImage": "Reorder image {{p0}}",
         "remove": "Remove {{p0}}"
@@ -2203,7 +2203,7 @@
         "createdOnePdfFromSelectedPages": "Created one PDF from {{p0}} selected pages.",
         "checkTheFileNamesAndPageRanges": "Check the file names and page ranges.",
         "selectPagesToSaveAsSeparatePdfs": "Select pages to save as separate PDFs.",
-        "createdPdfsAndPackedThemIntoAZip": "Created {{p0}} PDFs and packed them into a ZIP.",
+        "createdPdfsAndPackedThemIntoAZip": "Created {{p0}} PDFs.",
         "unableToCreateThePdfOutput": "Unable to create the PDF output.",
         "checkThePageRangeToSelect": "Check the page range to select.",
         "addPdfs": "Add PDFs",
@@ -2247,9 +2247,9 @@
         "onePdf": "One PDF",
         "saveSelectedPagesInCurrentOrder": "Save selected pages in current order",
         "onePdfPerRange": "One PDF per range",
-        "createEachRowAsAPdfInA": "Create each row as a PDF in a ZIP",
+        "createEachRowAsAPdfInA": "Create a PDF per row; ZIP for multiple files",
         "onePdfPerPage": "One PDF per page",
-        "splitSelectedPagesIntoAZip": "Split selected pages into a ZIP",
+        "splitSelectedPagesIntoAZip": "Create a PDF per selected page; ZIP for multiple files",
         "sourceFiles": "Source files",
         "pagesInRanges": "Pages in ranges",
         "selectedPages": "Selected pages",
@@ -2643,7 +2643,7 @@
         "pdf-to-image": {
           "eyebrow": "PDF TO IMAGE",
           "title": "Convert PDF pages to images",
-          "description": "Render every PDF page as PNG or JPG and download them in a ZIP archive."
+          "description": "Render PDF pages as PNG or JPG. Download one image directly or multiple images in one ZIP."
         },
         "convert": {
           "eyebrow": "PDF OCR & CONVERT",

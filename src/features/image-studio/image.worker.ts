@@ -2,7 +2,7 @@
 
 import { applyPalette, GIFEncoder, quantize } from "gifenc";
 import { calculateCollageLayout, CollageLayoutError } from "./collageLayout";
-import { createZipArchiveBlob } from "../../utils/zipArchive.ts";
+import { createResultDownload } from "../../utils/resultDownload.ts";
 
 import type {
   BatchImageOptions,
@@ -65,19 +65,18 @@ async function processBatch(inputs: ImageWorkerInput[], options: BatchImageOptio
       }
       progress(6 + ((index + 1) / inputs.length) * 74, `[${index + 1}/${inputs.length}] ${input.name} ${local("처리 완료", "processed")}`);
     }
-    progress(82, local(`${inputs.length}개 결과를 ZIP으로 묶는 중…`, `Bundling ${inputs.length} results into a ZIP…`));
-    const archive = await createZipArchiveBlob(
-      archiveFiles,
+    if (archiveFiles.length > 1) progress(82, local(`${inputs.length}개 결과를 ZIP으로 묶는 중…`, `Bundling ${inputs.length} results into a ZIP…`));
+    const output = await createResultDownload(
+      archiveFiles, ensureExtension(archiveName, "zip"),
       undefined,
       ({ loadedBytes, totalBytes }) => {
         const percent = (loadedBytes / totalBytes) * 100;
         progress(82 + percent * 0.17, `${local("ZIP 압축 중…", "Compressing ZIP…")} ${Math.round(percent)}%`);
       },
-      undefined,
       { level: 6 },
     );
     return {
-      ...binaryResult(await archive.arrayBuffer(), ensureExtension(archiveName, "zip"), "application/zip", []),
+      ...binaryResult(await output.blob.arrayBuffer(), output.fileName, output.blob.type, []),
       images: archiveFiles.map(({ fileName, blob }) => ({ fileName, blob, mimeType: blob.type, size: blob.size })),
     };
   } finally {

@@ -35,7 +35,7 @@ async function mountPanel(language: "ko" | "en") {
     if (id.endsWith("/useHandoffReceiver")) return { useHandoffReceiver: () => ({ notReceived: false, recoveryFiles: [], dismiss() {} }) };
     if (id.endsWith("/toolState")) return { useUnsavedWorkGuard() {}, setUnsavedWork() {} };
     if (id.endsWith("/useOperationProgress")) return { useOperationProgress: () => ({ status: "idle", start() {}, succeed() {}, fail() {}, reset() {}, update() {} }) };
-    if (id === "./pdfPreview") return { inspectPdf: async () => ({ pageCount: 2 }), releasePdf: async () => {}, pdfToImageArchive: async () => ({ blob: new Blob(["synthetic archive"]), fileName: "pages.zip" }) };
+    if (id === "./pdfPreview") return { inspectPdf: async () => ({ pageCount: 2 }), releasePdf: async () => {}, pdfToImageArchive: async () => ({ blob: new Blob(["synthetic archive"], { type: "application/zip" }), fileName: "pages.zip" }) };
     if (id === "./PdfThumbnail") return { PdfThumbnail: () => React.createElement("div", { "data-testid": "pdf-page-card" }) };
     if (id === "./pdfUi") return { PdfError: () => null, PdfDownloadCard: () => React.createElement("div", { "data-testid": "pdf-download" }), useDownloadResult: () => {
       const [result, setResult] = React.useState<any>(null);

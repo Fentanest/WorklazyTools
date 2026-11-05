@@ -5,6 +5,7 @@ import { localizedVideoWorkerUrl } from "./localizedWorkerUrl";
 import { featureMessage, resolveFeatureMessage } from "../../i18n/featureMessages";
 import { FEATURE_MESSAGE_TOKEN_PREFIX } from "../../i18n/workerMessages";
 import { UserFacingVideoError } from "./videoErrors";
+import { createSafeFileName } from "../../utils/fileNameSafety.ts";
 
 export interface VideoZipSource {
   fileName: string;
@@ -20,6 +21,12 @@ export function createVideoZip(
   language: AppLanguage = "ko",
   resultStorage?: VideoResultStorageSession,
 ) {
+  if (signal?.aborted) return Promise.reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+  if (files.length === 1) {
+    const fileName = createSafeFileName(files[0].fileName);
+    const file = new File([files[0].blob], fileName, { type: files[0].blob.type });
+    return Promise.resolve<VideoZipResult>({ data: { kind: "file", file }, fileName, mimeType: file.type, size: file.size });
+  }
   const worker = new Worker(localizedVideoWorkerUrl(videoZipWorkerUrl), { type: "module" });
   return new Promise<VideoZipResult>((resolve, reject) => {
     let settled = false;
