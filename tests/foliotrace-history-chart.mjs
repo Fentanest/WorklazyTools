@@ -10,9 +10,7 @@ assert.ok(process.env.F6_OUTPUT, 'Set F6_OUTPUT to an explicit artifact director
 const out = process.env.F6_OUTPUT; await fs.mkdir(out, { recursive: true });
 const original = JSON.parse(await fs.readFile(new URL('./fixtures/foliotrace/chart-snapshot-20261103.json', import.meta.url)));
 const recovered = JSON.parse(await fs.readFile(new URL('./fixtures/foliotrace/published-history-counts-20261104.json', import.meta.url)));
-const countText = (point, lang) => lang === 'ko'
-  ? `평가 ${point.pricedCount.toLocaleString('en-US')}/${point.trackedCount.toLocaleString('en-US')}종목 · 제외 ${point.unvaluedCount}종목`
-  : `${point.pricedCount.toLocaleString('en-US')}/${point.trackedCount.toLocaleString('en-US')} securities priced · ${point.unvaluedCount} excluded`;
+const countText = (point, lang) => lang === 'ko' ? `평가 ${point.pricedCount.toLocaleString('en-US')}종목` : `${point.pricedCount.toLocaleString('en-US')} securities priced`;
 const reconstruction = JSON.parse(await fs.readFile(new URL('./fixtures/foliotrace/valuation-series-20261103.json', import.meta.url)));
 const browser = await chromium.launch({ executablePath: process.env.CHROME_EXECUTABLE || '/usr/bin/google-chrome', args: ['--no-sandbox'] });
 const facts = [];
@@ -24,7 +22,20 @@ async function setup(lang, theme, mobile, data) {
   await context.addInitScript(theme => {
     window.__WORKLAZY_MOCK_PROVIDERS__ = true;
     if (location.protocol === 'http:') localStorage.setItem('worklazy-theme', theme);
-    window.__f6Text = []; window.__f6Dashes = [];
+    window.__f6Text = []; window.__f6Dashes = []; window.__f6Strokes = [];
+    const proto = CanvasRenderingContext2D.prototype, paths = new WeakMap();
+    for (const method of ['beginPath', 'lineTo', 'arc', 'stroke']) {
+      const original = proto[method];
+      proto[method] = function(...args) {
+        if (method === 'beginPath') paths.set(this, { segments: 0, arcs: 0 });
+        const path = paths.get(this);
+        if (path && method === 'lineTo') path.segments++;
+        if (path && method === 'arc') path.arcs++;
+        if (path && method === 'stroke' && path.segments && window.__f6Strokes.length < 5000)
+          window.__f6Strokes.push({ ...path, color: this.strokeStyle, dashes: this.getLineDash() });
+        return original.apply(this, args);
+      };
+    }
     const fill = CanvasRenderingContext2D.prototype.fillText, dash = CanvasRenderingContext2D.prototype.setLineDash;
     CanvasRenderingContext2D.prototype.fillText = function(text, ...args) {
       if (window.__f6Text.length < 1000 && !window.__f6Text.includes(String(text))) window.__f6Text.push(String(text));
@@ -45,10 +56,25 @@ async function setup(lang, theme, mobile, data) {
   page.on('pageerror', error => errors.push(error.message)); await page.goto(`${base}/${lang}/tools/foliotrace/`);
   return { page, context, errors };
 }
+// The same visible logical-range padding used by the chart; dates remain evenly spaced.
+async function hoverDay(page, dates, day) {
+  const chart = page.locator('[data-chart-ready=true]');
+  await chart.evaluate(node => window.scrollTo({ top: node.getBoundingClientRect().top + scrollY - 100, behavior: 'instant' }));
+  const box = await chart.boundingBox(), width = box.width - 80;
+  const padding = Math.max(0.5, (dates.length - 1) * 24 / Math.max(1, width - 48));
+  const index = dates.indexOf(day); assert.ok(index >= 0);
+  await chart.hover({ position: { x: (index + padding + 0.5) * width / (dates.length + 2 * padding), y: box.height * 0.5 } });
+  const tooltip = page.getByRole('tooltip'); await tooltip.waitFor();
+  assert.equal(await tooltip.locator('time').getAttribute('datetime'), day);
+  return tooltip;
+}
+const merged = [...reconstruction.points.filter(point => !recovered.some(row => row.tradeDate === point.tradeDate)), ...recovered]
+  .sort((a, b) => a.tradeDate.localeCompare(b.tradeDate));
+const dates = merged.map(point => point.tradeDate);
 try {
   for (const lang of ['ko', 'en']) for (const theme of ['light-coral', 'dark-coral']) for (const mobile of [false, true]) {
     const id = `${lang}-${theme}-${mobile ? 'mobile' : 'desktop'}`;
-    await test(`F9 recovered published counts ${id}`, async () => {
+    await test(`single continuous chart and exact tooltip ${id}`, async () => {
       const { page, context, errors } = await setup(lang, theme, mobile, { ...original, history: recovered, valuationSeries: reconstruction });
       try {
         await page.locator('#foliotrace-events li').first().waitFor();
@@ -60,57 +86,42 @@ try {
         });
         assert.equal(await chart.getAttribute('data-point-count'), '19');
         const region = page.locator('.foliotrace-trend');
-        assert.match(await region.locator('[data-history-origin=published]').innerText(), /7$/);
-        assert.match(await region.locator('[data-history-origin=reconstructed]').innerText(), /≤0\.06%.*12/);
-        assert.ok(!(await region.locator('.foliotrace-trend-summary').innerText()).includes('20.77%'));
-        assert.ok((await region.locator('.foliotrace-trend-summary').innerText()).includes('+5.51%'));
-        assert.match(await region.locator('.foliotrace-reconstruction-change').innerText(), /−20\.77%/);
-        assert.ok((await region.locator('.foliotrace-trend-summary').innerText()).includes(money(original.history.at(-1).estimatedValue)));
-        await page.waitForFunction(() => window.__f6Dashes.length > 0);
+        assert.equal(await region.locator('.foliotrace-trend-summary, figcaption, details, .foliotrace-block-hint').count(), 0);
+        assert.doesNotMatch(await region.innerText(), /재구성|공개값|≤|종목 수 미제공|Reconstructed|Published|Counts not provided/);
         await page.waitForFunction(lang => window.__f6Text.some(text => lang === 'ko' ? text.includes('조원') : /₩.*T/.test(text)), lang);
-        const summary = region.locator('details > summary'); await summary.focus(); await page.keyboard.press('Enter');
-        assert.equal(await region.locator('tbody tr').count(), 19);
-        assert.equal(await region.locator('tr[data-record-origin=reconstructed]').count(), 12);
-        assert.equal(await region.locator('tr[data-record-origin=published]').count(), 7);
-        for (const point of recovered.slice(0, 6)) {
-          const row = region.locator('tbody tr').filter({ has: page.locator(`time[datetime="${point.tradeDate}"]`) });
-          assert.equal(await row.getAttribute('data-record-origin'), 'published');
-          assert.ok((await row.innerText()).includes(countText(point, lang)));
-        }
-        await region.locator('details').screenshot({ path: path.join(out, `${id}-published-count-table.png`) });
-        const last = region.locator('tbody tr').filter({ has: page.locator('time[datetime="2026-11-02"]') });
-        assert.ok((await last.innerText()).includes(money(original.history.at(-1).estimatedValue)));
-        assert.ok(!(await last.innerText()).includes(money(reconstruction.points.at(-1).estimatedValue)));
-        await summary.focus(); await page.keyboard.press('Space');
-        await chart.evaluate(node => window.scrollTo({ top: node.getBoundingClientRect().top + scrollY - 100, behavior: 'instant' }));
-        const box = await chart.boundingBox();
-        await chart.hover({ position: { x: (box.width - 80) * 0.2, y: box.height * 0.5 } });
-        const tooltip = region.getByRole('tooltip'); await tooltip.waitFor();
-        assert.equal(await tooltip.getAttribute('data-origin'), 'reconstructed'); assert.match(await tooltip.innerText(), /0\.06%/);
-        assert.match(await tooltip.innerText(), /−20\.77%/);
-        assert.match(await tooltip.innerText(), lang === 'ko' ? /가격·기업행위 잔차 0/ : /zero price\/corporate-action residual/);
+        // A single native canvas path must span all 19 points, including the former origin boundary.
+        const strokes = await chart.evaluate(node => {
+          const probe = document.createElement('canvas').getContext('2d');
+          probe.strokeStyle = getComputedStyle(node).getPropertyValue('--brand-on-bg').trim();
+          return window.__f6Strokes.filter(path => path.color === probe.strokeStyle && path.segments >= 18);
+        });
+        assert.ok(strokes.length > 0, 'a continuous brand-colored path covers all 19 dates');
+        assert.ok(strokes.every(path => path.arcs === 0 && path.dashes.length === 0), 'no point markers or dashed segments');
+        const tooltip = await hoverDay(page, dates, reconstruction.points[4].tradeDate);
+        assert.equal((await tooltip.innerText()).split('\n').length, 3);
+        assert.doesNotMatch(await tooltip.innerText(), /재구성|추정|공개|≤|Reconstructed|Estimated|Published/);
         const tipBounds = await tooltip.boundingBox(), plotBounds = await region.locator('.foliotrace-trend-plot').boundingBox();
         assert.ok(tipBounds.x >= plotBounds.x && tipBounds.y >= plotBounds.y);
         assert.ok(tipBounds.x + tipBounds.width <= plotBounds.x + plotBounds.width + 1);
         assert.ok(tipBounds.y + tipBounds.height <= plotBounds.y + plotBounds.height + 1);
         assert.ok(await tooltip.evaluate(node => node.scrollWidth <= node.clientWidth + 1 && node.scrollHeight <= node.clientHeight + 1), 'tooltip text fits without clipping');
         const day = await tooltip.locator('time').getAttribute('datetime');
-        assert.ok((await tooltip.locator('strong').innerText()).includes(money(reconstruction.points.find(point => point.tradeDate === day).estimatedValue)));
+        assert.equal(await tooltip.locator('strong').innerText(), money(reconstruction.points.find(point => point.tradeDate === day).estimatedValue));
         await region.locator('.foliotrace-trend-plot').screenshot({ path: path.join(out, `${id}-reconstructed-tooltip.png`), style: '.wl-topbar,.mobile-header,.bottom-tabs{visibility:hidden!important}' });
-        await chart.evaluate(node => window.scrollTo({ top: node.getBoundingClientRect().top + scrollY - 100, behavior: 'instant' }));
-        const refreshedBox = await chart.boundingBox();
-        await chart.hover({ position: { x: (refreshedBox.width - 80) * 0.87, y: refreshedBox.height * 0.5 } });
-        await region.locator('[role=tooltip][data-origin=published]').waitFor();
-        const publishedDay = await tooltip.locator('time').getAttribute('datetime');
-        assert.equal(await tooltip.locator('strong').innerText(), money(original.history.find(point => point.tradeDate === publishedDay).estimatedValue));
-        assert.ok((await tooltip.innerText()).includes(countText(recovered.find(point => point.tradeDate === publishedDay), lang)));
+        for (const point of recovered) {
+          await hoverDay(page, dates, point.tradeDate);
+          assert.equal(await tooltip.locator('strong').innerText(), money(point.estimatedValue));
+          assert.ok((await tooltip.innerText()).includes(countText(point, lang)));
+        }
+        await region.locator('.foliotrace-trend-plot').screenshot({ path: path.join(out, `${id}-published-tooltip.png`), style: '.wl-topbar,.mobile-header,.bottom-tabs{visibility:hidden!important}' });
+        assert.deepEqual(await page.evaluate(() => window.__f6Dashes), [], 'no grid/crosshair/series dashed lines');
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
         await page.mouse.move(0, 0);
         await tooltip.waitFor({ state: 'hidden' });
         await region.screenshot({ path: path.join(out, `${id}-chart.png`), style: '.wl-topbar,.mobile-header,.bottom-tabs{visibility:hidden!important}' });
         assert.deepEqual(errors, []);
         facts.push({ id, days: 19, published: 7, reconstructed: 12,
-          dashPatterns: await page.evaluate(() => [...new Set(window.__f6Dashes.map(value => value.join(',')))]), errors });
+          continuousPaths: strokes.length, dashPatterns: await page.evaluate(() => [...new Set(window.__f6Dashes.map(value => value.join(',')))]), errors });
       } catch (error) { await page.screenshot({ path: path.join(out, `${id}-failure.png`) }).catch(() => {}); throw error; }
       finally { await context.close(); }
     });
@@ -120,9 +131,11 @@ try {
     try {
       await page.locator('[data-chart-ready=true]').waitFor();
       assert.equal(await page.getByTestId('foliotrace-history-chart').getAttribute('data-point-count'), '7');
-      assert.equal(await page.locator('[data-history-origin=reconstructed]').count(), 0);
-      await page.locator('.foliotrace-trend details > summary').click();
-      assert.equal(await page.locator('.foliotrace-trend tbody tr').filter({ hasText: 'Counts not provided' }).count(), 6);
+      const tooltip = await hoverDay(page, original.history.map(point => point.tradeDate), original.history[0].tradeDate);
+      assert.equal(await tooltip.locator('small').isHidden(), true);
+      assert.equal((await tooltip.innerText()).split('\n').length, 2);
+      assert.doesNotMatch(await tooltip.innerText(), /Counts not provided/);
+      await page.mouse.move(0, 0);
       await page.locator('.foliotrace-trend').screenshot({ path: path.join(out, 'legacy-seven.png') });
     } finally { await context.close(); }
   });
@@ -132,9 +145,8 @@ try {
     const { page, context } = await setup(lang, 'light-coral', true, { ...original, history });
     try {
       await page.locator('[data-chart-ready=true]').waitFor();
-      await page.locator('.foliotrace-trend details > summary').click();
-      const row = page.locator('.foliotrace-trend tbody tr').filter({ has: page.locator(`time[datetime="${history[0].tradeDate}"]`) });
-      assert.ok((await row.innerText()).includes(countText(history[0], lang)));
+      const tooltip = await hoverDay(page, history.map(point => point.tradeDate), history[0].tradeDate);
+      assert.ok((await tooltip.innerText()).includes(countText(history[0], lang)));
     } finally { await context.close(); }
   });
   for (const count of [0, 1, 2]) await test(`history with ${count} points has an accessible empty state`, async () => {
@@ -145,14 +157,14 @@ try {
       if (count > 0) await page.locator('.foliotrace-trend').screenshot({ path: path.join(out, `empty-${count}.png`) });
     } finally { await context.close(); }
   });
-  await test('null reconstruction leaves an explicit unvalued record', async () => {
+  await test('null reconstruction keeps its date without inventing a valuation', async () => {
     const series = structuredClone(reconstruction), point = series.points[4];
     point.estimatedValue = null;
     const { page, context } = await setup('en', 'light-coral', false, { ...original, valuationSeries: series });
     try {
-      await page.locator('[data-chart-ready=true]').waitFor(); await page.locator('.foliotrace-trend details > summary').click();
-      const row = page.locator('.foliotrace-trend tbody tr').filter({ has: page.locator(`time[datetime="${point.tradeDate}"]`) });
-      assert.match(await row.innerText(), /No valuation/);
+      await page.locator('[data-chart-ready=true]').waitFor();
+      const tooltip = await hoverDay(page, dates, point.tradeDate);
+      assert.equal(await tooltip.locator('strong').innerText(), 'No valuation');
     } finally { await context.close(); }
   });
   const invalidInputs = [
