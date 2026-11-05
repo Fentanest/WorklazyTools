@@ -44,7 +44,8 @@ async function open(language = 'en', width = 1280, height = 900) {
   await page.goto(`${base}/${language}/tools/document-generator/`, { waitUntil: 'networkidle' });
   const essential = page.getByRole('button', { name: language === 'ko' ? '필수 기능만 사용' : 'Use essential features only' });
   if (await essential.count()) await essential.click();
-  await page.waitForTimeout(350);
+  await page.locator('[data-generator-input="template"] input[type=file]').waitFor({ state: 'attached' });
+  await page.evaluate(() => document.fonts.ready);
   const initialCls = await page.evaluate(() => window.__layoutShifts.reduce((sum, value) => sum + value, 0));
   assert.ok(initialCls <= .1, `initial CLS ${initialCls}`);
   observations.push({language,width,height,initialCls});
@@ -83,6 +84,51 @@ async function saveDownload(page, action, name, expectedName) {
   const file = path.join(output, name); await download.saveAs(file); downloads.push({file,suggestedFilename:download.suggestedFilename()}); return file;
 }
 
+async function applySettledTheme(page, theme) {
+  await page.evaluate(async theme => {
+    document.documentElement.setAttribute('data-theme', theme);
+    await Promise.all(document.getAnimations()
+      .filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity)
+      .map(animation => animation.finished.catch(() => {})));
+  }, theme);
+}
+
+async function auditGeneratorThemes(page, phase, fullPage = false) {
+  const original = await page.locator('html').getAttribute('data-theme');
+  for (const theme of ['light-coral', 'dark-coral', 'light-mint', 'dark-mint']) {
+    await applySettledTheme(page, theme);
+    const audit = fullPage
+      ? await new AxeBuilder({ page }).analyze()
+      : await new AxeBuilder({ page }).include('[data-testid=document-generator-page] a[download]').withRules(['color-contrast']).analyze();
+    await fs.writeFile(path.join(output, `${phase}-${theme}-axe.json`), JSON.stringify(audit, null, 2));
+    assert.deepEqual(audit.violations.map(item => item.id), [], `${phase} ${theme} has no axe violations`);
+    const colors = await page.locator('[data-testid=document-generator-page]').evaluate(root => ({
+      brand: getComputedStyle(document.documentElement).getPropertyValue('--brand').trim(),
+      actionColor: getComputedStyle(root).getPropertyValue('--generator-action').trim(),
+      controls: [...root.querySelectorAll('button.bg-primary:not(:disabled), a[download]')].map(element => ({
+        text: element.textContent.trim(), color: getComputedStyle(element).color, background: getComputedStyle(element).backgroundColor,
+      })),
+    }));
+    assert.ok(colors.actionColor, `${phase} ${theme} has a defined local action color`);
+    assert.ok(colors.controls.length > 0, `${phase} ${theme} audits visible controls`);
+    observations.push({ name: `${phase}-${theme}-contrast`, ...colors });
+    if (fullPage) {
+      const buttons = page.locator('[data-testid=document-generator-page] button.bg-primary:not(:disabled)');
+      for (let index = 0; index < await buttons.count(); index++) {
+        const button = buttons.nth(index);
+        await button.hover();
+        await button.evaluate(element => Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => {}))));
+        const hoverAudit = await new AxeBuilder({ page }).include('[data-testid=document-generator-page]').withRules(['color-contrast']).analyze();
+        await fs.writeFile(path.join(output, `${phase}-${theme}-hover-${index}-axe.json`), JSON.stringify(hoverAudit, null, 2));
+        assert.deepEqual(hoverAudit.violations.map(item => item.id), [], `${phase} ${theme} button ${index} hover contrast`);
+      }
+      await page.mouse.move(0, 0);
+      await shot(page, `${phase}-${theme}`);
+    }
+  }
+  await applySettledTheme(page, original);
+}
+
 try {
   const page = await open('en');
   assert.equal(await page.locator('input[type=file]').count(), 2, 'two native file inputs');
@@ -114,6 +160,7 @@ try {
   }, 'sample.docx');
   assert.ok(new PizZip(await fs.readFile(sample)).file('word/document.xml'), 'sample reopens');
   assert.ok(chosenRow, 'explicit selected sample row');
+  await auditGeneratorThemes(page, 'sample');
   const sampleUrl = await page.getByRole('link', { name:'Download sample DOCX' }).getAttribute('href');
   await rowPicker.selectOption({index:0});
   await page.getByRole('link', {name:'Download sample DOCX'}).waitFor({state:'detached'});
@@ -168,8 +215,7 @@ try {
   await shot(page, 'en-desktop-canceled');
   const publishedHref = await page.locator('[data-testid=document-generator-results] li').first().getByRole('button', { name:'Download' }).count();
   assert.equal(publishedHref, 1, 'old result remains actionable after canceled retry');
-  const axe = await new AxeBuilder({ page }).analyze();
-  assert.deepEqual(axe.violations.map(item => item.id), [], 'stable U7 result has no axe violations');
+  await auditGeneratorThemes(page, 'stable-results', true);
   const flowCls = await page.evaluate(() => window.__layoutShifts.reduce((sum, value) => sum + value, 0));
   observations.push({name:'full-interactive-flow-not-web-vital-navigation-window',flowCls});
   await page.getByRole('button', {name:'Generate documents'}).click();
@@ -188,13 +234,13 @@ try {
   await damagedPage.close();
 
   for (const profile of [
-    { language:'en', width:320, height:720, theme:'light' },
-    { language:'ko', width:820, height:900, theme:'dark' },
-    { language:'en', width:821, height:900, theme:'dark' },
-    { language:'ko', width:1440, height:1000, theme:'light' },
+    { language:'en', width:320, height:720, theme:'light-coral' },
+    { language:'ko', width:820, height:900, theme:'dark-coral' },
+    { language:'en', width:821, height:900, theme:'dark-mint' },
+    { language:'ko', width:1440, height:1000, theme:'light-mint' },
   ]) {
     const candidate = await open(profile.language, profile.width, profile.height);
-    if (profile.theme === 'dark') await candidate.evaluate(() => document.documentElement.classList.add('dark'));
+    await applySettledTheme(candidate, profile.theme);
     await upload(candidate, [dataA]); await prepare(candidate, profile.language);
     const suffix = `${profile.language}-${profile.width}-${profile.theme}-selected`;
     await shot(candidate, suffix);

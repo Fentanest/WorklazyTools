@@ -244,7 +244,7 @@ export function DocumentGeneratorPage() {
   const selectedRow = plan?.rows.find(row=>row.id===sampleRow);
   const guide = tr('features:documentGenerator.guide', {returnObjects:true}) as any;
 
-  return <UtilityPage toolId="document-generator"><div ref={intakeRoot} className="contents">
+  return <UtilityPage toolId="document-generator"><div ref={intakeRoot} className="contents [--generator-action:color-mix(in_srgb,var(--brand-strong)_85%,black)] dark:[--generator-action:var(--brand-strong)] [&_button.bg-primary]:[--primary:var(--generator-action)] [&_a[download]]:[--primary:var(--generator-action)] [&_button.bg-primary:hover]:bg-[color-mix(in_srgb,var(--primary)_92%,var(--primary-foreground))]" data-testid="document-generator-page">
       {(handoff.notReceived || (handoff.result && handoff.recoveryFiles.length > 0)) && <UtilityNotice kind="warning" role="status" className="mb-4 flex-col items-start gap-2" data-handoff-recovery>
         <p>{templateOnlyHandoff
           ? tr("features:documentGenerator.handoffTemplateOnly")

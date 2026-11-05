@@ -191,8 +191,7 @@ try {
       return count > 0 && count <= before;
     }, {}, rowsBeforeSearch);
 
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const completedReload = await reloadWithUnsavedFiles(page);
     inputs = await page.$$('[data-testid=excel-compare-page] input[type="file"]');
     await inputs[0].uploadFile(fixture("cancel-left.xlsx"), fixture("cancel-right.xlsx"));
     await page.waitForFunction(() => document.querySelectorAll("[data-testid=excel-sheet-fields]").length === 2 && !document.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]')?.disabled);
@@ -202,10 +201,10 @@ try {
     await page.waitForFunction(() => document.querySelector(".ui-operation-progress.ui-status-error")?.textContent?.includes("취소"));
 
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 2 });
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    const canceledReload = await reloadWithUnsavedFiles(page);
     const mobileLayout = await page.evaluate(() => {
       const dropZone = document.querySelector("[data-testid=excel-compare-page] [data-testid=excel-pair-drop-zone]");
+      const dropTarget = dropZone?.querySelector('[data-ui-part="drop-target"]');
       const sectionCard = document.querySelector(".ui-section-card");
       const hint = dropZone?.querySelector('[data-ui-part="drop-hint"]');
       const protectedHintSegment = Array.from(hint?.querySelectorAll('[data-ui-part="drop-hint-segment"]') ?? []).find((segment) => segment.textContent?.includes("SpreadsheetML"));
@@ -214,7 +213,7 @@ try {
         pairColumns: getComputedStyle(document.querySelector("[data-testid=excel-pair-files]")).gridTemplateColumns,
         actionHeight: document.querySelector("[data-testid=excel-compare-page] [data-testid=excel-pair-drop-zone] [data-slot=button]")?.getBoundingClientRect().height || 0,
         dropOverflow: (dropZone?.scrollWidth || 0) - (dropZone?.clientWidth || 0),
-        dropRadius: dropZone ? getComputedStyle(dropZone).borderRadius : "",
+        dropRadius: dropTarget ? getComputedStyle(dropTarget).borderRadius : "0px",
         cardRadius: sectionCard ? getComputedStyle(sectionCard).borderRadius : "",
         hintText: hint?.textContent || "",
         protectedHintSegmentLines: protectedHintSegment?.getClientRects().length || 0,
@@ -300,6 +299,7 @@ try {
       headerSelection,
       b4Affordance,
       cancellation: "passed",
+      reloads: { completed: completedReload, canceled: canceledReload },
       mobile,
     }, null, 2));
   } finally {
@@ -307,6 +307,36 @@ try {
   }
 } finally {
   await fs.rm(temporaryDirectory, { recursive: true, force: true });
+}
+
+async function reloadWithUnsavedFiles(page) {
+  // File-backed work intentionally raises beforeunload. The unhandled warning
+  // blocks navigation, so confirm leaving just for this reload.
+  const dialogs = [];
+  const handled = [];
+  const confirmLeave = (dialog) => {
+    dialogs.push(dialog.type());
+    handled.push(dialog.type() === "beforeunload" ? dialog.accept() : dialog.dismiss());
+  };
+  page.on("dialog", confirmLeave);
+  try {
+    const response = await page.reload({ waitUntil: "domcontentloaded" });
+    await Promise.all(handled);
+    if (dialogs.length !== 1 || dialogs[0] !== "beforeunload" || !(response?.ok() || response?.status() === 304)) {
+      throw new Error(`Reload did not confirm the file-loss warning and load successfully: ${JSON.stringify({ dialogs, status: response?.status() })}`);
+    }
+    await page.waitForSelector('[data-testid="excel-compare-page"]');
+    await page.waitForFunction(() => {
+      const root = document.querySelector('[data-testid="excel-compare-page"]');
+      const input = root?.querySelector('input[type="file"]');
+      const action = root?.querySelector('[data-testid=excel-compare-actions] [data-ui-component=primary-button]');
+      return input && input.files.length === 0 && action?.disabled
+        && root.querySelectorAll('[data-testid=excel-selected-file], [data-testid=excel-sheet-fields], [data-testid=excel-report-download]').length === 0;
+    });
+    return { dialogs, status: response.status(), emptyInputsReady: true };
+  } finally {
+    page.off("dialog", confirmLeave);
+  }
 }
 
 async function downloadReportLinks(page, client, root, phase) {
@@ -533,8 +563,11 @@ async function assertB4Affordance(page, leftPath, rightPath) {
   await page.setViewport({ width: 1280, height: 900, deviceScaleFactor: 1 });
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-testid=excel-add-pair]");
+  await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark-coral"));
+  await settleAnimations(page);
   await page.click("[data-testid=excel-compare-mode-grid] button:nth-child(2)");
-  await new Promise((resolve) => setTimeout(resolve, 240));
+  await page.waitForFunction(() => document.querySelector('[data-testid=excel-compare-mode-grid] [data-excel-mode=key]')?.getAttribute("aria-checked") === "true");
+  await settleAnimations(page);
   const contrast = await page.evaluate(() => {
     const selected = document.querySelector("[data-testid=excel-compare-mode-grid] [data-selected=true]");
     const adjacent = document.querySelector("[data-testid=excel-compare-mode-grid] button:not([data-selected])");
@@ -577,11 +610,11 @@ async function assertB4Affordance(page, leftPath, rightPath) {
     hoverClass: button.className.includes("hover:bg-primary/10!"),
   }));
   await page.hover("[data-testid=excel-add-pair]");
-  await new Promise((resolve) => setTimeout(resolve, 180));
+  await settleAnimations(page);
   const addHover = await page.$eval("[data-testid=excel-add-pair]", (button) => getComputedStyle(button).backgroundColor);
   await page.keyboard.press("Tab");
   await page.focus("[data-testid=excel-add-pair]");
-  await new Promise((resolve) => setTimeout(resolve, 180));
+  await settleAnimations(page);
   const addFocus = await page.$eval("[data-testid=excel-add-pair]", (button) => ({ shadow: getComputedStyle(button).boxShadow, visible: button.matches(":focus-visible") }));
 
   const input = await page.$('[data-testid=excel-compare-page] input[type="file"]');
@@ -595,11 +628,11 @@ async function assertB4Affordance(page, leftPath, rightPath) {
     hoverClass: button.className.includes("hover:bg-primary/10!"),
   }));
   await page.hover("[data-testid=excel-pair-swap]");
-  await new Promise((resolve) => setTimeout(resolve, 180));
+  await settleAnimations(page);
   const swapHover = await page.$eval("[data-testid=excel-pair-swap]", (button) => getComputedStyle(button).backgroundColor);
   await page.keyboard.press("Tab");
   await page.focus("[data-testid=excel-pair-swap]");
-  await new Promise((resolve) => setTimeout(resolve, 180));
+  await settleAnimations(page);
   const swapFocus = await page.$eval("[data-testid=excel-pair-swap]", (button) => ({ shadow: getComputedStyle(button).boxShadow, visible: button.matches(":focus-visible") }));
   const hoverCapable = await page.evaluate(() => matchMedia("(hover: hover)").matches);
   const result = { contrast, hoverCapable, add: { ...addBefore, hover: addHover, focus: addFocus }, swap: { ...swapBefore, hover: swapHover, focus: swapFocus } };
@@ -610,6 +643,12 @@ async function assertB4Affordance(page, leftPath, rightPath) {
     throw new Error(`B4 selected-card contrast or Swap/Add affordance failed: ${JSON.stringify(result)}`);
   }
   return result;
+}
+
+async function settleAnimations(page) {
+  await page.evaluate(() => Promise.all(document.getAnimations()
+    .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+    .map((animation) => animation.finished.catch(() => {}))));
 }
 
 async function assertIntegrityFailure(browser, leftPath, rightPath, mode) {
