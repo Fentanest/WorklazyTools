@@ -7,7 +7,7 @@
     "implementation": "muse-spark-1.3-contributor",
     "implementation_fallback": "gpt-6.1-sol",
     "review": "gpt-6.1-sol",
-    "research": "gpt-6.1-luna",
+    "research": "gpt-6-luna",
     "terra": "gpt-6.1-terra",
     "muse_runtime_id": "opencode-go/muse-spark-1.3-contributor",
     "review_alt_for_sol_implementation": "claude-sonnet",
@@ -96,12 +96,12 @@
     }
   ],
   "review_assignment": {
-    "muse": "Reviewer(sol)",
-    "sonnet": "Reviewer(sol)",
-    "sol": "Reviewer(sonnet)",
-    "plan": "Reviewer(Astra)",
+    "muse": "Sol",
+    "sonnet": "Sol",
+    "sol": "Sonnet",
+    "plan": "Astra",
     "escalate_after_same_finding_fix_rounds": 3,
-    "escalation": "Reviewer(Astra)",
+    "escalation": "Astra",
     "effective": "2026-11-02 new jobs"
   }
 }

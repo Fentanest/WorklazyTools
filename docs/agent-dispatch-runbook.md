@@ -1,64 +1,60 @@
 # 에이전트 호출·복구 런북
 
-2026-09-22 정리. 정책은 PROJECT_RULES.md, 정확한 모델은 `docs/agent-ops-config.json`이 정본이다. 첫 호출·설치 버전/환경 변경·복구 때 읽고 확인한 같은 계약은 재사용한다. 아래 명령은 사용자 Linux 호스트에서 실행한다. 문서·파일 생성은 호스트에서의 성공 증명이 아니다.
+2026-09-22 정리. 정책은 PROJECT_RULES.md 가 정본이다. 에이전트 이름 → Paseo 실행값(provider/model·모드)은 §0 표가 정본이고, `docs/agent-ops-config.json` 은 보조 실행기(`agent_ops.py`·`codex_direct.py`·`gemini_research.py`)가 읽는 모델 설정이다 — 두 곳의 같은 모델 값은 일치시킨다. 첫 호출·설치 버전/환경 변경·복구 때 읽고 확인한 같은 계약은 재사용한다. 아래 명령은 사용자 Linux 호스트에서 실행한다. 문서·파일 생성은 호스트에서의 성공 증명이 아니다.
 
-## 0. 기본 실행 표면 — herdr (2026-10-26 사용자 지시)
+## 0. 기본 실행 표면 — Paseo (2026-11-09 사용자 지시로 herdr 에서 전환)
 
-사용자가 herdr 화면에서 직접 지켜볼 수 있도록 **외부 에이전트는 모두 herdr 페인에서 대화형 세션으로 띄운다.** 대상은 Codex(Sol·Reviewer(sol)·Reviewer(Astra)·Luna), Gemini(agy), Muse(OpenCode), Claude 작업자(Sonnet 등)다. 헤드리스 `codex exec`·companion `--background`·`agy -p`·`opencode run`·`nohup`, Claude `Agent` 서브에이전트로 다른 모델 몫을 대신 돌리는 방식은 기본 경로가 아니다. herdr를 쓸 수 없을 때(`HERDR_ENV` 없음, herdr 서버 장애)만 §2~§5의 기존 경로를 쓰고 그 이유를 작업 기록에 남긴다.
+사용자가 Paseo 앱에서 직접 지켜볼 수 있도록 **외부 에이전트는 모두 Paseo 에이전트(총괄의 하위 에이전트)로 띄운다.** 대상은 Muse(OpenCode), Codex(Sol·Astra·Luna), Claude 작업자(Sonnet)다. **Gemini 는 예외**로 메모리 상한이 필수라 §3 의 상한 셸 경로가 기본이다(아래). 총괄 Claude 는 Paseo 가 주입한 MCP 도구(`create_agent`·`send_agent_prompt` 등)로 발주한다. 헤드리스 `codex exec`·companion `--background`·`agy -p`·`opencode run`·`nohup`, Claude `Agent` 서브에이전트로 다른 모델 몫을 대신 돌리는 방식은 기본 경로가 아니다. Paseo 를 쓸 수 없을 때(Paseo MCP 도구 없음, daemon 장애)만 §2~§5의 기존 경로를 쓰고 그 이유를 작업 기록에 남긴다.
 
-**권한 — 사용자 명시 승인(2026-10-26: "권한 차단당하지 말고", opencode 호출 포함).** 권한 질문이나 샌드박스 때문에 작업자가 멈추거나, 질문이 자동 거부돼 빈 결과로 끝나지 않도록 아래 플래그로 시작한다.
+**권한 — 사용자 명시 승인(2026-10-26: "권한 차단당하지 말고", opencode 호출 포함).** 권한 질문이나 샌드박스 때문에 작업자가 멈추거나, 질문이 자동 거부돼 빈 결과로 끝나지 않도록 아래 모드로 시작한다. 모델은 항상 명시한다.
 
-| 역할 | `--kind` | `--` 뒤 인자 |
-|---|---|---|
-| Muse(주 구현) | `opencode` | `--auto "$WT"` — 모델은 `~/.config/opencode/opencode.jsonc`의 `model`(`opencode-go/muse-spark-1.3-contributor`). Muse는 codex로 띄울 수 없다. 실제 ID를 `muse_runtime_id`와 대조한다 |
-| Sol(보조 구현)·Reviewer(sol)·Reviewer(Astra) | `codex` | `-C "$WT" -m <gpt-6.1-sol / gpt-6-astra> --dangerously-bypass-approvals-and-sandbox` |
-| Luna | `codex` | `-C "$WT" -m gpt-6.1-luna --dangerously-bypass-approvals-and-sandbox` |
-| Gemini | `agy` | `--add-dir "$WT" --model gemini-4-argon-high --dangerously-skip-permissions` |
-| Claude 작업자·Reviewer(sonnet) | `claude` | `--model sonnet --dangerously-skip-permissions` |
+**에이전트 표 — 이 표가 유일한 정본이다**(2026-11-09 사용자 지시). Paseo 에이전트 프로필(`list_profiles`)은 쓰지 않는다 — 비어 있어도 정상이고, 생겨도 이 표가 우선한다. 에이전트 이름은 모든 저장소에서 같은 provider/model 을 가리키고 역할만 저장소마다 다르다. `create_agent` 에는 `provider`=`<provider>/<model>`, `settings.modeId`, `settings.thinkingOptionId` 로 그대로 옮겨 적는다.
 
-- 권한 플래그와 아래 「최대 허용」 범위를 따른다(2026-10-31). 남기는 금지는 아래 목록뿐이며 작업서와 사후 검사(`git status --short`, `find <경로> -newer <marker>`)로 지킨다.
-**권한 범위 — 최대 허용(2026-10-31 사용자 지시 「권한은 최대한 허락하는 쪽으로 모두 맞추고」).** 위 플래그로 띄운 작업자는 작업서의 일을 끝내는 데 필요한 명령을 질문 없이 실행한다.
+| 에이전트 | `provider`(provider/model) | `modeId` | `thinkingOptionId` | 이 프로젝트의 역할 |
+|---|---|---|---|---|
+| Muse | `opencode/opencode-go/muse-spark-1.3-contributor` | `build` | (기본) | **주 구현**(우선 배정). 실제 ID 를 `muse_runtime_id` 와 대조한다. Muse 는 codex 로 띄울 수 없다 |
+| Sol | `codex/gpt-6.1-sol` | `full-access` | `high` | 보조 구현(Muse 불가 시), 정식 검수 기본(Muse·Sonnet 구현분) |
+| Sonnet | `claude/claude-sonnet-5-5` | `bypassPermissions` | (기본) | Claude 작업자 구현, Sol 구현분 정식 검수(대척점 교차) |
+| Astra | `codex/gpt-6-astra` | `full-access` | `high` | `!계획!`·`!계획만!` 계획 기술 검토, 같은 지적 3회 수정 실패 시 추가 검토 |
+| Gemini | `antigravity/gemini-4-argon-high` | `full-access` | — | 조사·원문 수집·시각 검토. **Paseo `create_agent` 로 띄우지 않는다** — 메모리 상한을 씌울 수 없어서 §3 상한 셸 경로가 기본(아래). 이 값은 상한 적용이 확인된 뒤에만 쓴다 |
+| Luna | `codex/gpt-6-luna` | `full-access` | `high` | Gemini 실제 한도 초과 시 조사 대체만. DART 원문·판정·검증물 열람 금지(2026-11-09 사용자 확인: Luna 최신은 `gpt-6-luna`) |
+
+- 모드 대응: OpenCode `build`(호스트 `~/.config/opencode/opencode.jsonc` 의 edit·bash·webfetch allow)는 기존 `--auto`, Codex `full-access` 는 `--dangerously-bypass-approvals-and-sandbox`, Claude `bypassPermissions`·antigravity `full-access` 는 `--dangerously-skip-permissions` 와 같은 취지다.
+- 총괄 자신은 사용자가 Paseo 앱에서 Fable(없으면 실제 확인한 Opus)로 띄운다.
+- 에이전트 제목은 `<에이전트>-<작업>`(예: `muse-<작업>`, `sol-review-<작업>`, `sonnet-review-<작업>`, `astra-plan-<작업>`)으로 해 구현 세션과 검수 세션을 구분한다.
+- 권한 모드와 아래 「최대 허용」 범위를 따른다(2026-10-31). 남기는 금지는 아래 목록뿐이며 작업서와 사후 검사(`git status --short`, `find <경로> -newer <marker>`)로 지킨다.
+
+**권한 범위 — 최대 허용(2026-10-31 사용자 지시 「권한은 최대한 허락하는 쪽으로 모두 맞추고」).** 위 모드로 띄운 작업자는 작업서의 일을 끝내는 데 필요한 명령을 질문 없이 실행한다.
 - 허용: 자기 worktree·작업 브랜치의 파일 쓰기와 커밋(총괄 대리 커밋이 기본이 아니다), 네트워크, 작업 공간 안 패키지·도구 설치, docker·`sudo`, 운영 데이터·로그·컨테이너 상태 읽기, 시험용 일회용 서비스·컨테이너 기동과 정리, 작업서가 지정한 운영 단계(출고·재적재·스냅샷·기기 시험 등)의 실행.
-- 남기는 금지(되돌릴 수 없거나 바깥에 영향이 가는 것만): 비밀값·토큰 출력·전송, 실주문·실결제·주문 API, 사용자 승인 없는 원격 push·출고·스토어 업로드, 운영 데이터 삭제·수동 수정(작업서가 지정한 운영 단계 제외), 다른 작업의 worktree 쓰기, 전역 설정(`~/.claude`·`~/.codex`·셸 rc 등) 변경, 여러 에이전트가 함께 쓰는 공용 서비스(adb 서버·운영 Redis 등) 재시작.
+- 남기는 금지(되돌릴 수 없거나 바깥에 영향이 가는 것만): 비밀값·토큰 출력·전송, 실주문·실결제·주문 API, 사용자 승인 없는 원격 push·출고·스토어 업로드, 운영 데이터 삭제·수동 수정(작업서가 지정한 운영 단계 제외), 다른 작업의 worktree 쓰기, 전역 설정(`~/.claude`·`~/.codex`·`~/.paseo`·셸 rc 등) 변경, 여러 에이전트가 함께 쓰는 공용 서비스(adb 서버·운영 Redis·Paseo daemon 등) 재시작.
 - 지킨 여부는 작업서의 사후 검사(`git status --short`, `find <경로> -newer <marker>`, 운영 기록)로 확인한다.
 
 ### 절차
 
-총괄 Claude 자신이 herdr 페인 안에서 실행 중이어야 한다(`test "$HERDR_ENV" = 1`). 하나라도 어기면 소환하지 않는다: `HERDR_ENV` 미설정·`herdr pane list` 실패·대상 worktree 미마운트·모델 ID 불일치. 아니면 바깥에서 사용자의 herdr 세션을 조작하지 말고, herdr 안에서 Claude를 다시 열어 달라고 요청한다. 명령 문법의 정본은 설치된 `herdr agent`·`herdr pane` 도움말이다. 모든 소환은 `--current --cwd "$WT" --no-focus`, 이름 유일, ID는 JSON에서만 취득한다.
+총괄 Claude 는 Paseo 에이전트로 실행 중이어야 한다(`PASEO_AGENT_ID` 가 있고 `mcp__paseo__*` 도구가 보임). 하나라도 어기면 소환하지 않는다: Paseo 도구 없음·대상 worktree 없음·모델 ID 불일치. 아니면 바깥에서 사용자의 Paseo 세션을 조작하지 말고 Paseo 안에서 Claude 를 다시 열어 달라고 요청한다. 도구 문법의 정본은 Paseo MCP 도구 설명과 `paseo --help` 다.
 
-```bash
-WT=/절대/경로/작업-worktree; NAME=sol-search      # 이름: [a-z][a-z0-9_-]{0,31}, 살아 있는 에이전트끼리 유일
-herdr pane layout --pane "$HERDR_PANE_ID"          # 넓으면 right, 좁거나 길면 down
-P=$(herdr pane split --current --direction right --cwd "$WT" --no-focus | jq -r .result.pane.pane_id)
-herdr agent start "$NAME" --kind codex --pane "$P" --timeout 60000 -- \
-  -C "$WT" -m gpt-6.1-sol --dangerously-bypass-approvals-and-sandbox
-herdr agent prompt "$NAME" "작업서 $WT/docs/jobs/todo/<파일>.md 를 읽고 수행하라. 결과는 $WT/<결과경로> 에 쓰고, 끝나면 그 경로와 한 줄 요약만 답하라." --wait --timeout 120000
-herdr agent wait "$NAME" --timeout 3600000        # 긴 작업: Bash run_in_background로 걸어 하네스 완료 알림을 받는다
-herdr agent read "$NAME" --source recent-unwrapped --lines 200
-```
+1. 작업 공간: 총괄이 작업 worktree 를 준비한 뒤 `create_workspace(isolation="local", path=<WT 절대경로>, title=<작업>)` 로 등록하고 `workspaceId` 를 받는다. 이미 등록된 경로는 `list_workspaces` 로 찾아 재사용한다. Paseo 관리 worktree(`isolation="worktree"`)로 브랜치를 만들지 않는다.
+2. 기동: `create_agent(title="sol-<작업>", provider="codex/gpt-6.1-sol", settings={modeId:"full-access", thinkingOptionId:"high"}, workspaceId=<id>, initialPrompt="작업서 $WT/docs/jobs/todo/<파일>.md 를 읽고 수행하라. 결과는 $WT/<결과경로> 에 쓰고, 끝나면 그 경로와 한 줄 요약만 답하라.", notifyOnFinish=true)`. agentId 를 작업 기록·`.team/ledger.md` 에 남긴다.
+3. 대기·완료: `notifyOnFinish` 알림(완료·오류·권한 요청)을 받는다. 짧은 폴링·`pgrep`·로그 grep 대기 루프를 만들지 않는다. 필요할 때 `get_agent_status`·`get_agent_activity`(셸에서는 `paseo wait`·`paseo logs`)로 본다.
+4. 후속: 같은 작업의 후속은 같은 agentId 로 `send_agent_prompt` 해 세션을 잇는다. 다른 작업·다른 worktree 는 새 에이전트.
 
-- 배치: 기본은 현재 탭의 형제 페인이고 `--no-focus`로 사용자 포커스를 뺏지 않는다. 동시 작업자가 3개를 넘으면 `herdr tab create --label <묶음> --cwd "$WT" --no-focus`로 묶음 탭을 따로 만든다. ID는 JSON 응답에서 읽고 예시·사이드바 순서로 추측하지 않는다.
-- 프롬프트: 작업서는 worktree 안 파일로 두고 경로만 보낸다. 긴 결과는 파일로 쓰게 하고 `agent read`는 상태 확인에 쓴다.
-- 대기: `--wait`는 첫 `idle`/`done`/`blocked`에서 돌아온다. `pgrep`·로그 grep 대기 루프를 만들지 않는다. `timeout`·`agent_prompt_stalled`는 미전달의 증거가 아니므로 같은 프롬프트를 바로 다시 보내지 말고 `agent get`/`agent read`부터 본다.
-- `blocked`: 권한 우회 뒤에도 남은 질문 화면이다. `agent read`로 보고, 작업서 범위 안의 선택이면 `agent send-keys`로 답하고 범위 밖이면 사용자에게 묻는다.
-- 완료 판정: `idle`/`done`은 입력 대기일 뿐이다. 결과 파일·diff·검사 출력으로 확인한다. agy는 내부 백그라운드 작업이 남아 있어도 idle로 보일 수 있다.
-- 후속: 같은 작업의 후속은 같은 에이전트 이름으로 `agent prompt`해 세션을 잇는다. 다른 작업·다른 worktree는 새 페인·새 세션으로 띄운다.
-- 정리: 결과를 회수해 보고한 뒤 **자기가 만든 페인만** `herdr pane close <pane>`로 닫는다. 사용자가 보는 중이거나 남겨 달라고 하면 둔다. 다른 페인·탭·워크스페이스와 `herdr server stop`은 건드리지 않는다.
-- 검수자 배정(2026-11-02): 정식 결과 검수는 Muse·Sonnet 구현분 Reviewer(sol), Sol 구현분 Reviewer(sonnet), `!계획!`·`!계획만!` 계획 검토와 같은 지적 3회 수정 실패 시 Reviewer(Astra)다(`PROJECT_RULES.md` 「검수자 배정」). herdr 이름은 `reviewer-sol`·`reviewer-sonnet`·`reviewer-astra`, 탭 라벨은 `Reviewer(sol)` 등. 새 잡부터 적용.
-- 묶음 검수: herdr 경로로 띄운 정식 검수는 `agent_ops.py dispatch-review`/`finish-review`(companion 잡 ID 기반)를 거치지 않는다. 검수 프롬프트에 정식 결과 JSON 경로를 지정하고, 에이전트 이름·worktree·고정 후보·결과 경로를 `docs/jobs`에 기록한다. `agent_ops.py`의 herdr 연동은 아직 없다.
+- 질문·멈춤: 권한 요청 알림이 오거나 입력 대기·질문에서 멈추면 `list_pending_permissions` 로 읽고, 작업서 범위 안이면 `respond_to_permission`·`send_agent_prompt` 로 답하고 밖이면 사용자에게 묻는다.
+- 완료 판정: idle·완료 알림은 입력 대기일 뿐이다. 결과 파일·diff·검사 출력으로 확인한다. agy 는 내부 백그라운드 작업이 남아 있어도 idle 로 보일 수 있다. 응답이 늦다고 같은 프롬프트를 바로 다시 보내지 말고 상태부터 본다.
+- 정리: 결과를 회수해 보고한 뒤 **자기가 만든 에이전트만** 곧바로 `archive_agent` 로 정리한다(2026-11-09 사용자 지시). 다른 에이전트·작업 공간·Paseo daemon 은 건드리지 않는다.
+- 검수자 배정(2026-11-02): 정식 결과 검수는 Muse·Sonnet 구현분은 Sol, Sol 구현분은 Sonnet, `!계획!`·`!계획만!` 계획 검토와 같은 지적 3회 수정 실패 시 Astra 다(`PROJECT_RULES.md` 「검수자 배정」). 같은 모델이라도 구현·검수는 별도 에이전트다.
+- 묶음 검수: Paseo 로 띄운 정식 검수는 `agent_ops.py dispatch-review`/`finish-review`(companion 잡 ID 기반)를 거치지 않는다. 검수 프롬프트에 정식 결과 JSON 경로를 지정하고, agentId·worktree·고정 후보·결과 경로를 `docs/jobs`에 기록한다. `agent_ops.py`의 Paseo 연동은 없다.
 
-### agy가 시작 직후 꺼지거나 빈 결과로 끝날 때
+### Gemini(agy) 메모리 상한·빈 결과
 
-- `-p`(인쇄 모드)를 쓰지 않는다. 인쇄 모드는 한 턴 뒤 종료되고 권한 질문을 자동 거부해 빈 출력이 된다. 대화형으로 띄워야 페인이 유지되고 사용자가 볼 수 있다.
-- `--dangerously-skip-permissions`와 `--add-dir "$WT"`를 반드시 준다. `--sandbox`(셸이 `connecting to sandbox server ... connection reset by peer`로 전부 실패)와 `--mode plan`은 쓰지 않는다.
-- `agent start`가 `agent_not_ready`·타임아웃으로 끝나거나 페인이 셸 프롬프트로 돌아오면 `herdr pane read "$P" --source recent-unwrapped --lines 200`과 agy 로그로 원인(인증·한도·모델 ID·신뢰 질문)을 확인한다. 고칠 수 있는 원인을 고친 뒤 같은 인자로 한 번만 다시 시작한다.
-- 메모리 상한(§3, 2026-10-13 OOM): 페인 셸을 먼저 상한 scope 셸로 바꾼 뒤 그 안에서 agy를 시작한다. `herdr pane run "$P" "systemd-run --user --scope --collect -p MemoryMax=8G -p MemorySwapMax=0 bash"` → 프롬프트 확인 → `herdr agent start ... --pane "$P"`. 이 중첩 셸을 herdr가 사용 가능한 셸로 인식하는지는 **미검증**이다. 첫 사용 때 확인하고 이 줄을 고친다.
+- 메모리 상한 필수(§3, 2026-10-13 OOM): Paseo `create_agent` 는 agy 를 직접 띄워 `systemd-run` 상한(`MemoryMax=8G`, `MemorySwapMax=0`)을 씌울 수 없다. 그래서 **Gemini 의 기본 경로는 §3 의 상한 셸 + agy** 다. 작은 작업 폴더·`artifacts/` 제외는 입력량을 줄이는 보조책일 뿐 상한을 대신하지 않는다. 사용자가 화면으로 보게 하려면 Paseo 터미널(`create_terminal`)에서 상한 셸(`systemd-run --user --scope --collect -p MemoryMax=8G -p MemorySwapMax=0 bash`)을 먼저 열고 그 안에서 대화형 agy 를 실행할 수 있다 — 이 방식은 **미검증**이므로 첫 사용 때 `systemctl --user status` 로 scope 상한 적용을 확인하고 이 줄을 고친다. Paseo `create_agent` 경로는 상한 적용이 확인되기 전에는 쓰지 않는다.
+- `--sandbox`(셸이 `connecting to sandbox server ... connection reset by peer`로 전부 실패)와 `--mode plan`은 쓰지 않는다.
+- 기동 직후 꺼지거나 빈 결과면 `get_agent_activity`·agy 로그로 원인(인증·한도·모델 ID·신뢰 질문)을 확인하고, 고칠 수 있는 원인을 고친 뒤 같은 값으로 한 번만 다시 띄운다.
 
 ## 1. 실행 유형과 worktree
 
 | 유형 | 모델·용도 | 실제 권한 |
 |---|---|---|
-| 조사/순수 원문 대조 | Gemini, 한도 초과 조사 대체 Luna(`gpt-6.1-luna`), 순수 계획 판독 Astra | 원문 읽기·검색·허용 조사 스크립트. 제품 수정 없음. Luna의 DART 원문·판정·검증물 열람 금지 |
+| 조사/순수 원문 대조 | Gemini, 한도 초과 조사 대체 Luna(`gpt-6-luna`), 순수 계획 판독 Astra | 원문 읽기·검색·허용 조사 스크립트. 제품 수정 없음. Luna의 DART 원문·판정·검증물 열람 금지 |
 | 격리 검수 재현 | 정식 검수자(Reviewer) | 검수 worktree의 임시 빌드·테스트·보고 쓰기. 제품 원본·커밋·push·배포 금지 |
 | 구현 | Muse(주) 또는 Sol(보조) | 승인된 자기 구현 worktree의 제품 수정·국소 검사·보존 커밋. Muse 우선 배정 |
 
@@ -66,13 +62,13 @@ herdr agent read "$NAME" --source recent-unwrapped --lines 200
 
 발주·상태·결과·취소의 cwd는 **해당 작업의 worktree**로 고정한다. 주 저장소로 무조건 복귀하지 않는다. `git rev-parse --show-toplevel`, `git worktree list --porcelain`, 대상 HEAD·dirty·소유 범위를 확인한다. 구현·검수는 별도 공간이고 검수 후보는 고정한다.
 
-worktree를 사용할 때 실제 호스트의 trusted 프로젝트 설정, linked gitdir, 필요한 임시/의존성 캐시 쓰기 경로를 확인한다. 상위 프로젝트 신뢰가 하위 worktree에 자동 적용됐다고 가정하지 않는다. `.codex/config.toml` 같은 gitignored 설정은 확인된 필요한 사본만 전달한다. herdr 작업자는 §0의 사용자 승인 플래그로 실행한다. companion 대체 경로의 권한 오류는 실제 mount·설정·로그로 진단하며 전역 설정의 sandbox 해제·무제한 writable_roots로 고치지 않는다. 제품 원본·다른 worktree를 쓰기 가능 범위에 넣지 않는다.
+worktree를 사용할 때 실제 호스트의 trusted 프로젝트 설정, linked gitdir, 필요한 임시/의존성 캐시 쓰기 경로를 확인한다. 상위 프로젝트 신뢰가 하위 worktree에 자동 적용됐다고 가정하지 않는다. `.codex/config.toml` 같은 gitignored 설정은 확인된 필요한 사본만 전달한다. Paseo 작업자는 §0의 사용자 승인 모드로 실행한다. companion 대체 경로의 권한 오류는 실제 mount·설정·로그로 진단하며 전역 설정의 sandbox 해제·무제한 writable_roots로 고치지 않는다. 제품 원본·다른 worktree를 쓰기 가능 범위에 넣지 않는다.
 
 필요한 의존성 준비는 지정 준비 담당이 실제 lock·설치 상태를 확인한 후 수행한다. 매 호출 무조건 재설치하지 않으며, 병렬 작업이 변경 가능한 node_modules·fixture를 공유하지 않는다. 준비 미완료를 테스트 통과로 바꾸지 않는다.
 
-## 2. Codex — herdr를 못 쓸 때: 공식 플러그인 companion 직접 호출
+## 2. Codex — Paseo를 못 쓸 때: 공식 플러그인 companion 직접 호출
 
-기본은 §0의 herdr 페인(`--kind codex`)이다. 이 절은 herdr를 쓸 수 없을 때의 대체 경로와 `agent_ops.py dispatch-review` 자동 발주용이다. 대체 경로에서는 기존 **공식 Claude용 Codex 플러그인**을 유지한다. `Agent(codex:codex-rescue)`를 거치는 LLM 포워더 대신 그 플러그인의 `scripts/codex-companion.mjs`를 직접 부른다. 별도 Codex API·`nohup codex exec`·다른 하네스로 바꾸지 않는다.
+기본은 §0의 Paseo 에이전트(`codex/...`)다. 이 절은 Paseo를 쓸 수 없을 때의 대체 경로와 `agent_ops.py dispatch-review` 자동 발주용이다. 대체 경로에서는 기존 **공식 Claude용 Codex 플러그인**을 유지한다. `Agent(codex:codex-rescue)`를 거치는 LLM 포워더 대신 그 플러그인의 `scripts/codex-companion.mjs`를 직접 부른다. 별도 Codex API·`nohup codex exec`·다른 하네스로 바꾸지 않는다.
 
 호출 전에 실제 설치 디렉터리의 `agents/codex-rescue.md`와 companion 옵션을 확인한다. 이 문서는 옵션 의미의 참고이며 ‘모델 미지정 기본값’·포워더 호출·검토 시 무조건 쓰기 제거 같은 일반 동작을 이번 명시적 정책보다 우선하지 않는다. 정확한 역할 모델·worktree·실행 유형·fresh/resume 선택·프롬프트를 확정한다.
 
@@ -108,7 +104,7 @@ python3 scripts/codex_direct.py --repo "$WORKTREE" cancel "$JOB"
 
 ## 3. Gemini — `gemini-4-argon-high` 고정, 셸 허용, 결과 회수
 
-기본은 §0의 herdr 대화형 agy(`--kind agy`, `--dangerously-skip-permissions`)다. 아래 `agy -p`·`scripts/gemini_research.py`는 herdr를 쓸 수 없을 때의 대체 경로다. 대체 경로에서도 셸이 필요한 조사는 `--dangerously-skip-permissions`를 붙인다(인쇄 모드의 권한 질문 자동 거부로 빈 출력이 되는 것을 막는다, 2026-10-26 사용자 승인).
+Gemini 는 메모리 상한 때문에 **아래 상한 셸 경로(`agy -p`·`scripts/gemini_research.py`, 또는 §0 의 Paseo 터미널 안 상한 셸)가 기본**이다. Paseo `create_agent` 경로는 상한 적용이 확인되기 전에는 쓰지 않는다(§0). 대체 경로에서도 셸이 필요한 조사는 `--dangerously-skip-permissions`를 붙인다(인쇄 모드의 권한 질문 자동 거부로 빈 출력이 되는 것을 막는다, 2026-10-26 사용자 승인).
 
 Gemini 모델은 `gemini-4-argon-high`로 고정한다(2026-10-30 사용자 지시). 값은 `docs/agent-ops-config.json`의 `models.gemini`이며 `scripts/gemini_research.py`가 `--model`로 넘긴다. 모델 ID는 `agy models`로 대조한다. 실제 사용 모델을 기록한다. `--mode plan`은 기본값으로 쓰지 않는다. 모델에 따라 `--effort`를 거부하므로 붙이지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
 
@@ -145,13 +141,13 @@ agy --add-dir "$WORKTREE" --dangerously-skip-permissions \
 
 ## 4. 정식 검수 발주
 
-`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비하고 `dispatch-review`를 실행한다. `--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다. companion 대체 경로의 담당 모델은 `agent-ops-config.json`의 `models.review`(`gpt-6.1-sol`)다. Sol 구현분은 herdr Reviewer(sonnet)로 발주한다. 정식 검수 결과는 `finish-review`로 회수한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
+`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비하고 `dispatch-review`를 실행한다. `--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다. companion 대체 경로의 담당 모델은 `agent-ops-config.json`의 `models.review`(`gpt-6.1-sol`)다. Sol 구현분은 §0 의 Sonnet 검수 에이전트로 발주한다. 정식 검수 결과는 `finish-review`로 회수한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
 
 이 코드 설치는 전역 Stop hook·MCP·새 daemon을 설치하지 않는다. 구현 종료/영역 전환 단계가 해당 명령을 실제 호출해야 작동한다. 기존 플러그인의 자동 review gate가 켜져 있으면 건별 중복 검수가 발생할 수 있으므로 현재 설정을 확인해 이번 묶음 정책과 충돌하는지 기록한다. 관련 설정을 조용히 바꾸거나 CI 필수 검사와 혼동하지 않는다.
 
 ## 5. WorklazyTools 전용 — Muse / OpenCode
 
-기본은 §0의 herdr 대화형 OpenCode(`--kind opencode`, `--auto`)다. herdr 페인에서는 같은 에이전트 이름에 `agent prompt`를 보내 세션을 잇고, 이전 세션을 다시 열 때는 `--` 뒤에 `-s "$SESSION_ID"`를 준다. 아래 `opencode run`은 herdr를 쓸 수 없을 때의 대체 경로다.
+기본은 §0의 Paseo 에이전트(`opencode/opencode-go/muse-spark-1.3-contributor`, `build`)다. Paseo 에서는 같은 agentId 에 `send_agent_prompt` 를 보내 세션을 잇는다. 아래 `opencode run`은 Paseo를 쓸 수 없을 때의 대체 경로다.
 
 Muse Spark 1.3은 Sol과 함께 정식 구현자이며 Muse 우선 배정이다. MyTradingDesk에는 이 실행기를 추가하지 않는다. Muse의 실제 provider/model ID는 호스트 `opencode models`에서 확인해 작업지시서와 `docs/agent-ops-config.json`의 `muse_runtime_id`에 기록한다. 표시 이름으로 ID를 추정하거나 Codex 명령의 모델 문자열만 바꾸지 않는다. 기존 OpenCode·구독 연결을 유지한다.
 
@@ -174,7 +170,7 @@ Muse Spark 1.3은 Sol과 함께 정식 구현자이며 Muse 우선 배정이다.
 
 ## 감시·실패·복구·완료
 
-herdr 작업자는 `herdr agent wait`(필요하면 Bash `run_in_background`)로 기다린다. 그 밖에도 가능하면 하네스가 완료를 통지하는 실행을 사용한다. 일회성 종료 대기에 만료되는 감시기만 의존하지 않는다. 완료 알림이 없는 별도 `nohup`만 띄워 놓고 대화를 끝내지 않는다. 대기 루프가 필요하면 별도 스크립트와 정확한 잡 ID/PID를 사용하고 `pgrep -f`·넓은 `pkill -f`로 자기 감시기·다른 잡을 잡지 않는다.
+Paseo 작업자는 `notifyOnFinish` 완료 알림으로 기다린다(§0). 그 밖에도 가능하면 하네스가 완료를 통지하는 실행을 사용한다. 일회성 종료 대기에 만료되는 감시기만 의존하지 않는다. 완료 알림이 없는 별도 `nohup`만 띄워 놓고 대화를 끝내지 않는다. 대기 루프가 필요하면 별도 스크립트와 정확한 잡 ID/PID를 사용하고 `pgrep -f`·넓은 `pkill -f`로 자기 감시기·다른 잡을 잡지 않는다.
 
 상태 문자열·로그 갱신·프로세스·실제 결과를 함께 확인한다. 단순 running·종료 알림·로그 정체만으로 성공을 판정하지 않는다. 실행기 종료·모델 답변·검수 통과·최종 승인·배포는 다르다. 제공 코드의 `completed`는 프로세스 terminal 상태이지 검수 통과가 아니다.
 

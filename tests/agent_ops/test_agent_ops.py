@@ -43,7 +43,7 @@ class RepoFixture(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)/'repo';self.root.mkdir()
         self.git('init','-q');self.git('config','user.email','fixture@example.invalid');self.git('config','user.name','Fixture')
         (self.root/'docs').mkdir();(self.root/'src').mkdir()
-        self.config={'schema_version':1,'project':'Fixture','models':{'gemini':'gemini-4-argon-high','implementation':'gpt-6-sol','review':'gpt-6-astra','research':'gpt-6.1-luna'},'review':{'max_tasks':5,'max_lines':800},'line_count_exclude_globs':['vendor/**'],'high_risk_paths':[{'glob':'src/orders.py','reason':'order_safety'}]}
+        self.config={'schema_version':1,'project':'Fixture','models':{'gemini':'gemini-4-argon-high','implementation':'gpt-6-sol','review':'gpt-6-astra','research':'gpt-6-luna'},'review':{'max_tasks':5,'max_lines':800},'line_count_exclude_globs':['vendor/**'],'high_risk_paths':[{'glob':'src/orders.py','reason':'order_safety'}]}
         self.write_config()
         (self.root/'src/search.py').write_text('def search():\n    return 1\n')
         (self.root/'plan.md').write_text('# Approved plan\nReturn 2 from search.\n')
