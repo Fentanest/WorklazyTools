@@ -20,7 +20,7 @@ python3 scripts/codex_direct.py doctor
 |---|---|
 | `scripts/agent_ops.py` | 원문 추출·계획 해시·테스트 영수증·누적 상태·조건 판정·묶음 검수 발주/회수 |
 | `scripts/codex_direct.py` | 설치된 companion 직접 실행·실제 모델/cwd/sandbox 확인·발주 예약·중복 방지 |
-| `scripts/gemini_research.py` | Gemini(설정 모델 `gemini-4-argon-high`)·셸 허용·전경 실행·결과/오류 영속 보관 |
+| `scripts/gemini_research.py` | Gemini(설정 모델 `gemini-4-argon-high`)·셸 허용·전경 실행·결과/오류 영속 보관. 이 보조 실행기는 argon 만 호출한다. 실제 한도 초과가 확인되면 `gemini-3.8-flash-high`는 런북 §0 표의 Gemini 값(model 만 교체) 또는 §3 의 직접 `agy` 호출로 다시 부른다(자동 전환 없음) |
 | `scripts/secret_scan.py` | 영수증·프롬프트·출력에 대한 비밀값 모양 검사(보조 수단, 경로 허용 목록이 1차 통제) |
 | `docs/agent-ops-config.json` | 모델 매핑, 5개/800줄 초기 상한, 고위험 경로·줄 수 제외 목록 |
 
@@ -88,7 +88,7 @@ A+B 검수 중 C가 추가되면 A+B만 통과로 기록하고 C는 남긴다. �
 
 ## 5. 일반 Codex 구현·순수 조사 호출
 
-`docs/agent-ops-examples/dispatch.example.json`의 필드를 실제 승인 작업으로 채운다. 역할과 실행 유형을 따로 지정한다. `implementation`은 구현 허가·linked worktree, `verification`은 격리 검수 worktree가 필요하다. `research` 역할의 Luna는 `fallback_reason=gemini_quota_exceeded`와 실제 실패 증거 참조가 있어야 한다.
+`docs/agent-ops-examples/dispatch.example.json`의 필드를 실제 승인 작업으로 채운다. 역할과 실행 유형을 따로 지정한다. `implementation`은 구현 허가·linked worktree, `verification`은 격리 검수 worktree가 필요하다. `research` 역할의 Luna는 `fallback_reason=gemini_quota_exceeded`(argon·3.8 Flash 모두 한도 초과)와 실제 실패 증거 참조가 있어야 한다.
 
 ```bash
 python3 scripts/codex_direct.py --repo "$WORKTREE" dispatch --request "$REQUEST_JSON"

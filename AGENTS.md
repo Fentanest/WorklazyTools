@@ -11,7 +11,8 @@
 | 정식 묶음 검수(Sol 구현분) | Sonnet `claude-sonnet-5-5`(구현과 분리된 검수 에이전트) |
 | 구현·수정·국소 검사·작업 브랜치 보존용 커밋 | Muse Spark 1.3(우선) 또는 Sol(`gpt-6.1-sol`, 보조) |
 | 통합·원격 반영·배포 | Claude(정식 검수·Claude 감사 통과 후 직접 실행, `PROJECT_RULES.md` 「역할·권한」) |
-| Gemini 실제 한도 초과 시 조사만 대체 | `gpt-6-luna` |
+| Gemini(argon·3.8 Flash) 모두 실제 한도 초과 시 조사만 대체 | `gpt-6-luna` |
+| 총괄(Claude) 부재 시 대리 총괄 | Astra `gpt-6-astra` |
 
 이는 지정값이지 실시간 가용 목록이 아니다. 부재·권한·한도 실패를 같은 사건으로 처리하지 않는다. 부재 시 기본 모델로 조용히 대체하지 않고 지정 역할·승인 범위를 유지한다.
 
@@ -55,4 +56,4 @@ Claude가 Paseo 에이전트(Codex·OpenCode·Claude 작업자)로 띄우며 사
 
 ## 팀 정본(`.team/`) 갱신
 
-팀 정본은 `/home/better0101/projects/worklazytools/.team/`(`ledger.md`·`decisions.md`·`HANDOFF.md`)이다. 갱신은 총괄, 부재 시 대리 총괄(deputy)만 한다. 발주·회수·검수 판정·설치/출고·사용자 결정마다 `ledger.md`·`decisions.md`를 즉시 고치고, 인계·세션 종료·재시작 전에는 `HANDOFF.md` 맨 위 현황을 교체한다. 구현·검수·조사 담당자는 `.team/`을 직접 고치지 않고 보고서로만 알린다. 자동 갱신이 아니므로 재개 시 `.team/`과 실제 상태를 먼저 대조한다.
+팀 정본은 `/home/better0101/projects/worklazytools/.team/`(`ledger.md`·`decisions.md`·`HANDOFF.md`)이다. 갱신은 총괄, 부재 시 대리 총괄(deputy, Astra)만 한다. 발주·회수·검수 판정·설치/출고·사용자 결정마다 `ledger.md`·`decisions.md`를 즉시 고치고, 인계·세션 종료·재시작 전에는 `HANDOFF.md` 맨 위 현황을 교체한다. 구현·검수·조사 담당자는 `.team/`을 직접 고치지 않고 보고서로만 알린다. 자동 갱신이 아니므로 재개 시 `.team/`과 실제 상태를 먼저 대조한다.
