@@ -16,6 +16,8 @@ python3 scripts/codex_direct.py doctor
 
 ## 어떤 파일이 실제로 실행되는가
 
+**모델을 부르는 발주의 기본 경로는 Paseo 에이전트다(`docs/agent-dispatch-runbook.md` §0).** 조사(Gemini)·구현·정식 검수는 Paseo `create_agent` 로 발주하고 결과 파일로 회수한다. 아래 절의 `gemini_research.py`, `agent_ops.py dispatch-review`·`finish-review`, `codex_direct.py dispatch` 발주 예제는 **Paseo 를 쓸 수 없을 때(Paseo 도구 없음·daemon 장애)의 대체 절차**이며, 쓸 때는 이유를 작업 기록에 남긴다. 모델을 부르지 않는 단계(`doctor`, 입력표, `check`, 영수증, `boundary`)는 Paseo 여부와 무관하게 그대로 쓴다.
+
 | 파일 | 기능 |
 |---|---|
 | `scripts/agent_ops.py` | 원문 추출·계획 해시·테스트 영수증·누적 상태·조건 판정·묶음 검수 발주/회수 |
@@ -29,6 +31,8 @@ python3 scripts/codex_direct.py doctor
 ## 1. 조사와 입력표
 
 정본 계획에 있는 요구사항을 Gemini가 작은 항목으로 나누고, 각 항목에 실제 코드 범위와 관련 검사 입력을 연결한다. `docs/agent-ops-examples/task.example.json`을 형식으로 사용하되 경로·SHA·완료 기준은 실제 값으로 채운다. 샘플을 통과 증거로 사용하지 않는다. 승인 계획 파일의 SHA는 셸에서 계산할 수 있으며 비밀 파일을 읽지 않는다.
+
+기본은 런북 §0 표의 Gemini 값으로 띄운 Paseo 에이전트에 프롬프트 파일 경로를 주는 것이다. 아래는 Paseo 를 쓸 수 없을 때의 대체 실행이다.
 
 ```bash
 python3 scripts/gemini_research.py --prompt-file "$PROMPT_FILE" --task-id "$TASK_ID"
@@ -69,6 +73,8 @@ python3 scripts/agent_ops.py status
 
 검수 필요 시 보존용 커밋으로 후보를 고정하고, 그 커밋을 별도의 검수 worktree에서 checkout한다. 자동 발주기가 작업트리를 무단 checkout·reset하거나 환경 설정을 고치지 않도록 이 준비는 지정 담당이 수행한다. 필요한 의존성·규칙·접근 범위도 준비한다. 생성 예시:
 
+검수 worktree 준비(`git worktree add --detach`)는 두 경로에 공통이다. 기본은 그 worktree 를 Paseo 작업 공간으로 등록해 런북 §0 의 검수 에이전트(Sol, Sol 구현분은 Sonnet)에 발주하고 지정한 결과 파일로 회수하는 것이다. 아래 `dispatch-review` 는 Paseo 를 쓸 수 없을 때의 companion 대체 발주다.
+
 ```bash
 git worktree add --detach "$REVIEW_WORKTREE" "$CANDIDATE_COMMIT"
 python3 scripts/agent_ops.py dispatch-review --batch "$BATCH" \
@@ -89,6 +95,8 @@ A+B 검수 중 C가 추가되면 A+B만 통과로 기록하고 C는 남긴다. �
 ## 5. 일반 Codex 구현·순수 조사 호출
 
 `docs/agent-ops-examples/dispatch.example.json`의 필드를 실제 승인 작업으로 채운다. 역할과 실행 유형을 따로 지정한다. `implementation`은 구현 허가·linked worktree, `verification`은 격리 검수 worktree가 필요하다. `research` 역할의 Luna는 `fallback_reason=gemini_quota_exceeded`(argon·3.8 Flash 모두 한도 초과)와 실제 실패 증거 참조가 있어야 한다.
+
+기본은 런북 §0 의 Paseo 에이전트 발주다. 아래 `codex_direct.py dispatch` 는 Paseo 를 쓸 수 없을 때의 companion 대체 발주다.
 
 ```bash
 python3 scripts/codex_direct.py --repo "$WORKTREE" dispatch --request "$REQUEST_JSON"

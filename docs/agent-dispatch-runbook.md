@@ -46,7 +46,7 @@
 
 ### Gemini(agy) 메모리 주의·빈 결과
 
-- **Gemini 도 Paseo `create_agent` 로 띄운다(2026-11-10 사용자 지시).** Paseo 는 agy 를 직접 띄우므로 `systemd-run` 메모리 상한(`MemoryMax=8G`, `MemorySwapMax=0`)을 씌울 수 없다. 2026-10-13 OOM(agy 가 작업 폴더의 git 미추적 파일마다 diff 를 만들어 수십 GB 로 커짐)을 다시 내지 않도록 다음을 지킨다: 저장소 전체가 아니라 **필요한 범위의 작은 전용 폴더(전용 worktree)만 작업 공간으로 준다**, 운영 데이터 폴더(`artifacts/`)는 로컬 `.git/info/exclude` 로 미추적 목록에서 뺀다, 대용량 미추적 자료가 있는 폴더는 작업 공간으로 주지 않는다. 큰 미추적 자료를 피할 수 없는 조사만 §3 의 상한 셸 경로로 돌리고 그 이유를 기록한다.
+- **Gemini 도 Paseo `create_agent` 로 띄운다(2026-11-10 사용자 지시).** Paseo 는 agy 를 직접 띄우므로 `systemd-run` 메모리 상한(`MemoryMax=8G`, `MemorySwapMax=0`)을 씌울 수 없다. 2026-10-13 OOM(agy 가 작업 폴더의 git 미추적 파일마다 diff 를 만들어 수십 GB 로 커짐)을 다시 내지 않도록 다음을 지킨다: 저장소 전체가 아니라 **필요한 범위의 작은 전용 폴더(전용 worktree)만 작업 공간으로 준다**, 운영 데이터 폴더(`artifacts/`)는 로컬 `.git/info/exclude` 로 미추적 목록에서 뺀다, 대용량 미추적 자료가 있는 폴더는 작업 공간으로 주지 않는다. 전용 worktree 라는 이유만으로 안전하다고 보지 않고 **띄우기 전에 작업 공간으로 줄 폴더의 미추적 파일 수와 용량을 확인한다**(`git -C "$WT" status --porcelain --untracked-files=all | grep -c '^??'`, `git -C "$WT" ls-files --others --exclude-standard -z | du -ch --files0-from=- | tail -1`). 큰 미추적 자료가 필요한 조사는 필요한 부분만 작은 폴더로 떼어 내거나 일반 프로그램으로 먼저 줄여서 Paseo 로 넘긴다. 일하는 중 메모리가 급히 늘면(`free -g`, `ps -o rss,cmd -C agy`) 자기가 띄운 그 Gemini 에이전트만 멈추고 입력을 줄여 다시 띄운다. §3 의 상한 셸 경로는 §0 대로 Paseo 를 쓸 수 없을 때만 쓴다.
 - 호출 순서: `antigravity/gemini-4-argon-high` → 실제 한도 초과가 로그·상태로 확인되면 `antigravity/gemini-3.8-flash-high` 로 같은 작업을 다시 호출 → 그것도 한도 초과면 Luna. 한도 초과가 아닌 오류를 이 전환으로 처리하지 않는다.
 - `--sandbox`(셸이 `connecting to sandbox server ... connection reset by peer`로 전부 실패)와 `--mode plan`은 쓰지 않는다.
 - 기동 직후 꺼지거나 빈 결과면 `get_agent_activity`·agy 로그로 원인(인증·한도·모델 ID·신뢰 질문)을 확인하고, 고칠 수 있는 원인을 고친 뒤 같은 값으로 한 번만 다시 띄운다.
@@ -105,7 +105,7 @@ python3 scripts/codex_direct.py --repo "$WORKTREE" cancel "$JOB"
 
 ## 3. Gemini — argon 우선·한도 초과 시 3.8 Flash, 셸 허용, 결과 회수(Paseo 대체 경로는 상한 셸 `agy -p`)
 
-기본은 §0 의 Paseo 에이전트다(2026-11-10 사용자 지시). 아래 상한 셸 경로(`agy -p`·`scripts/gemini_research.py`)는 Paseo 를 쓸 수 없거나 큰 미추적 자료를 피할 수 없는 조사에 쓰는 대체 경로다. 대체 경로에서도 셸이 필요한 조사는 `--dangerously-skip-permissions`를 붙인다(인쇄 모드의 권한 질문 자동 거부로 빈 출력이 되는 것을 막는다, 2026-10-26 사용자 승인).
+기본은 §0 의 Paseo 에이전트다(2026-11-10 사용자 지시). 아래 상한 셸 경로(`agy -p`·`scripts/gemini_research.py`)는 Paseo 를 쓸 수 없을 때의 대체 경로다. 대체 경로에서도 셸이 필요한 조사는 `--dangerously-skip-permissions`를 붙인다(인쇄 모드의 권한 질문 자동 거부로 빈 출력이 되는 것을 막는다, 2026-10-26 사용자 승인).
 
 Gemini 는 `gemini-4-argon-high`로 먼저 호출하고, 실제 한도 초과가 로그·상태로 확인되면 `gemini-3.8-flash-high`로 같은 작업을 다시 호출한다(2026-11-10 사용자 지시; 이력: 2026-10-30 argon 고정). 3.8 Flash 도 한도 초과면 Luna 로 대체한다. 값은 `docs/agent-ops-config.json`의 `models.gemini`·`models.gemini_on_quota_exceeded`이며 `scripts/gemini_research.py`는 `models.gemini`(argon)만 `--model`로 넘긴다(자동 전환 없음). 모델 ID는 `agy models`로 대조한다. 실제 사용 모델을 기록한다. `--mode plan`은 기본값으로 쓰지 않는다. 모델에 따라 `--effort`를 거부하므로 붙이지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
 
@@ -142,7 +142,7 @@ agy --add-dir "$WORKTREE" --dangerously-skip-permissions \
 
 ## 4. 정식 검수 발주
 
-`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비하고 `dispatch-review`를 실행한다. `--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다. companion 대체 경로의 담당 모델은 `agent-ops-config.json`의 `models.review`(`gpt-6.1-sol`)다. Sol 구현분은 §0 의 Sonnet 검수 에이전트로 발주한다. 정식 검수 결과는 `finish-review`로 회수한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
+`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비한다. **기본(Paseo):** 그 worktree 를 Paseo 작업 공간으로 등록하고 §0 의 검수 에이전트(Muse·Sonnet 구현분은 Sol, Sol 구현분은 Sonnet)에 발주해, 프롬프트에 지정한 정식 결과 파일로 회수한다. `dispatch-review`·`finish-review` 는 거치지 않는다(§0 「묶음 검수」). **대체(Paseo 를 쓸 수 없을 때만):** `dispatch-review`를 실행하고(`--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다) 결과는 `finish-review`로 회수한다. companion 대체 경로의 담당 모델은 `agent-ops-config.json`의 `models.review`(`gpt-6.1-sol`)이고, Sol 구현분은 companion 으로 넘기지 않고 Paseo 가 복구된 뒤 Sonnet 검수 에이전트로 발주한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
 
 이 코드 설치는 전역 Stop hook·MCP·새 daemon을 설치하지 않는다. 구현 종료/영역 전환 단계가 해당 명령을 실제 호출해야 작동한다. 기존 플러그인의 자동 review gate가 켜져 있으면 건별 중복 검수가 발생할 수 있으므로 현재 설정을 확인해 이번 묶음 정책과 충돌하는지 기록한다. 관련 설정을 조용히 바꾸거나 CI 필수 검사와 혼동하지 않는다.
 

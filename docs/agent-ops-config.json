@@ -11,7 +11,7 @@
     "research": "gpt-6-luna",
     "terra": "gpt-6.1-terra",
     "muse_runtime_id": "opencode-go/muse-spark-1.3-contributor",
-    "review_alt_for_sol_implementation": "claude-sonnet",
+    "review_alt_for_sol_implementation": "claude-sonnet-5-5",
     "plan_review": "gpt-6-astra",
     "escalation_review": "gpt-6-astra"
   },
