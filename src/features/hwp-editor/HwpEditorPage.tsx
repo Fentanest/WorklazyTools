@@ -95,7 +95,7 @@ export function HwpEditorPage() {
           throw new DOMException("Closed", "AbortError");
         }
         editor.element.title = initializationRef.current.t("hwpEditor.frameTitle");
-        // Studio 0.8.7 leaves its IME input's accessible name in Korean.
+        // Match the Studio IME input by its original Korean accessible name.
         // Localize that control only; document text, style names and fonts remain data.
         const originalInputLabel = initializationRef.current.i18n.t("features:hwpEditor.documentInputLabel", { lng: "ko" });
         editor.element.contentDocument?.querySelectorAll(`[aria-label="${originalInputLabel}"]`).forEach(input => {
