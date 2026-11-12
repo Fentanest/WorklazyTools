@@ -50385,18 +50385,16 @@
         "tz": "America/New_York"
       }
     ],
-    "special": "Early Close",
+    "special": "Day after Thanksgiving",
     "sources": [
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
-        "quote": "*** Each market will close early at 1:00 p.m. (1:15 p.m. for eligible options) on Friday, November 27, 2026, Friday, November 26, 2027, and Friday, November 24, 2028 (the day after Thanksgiving)."
+        "quote": "*** Each market will close early at 1:00 p.m. (1:15 p.m. for eligible options) on Friday, November 27, 2026, Friday, November 26, 2027, and Friday, November 24, 2028 (the day after Thanksgiving). NYSE American Equities, NYSE Arca Equities, NYSE National, and NYSE Texas late trading sessions will close at 5:00 p.m. All times are Eastern Time."
       }
     ],
     "reason": null,
-    "notes": [
-      "Early close at 1:00 p.m."
-    ]
+    "notes": []
   },
   {
     "date": "20271127",
