@@ -10,7 +10,7 @@ const libraries = [
   { name: "BiRefNet-512 · Studio Ludens ONNX conversion", license: "MIT · Copyright (c) 2024 ZhengPeng / Copyright (c) 2026 Studio Ludens V.O.F.", url: "https://huggingface.co/studioludens/birefnet-lite-512/tree/962e67969ec6acec9c19fab76acee4f5e22e990c", purpose: "사물·제품 배경 제거 · 고정 커뮤니티 변환 후보" },
   { name: "Microsoft MarkItDown 0.1.8 document converters", license: "MIT", url: "https://github.com/microsoft/markitdown", purpose: "공식 Python 변환기로 Markdown 추출 · 브라우저용 지연 로딩 진입점 적용" },
   { name: "PptxGenJS 4.0.1", license: "MIT", url: "https://github.com/gitbrent/PptxGenJS", purpose: "PDF 추출 텍스트와 이미지로 편집 가능한 PPTX 생성" },
-  { name: "rhwp / @rhwp/core·@rhwp/editor 0.8.7", license: "MIT", url: "https://github.com/edwardkim/rhwp", purpose: "HWP·HWPX·HML 문서 해석, 편집기 UI와 파일 저장" },
+  { name: "rhwp / @rhwp/core·@rhwp/editor 0.9.0", license: "MIT", url: "https://github.com/edwardkim/rhwp", purpose: "HWP·HWPX·HML 문서 해석, 편집기 UI와 파일 저장" },
   { name: "ZetaOffice / LibreOffice browser build snapshot 2026-08-25", license: "MPL-2.0", url: "https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2", purpose: "Writer·Calc·Impress 브라우저 편집 화면" },
   { name: "ZetaJS 1.2.0", license: "MIT", url: "https://github.com/allotropia/zetajs", purpose: "LibreOffice UNO JavaScript 연결" },
   { name: "Nanum Gothic", license: "SIL OFL-1.1", url: "https://github.com/google/fonts/tree/main/ofl/nanumgothic", purpose: "브라우저 오피스 편집기의 한글 표시와 대체 글꼴" },

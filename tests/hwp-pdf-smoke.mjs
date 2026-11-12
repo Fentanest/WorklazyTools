@@ -40,7 +40,7 @@ for (const input of ['sample.hwp', 'sample.hwpx', 'rich.hwp']) {
     await frame.getByRole('button', { name:'Open print dialog', exact:true }).click();
     await page.waitForFunction(() => window.__printCapture);
     const capture = await page.evaluate(() => window.__printCapture);
-    assert.match(capture.url, /rhwp-studio\/0\.8\.7\/print.html$/);
+    assert.match(capture.url, /rhwp-studio\/0\.9\.0\/print.html$/);
     await fs.writeFile(path.join(output, input+'.html'), capture.html);
     const print = await context.newPage();
     try {

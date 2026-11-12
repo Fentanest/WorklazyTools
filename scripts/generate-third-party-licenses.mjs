@@ -28,6 +28,7 @@ const sections = [
   "Tesseract language data — see the model's upstream notice and https://github.com/tesseract-ocr/tessdata",
   "ZetaOffice / LibreOffice browser build snapshot 2026-08-25 — MPL-2.0 — https://git.libreoffice.org/core/+/refs/heads/distro/allotropia/zeta-24-2",
   "LibreOffice source and license information — https://www.libreoffice.org/about-us/licenses/",
+  `rhwp Studio / @rhwp/core / @rhwp/editor ${versionOf("@rhwp/core")} — MIT; bundled component/font notices: /vendor/rhwp-studio/${versionOf("@rhwp/core")}/notices/THIRD_PARTY_LICENSES.md`,
   "Nanum Gothic — SIL Open Font License 1.1 — https://github.com/google/fonts/tree/main/ofl/nanumgothic",
   "Noto Sans KR label font Sans2.004 — SIL Open Font License 1.1 — https://github.com/notofonts/noto-cjk/tree/Sans2.004/Sans/SubsetOTF/KR",
   "JSDoc legacy Word reader snapshot 821695a — 0BSD — https://github.com/Alpaq92/JSDoc",
@@ -80,6 +81,9 @@ for (const [packagePath, lockMetadata] of productionPackages) {
     if (normalized) sections.push("", `--- ${fileName} ---`, normalized);
   }
 }
+
+const rhwpNotices = await fs.readFile(path.join(projectRoot, "node_modules/@rhwp/core/notices/THIRD_PARTY_LICENSES.md"), "utf8");
+sections.push("", "=".repeat(78), "rhwp bundled WASM and font notices", rhwpNotices.trim());
 
 const legalDirectory = path.join(projectRoot, "public", "legal");
 await fs.mkdir(legalDirectory, { recursive: true });

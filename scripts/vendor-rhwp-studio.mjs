@@ -17,6 +17,7 @@ if (!/^\d+\.\d+\.\d+$/.test(coreVersion) || coreVersion !== editorVersion) {
 
 const version = coreVersion;
 const tag = `v${version}`;
+const upstreamCommit = "c9095c5f67632e6721e800ccc7fb43ea49d26682";
 const upstreamUrl = "https://github.com/edwardkim/rhwp.git";
 const withoutHwpCtrl = process.env.RHWP_WITHOUT_HWPCTRL !== "0";
 const suppliedSource = process.env.RHWP_SOURCE_DIR ? path.resolve(process.env.RHWP_SOURCE_DIR) : undefined;
@@ -34,7 +35,7 @@ try {
 
   if (!suppliedSource) {
     await run("git", ["clone", "--filter=blob:none", "--depth", "1", "--branch", tag, "--sparse", upstreamUrl, sourceRoot]);
-    const sparsePaths = ["rhwp-studio", "assets/fonts", "assets/logo"];
+    const sparsePaths = ["rhwp-studio", "rhwp-shared", "src/renderer", "vendor/npm/ajv", "assets/fonts", "assets/logo"];
     if (!withoutHwpCtrl) sparsePaths.push("npm/hwpctrl-ocx");
     await run("git", ["-C", sourceRoot, "sparse-checkout", "set", ...sparsePaths]);
   }
@@ -48,7 +49,7 @@ try {
   const { stdout: commitOutput } = await execFileAsync("git", ["-C", sourceRoot, "rev-parse", "HEAD"], { encoding: "utf8" });
   const commit = commitOutput.trim();
   const { stdout: tagCommitOutput } = await execFileAsync("git", ["-C", sourceRoot, "rev-list", "-n", "1", tag], { encoding: "utf8" });
-  if (commit !== tagCommitOutput.trim()) throw new Error(`${tag}의 정확한 커밋이 checkout되지 않았습니다.`);
+  if (commit !== upstreamCommit || commit !== tagCommitOutput.trim()) throw new Error(`${tag}의 정확한 커밋이 checkout되지 않았습니다.`);
 
   // Build the pinned upstream with a reviewed local UI patch. Refuse unrelated
   // tracked edits in a supplied source checkout; never overwrite a reference.
@@ -79,6 +80,7 @@ try {
     env: {
       ...process.env,
       RHWP_DISABLE_EXTERNAL_WEBFONTS: "1",
+      RHWP_WITHOUT_AI: "1",
       RHWP_WITHOUT_HWPCTRL: withoutHwpCtrl ? "1" : "0",
     },
   });
@@ -125,6 +127,10 @@ try {
   await fs.copyFile(path.join(sourceRoot, "LICENSE"), path.join(outputRoot, "LICENSE.rhwp.txt"));
   await fs.copyFile(path.join(sourceRoot, "THIRD_PARTY_LICENSES.md"), path.join(outputRoot, "THIRD_PARTY_LICENSES.md"));
 
+  // The 0.9.0 WASM ships additional font, PDF decoder and color-management
+  // notices (including original PDFs). Preserve the full published directory.
+  await fs.cp(path.join(corePackageRoot, "notices"), path.join(outputRoot, "notices"), { recursive: true });
+
   const files = await describeFiles(outputRoot, new Set(["rhwp-vendor.json"]));
   const manifest = {
     name: "rhwp-studio",
@@ -135,6 +141,7 @@ try {
     localPatch,
     packages: { "@rhwp/core": coreVersion, "@rhwp/editor": editorVersion },
     externalWebFonts: false,
+    withoutAi: true,
     withoutHwpCtrl,
     networkPolicy: "same-origin-only",
     files,

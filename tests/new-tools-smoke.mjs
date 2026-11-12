@@ -22,6 +22,8 @@ const onlyImageMobile = process.env.TEST_ONLY_IMAGE_MOBILE === "1";
 const onlyImageAccessibility = process.env.TEST_ONLY_IMAGE_ACCESSIBILITY === "1";
 const onlyImage = process.env.TEST_ONLY_IMAGE === "1" || onlyImageSizing || onlyImageMobile || onlyImageAccessibility;
 const onlyHwp = process.env.TEST_ONLY_HWP === "1";
+const hwpNetworkRequests = [];
+const hwpExternalRequests = [];
 const HWP_ROUNDTRIP_SENTINEL = "WL_RHWP_086_SENTINEL";
 const HWP_FIXTURE_SHA256 = "35c590e316c18e7310bb7b2f954b87d32f1d45416179466aee2bebb99d7e706f";
 const HWP_DIFF_BEFORE_SHA256 = "65255f73e971e65b317b225e30060b2786e18a86b075ded00d2d4243fc8a5980";
@@ -45,6 +47,21 @@ try {
     page.setDefaultTimeout(300_000);
     const pageErrors = [];
     const requestFailures = [];
+    if (onlyHwp) await page.evaluateOnNewDocument(() => {
+      window.__worklazyCspViolations = [];
+      document.addEventListener("securitypolicyviolation", (event) => window.__worklazyCspViolations.push({ directive: event.effectiveDirective, blocked: event.blockedURI }));
+    });
+    if (onlyHwp) {
+      await page.setRequestInterception(true);
+      page.on("request", (request) => {
+        const url = new URL(request.url());
+        hwpNetworkRequests.push(url.href);
+        if (url.origin !== new URL(baseUrl).origin && !["blob:", "data:"].includes(url.protocol)) {
+          hwpExternalRequests.push(url.href);
+          void request.abort();
+        } else void request.continue();
+      });
+    }
     page.on("pageerror", (error) => { pageErrors.push(error.message); console.error("[page error]", error.message); });
     page.on("console", (message) => { if (message.type() === "error" && !message.text().includes("ERR_CONNECTION_REFUSED")) console.error("[browser]", message.text()); });
     page.on("requestfailed", (request) => {
@@ -139,10 +156,13 @@ try {
       }
     }
 
+    if (hwpExternalRequests.length) throw new Error(`HWP requested external resources: ${hwpExternalRequests.join(", ")}`);
+    if (onlyHwp) console.log(`  hwp: ${hwpNetworkRequests.length} network requests, external=0`);
     if (pageErrors.length) throw new Error(`Browser errors:\n${pageErrors.join("\n")}`);
     if (requestFailures.length) throw new Error(`Same-origin request failures:\n${requestFailures.join("\n")}`);
   } finally {
     await browser.close();
+    if (onlyHwp && process.env.HWP_NETWORK_LOG) await fs.writeFile(process.env.HWP_NETWORK_LOG, JSON.stringify({ requests: hwpNetworkRequests, external: hwpExternalRequests }, null, 2));
   }
   console.log(process.env.TEST_ONLY_HWP === "1"
     ? "HWP editor and unified document comparison smoke tests passed."
@@ -162,7 +182,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
   await page.goto(`${koBaseUrl}/tools/document-compare`, { waitUntil: "domcontentloaded" });
   await page.waitForSelector("[data-slot='rhwp-version-notice']");
   const compareVersion = await page.$eval("[data-slot='rhwp-version-notice']", (element) => element.textContent || "");
-  if (!compareVersion.includes("rhwp 0.8.7") || !compareVersion.includes("공식 비교 파일")) {
+  if (!compareVersion.includes("rhwp 0.9.0") || !compareVersion.includes("공식 비교 파일")) {
     throw new Error(`HWP comparison version notice is incomplete: ${compareVersion}`);
   }
   let compareInputs = await page.$$("[data-tool-page='document-compare'] input[type=file]");
@@ -221,7 +241,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
     const version = iframe.contentDocument?.querySelector('meta[name="rhwp-version"]')?.getAttribute("content") || "";
     return { sameOrigin: url.origin === location.origin, path: url.pathname, csp, version };
   });
-  if (!runtime.sameOrigin || !runtime.path.includes("/vendor/rhwp-studio/0.8.7/") || runtime.version !== "0.8.7"
+  if (!runtime.sameOrigin || !runtime.path.includes("/vendor/rhwp-studio/0.9.0/") || runtime.version !== "0.9.0"
     || !runtime.csp.includes("connect-src 'self'") || !runtime.csp.includes("font-src 'self'")) {
     throw new Error(`HWP editor is not using the isolated self-hosted runtime: ${JSON.stringify(runtime)}`);
   }
@@ -238,7 +258,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
     return focus && sidebar && shell && mainContent ? { focus: { left: focus.left, right: focus.right, top: focus.top, bottom: focus.bottom }, sidebar: { right: sidebar.right }, shellHeight: shell.height, viewportWidth: innerWidth, mainRightPadding: Number.parseFloat(getComputedStyle(mainContent).paddingRight), hasPageHeader: Boolean(document.querySelector("[data-tool-page='hwp-editor'] .ui-page-header")) } : null;
   });
   if (onlyHwp) {
-    const captureDirectory = path.resolve("tests/visual-artifacts/ad-policy-hwp-focus");
+    const captureDirectory = path.resolve(process.env.HWP_CAPTURE_DIR || "tests/visual-artifacts/ad-policy-hwp-focus");
     await fs.mkdir(captureDirectory, { recursive: true });
     await page.screenshot({ path: path.join(captureDirectory, "desktop.png") });
     await page.setViewport({ width: 390, height: 844, deviceScaleFactor: 1 });
@@ -254,7 +274,7 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
     return button instanceof HTMLButtonElement && !button.disabled;
   });
   const editorVersion = await page.$eval("[data-slot='rhwp-version-notice'][data-compact='true']", (element) => element.textContent || "");
-  if (!editorVersion.includes("rhwp 0.8.7") || !editorVersion.includes("이 사이트에 포함")) {
+  if (!editorVersion.includes("rhwp 0.9.0") || !editorVersion.includes("이 사이트에 포함")) {
     throw new Error(`HWP editor version notice is incomplete: ${editorVersion}`);
   }
 
@@ -271,6 +291,8 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
   const studioFrame = await studioIframe?.contentFrame();
   if (!studioFrame) throw new Error("HWP Studio iframe was not available for round-trip editing.");
   await studioFrame.waitForSelector(".document-page-canvas");
+  const aiControls = await studioFrame.$$(".ai-panel, [data-command='ext:ai.toggle-panel'], [data-command='ext:ai.settings'], [data-panel-id='chat']");
+  if (aiControls.length) throw new Error("HWP Studio exposes AI controls in the isolated build.");
   await studioFrame.click(".document-page-canvas", { offset: { x: 130, y: 130 } });
   await page.keyboard.type(HWP_ROUNDTRIP_SENTINEL, { delay: 10 });
   await page.click("[data-testid='hwp-save']");
@@ -300,6 +322,22 @@ async function testHwpEditor(page, hwpPaths, wordDocx, editorHwp) {
     && document.querySelector("[data-testid='hwp-focus-document'] small")?.textContent?.includes("1페이지"), {}, reopenedName);
   console.log(`  hwp: round-trip ${roundTripBytes.byteLength} bytes, ${roundTripStructure.pageCount} page, sentinel parsed and Studio reopened`);
 
+  // Canvas FontFace(ArrayBuffer) can hide a blocked CSS URL by satisfying the
+  // same family first. Load every generated CSS source under a fresh alias.
+  const cssFonts = await studioFrame.evaluate(async () => {
+    const style = document.getElementById("rhwp-web-font-faces");
+    const rules = Array.from(style?.sheet?.cssRules || []).filter(rule => rule instanceof CSSFontFaceRule);
+    const results = await Promise.all(rules.map(async (rule, index) => {
+      const src = rule.style.getPropertyValue("src");
+      try { await new FontFace(`worklazy-csp-font-${index}`, src).load(); return { ok: true }; }
+      catch (error) { return { ok: false, error: String(error) }; }
+    }));
+    return { count: rules.length, failed: results.filter(result => !result.ok) };
+  });
+  if (!cssFonts.count || cssFonts.failed.length) throw new Error(`HWP CSS font sources cannot load under the unchanged CSP: ${JSON.stringify(cssFonts)}`);
+  const cspViolations = await studioFrame.evaluate(() => window.__worklazyCspViolations || []);
+  if (cspViolations.length) throw new Error(`HWP Studio violates its CSP: ${JSON.stringify(cspViolations)}`);
+  console.log("  hwp: Studio CSP violations=0, AI controls=0");
   page.off("request", recordRhwpRequest);
   if (forbiddenRhwpRequests.length) throw new Error(`HWP editor requested external rhwp resources: ${forbiddenRhwpRequests.join(", ")}`);
 }

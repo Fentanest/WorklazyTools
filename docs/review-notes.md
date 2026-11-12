@@ -3629,3 +3629,14 @@ Twemoji v17.0.3(4,009개, 10,121,593B, 개별 gzip 합 4,475,637B) vs Noto Emoji
 - 문서 생성은 버튼 4개와 ZIP 링크의 실제 대비가 3.73:1인 제품 결함이었다. 페이지 안의 강조 버튼과 다운로드 링크만 별도 `--generator-action` 색을 소비하게 했다. 라이트는 기존 brand-strong과 검정을 혼합하고, 다크는 기존 brand-strong을 쓴다. hover는 글자색을 8% 혼합한다. 전역 토큰·브랜드 카드·공용 컴포넌트·진행 막대의 색은 바꾸지 않았다. 원래 전체 페이지 axe 위반 0 단언을 유지하며 4개 실제 data-theme, 샘플 링크, 버튼 hover까지 24개 원본 axe 결과를 보존했다.
 - 최종 소스에서 build(112 정적 페이지), unit 1,540+36=1,576건(실패/skip/cancel 0), i18n(142 TSX·위반 0), static(startup 196·직접 진입 18행) 및 두 전체 스모크가 종료 0·입력 해시 불변으로 통과했다. 문서 생성은 19 시나리오·다운로드 6개·캡처 13개·외부 요청/예외 0, axe 24회 위반 0이다. 한영·1280/390px·4테마의 별도 28개 기본/hover 측정 최저 대비는 5.516:1이다. 대표 화면 4개를 직접 열람했다. 상세 보고서와 실패/최종 영수증은 `SOL-OLDSMOKES-REPORT.md` 및 `/tmp/worklazy-oldsmokes-evidence/`에 보존한다. 브라우저 자체 JSON 출력을 지원하지 않는 기존 영수증 파서는 수정하지 않고 실제 프로세스 종료·JSON 요약·전후 입력 해시를 별도 기록했다. unit 영수증 selected_count=36은 마지막 TAP suite 값이므로 두 TAP 합계 JSON을 함께 남겼다.
 - 초기 의존성 복사본 누락, 진단용 시험 복사본의 광고 allowlist 실패, 중간 색 토큰 오적용과 전환 중 측정 실패는 최종 통과로 집계하지 않았다. 잠금 파일 그대로 독립 npm ci, 진단 사본 격리, 실제 로드되는 토큰·준비 조건 수정 후 최종 검사를 새로 실행했다. `.env` 열람·외부 로그인·다른 서버 종료·push·merge·배포·`.team` 변경은 하지 않았다.
+
+
+## 2026-11-12 — rhwp 0.9.0 (구현자 국소 검사·정식 검수 대기·미게시)
+
+core/editor·Studio를 `c9095c5f67632e6721e800ccc7fb43ea49d26682` / 0.9.0으로 맞췄다. v0.9.0의 새 SkSL import 때문에 기존 sparse 빌드가 실패한 원인을 `src/renderer` 추가로 고쳤다. 신규 AI 플러그인은 `RHWP_WITHOUT_AI=1`로 제외하며, validator가 22개 런타임 파일의 실제 바이트와 청크 이름에서 SDK·패널·제공자 API 부재를 검사한다. 올바른 manifest 해시를 가진 오염 출력도 거부하는 12개 국소 시험이 통과했다.
+
+0.9.0 CSS 글꼴 로더는 blob URL을 만들지만 기존 `font-src 'self' data:`가 이를 막았다. Canvas의 ArrayBuffer FontFace가 같은 이름을 먼저 적재하면 이 결함을 가릴 수 있어, 각 CSS 소스를 새 이름으로 실제 로드하는 스모크를 추가했다. 수정 전 `NetworkError`를 재현했고 같은 바이트의 data URL 공급으로 수정 후 로드·CSP 위반 0을 확인했다. CSP 문자열 자체는 0.8.7과 같다.
+
+payload는 195파일·108,845,204바이트, manifest 포함 196파일·108,876,635바이트다. 최대 파일은 WASM 26,835,482바이트다. 새 폰트 고지와 core의 원본 notices 84파일을 보존했다. 고정 fixture·sentinel·비교 요구·출력 페이지 수와 추출 텍스트 기대값은 유지했다. HWP 왕복은 3,584바이트/1페이지, 외부 요청 0·CSP 위반 0·AI controls 0이다. 0.8.7/0.9.0 동일 조건의 빈 Studio axe 위반은 한영 모두 0이며, 이전 6노드 미해결 기록의 결과를 버전만 치환해 재사용하지 않았다. PDF 3종의 페이지 수·텍스트는 같고 렌더 픽셀은 각각 579/931/1,894개 달랐다(778×1100, threshold 0; 양쪽 캡처 직접 확인).
+
+상세 실행 로그·실패 원인·QA/운영 빌드 구분·최종 커밋은 `/home/better0101/projects/worklazytools/wt/_jobs/20261112/SOL-SITE-RHWP-090.md`에 기록한다. 정식 검수(Sonnet)·Claude 감사·통합·push·배포는 별도다. — Codx

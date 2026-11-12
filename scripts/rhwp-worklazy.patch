@@ -147,9 +147,9 @@ index dd0c3df..45d9dc8 100644
 +  "worklazy.print.readyPdf": "PDF ready — {p1}",
 +  "worklazy.print.ready": "Print preview ready",
 +  "worklazy.print.error": "Could not prepare the document for printing. Reopen the document and try again.",
-   "command.edit.compareDocuments.label": "Compare Documents",
-   "command.edit.compareDocuments.splitLabel": "Compare Documents ",
-   "command.edit.compareDocuments.toolbarLabel": "Compare\nDocuments",
+   "dialog.localFontList.button": "Local font list",
+   "dialog.localFontList.title": "Local font list",
+   "dialog.localFontList.close": "Close",
 @@ -1212,7 +1218,7 @@ const catalog = {
    "dialog.pdfPrint.preferenceLabel.text": "Do not show this again",
    "dialog.pdfPrint.showAsync.label": "Save as PDF",
@@ -173,9 +173,9 @@ index 232e24b..b12ea0d 100644
 +  "worklazy.print.readyPdf": "PDF 준비 완료 — {p1}",
 +  "worklazy.print.ready": "인쇄 미리보기 준비 완료",
 +  "worklazy.print.error": "인쇄할 문서를 준비하지 못했습니다. 문서를 다시 열고 시도해 주세요.",
-   "command.edit.compareDocuments.label": "문서 비교",
-   "command.edit.compareDocuments.splitLabel": "문서 비교 ",
-   "command.edit.compareDocuments.toolbarLabel": "문서\n비교",
+   "dialog.localFontList.button": "로컬 글꼴 목록",
+   "dialog.localFontList.title": "로컬 글꼴 목록",
+   "dialog.localFontList.close": "닫기",
 @@ -1212,7 +1218,7 @@ const catalog = {
    "dialog.pdfPrint.preferenceLabel.text": "다음부터 이 안내를 표시하지 않기",
    "dialog.pdfPrint.showAsync.label": "PDF로 저장",
@@ -240,3 +240,22 @@ index 320409f..c07c845 100644
        this.cancelButton = this.dialog.querySelector(
          '.dialog-footer .dialog-btn:not(.dialog-btn-primary)',
        );
+diff --git a/rhwp-studio/src/core/font-loader.ts b/rhwp-studio/src/core/font-loader.ts
+--- a/rhwp-studio/src/core/font-loader.ts
++++ b/rhwp-studio/src/core/font-loader.ts
+@@ -104,7 +104,14 @@
+       ]);
+       if (failedFontFiles.has(file)) throw new Error('WEB_FONT_FILE_UNAVAILABLE');
+       // CSS도 같은 바이트를 사용해야 캐시 불가 응답을 다시 요청하지 않는다.
+-      const resource = { bytes, cssUrl: URL.createObjectURL(new Blob([bytes])) };
++      // Worklazy's font CSP permits self/data, so preserve the fetched bytes
++      // in a data URL rather than a blob URL (no CSP relaxation or second fetch).
++      const chunks: string[] = [];
++      const view = new Uint8Array(bytes);
++      for (let offset = 0; offset < view.length; offset += 0x8000) {
++        chunks.push(String.fromCharCode(...view.subarray(offset, offset + 0x8000)));
++      }
++      const resource = { bytes, cssUrl: `data:application/octet-stream;base64,${btoa(chunks.join(''))}` };
+       fontResources.set(file, resource);
+       return resource;
+     } finally {

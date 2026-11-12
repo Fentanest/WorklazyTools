@@ -31,7 +31,7 @@ test('Studio callers that set their own locale retain the original directory URL
   }
 });
 test('Pinned Studio first-paint bootstrap honors the host locale over opposite stored preferences', () => {
-  const source = readFileSync('public/vendor/rhwp-studio/0.8.7/locale-init.js', 'utf8');
+  const source = readFileSync('public/vendor/rhwp-studio/0.9.0/locale-init.js', 'utf8');
   for (const language of ['ko', 'en']) {
     const document = { documentElement: { lang: '' } };
     vm.runInNewContext(source, { URLSearchParams, location: { search: '?lang=' + language }, localStorage: { getItem: () => language === 'en' ? 'ko' : 'en' }, document });

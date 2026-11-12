@@ -11,7 +11,7 @@ after(async()=>{await browser?.close();await fs.writeFile(path.join(out,'summary
 for(const lang of ['ko','en'])for(const route of ['pdf-converter/image-to-pdf','pdf-converter/document-to-pdf','pdf-converter/pdf-to-document','document-markdown','vendor'])test(lang+' '+route+' accessible names and measured contrast',async()=>{
  const context=await browser.newContext({reducedMotion:"reduce",viewport:route==='vendor'?{width:1280,height:800}:{width:390,height:844}});
  try{await context.addInitScript(()=>localStorage.setItem('worklazy_privacy_consent_v2','denied'));await context.route('**/*',r=>new URL(r.request().url()).origin===new URL(base).origin?r.continue():r.abort());
- const page=await context.newPage();await page.goto(base+(route==='vendor'?'/vendor/rhwp-studio/0.8.7/index.html?embed=1&lang='+lang:'/'+lang+'/tools/'+route+'/'));
+ const page=await context.newPage();await page.goto(base+(route==='vendor'?'/vendor/rhwp-studio/0.9.0/index.html?embed=1&lang='+lang:'/'+lang+'/tools/'+route+'/'));
  if(route==='vendor')await page.locator('#sb-message').filter({hasText:lang==='ko'?'페이지':'Page'}).waitFor({timeout:90000});else await page.locator('[data-tool-page]').waitFor();
  await page.evaluate(async()=>{await document.fonts.ready;await Promise.all(document.getAnimations().filter(a=>a.effect?.getComputedTiming().iterations!==Infinity).map(a=>a.finished.catch(()=>{})));});
  await page.evaluate(await fs.readFile(path.join(import.meta.dirname,'../node_modules/axe-core/axe.min.js'),'utf8'));

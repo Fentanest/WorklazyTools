@@ -14,9 +14,9 @@ if (!clientConfig.includes(`RHWP_VERSION = "${version}"`)) throw new Error("화�
 const vendorRoot = path.join(projectRoot, "public", "vendor", "rhwp-studio", version);
 const manifest = JSON.parse(await fs.readFile(path.join(vendorRoot, "rhwp-vendor.json"), "utf8"));
 if (manifest.version !== version || manifest.tag !== `v${version}`) throw new Error("rhwp vendor 버전 메타데이터가 일치하지 않습니다.");
-if (!/^[0-9a-f]{40}$/.test(manifest.commit ?? "")) throw new Error("rhwp vendor 커밋 메타데이터가 올바르지 않습니다.");
+if (manifest.commit !== "c9095c5f67632e6721e800ccc7fb43ea49d26682") throw new Error("rhwp vendor 커밋 메타데이터가 올바르지 않습니다.");
 if (manifest.packages?.["@rhwp/core"] !== version || manifest.packages?.["@rhwp/editor"] !== version) throw new Error("rhwp vendor 패키지 버전이 일치하지 않습니다.");
-if (manifest.externalWebFonts !== false || manifest.withoutHwpCtrl !== true || manifest.networkPolicy !== "same-origin-only") throw new Error("rhwp vendor 네트워크/플러그인 격리 설정이 누락되었습니다.");
+if (manifest.externalWebFonts !== false || manifest.withoutHwpCtrl !== true || manifest.withoutAi !== true || manifest.networkPolicy !== "same-origin-only") throw new Error("rhwp vendor 네트워크/플러그인 격리 설정이 누락되었습니다.");
 
 const localPatchPath = "scripts/rhwp-worklazy.patch";
 const localPatchHash = createHash("sha256").update(await fs.readFile(path.join(projectRoot, localPatchPath))).digest("hex");
@@ -44,6 +44,10 @@ if (pwaFiles.length) throw new Error(`rhwp Studio PWA 파일이 남아 있습니
 const studioPluginFiles = actualPaths.filter((relative) => /(^|\/)studio-plugin-[^/]+\.js$/.test(relative));
 if (studioPluginFiles.length) throw new Error(`rhwp Studio에 HwpCtrl 플러그인 청크가 남아 있습니다: ${studioPluginFiles.join(", ")}`);
 
+const aiFiles = actualPaths.filter((relative) => /(^|\/)(?:ai[-/]|(?:anthropic|claude|openai|gemini|transform-json-schema)[-./])/i.test(relative));
+if (aiFiles.length) throw new Error(`rhwp Studio에 AI 플러그인/SDK 청크가 남아 있습니다: ${aiFiles.join(", ")}`);
+let scannedRuntimeFiles = 0;
+
 for (const relative of expectedPaths) {
   if (path.posix.isAbsolute(relative) || relative.split("/").includes("..")) {
     throw new Error(`rhwp vendor manifest에 안전하지 않은 경로가 있습니다: ${relative}`);
@@ -53,13 +57,21 @@ for (const relative of expectedPaths) {
     throw new Error(`rhwp vendor manifest 파일 메타데이터가 올바르지 않습니다: ${relative}`);
   }
   const bytes = await fs.readFile(path.join(vendorRoot, relative));
+  // Inspect output bytes, independently of build flags and manifest hashes.
+  // These are implementation/provider markers, not translated catalog labels.
+  if (/\.(?:[cm]?js|css|html|json|map)$/i.test(relative)) {
+    scannedRuntimeFiles += 1;
+    if (/@anthropic-ai\/sdk|api\.anthropic\.com|api\.openai\.com|generativelanguage\.googleapis\.com|anthropic-version|x-stainless-|ai-panel|ai-settings-dialog|ai-unlock-dialog/i.test(bytes.toString("utf8"))) {
+      throw new Error(`rhwp Studio에 AI 플러그인/SDK 또는 외부 AI API가 남아 있습니다: ${relative}`);
+    }
+  }
   const actual = createHash("sha256").update(bytes).digest("hex");
   if (bytes.byteLength !== expected.bytes) throw new Error(`rhwp vendor 파일 크기가 다릅니다: ${relative}`);
   if (actual !== expected.sha256) throw new Error(`rhwp vendor 파일 해시가 다릅니다: ${relative}`);
 }
 
 const totalBytes = Object.values(expectedFiles).reduce((sum, file) => sum + file.bytes, 0);
-console.log(`rhwp Studio ${version} vendor validation passed (${expectedPaths.length} files, ${totalBytes} bytes).`);
+console.log(`rhwp Studio ${version} vendor validation passed (${expectedPaths.length} files, ${totalBytes} bytes; ${scannedRuntimeFiles} runtime files scanned, AI artifacts=0).`);
 
 function isPwaArtifact(fileName) {
   return fileName === "registerSW.js"

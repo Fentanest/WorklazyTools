@@ -1,6 +1,6 @@
 import type { AppLanguage } from "../i18n/languages";
 
-export const RHWP_VERSION = "0.8.7";
+export const RHWP_VERSION = "0.9.0";
 export const RHWP_UPSTREAM_URL = "https://github.com/edwardkim/rhwp";
 export const RHWP_STUDIO_VENDOR_PATH = `vendor/rhwp-studio/${RHWP_VERSION}/`;
 

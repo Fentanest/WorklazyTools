@@ -62,20 +62,26 @@ HWP 편집기는 공식 rhwp Studio를 Worklazy Tools와 같은 origin의 정적
 
 | 항목 | 고정값 |
 | --- | --- |
-| 버전 / 태그 | `0.8.7` / `v0.8.7` |
-| upstream 커밋 | `1a76570e833917d15817415a53c09ad61ab3203f` |
-| npm 패키지 | `@rhwp/core@0.8.7`, `@rhwp/editor@0.8.7` |
-| payload | 78파일, 64,881,144바이트 |
-| `rhwp-vendor.json` | 11,973바이트, SHA-256 `984eba76e7c83d00cb6da02901c572bac3d54d5a6411ea0560a0e635384da533` |
-| manifest 포함 전체 | 79파일, 64,893,117바이트 |
+| 버전 / 태그 | `0.9.0` / `v0.9.0` |
+| upstream 커밋 | `c9095c5f67632e6721e800ccc7fb43ea49d26682` |
+| npm 패키지 | `@rhwp/core@0.9.0`, `@rhwp/editor@0.9.0` |
+| payload | 195파일, 108,845,204바이트 |
+| `rhwp-vendor.json` | 31,431바이트, SHA-256 `03e880a1c9741b157d362ec3a32a521af2f7c3f0a5833e3eefa53d47d11dbbb6` |
+| manifest 포함 전체 | 196파일, 108,876,635바이트 |
 
-`scripts/vendor-rhwp-studio.mjs`는 GitHub의 정확한 `v0.8.7` 태그를 sparse clone하고, 설치된 두 npm 패키지 버전이 목표 버전과 정확히 일치할 때만 Studio를 빌드한다. 외부 웹폰트는 `RHWP_DISABLE_EXTERNAL_WEBFONTS=1`로 차단한다. Studio 단독 배포에는 HwpCtrl 플러그인이 필요하지 않아 `RHWP_WITHOUT_HWPCTRL=1`을 기본 적용하며, `studio-plugin` 청크가 남지 않는지 검증한다. 이번 버전의 플러그인 포함 빌드와 payload 차이는 별도로 측정하지 않았다.
+`scripts/vendor-rhwp-studio.mjs`는 GitHub의 정확한 `v0.9.0` 태그를 sparse clone하고, 설치된 두 npm 패키지 버전이 목표 버전과 정확히 일치할 때만 Studio를 빌드한다. 외부 웹폰트는 `RHWP_DISABLE_EXTERNAL_WEBFONTS=1`로 차단한다. `RHWP_WITHOUT_AI=1`로 AI 플러그인과 제공자 SDK를 빌드에서 제거한다. validator는 manifest의 플래그뿐 아니라 실제 JS·CSS·HTML·JSON·소스맵에서 SDK·패널 구현 식별자와 외부 AI API 주소, AI 청크 파일명의 부재를 검사한다. Studio 단독 배포에는 HwpCtrl 플러그인이 필요하지 않아 `RHWP_WITHOUT_HWPCTRL=1`을 기본 적용하며, `studio-plugin` 청크가 남지 않는지 검증한다. 플러그인 포함 빌드와 payload 차이는 별도로 측정하지 않았다. sparse checkout에는 Studio가 직접 소비하는 `rhwp-shared`, `src/renderer`(SkSL), `vendor/npm/ajv`도 포함한다.
 
 생성과 검증 절차는 다음과 같다.
 
-1. `npm install`을 실행하고 `npm ls @rhwp/core @rhwp/editor --depth=0`과 두 설치 package.json에서 버전이 모두 `0.8.7`인지 확인한다.
+1. `npm install`을 실행하고 `npm ls @rhwp/core @rhwp/editor --depth=0`과 두 설치 package.json에서 버전이 모두 `0.9.0`인지 확인한다.
 2. `npm run vendor:rhwp`를 실행한다. 스크립트는 Studio 빌드 뒤 `workbox-*.js`, `registerSW.js`, `sw.js`, `manifest.webmanifest`를 재귀 제거하고 잔존 파일이 있으면 실패한다.
 3. 생성된 `rhwp-vendor.json`의 각 파일 `{bytes, sha256}`를 검토한 뒤 `node scripts/validate-rhwp-vendor.mjs`를 실행한다. validator는 manifest에 없는 추가 파일과 실제로 누락된 파일, 바이트·SHA-256 불일치를 모두 거부한다. 같은 검증은 `npm run build`의 prebuild 게이트에서도 실행된다.
 4. 교체 검증이 끝난 이전 스냅샷만 `npm run vendor:rhwp:prune`으로 제거한다. 스크립트의 명시 허용목록 밖 버전과 현재 버전은 제거할 수 없다.
 
 rollback은 업그레이드 커밋을 revert해 package/lock/config와 이전 고정 스냅샷을 함께 복원한 뒤 `npm ci`, `node scripts/validate-rhwp-vendor.mjs`, HWP 전용 왕복 스모크를 다시 실행한다. `public/vendor/**` 파일을 손으로 복사·수정·삭제해서 되돌리지 않는다.
+
+0.9.0의 `rhwp_bg.wasm`은 26,835,482바이트다(공개 root·해시된 assets 두 사본). 이전 0.8.7은 각 11,821,756바이트였다. 파일별 최대 크기는 26,835,482바이트로 GitHub Pages 100MB 상한 이하다. Studio는 iframe 생성 때, 비교·PDF 편집기는 기능 진입 후 Worker에서 로드하며 기존 준비/실행 진행 표시와 취소 경로를 유지한다. 사이트 service worker는 rhwp 자산을 네트워크로 전달하고 문서/자산을 Cache Storage에 쓰지 않는다. Studio 자체 PWA 파일은 제거한다.
+
+신규 수식·옛한글·공개 바탕 글꼴과 `fonts/licenses`는 업스트림 정적 자산 그대로 포함한다. `@rhwp/core/notices/` 84파일(4,722,927바이트)도 `notices/`에 복사해 Unicode v3, Intel MediaSDK, IJG, GUST, PDFium, qcms, URW와 폰트 원본 PDF 고지를 보존한다. 배포 고지 묶음에는 이 원본 경로와 THIRD_PARTY_LICENSES 전문을 포함한다.
+
+0.9.0 글꼴 로더의 CSS용 blob URL은 기존 `font-src self data:`와 충돌한다. 로컬 패치는 가져온 바이트를 data URL로 공급하여 CSS와 Canvas가 같은 글꼴을 쓰게 하며 CSP를 완화하지 않는다. HWP 스모크는 각 CSS 글꼴 소스를 별도 FontFace 이름으로 실제 로드하고 CSP 위반 0을 요구한다.

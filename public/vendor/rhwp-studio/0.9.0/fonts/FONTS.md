@@ -1,0 +1,166 @@
+# 웹 폰트 목록
+
+웹 배포에 사용하는 WOFF2 폰트의 canonical source 목록이다. Git에는 38개 WOFF2,
+총 26,196,084 bytes가 포함된다. Studio와 legacy `/web`은 각각의 `fonts/` runtime URL을 유지하면서
+이 디렉토리를 참조하고, extension build는 여기에서 배포 산출물로 복사한다.
+
+재배포 권한이 확인되지 않은 상용 폰트는 Git에 포함하지 않는다. 오픈소스 폰트도 저작권의
+보호를 받으며, [파일별 고지와 라이선스 전문](licenses/README.md)을 제품 패키지에 함께 배포한다.
+
+## 저작권 폰트 (Git 미포함)
+
+로컬에 직접 배치해야 한다. 웹 배포 시 대응되는 폰트 폴백으로 대체 가능하다.
+
+### 한컴 폰트
+
+| 파일명 | 폰트명 | 폴백 대체 |
+|--------|--------|----------|
+| hamchob-r.woff2 | 함초롬바탕 | Pretendard 또는 시스템 세리프 |
+| hamchod-r.woff2 | 함초롬돋움 | Pretendard 또는 시스템 산세리프 |
+| h2hdrm.woff2 | HY헤드라인M | Pretendard-Bold |
+| hygprm.woff2 | HY고딕 | Pretendard |
+| hygtre.woff2 | HY그래픽 | Pretendard |
+| hymjre.woff2 | HY명조 | Pretendard 또는 시스템 세리프 |
+
+### Microsoft 폰트
+
+| 파일명 | 폰트명 | 폴백 대체 |
+|--------|--------|----------|
+| ArialW05-Regular.woff2 | Arial | 시스템 산세리프 |
+| Calibri.woff2 | Calibri | Pretendard |
+| CourierNewW05-Regular.woff2 | Courier New | 시스템 모노스페이스 |
+| TahomaW05-Regular.woff2 | Tahoma | Pretendard |
+| TimesNewRomanW05-Regular.woff2 | Times New Roman | 시스템 세리프 |
+| VerdanaW05-Regular.woff2 | Verdana | Pretendard |
+| MalgunGothicW35-Regular.woff2 | 맑은 고딕 | Pretendard |
+| WebdingsW95-Regular.woff2 | Webdings | — |
+| WingdingsW95-3.woff2 | Wingdings 3 | — |
+
+## 오픈 라이선스 폰트 (Git 포함)
+
+### Serif (명조체 계열)
+
+| 파일명 | 폰트명 | 라이선스 | 출처 | 대체 대상 |
+|--------|--------|---------|------|----------|
+| RHWPPublicBatang-Regular.woff2 | RHWP Public Batang Regular | SIL OFL 1.1 | Google Fonts Batang 파생본 | 명시 family와 원본·문서 지정 프로그램이 없는 하이텔울릉도제목체의 조건부 대체 |
+| NotoSerifKR-Regular.woff2 | Noto Serif KR Regular | SIL OFL 1.1 | Google Fonts | 바탕, 한컴바탕, 함초롬바탕 |
+| NotoSerifKR-Bold.woff2 | Noto Serif KR Bold | SIL OFL 1.1 | Google Fonts | 바탕 Bold |
+| NanumMyeongjo-Regular.woff2 | 나눔명조 Regular | SIL OFL 1.1 | Google Fonts | HY명조, 휴먼명조 |
+| NanumMyeongjo-Bold.woff2 | 나눔명조 Bold | SIL OFL 1.1 | Google Fonts | HY명조 Bold |
+| NanumMyeongjo-ExtraBold.woff2 | 나눔명조 ExtraBold | SIL OFL 1.1 | Google Fonts | HY명조 ExtraBold |
+| GowunBatang-Regular.woff2 | 고운바탕 Regular | SIL OFL 1.1 | Google Fonts | 궁서 대체 |
+| GowunBatang-Bold.woff2 | 고운바탕 Bold | SIL OFL 1.1 | Google Fonts | 궁서 Bold |
+
+### Sans-serif (고딕체 계열)
+
+| 파일명 | 폰트명 | 라이선스 | 출처 | 대체 대상 |
+|--------|--------|---------|------|----------|
+| Pretendard-*.woff2 (9종) | Pretendard | SIL OFL 1.1 | GitHub | 맑은 고딕, 함초롬돋움 |
+| NotoSansKR-Regular.woff2 | Noto Sans KR Regular | SIL OFL 1.1 | Google Fonts | 한컴돋움(=함초롬돋움 별칭), CanvasKit 기본 typeface |
+| NotoSansKR-Bold.woff2 | Noto Sans KR Bold | SIL OFL 1.1 | Google Fonts | 돋움 Bold |
+| NotoSansKR-ExtraLight.woff2 | Noto Sans KR ExtraLight | SIL OFL 1.1 | Google Fonts (wght 200 인스턴스) | Haansoft Dotum·돋움·굴림 (Task #1224 — 한컴 돋움 획 두께 정합) |
+| NanumGothic-Regular.woff2 | 나눔고딕 Regular | SIL OFL 1.1 | Google Fonts | 나눔고딕 (동일) |
+| NanumGothic-Bold.woff2 | 나눔고딕 Bold | SIL OFL 1.1 | Google Fonts | 나눔고딕 Bold |
+| NanumGothic-ExtraBold.woff2 | 나눔고딕 ExtraBold | SIL OFL 1.1 | Google Fonts | 나눔고딕 ExtraBold |
+| GowunDodum-Regular.woff2 | 고운돋움 Regular | SIL OFL 1.1 | Google Fonts | HY고딕 대체 |
+| SpoqaHanSans-Regular.woff2 | 스포카 한 산스 | SIL OFL 1.1 | GitHub | 보조 Sans |
+
+### Noto Sans KR Regular 서브셋 재생성
+
+CanvasKit은 브라우저 시스템 폰트 폴백을 사용하지 않으므로 `NotoSansKR-Regular.woff2`에 필요한
+글머리/도형 glyph가 실제로 포함돼야 한다. Regular asset은 기존 한글/라틴 cmap에 다음 범위를 추가한다.
+
+- `U+2500-257F`: 표 테두리용 Box Drawing
+- `U+25A0-25FF`: KS X 1001 글머리와 Geometric Shapes
+
+입력은 Google Fonts의 `ofl/notosanskr/NotoSansKR[wght].ttf`이고, `wght=400` 정적 instance를
+생성한다. 현재 재현 기준 source TTF는 `ttfs/opensource/NotoSansKR-Regular.ttf`에 커밋되어 있으므로
+일반 검증이나 CI가 인터넷 다운로드에 의존하지 않는다. 아래 `curl`은 maintainer가 새 source에서 asset을
+다시 생성할 때의 갱신 절차다. 재생성은 `fonttools[woff]` 환경에서 수행한다.
+
+```bash
+curl -L -o '/tmp/NotoSansKR[wght].ttf' \
+  https://github.com/google/fonts/raw/main/ofl/notosanskr/NotoSansKR%5Bwght%5D.ttf
+python tools/subset_noto_sans_kr_regular.py \
+  --source '/tmp/NotoSansKR[wght].ttf'
+```
+
+출력은 `ttfs/opensource/NotoSansKR-Regular.ttf`와 `assets/fonts/NotoSansKR-Regular.woff2`다.
+`npm run e2e:canvaskit-font-coverage`는 CanvasKit 실번들에서 `■`, `▪`, `□`, `○`, `─`의 glyph ID가
+`0`이 아닌지 확인한다.
+
+2026-07-11 생성 입력의 SHA-256은
+`194018e6b2b293a7964f037b25c0249ce1418bc9ab3c971060a03aa57861e252`이다.
+
+### Monospace (고정폭)
+
+| 파일명 | 폰트명 | 라이선스 | 출처 | 대체 대상 |
+|--------|--------|---------|------|----------|
+| D2Coding-Regular.woff2 | D2 Coding Regular | SIL OFL 1.1 | GitHub (naver) | 굴림체, 바탕체 |
+| D2Coding-Bold.woff2 | D2 Coding Bold | SIL OFL 1.1 | GitHub (naver) | 굴림체 Bold |
+| NanumGothicCoding-Regular.woff2 | 나눔고딕코딩 Regular | SIL OFL 1.1 | Google Fonts | 보조 Monospace |
+| NanumGothicCoding-Bold.woff2 | 나눔고딕코딩 Bold | SIL OFL 1.1 | Google Fonts | 보조 Monospace Bold |
+
+### 특수/장식체
+
+| 파일명 | 폰트명 | 라이선스 | 출처 |
+|--------|--------|---------|------|
+| Cafe24Ssurround-v2.0.woff2 | 카페24 써라운드 | SIL OFL 1.1 | Cafe24 |
+| Cafe24Supermagic-Regular-v1.0.woff2 | 카페24 슈퍼매직 | SIL OFL 1.1 | Cafe24 |
+| Happiness-Sans-*.woff2 (3종) | 해피니스 산스 Regular/Bold/Title | SIL OFL 1.1 | [현대백화점](https://thehyundaifont.com/) |
+| HappinessSansVF.woff2 | 해피니스 산스 Variable | SIL OFL 1.1 | [현대백화점](https://thehyundaifont.com/) |
+
+해피니스 산스의 [공식 동봉 라이선스 PDF](../../ttfs/redistributable/happiness-sans/HapinessSans_License.pdf)는
+OFL 1.1 전문과 Reserved Font Name을 명시한다. 이 네 WOFF2는 공식 `HappinessSans-Screen.zip`의
+대응 member와 바이트가 같으며 임의 변환본이 아니다. 재배포 시 권리자 고지와 라이선스를 함께 보존한다.
+
+### 문자/수식 보조
+
+| 파일명 | 폰트명 | 라이선스 | 출처 | 용도 |
+|--------|--------|---------|------|------|
+| RHWPOldHangul-Regular.woff2 | RHWP Old Hangul subset | SIL OFL 1.1 (`SourceHanSerifK-OFL.txt`) | Adobe / Google | 옛한글 자모·합자 fallback |
+| LatinModernMath-Regular.woff2 | Latin Modern Math | GUST Font License | GUST / TeX ecosystem | 수식 fallback |
+| LatinModernMath-VariableOutline-subset.otf | RHWP LMM Variable Outline | GUST Font License | 위 Latin Modern Math의 A~Z/a~z 정체와 a~z 이탤릭 윤곽 파생 subset | 공통 수식 변수 윤곽 파싱; [manifest](MANIFEST-RHWP-LMM-VariableOutline.txt) 참조 |
+
+| NotoSansMath-Regular.woff2 | Noto Sans Math Regular | SIL OFL 1.1 (`NotoSansMath-OFL.txt`) | Google / Ubuntu fonts-noto-core | 선택 가능한 수식 대체 글꼴 |
+
+Noto Sans Math는 `/usr/share/fonts/truetype/noto/NotoSansMath-Regular.ttf`의 전체 glyph를
+fontTools `TTFont`의 `flavor='woff2'`로 변환했다. subset·문자 매핑 변경은 없다.
+원 TTF의 SHA-256은 `8242bd1e55368b27e32455260754cf9aa58f3ad7ea80664b66c21f1b09910d6c`,
+WOFF2의 SHA-256은 `6836027b99d29fd0e6f668cf0c2e89107de4131b91116cd96516ad4a7e19d66d`다.
+CanvasKit 수식의 기본 수학 face는 Latin Modern Math다. glyph ID가 0이면 기본 본문
+face와 기호 face를 차례로 확인한다. `mathFallbackFontUrl`을 지정한 호출자는 다른
+수학 face를 선택할 수 있다. 공통 FontGlyph 윤곽이 있는 항목은 같은 윤곽을 직접
+재생한다. U+2AFD 하나의 누락으로 정상 AB/CD와 dyad 장식을 포함한 수식 전체를
+버리지 않으며 폴백 실패는 진단으로 남긴다.
+
+배포 권한은 폰트 내부 name ID13의 SIL OFL1.1, Ubuntu `fonts-noto-core`의 copyright와
+[Noto Sans Math 공식 라이선스](https://github.com/google/fonts/blob/main/ofl/notosansmath/OFL.txt)에서
+확인했다. 동봉 `NotoSansMath-OFL.txt`에 이2.001 버전의 Copyright2018 Google LLC와
+OFL 전문을 보존하며, 폰트 자체는 프로젝트의 다른 라이선스로 재허가하지 않는다.
+
+### 공개 Batang의 전체 WOFF2
+
+`ttfs/opensource/RHWPPublicBatang-Regular.ttf`는 공식 Google Fonts Batang을
+`RHWP Public Batang`이라는 별도 이름으로 공급하는 Native 원본이다. 웹은 동일한 전체 프로그램의
+`RHWPPublicBatang-Regular.woff2`를 사용한다. TTF 6,829,644 bytes에서 WOFF2 2,832,012 bytes로
+58.53% 줄이며, 글리프·cmap·전진폭·힌팅·GSUB와 이름 고지를 보존한다. 글자를 제거한 subset이 아니다.
+
+재생성은 저장소의 고정 버전 requirements를 설치한 환경에서 수행한다.
+
+```bash
+python -m fontTools.ttLib.woff2 compress ttfs/opensource/RHWPPublicBatang-Regular.ttf -o assets/fonts/RHWPPublicBatang-Regular.woff2
+```
+
+[출처·압축 검증](../font-rules/evidence/issue-7445-public-batang-webfont.json)과
+[OFL 전문](licenses/RHWPPublicBatang-OFL.txt)을 함께 보존한다. Native 로더는 현재 TTF를 사용한다.
+WOFF2는 WASM 바이너리에 들어가지 않으며, 웹 호스트가 같은 출처의
+`fonts/RHWPPublicBatang-Regular.woff2`에서 별도로 공급한다.
+
+카탈로그 등록과 대체 선택은 별개다. [조건부 선택 규칙](../font-rules/changes/issue-7445-missing-title-public-fallback.json)은
+`하이텔울릉도제목체`의 원본·문서 지정 프로그램이 모두 없고 실제 공개 프로그램을 준비했을 때만
+이 family를 선택한다. 내장 프로그램과 호출자가 지정한 출력 환경을 보존하며 원본 글꼴 선언을
+수정하지 않는다. 선택한 규칙의 출처는 출력 환경과 글꼴 trace에 전달한다. 이 선택 정책 자체가
+문서 전체의 한컴 출력 일치를 뜻하지는 않으며, 실제 출력의 전쪽 검증은 별도다.
+Studio의 자동 준비는 호스트 글꼴 공급자가 없는 Canvas2D 경로에 적용한다. CanvasKit이나
+호스트 공급 경로의 프로그램 준비·지원 여부를 이 CSS 공급 결과로 대신하지 않는다.
