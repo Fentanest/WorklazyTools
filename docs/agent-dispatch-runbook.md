@@ -33,7 +33,7 @@
 
 총괄 Claude 는 Paseo 에이전트로 실행 중이어야 한다(`PASEO_AGENT_ID` 가 있고 `mcp__paseo__*` 도구가 보임). 하나라도 어기면 소환하지 않는다: Paseo 도구 없음·대상 worktree 없음·모델 ID 불일치. 아니면 바깥에서 사용자의 Paseo 세션을 조작하지 말고 Paseo 안에서 Claude 를 다시 열어 달라고 요청한다. 도구 문법의 정본은 Paseo MCP 도구 설명과 `paseo --help` 다.
 
-1. 작업 공간: 총괄이 작업 worktree 를 준비한 뒤 `create_workspace(isolation="local", path=<WT 절대경로>, title=<작업>)` 로 등록하고 `workspaceId` 를 받는다. 이미 등록된 경로는 `list_workspaces` 로 찾아 재사용한다. Paseo 관리 worktree(`isolation="worktree"`)로 브랜치를 만들지 않는다.
+1. 작업 공간: 총괄이 작업 worktree 를 준비한 뒤 `create_workspace(isolation="local", path=<WT 절대경로>, title=<작업>, projectId=<기존 프로젝트 ID>)` 로 등록하고 `workspaceId` 를 받는다. **새 Paseo 프로젝트를 만들지 않는다**(2026-11-12 사용자 지적): `projectId` 를 빼면 worktree 마다 프로젝트가 새로 생기므로, 먼저 `list_workspaces` 로 총괄 자신의 작업 공간이 속한 `projectId` 를 확인해 그대로 넘기고, 응답의 `projectId` 가 그 값과 같은지 바로 확인한다. 다르면 에이전트를 띄우기 전에 그 작업 공간을 `archive_workspace` 로 정리하고 다시 등록한다. 이미 등록된 경로는 `list_workspaces` 로 찾아 재사용한다. Paseo 관리 worktree(`isolation="worktree"`)로 브랜치를 만들지 않는다.
 2. 기동: `create_agent(title="sol-<작업>", provider="codex/gpt-6.1-sol", settings={modeId:"full-access", thinkingOptionId:"high"}, workspaceId=<id>, initialPrompt="작업서 $WT/docs/jobs/todo/<파일>.md 를 읽고 수행하라. 결과는 $WT/<결과경로> 에 쓰고, 끝나면 그 경로와 한 줄 요약만 답하라.", notifyOnFinish=true)`. agentId 를 작업 기록·`.team/ledger.md` 에 남긴다.
 3. 대기·완료: `notifyOnFinish` 알림(완료·오류·권한 요청)을 받는다. 짧은 폴링·`pgrep`·로그 grep 대기 루프를 만들지 않는다. 필요할 때 `get_agent_status`·`get_agent_activity`(셸에서는 `paseo wait`·`paseo logs`)로 본다.
 4. 후속: 같은 작업의 후속은 같은 agentId 로 `send_agent_prompt` 해 세션을 잇는다. 다른 작업·다른 worktree 는 새 에이전트.
