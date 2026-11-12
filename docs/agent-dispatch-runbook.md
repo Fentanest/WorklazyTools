@@ -4,7 +4,7 @@
 
 ## 0. 기본 실행 표면 — Paseo (2026-11-09 사용자 지시로 herdr 에서 전환)
 
-사용자가 Paseo 앱에서 직접 지켜볼 수 있도록 **외부 에이전트는 모두 Paseo 에이전트(총괄의 하위 에이전트)로 띄운다.** 대상은 Muse(OpenCode), Codex(Sol·Astra·Luna), Claude 작업자(Sonnet), Gemini(antigravity/agy)다(Gemini 는 2026-11-10 사용자 지시로 Paseo 에이전트 호출로 바꿨다. 메모리 주의는 아래). 총괄 Claude 는 Paseo 가 주입한 MCP 도구(`create_agent`·`send_agent_prompt` 등)로 발주한다. 헤드리스 `codex exec`·companion `--background`·`agy -p`·`opencode run`·`nohup`, Claude `Agent` 서브에이전트로 다른 모델 몫을 대신 돌리는 방식은 기본 경로가 아니다. Paseo 를 쓸 수 없을 때(Paseo MCP 도구 없음, daemon 장애)만 §2~§5의 기존 경로를 쓰고 그 이유를 작업 기록에 남긴다.
+사용자가 Paseo 앱에서 직접 지켜볼 수 있도록 **외부 에이전트는 모두 Paseo 에이전트(총괄의 하위 에이전트)로 띄운다.** 대상은 Muse(OpenCode), Codex(Sol·Astra·Terra), Claude 작업자(Sonnet), Gemini(antigravity/agy)다(Gemini 는 2026-11-10 사용자 지시로 Paseo 에이전트 호출로 바꿨다. 메모리 주의는 아래). 총괄 Claude 는 Paseo 가 주입한 MCP 도구(`create_agent`·`send_agent_prompt` 등)로 발주한다. 헤드리스 `codex exec`·companion `--background`·`agy -p`·`opencode run`·`nohup`, Claude `Agent` 서브에이전트로 다른 모델 몫을 대신 돌리는 방식은 기본 경로가 아니다. Paseo 를 쓸 수 없을 때(Paseo MCP 도구 없음, daemon 장애)만 §2~§5의 기존 경로를 쓰고 그 이유를 작업 기록에 남긴다.
 
 **권한 — 사용자 명시 승인(2026-10-26: "권한 차단당하지 말고", opencode 호출 포함).** 권한 질문이나 샌드박스 때문에 작업자가 멈추거나, 질문이 자동 거부돼 빈 결과로 끝나지 않도록 아래 모드로 시작한다. 모델은 항상 명시한다.
 
@@ -16,8 +16,8 @@
 | Sol | `codex/gpt-6.1-sol` | `full-access` | `high` | 보조 구현(Muse 불가 시), 정식 검수 기본(Muse·Sonnet 구현분) |
 | Sonnet | `claude/claude-sonnet-5-5` | `bypassPermissions` | (기본) | Claude 작업자 구현, Sol 구현분 정식 검수(대척점 교차) |
 | Astra | `codex/gpt-6-astra` | `full-access` | `high` | `!계획!`·`!계획만!` 계획 기술 검토, 같은 지적 3회 수정 실패 시 추가 검토, 총괄(Claude) 부재 시 대리 총괄(2026-11-10 사용자 지시) |
-| Gemini | `antigravity/gemini-4-argon-high` | `full-access` | — | 조사·원문 수집·시각 검토. Paseo `create_agent` 로 띄운다(2026-11-10 사용자 지시). 실제 한도 초과 확인 시 `antigravity/gemini-3.8-flash-high` 로 재호출, 그것도 한도 초과면 Luna. 작은 전용 작업 폴더만 작업 공간으로 준다(아래 메모리 주의) |
-| Luna | `codex/gpt-6-luna` | `full-access` | `high` | Gemini 두 모델(argon·3.8 Flash) 모두 실제 한도 초과 시 조사 대체만. DART 원문·판정·검증물 열람 금지(2026-11-09 사용자 확인: Luna 최신은 `gpt-6-luna`) |
+| Gemini | `antigravity/gemini-4-argon-high` | `full-access` | — | 조사·원문 수집·시각 검토. Paseo `create_agent` 로 띄운다(2026-11-10 사용자 지시). 실제 한도 초과 확인 시 `antigravity/gemini-3.8-flash-high` 로 재호출, 그것도 한도 초과면 Terra. 작은 전용 작업 폴더만 작업 공간으로 준다(아래 메모리 주의) |
+| Terra | `codex/gpt-6.1-terra` | `full-access` | `high` | Gemini 두 모델(argon·3.8 Flash) 모두 실제 한도 초과 시 조사 대체만(2026-11-12 사용자 지시로 Luna 에서 변경, 모델 ID 는 Paseo `list_models` 로 확인). DART 원문·판정·검증물 열람 금지 |
 
 - 모드 대응: OpenCode `build`(호스트 `~/.config/opencode/opencode.jsonc` 의 edit·bash·webfetch allow)는 기존 `--auto`, Codex `full-access` 는 `--dangerously-bypass-approvals-and-sandbox`, Claude `bypassPermissions`·antigravity `full-access` 는 `--dangerously-skip-permissions` 와 같은 취지다.
 - 총괄 자신은 사용자가 Paseo 앱에서 Fable(없으면 실제 확인한 Opus)로 띄운다. Claude 사용량이 다해 총괄이 없으면 대리 총괄은 표의 Astra 값으로 띄우고 작업서에 대리 총괄 역할을 적는다(2026-11-10 사용자 지시).
@@ -47,7 +47,7 @@
 ### Gemini(agy) 메모리 주의·빈 결과
 
 - **Gemini 도 Paseo `create_agent` 로 띄운다(2026-11-10 사용자 지시).** Paseo 는 agy 를 직접 띄우므로 `systemd-run` 메모리 상한(`MemoryMax=8G`, `MemorySwapMax=0`)을 씌울 수 없다. 2026-10-13 OOM(agy 가 작업 폴더의 git 미추적 파일마다 diff 를 만들어 수십 GB 로 커짐)을 다시 내지 않도록 다음을 지킨다: 저장소 전체가 아니라 **필요한 범위의 작은 전용 폴더(전용 worktree)만 작업 공간으로 준다**, 운영 데이터 폴더(`artifacts/`)는 로컬 `.git/info/exclude` 로 미추적 목록에서 뺀다, 대용량 미추적 자료가 있는 폴더는 작업 공간으로 주지 않는다. 전용 worktree 라는 이유만으로 안전하다고 보지 않고 **띄우기 전에 작업 공간으로 줄 폴더의 미추적 파일 수와 용량을 확인한다**(`git -C "$WT" status --porcelain --untracked-files=all | grep -c '^??'`, `(cd "$WT" && git ls-files --others --exclude-standard -z | du -ch --files0-from=- | tail -1)` — 용량은 반드시 대상 폴더 안에서 센다. 밖에서 돌리면 경로를 못 찾아 `0 total` 이 나오며, 오류 문구가 보이면 0 으로 읽지 않는다). 큰 미추적 자료가 필요한 조사는 필요한 부분만 작은 폴더로 떼어 내거나 일반 프로그램으로 먼저 줄여서 Paseo 로 넘긴다. 일하는 중 메모리가 급히 늘면(`free -g`, `ps -o rss,cmd -C agy`) 자기가 띄운 그 Gemini 에이전트만 멈추고 입력을 줄여 다시 띄운다. §3 의 상한 셸 경로는 §0 대로 Paseo 를 쓸 수 없을 때만 쓴다.
-- 호출 순서: `antigravity/gemini-4-argon-high` → 실제 한도 초과가 로그·상태로 확인되면 `antigravity/gemini-3.8-flash-high` 로 같은 작업을 다시 호출 → 그것도 한도 초과면 Luna. 한도 초과가 아닌 오류를 이 전환으로 처리하지 않는다.
+- 호출 순서: `antigravity/gemini-4-argon-high` → 실제 한도 초과가 로그·상태로 확인되면 `antigravity/gemini-3.8-flash-high` 로 같은 작업을 다시 호출 → 그것도 한도 초과면 Terra. 한도 초과가 아닌 오류를 이 전환으로 처리하지 않는다.
 - `--sandbox`(셸이 `connecting to sandbox server ... connection reset by peer`로 전부 실패)와 `--mode plan`은 쓰지 않는다.
 - 기동 직후 꺼지거나 빈 결과면 `get_agent_activity`·agy 로그로 원인(인증·한도·모델 ID·신뢰 질문)을 확인하고, 고칠 수 있는 원인을 고친 뒤 같은 값으로 한 번만 다시 띄운다.
 
@@ -55,7 +55,7 @@
 
 | 유형 | 모델·용도 | 실제 권한 |
 |---|---|---|
-| 조사/순수 원문 대조 | Gemini(argon, 한도 초과 시 3.8 Flash), 둘 다 한도 초과 시 조사 대체 Luna(`gpt-6-luna`), 순수 계획 판독 Astra | 원문 읽기·검색·허용 조사 스크립트. 제품 수정 없음. Luna의 DART 원문·판정·검증물 열람 금지 |
+| 조사/순수 원문 대조 | Gemini(argon, 한도 초과 시 3.8 Flash), 둘 다 한도 초과 시 조사 대체 Terra(`gpt-6.1-terra`), 순수 계획 판독 Astra | 원문 읽기·검색·허용 조사 스크립트. 제품 수정 없음. Terra의 DART 원문·판정·검증물 열람 금지 |
 | 격리 검수 재현 | 정식 검수자(Reviewer) | 검수 worktree의 임시 빌드·테스트·보고 쓰기. 제품 원본·커밋·push·배포 금지 |
 | 구현 | Muse(주) 또는 Sol(보조) | 승인된 자기 구현 worktree의 제품 수정·국소 검사·보존 커밋. Muse 우선 배정 |
 
@@ -107,7 +107,7 @@ python3 scripts/codex_direct.py --repo "$WORKTREE" cancel "$JOB"
 
 기본은 §0 의 Paseo 에이전트다(2026-11-10 사용자 지시). 아래 상한 셸 경로(`agy -p`·`scripts/gemini_research.py`)는 Paseo 를 쓸 수 없을 때의 대체 경로다. 대체 경로에서도 셸이 필요한 조사는 `--dangerously-skip-permissions`를 붙인다(인쇄 모드의 권한 질문 자동 거부로 빈 출력이 되는 것을 막는다, 2026-10-26 사용자 승인).
 
-Gemini 는 `gemini-4-argon-high`로 먼저 호출하고, 실제 한도 초과가 로그·상태로 확인되면 `gemini-3.8-flash-high`로 같은 작업을 다시 호출한다(2026-11-10 사용자 지시; 이력: 2026-10-30 argon 고정). 3.8 Flash 도 한도 초과면 Luna 로 대체한다. 값은 `docs/agent-ops-config.json`의 `models.gemini`·`models.gemini_on_quota_exceeded`이며 `scripts/gemini_research.py`는 `models.gemini`(argon)만 `--model`로 넘긴다(자동 전환 없음). 모델 ID는 `agy models`로 대조한다. 실제 사용 모델을 기록한다. `--mode plan`은 기본값으로 쓰지 않는다. 모델에 따라 `--effort`를 거부하므로 붙이지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
+Gemini 는 `gemini-4-argon-high`로 먼저 호출하고, 실제 한도 초과가 로그·상태로 확인되면 `gemini-3.8-flash-high`로 같은 작업을 다시 호출한다(2026-11-10 사용자 지시; 이력: 2026-10-30 argon 고정). 3.8 Flash 도 한도 초과면 Terra 로 대체한다. 값은 `docs/agent-ops-config.json`의 `models.gemini`·`models.gemini_on_quota_exceeded`이며 `scripts/gemini_research.py`는 `models.gemini`(argon)만 `--model`로 넘긴다(자동 전환 없음). 모델 ID는 `agy models`로 대조한다. 실제 사용 모델을 기록한다. `--mode plan`은 기본값으로 쓰지 않는다. 모델에 따라 `--effort`를 거부하므로 붙이지 않는다. 기존 agy·구독 연결을 유지한다. 구 gemini CLI나 별도 API 과금으로 조용히 바꾸지 않는다.
 
 **상한 셸 경로에서는 메모리 상한 필수(2026-10-13 사고):** agy는 작업 폴더의 git 미추적 파일마다 diff를 만든다. 대용량 미추적 운영 데이터가 있는 폴더를 `--add-dir`로 주면 수십 GB까지 커져 시스템 전체 OOM이 나고 편집기·Claude 세션까지 죽는다. 항상 `systemd-run --user --scope --collect -p MemoryMax=8G -p MemorySwapMax=0`으로 감싸고, 저장소 전체 대신 필요한 범위의 작은 폴더를 준다. 운영 데이터 폴더(`artifacts/`)는 로컬 `.git/info/exclude`로 미추적 목록에서 뺀다.
 

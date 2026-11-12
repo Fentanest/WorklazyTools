@@ -43,7 +43,7 @@ class RepoFixture(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)/'repo';self.root.mkdir()
         self.git('init','-q');self.git('config','user.email','fixture@example.invalid');self.git('config','user.name','Fixture')
         (self.root/'docs').mkdir();(self.root/'src').mkdir()
-        self.config={'schema_version':1,'project':'Fixture','models':{'gemini':'gemini-4-argon-high','implementation':'gpt-6-sol','review':'gpt-6-astra','research':'gpt-6-luna'},'review':{'max_tasks':5,'max_lines':800},'line_count_exclude_globs':['vendor/**'],'high_risk_paths':[{'glob':'src/orders.py','reason':'order_safety'}]}
+        self.config={'schema_version':1,'project':'Fixture','models':{'gemini':'gemini-4-argon-high','implementation':'gpt-6-sol','review':'gpt-6-astra','research':'gpt-6.1-terra'},'review':{'max_tasks':5,'max_lines':800},'line_count_exclude_globs':['vendor/**'],'high_risk_paths':[{'glob':'src/orders.py','reason':'order_safety'}]}
         self.write_config()
         (self.root/'src/search.py').write_text('def search():\n    return 1\n')
         (self.root/'plan.md').write_text('# Approved plan\nReturn 2 from search.\n')
@@ -174,10 +174,10 @@ class DispatchContractTests(RepoFixture):
     def test_implementation_needs_authorization(self):
         r=self.request();r.update(role='implementation',execution='implementation')
         with self.assertRaisesRegex(cd.DispatchError,'NOT_AUTHORIZED'):cd.dispatch(self.root,r,self.config)
-    def test_luna_fallback_needs_quota(self):
+    def test_research_fallback_needs_quota(self):
         r=self.request();r['role']='research'
         with self.assertRaisesRegex(cd.DispatchError,'QUOTA'):cd.dispatch(self.root,r,self.config)
-    def test_luna_fallback_needs_evidence(self):
+    def test_research_fallback_needs_evidence(self):
         r=self.request();r.update(role='research',fallback_reason='gemini_quota_exceeded')
         with self.assertRaisesRegex(cd.DispatchError,'EVIDENCE'):cd.dispatch(self.root,r,self.config)
     def test_execution_not_model_identity(self):

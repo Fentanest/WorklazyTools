@@ -11,7 +11,7 @@
 | 정식 묶음 검수(Sol 구현분) | Sonnet `claude-sonnet-5-5`(구현과 분리된 검수 에이전트) |
 | 구현·수정·국소 검사·작업 브랜치 보존용 커밋 | Muse Spark 1.3(우선) 또는 Sol(`gpt-6.1-sol`, 보조) |
 | 통합·원격 반영·배포 | Claude(정식 검수·Claude 감사 통과 후 직접 실행, `PROJECT_RULES.md` 「역할·권한」) |
-| Gemini(argon·3.8 Flash) 모두 실제 한도 초과 시 조사만 대체 | `gpt-6-luna` |
+| Gemini(argon·3.8 Flash) 모두 실제 한도 초과 시 조사만 대체 | Terra `gpt-6.1-terra`(2026-11-12 사용자 지시, 이전 Luna) |
 | 총괄(Claude) 부재 시 대리 총괄 | Astra `gpt-6-astra` |
 
 이는 지정값이지 실시간 가용 목록이 아니다. 부재·권한·한도 실패를 같은 사건으로 처리하지 않는다. 부재 시 기본 모델로 조용히 대체하지 않고 지정 역할·승인 범위를 유지한다.

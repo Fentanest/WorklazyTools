@@ -94,7 +94,7 @@ A+B 검수 중 C가 추가되면 A+B만 통과로 기록하고 C는 남긴다. �
 
 ## 5. 일반 Codex 구현·순수 조사 호출
 
-`docs/agent-ops-examples/dispatch.example.json`의 필드를 실제 승인 작업으로 채운다. 역할과 실행 유형을 따로 지정한다. `implementation`은 구현 허가·linked worktree, `verification`은 격리 검수 worktree가 필요하다. `research` 역할의 Luna는 `fallback_reason=gemini_quota_exceeded`(argon·3.8 Flash 모두 한도 초과)와 실제 실패 증거 참조가 있어야 한다.
+`docs/agent-ops-examples/dispatch.example.json`의 필드를 실제 승인 작업으로 채운다. 역할과 실행 유형을 따로 지정한다. `implementation`은 구현 허가·linked worktree, `verification`은 격리 검수 worktree가 필요하다. `research` 역할의 Terra는 `fallback_reason=gemini_quota_exceeded`(argon·3.8 Flash 모두 한도 초과)와 실제 실패 증거 참조가 있어야 한다.
 
 기본은 런북 §0 의 Paseo 에이전트 발주다. 아래 `codex_direct.py dispatch` 는 Paseo 를 쓸 수 없을 때의 companion 대체 발주다.
 

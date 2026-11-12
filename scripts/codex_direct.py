@@ -283,7 +283,7 @@ def dispatch(root: Path, request: dict, config: dict, plugin_arg: str | None = N
     if role == "research" and execution != "research":
         raise DispatchError("RESEARCH_MUST_USE_READ_ONLY_EXECUTION")
     if role == "research" and request.get("fallback_reason") != "gemini_quota_exceeded":
-        raise DispatchError("LUNA_RESEARCH_REQUIRES_CONFIRMED_GEMINI_QUOTA")
+        raise DispatchError("RESEARCH_FALLBACK_REQUIRES_CONFIRMED_GEMINI_QUOTA")
     if role == "research" and not request.get("failure_evidence"):
         raise DispatchError("MISSING_QUOTA_EVIDENCE_REFERENCE")
     if execution == "implementation" and (request.get("request_mode") != "plan-and-implement" or request.get("implementation_authorized") is not True):

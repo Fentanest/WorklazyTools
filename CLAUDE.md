@@ -12,11 +12,11 @@
 
 정형 추출은 프로그램, 의미 있는 코드·문서 조사는 Gemini를 이용한다. 실제 원문·diff·테스트 증거가 총괄 대화를 우회해 수집·대조되도록 `docs/agent-ops-guide.md`를 따른다. 긴 자료를 직접 중계하지 않고 짧은 사실표·핵심 증거·미확인만 받는다. 새로운 전제·모순·고위험 판단과 필요한 표본에서만 원문을 다시 확인한다.
 
-Gemini 는 `gemini-4-argon-high`로 먼저 호출하고 실제 한도 초과가 확인되면 `gemini-3.8-flash-high`로 다시 호출하며(2026-11-10 사용자 지시) 실제 사용 모델을 기록한다. 3.8 Flash 도 한도 초과일 때만 조사 대체 Luna(`gpt-6-luna`)를 사용하며, 권한·도구 오류는 먼저 원인을 고쳐 같은 담당으로 실행한다. 대체 조건과 Claude 조사 예외는 공통 규칙을 따른다. 숫자·해시·경로·실제 잡 모델을 추정하지 않는다.
+Gemini 는 `gemini-4-argon-high`로 먼저 호출하고 실제 한도 초과가 확인되면 `gemini-3.8-flash-high`로 다시 호출하며(2026-11-10 사용자 지시) 실제 사용 모델을 기록한다. 3.8 Flash 도 한도 초과일 때만 조사 대체 Terra(`gpt-6.1-terra`, 2026-11-12 사용자 지시로 Luna 에서 변경)를 사용하며, 권한·도구 오류는 먼저 원인을 고쳐 같은 담당으로 실행한다. 대체 조건과 Claude 조사 예외는 공통 규칙을 따른다. 숫자·해시·경로·실제 잡 모델을 추정하지 않는다.
 
 ## 호출·작업 공간
 
-외부 에이전트 호출의 기본은 **Paseo 에이전트**다(`docs/agent-dispatch-runbook.md` §0, 2026-11-09 사용자 지시로 herdr 에서 전환). 에이전트 이름(Muse·Sol·Sonnet·Astra·Gemini·Luna) → provider/model·모드는 런북 §0 표가 유일한 정본이며 Paseo 프로필은 쓰지 않는다. Gemini 도 그 값으로 Paseo 에이전트로 띄운다(2026-11-10). 그 값으로 `create_agent` 해 띄우고, 질문·권한 대기는 `list_pending_permissions`·`get_agent_status` 로 확인해 바로 답하며, 결과 회수 뒤 바로 `archive_agent` 한다. 아래 Codex companion 직접 호출과 `scripts/codex_direct.py`는 Paseo를 쓸 수 없을 때의 대체 경로다. `Agent(codex:codex-rescue)` 포워더는 이 프로젝트 기본 경로가 아니다. 호출 전 실제 설치본 `agents/codex-rescue.md`를 참조해 옵션 의미를 확인하되, 이 프로젝트의 명시적 모델·쓰기·worktree·신규/재개 선택을 일반 기본값으로 지우지 않는다.
+외부 에이전트 호출의 기본은 **Paseo 에이전트**다(`docs/agent-dispatch-runbook.md` §0, 2026-11-09 사용자 지시로 herdr 에서 전환). 에이전트 이름(Muse·Sol·Sonnet·Astra·Gemini·Terra) → provider/model·모드는 런북 §0 표가 유일한 정본이며 Paseo 프로필은 쓰지 않는다. Gemini 도 그 값으로 Paseo 에이전트로 띄운다(2026-11-10). 그 값으로 `create_agent` 해 띄우고, 질문·권한 대기는 `list_pending_permissions`·`get_agent_status` 로 확인해 바로 답하며, 결과 회수 뒤 바로 `archive_agent` 한다. 아래 Codex companion 직접 호출과 `scripts/codex_direct.py`는 Paseo를 쓸 수 없을 때의 대체 경로다. `Agent(codex:codex-rescue)` 포워더는 이 프로젝트 기본 경로가 아니다. 호출 전 실제 설치본 `agents/codex-rescue.md`를 참조해 옵션 의미를 확인하되, 이 프로젝트의 명시적 모델·쓰기·worktree·신규/재개 선택을 일반 기본값으로 지우지 않는다.
 
 첫 호출·버전/환경 변경·복구 시 `docs/agent-dispatch-runbook.md`를 읽는다. 대체 경로를 쓸 때는 `scripts/codex_direct.py`를 사용한다. 같은 실행 계약을 매번 장문으로 재독하지 않는다. 실행기는 매 발주 설치본 해시와 필수 옵션·역할 매핑을 확인한다. 작업·검수는 각자의 worktree에서 발주·조회하며 주 저장소 cwd로 강제 복귀하지 않는다. 실제 잡과 Codex 세션의 모델·cwd·sandbox가 맞지 않거나 검증 불가능하면 해당 잡만 취소·보류하고 결과를 기다리지 않는다.
 
