@@ -25825,7 +25825,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "Juneteenth National Independence Day (observed)",
+    "special": "Juneteenth National Independence Day (Observed)",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -28319,7 +28319,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "Independence Day (observed)",
+    "special": "Independence Day (Observed)",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -50385,8 +50385,13 @@
         "tz": "America/New_York"
       }
     ],
-    "special": "Day after Thanksgiving",
+    "special": "Early Close",
     "sources": [
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
+      },
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
@@ -54774,7 +54779,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "Christmas Day (observed)",
+    "special": "Christmas Day (Observed)",
     "sources": [
       {
         "id": "nyse-hours-calendars",

@@ -70,7 +70,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20260102",
@@ -2140,7 +2142,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20260120",
@@ -5417,7 +5421,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20260217",
@@ -10820,7 +10826,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20260404",
@@ -16770,7 +16778,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20260526",
@@ -19771,7 +19781,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20260620",
@@ -21420,7 +21432,7 @@
     "venue": "nyse",
     "status": "closed",
     "sessions": [],
-    "special": "Independence Day (observed)",
+    "special": "Independence Day (Observed)",
     "sources": [
       {
         "id": "nyse-hours-calendars",
@@ -21429,7 +21441,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20260704",
@@ -29109,7 +29123,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20260908",
@@ -38495,7 +38511,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20261127",
@@ -38628,17 +38646,22 @@
         "tz": "America/New_York"
       }
     ],
-    "special": "day after Thanksgiving",
+    "special": "Early Close",
     "sources": [
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "*** Each market will close early at 1:00 p.m. (1:15 p.m. for eligible options) on Friday, November 27, 2026, Friday, November 26, 2027, and Friday, November 24, 2028 (the day after Thanksgiving). NYSE American Equities, NYSE Arca Equities, NYSE National, and NYSE Texas late trading sessions will close at 5:00 p.m. All times are Eastern Time."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
     "reason": null,
     "notes": [
-      "Early close at 1:00 p.m. (day after Thanksgiving)"
+      "특수일"
     ]
   },
   {
@@ -41836,17 +41859,22 @@
         "tz": "America/New_York"
       }
     ],
-    "special": "Christmas Eve",
+    "special": "Early Close",
     "sources": [
       {
         "id": "nyse-hours-calendars",
         "url": "https://www.nyse.com/trade/hours-calendars",
         "quote": "**** Each market will close early at 1:00 p.m. (1:15 p.m. for eligible options) on Thursday, December 24, 2026. NYSE American Equities, NYSE Arca Equities, NYSE National, and NYSE Texas late trading sessions will close at 5:00 p.m. All times are Eastern Time."
+      },
+      {
+        "id": "nyse-hours-calendars",
+        "url": "https://www.nyse.com/trade/hours-calendars",
+        "quote": "Core Trading Session: 9:30 a.m. to 4:00 p.m. ET"
       }
     ],
     "reason": null,
     "notes": [
-      "Early close at 1:00 p.m. (Christmas Eve)"
+      "특수일"
     ]
   },
   {
@@ -41920,7 +41948,9 @@
       }
     ],
     "reason": null,
-    "notes": []
+    "notes": [
+      "특수일"
+    ]
   },
   {
     "date": "20261226",
