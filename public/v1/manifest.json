@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "generation_id": "20261113T210001.109193Z",
-  "created_at": "2026-11-13T21:28:00.815231+00:00",
-  "source_manifest_sha256": "9062fd2356f716ba0f2423578d031710ab340becbb5a014793cdf57d331ae3d3",
+  "generation_id": "20261114T025727.981232Z",
+  "created_at": "2026-11-14T03:23:58.990118+00:00",
+  "source_manifest_sha256": "fc5930943de9c926e90649d0a8450f5f467879d53f0933090f9003da34f58f29",
   "files": [
     {
       "path": "calendar-2026.json",
       "year": 2026,
-      "sha256": "730a3b87ec602f8a56797de5576b8ea928964602ac516952f6d8faa4de0f4407",
-      "source_sha256": "1cc9733e0b9ce3668273b796e6b7b7099d55ceba458cafdbc983e817c4e8ef44"
+      "sha256": "27d9d8fb2b9c66c58b4c48c36c623db502874296e8b4420f2a30ab0cac6ab015",
+      "source_sha256": "39017c05055b56d4d1c1426397a986def1b7f97ad9d7974d2faa0eeb7b2085e6"
     },
     {
       "path": "calendar-2027.json",
@@ -22,10 +22,10 @@
       "venue": "krx",
       "year": 2026,
       "included": true,
-      "evidence_generation": "8d2368ef26897a3c9e4207e318e1c233dc30e76a9a5dfb68aeece935be7d7add",
-      "last_checked_at": "2026-11-13T21:03:08.274706+00:00",
-      "validity": "stale",
-      "reason": "collection:krx-2026-public_holidays",
+      "evidence_generation": "8d38f17da70c7123b88ecea7bc0d2679cde8a1d98553cb5611a15dd61203a670",
+      "last_checked_at": "2026-11-14T03:00:54.761871+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -34,7 +34,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "3c9af8a29ec0c619d7c94505ba80a162dbb6835773f0adf0882aafa8f3a68874",
-      "last_checked_at": "2026-11-13T21:03:08.274706+00:00",
+      "last_checked_at": "2026-11-14T03:00:54.761871+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -44,10 +44,10 @@
       "venue": "nxt",
       "year": 2026,
       "included": true,
-      "evidence_generation": "a5a301c27bae2cb67f63e031f00859862d460c6f9c60cfa2c0d26ab3319fb43a",
-      "last_checked_at": "2026-11-13T21:03:08.274706+00:00",
-      "validity": "stale",
-      "reason": "collection:nxt-2026-public_holidays",
+      "evidence_generation": "e7551b4bb8d000944ceb2b0f81129d2e5ea4cf052e7e9b51e19a72c22931aac4",
+      "last_checked_at": "2026-11-14T03:00:54.761871+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -56,7 +56,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "4943e9d0f197f88821af711709ad676724248f5155f658d7ecb847594944caf0",
-      "last_checked_at": "2026-11-13T21:03:08.274706+00:00",
+      "last_checked_at": "2026-11-14T03:00:54.761871+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -67,9 +67,9 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "7901a67ba8ec5e9c7148551eb5cc1735bedeb9cf70ad1d74fbfe369e7c9c76b8",
-      "last_checked_at": "2026-11-13T21:03:08.274706+00:00",
-      "validity": "stale",
-      "reason": "collection:krx-2027-public_holidays",
+      "last_checked_at": "2026-11-14T03:00:54.761871+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -78,15 +78,15 @@
       "year": 2027,
       "included": false,
       "evidence_generation": null,
-      "last_checked_at": "2026-11-13T21:03:08.274706+00:00",
+      "last_checked_at": "2026-11-14T03:00:54.761871+00:00",
       "validity": "held",
       "reason": "nasdaq-2027-annual",
       "unpublished": true,
       "unpublished_evidence": [
         {
           "source_id": "nasdaq-holiday-schedule",
-          "fetched_at": "2026-11-13T21:00:59.442797+00:00",
-          "raw_sha256": "8b1a666d3d27d065ab540e2516f774186dc059aafda3fee3977499abc7c99774",
+          "fetched_at": "2026-11-14T02:58:34.988580+00:00",
+          "raw_sha256": "5452a0a870ba035acee6f7cd086d8a31347e7836028a8353ce908be3e5f82dd7",
           "rule": "D12-nasdaq-holiday-schedule-year-absent-v1"
         }
       ]
@@ -96,9 +96,9 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-11-13T21:03:08.274706+00:00",
-      "validity": "stale",
-      "reason": "collection:nxt-2027-public_holidays",
+      "last_checked_at": "2026-11-14T03:00:54.761871+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": []
     },
@@ -107,7 +107,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4943e9d0f197f88821af711709ad676724248f5155f658d7ecb847594944caf0",
-      "last_checked_at": "2026-11-13T21:03:08.274706+00:00",
+      "last_checked_at": "2026-11-14T03:00:54.761871+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
