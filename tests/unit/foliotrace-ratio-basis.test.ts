@@ -156,7 +156,7 @@ test("the combined-preferred aggregate never takes part in filing changes", () =
 });
 
 test("basis and denominator-source labels render without raw codes", async () => {
-  const { titleFiguresText, titleFilingFiguresLabel } = await import("../../src/features/foliotrace/ui/holdings.ts");
+  const { titleFiguresText } = await import("../../src/features/foliotrace/ui/holdings.ts");
   assert.equal(ratioBasisLabel("common_only", "ko"), "보통주만의 비율");
   assert.equal(ratioBasisLabel("preferred_combined", "ko"), "우선주 합계 비율");
   assert.equal(ratioBasisLabel("unverified", "ko"), "기준 미확인");
@@ -173,7 +173,8 @@ test("basis and denominator-source labels render without raw codes", async () =>
   assert.equal(denominatorReportLabel(null, "ko"), null);
   // 새 문구 전수: 내부 코드·영문 kind 값이 화면에 나오지 않는다.
   const labels = [
-    titleFilingFiguresLabel("ko"), titleFilingFiguresLabel("en"),
+    ratioBasisLabel("common_only", "ko"), ratioBasisLabel("unverified", "en"),
+    denominatorReportLabel("11012", "ko"),
     titleFiguresText({ titleQuantity: "1", titleCompanyOwnershipPercent: "1" }, "ko"),
     titleFiguresText({ titleQuantity: "1", titleCompanyOwnershipPercent: "1" }, "en"),
   ];
@@ -342,20 +343,26 @@ test("the combined-preferred aggregate follows its company's market, still unpri
   assert.equal(allocation.markets.KOSPI.amount, "0");
 });
 
-test("the 5% tracking rule runs on common rows only", async () => {
+test("the 5% tracking rule skips only rows with a recomputed preferred basis", async () => {
   const { filterHoldings, isBelowFivePercent } = await import("../../src/features/foliotrace/ui/holdings.ts");
-  // 코오롱인더우 0.75%: 종류별 비율이지 추적 이탈이 아니다.
-  const preferred = holding({ stockCode: "120115", securityKind: "preferred", quantity: "20773", companyOwnershipPercent: "0.750508" });
+  // 코오롱인더우 0.75%(preferred_only): 종류별 비율이지 추적 이탈이 아니다.
+  const preferred = holding({ stockCode: "120115", securityKind: "preferred", quantity: "20773", companyOwnershipPercent: "0.750508", ratioBasisKind: "preferred_only" });
   assert.equal(isBelowFivePercent(preferred), false);
   const combined = holding({
     stockCode: "00148540", securityKind: "unknown", quantity: "90712", companyOwnershipPercent: "1.398423",
     preferredCombined: true, ratioBasisKind: "preferred_combined",
   });
   assert.equal(isBelowFivePercent(combined), false);
+  // 연말 목록 우선주 줄(새 비율 없음)은 종전대로: 5% 미만이면 라벨·필터 대상.
+  // 실제 공개 스냅샷 행: 한화3우B 1.924496%, 코오롱우 0.456207%.
+  const ye1 = holding({ stockCode: "00088K", name: "한화3우B", securityKind: "preferred", quantity: "285347", companyOwnershipPercent: "1.924496", ratioBasisKind: "year_end", receiptNo: null, receiptDate: "2025-12-31", holdingDate: "2025-12-31", evidence: "legacy-import" });
+  const ye2 = holding({ stockCode: "002025", name: "코오롱우", securityKind: "preferred", quantity: "5294", companyOwnershipPercent: "0.456207", ratioBasisKind: undefined, receiptNo: null, receiptDate: "2025-12-31", holdingDate: "2025-12-31", evidence: "legacy-import" });
+  assert.equal(isBelowFivePercent(ye1), true);
+  assert.equal(isBelowFivePercent(ye2), true);
   // 보통주 행은 그대로: 5% 미만이면 라벨·필터 대상.
   assert.equal(isBelowFivePercent(holding({ stockCode: "120110", companyOwnershipPercent: "4.99" })), true);
   assert.equal(isBelowFivePercent(holding({ stockCode: "120110", companyOwnershipPercent: "12.946446" })), false);
-  assert.deepEqual(filterHoldings([preferred, combined, holding({ stockCode: "120110", companyOwnershipPercent: "4.99" })], "", "below-5").map((h) => h.stockCode), ["120110"]);
+  assert.deepEqual(filterHoldings([preferred, combined, ye1, ye2, holding({ stockCode: "120110", companyOwnershipPercent: "4.99" })], "", "below-5").map((h) => h.stockCode), ["00088K", "002025", "120110"]);
 });
 
 test("user-facing basis labels never expose internal codes", () => {

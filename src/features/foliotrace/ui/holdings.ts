@@ -342,10 +342,6 @@ const TITLE_FILING_FIGURES: Record<Lang, string> = {
   en: "Filing cover (incl. subscription warrants etc.)",
 };
 
-export function titleFilingFiguresLabel(lang: Lang): string {
-  return TITLE_FILING_FIGURES[lang];
-}
-
 export function titleFiguresText(
   figure: Pick<Holding, "titleQuantity" | "titleCompanyOwnershipPercent">, lang: Lang,
 ): string | null {
@@ -491,14 +487,14 @@ export function hasReceiptNo(receiptNo: string | null): receiptNo is string {
 /**
  * True when the reported ownership is a decimal below 5 (rows kept in the list but
  * outside the 5% filing threshold). The 5% tracking rule is company-level and runs on
- * the 보통주 (voting-rights) basis, so it applies to common rows only: preferred-kind
- * rows now carry their own per-class ratios (0.75% etc.) that must never read as
- * "below 5% · last confirmed quantity", and the combined-preferred aggregate is
- * outside tracking by construction. A preferred row's company still has its common
- * row carrying the status separately.
+ * the 보통주 (voting-rights) basis, so the per-class ratios newly attached in this
+ * fix (preferred_only·preferred_combined) never read as "below 5%": the same company's
+ * common row carries the status separately, and the combined aggregate is outside
+ * tracking by construction. All other rows — common rows and year-end preferred rows
+ * without a recomputed basis — keep the previous behavior unchanged.
  */
 export function isBelowFivePercent(h: Holding): boolean {
-  if (h.securityKind !== "common") return false;
+  if (h.ratioBasisKind === "preferred_only" || h.ratioBasisKind === "preferred_combined") return false;
   const ownership = parseDecimal(h.companyOwnershipPercent);
   const threshold = parseDecimal("5");
   return ownership !== null && threshold !== null && compareParsed(ownership, threshold) < 0;

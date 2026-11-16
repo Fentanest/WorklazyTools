@@ -869,9 +869,9 @@ function ReadyView({
   const entityName = lang === "ko" ? snapshot.entity.nameKo : snapshot.entity.nameEn;
   const scope = lang === "ko" ? snapshot.portfolio.scopeKo : snapshot.portfolio.scopeEn;
   const trackingStatusLabel = (holding: Holding): string | null =>
-    // 5% 추적 상태는 보통주(의결권) 기준이라 우선주 행에는 붙이지 않는다: 같은 회사의 보통주 행이
-    // 별도로 상태를 가진다. 합계 줄은 추적 대상 밖이다.
-    (holding.securityKind === "preferred" || holding.preferredCombined) ? null :
+    // 새 종류별 비율이 붙은 우선주 줄·합계 줄에는 5% 상태를 붙이지 않는다: 같은 회사의 보통주 행이
+    // 상태를 별도로 가진다. 그 외의 행(연말 목록 우선주 줄 포함)은 종전과 같다.
+    (holding.ratioBasisKind === "preferred_only" || holding.ratioBasisKind === "preferred_combined") ? null :
     (indirectReentries.has(`${holding.corpCode}:${holding.receiptNo}`) ||
       (holding.observationStatus === "verified_scoped" && holding.tracking === "active")) ? t.eventIndirectReentry :
       holding.tracking === "active" ? (isBelowFivePercent(holding) ? t.statusActiveBelow5 : t.statusActiveRecord) :
