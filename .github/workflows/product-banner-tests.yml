@@ -52,8 +52,8 @@ jobs:
           df -h
           if [ -n "${PB_JOB_ROOT:-}" ] && [ -d "$PB_JOB_ROOT" ]; then
             du -sh "$PB_JOB_ROOT" 2>/dev/null || true
-            rm_err=$(rm -rf "$PB_JOB_ROOT" 2>&1)
-            rm_status=$?
+            rm_status=0
+            rm_err=$(rm -rf "$PB_JOB_ROOT" 2>&1) || rm_status=$?
             if [ -e "$PB_JOB_ROOT" ]; then
               echo "::warning::failed to remove $PB_JOB_ROOT (rm exit $rm_status): $rm_err"
               cleanup_failed=1
@@ -72,8 +72,8 @@ jobs:
             du -sh "$RUNNER_TEMP" 2>/dev/null || true
             echo "entries before removal:"
             find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>&1 | head -30
-            find_err=$(find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>&1)
-            find_status=$?
+            find_status=0
+            find_err=$(find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>&1) || find_status=$?
             if [ "$find_status" -ne 0 ]; then
               echo "::warning::RUNNER_TEMP cleanup errors (find exit $find_status): $find_err"
               cleanup_failed=1
