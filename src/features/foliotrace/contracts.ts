@@ -74,6 +74,9 @@ export type RatioBasisKind = 'common_only' | 'voting_rights' | 'preferred_only' 
 
 export interface Holding {
   corpCode: string
+  /** Listed 6-char code — except the combined-preferred aggregate line, whose stockCode is
+   * the 8-digit company code (the same value as corpCode, not a listed security).
+   * Such rows always carry `preferredCombined: true` and are never priced. */
   stockCode: string
   name: string
   securityKind: 'common' | 'preferred' | 'other' | 'unknown'
@@ -127,7 +130,8 @@ export interface Holding {
   /** DART quarterly report code ('11013' | '11012' | '11014' | '11011') or filing form ('A1' | 'A2'). */
   ratioDenominatorReport?: string | null
   ratioDenominatorReceipt?: string | null
-  /** True for the combined-preferred aggregate line (kinds reported only as one total): never priced. */
+  /** True for the combined-preferred aggregate line (kinds reported only as one total): never priced.
+   * Its stockCode is the 8-digit company code, not a listed code. */
   preferredCombined?: boolean | null
   quote: Quote | null
   estimatedValue: DecimalString | null
@@ -150,10 +154,13 @@ export interface FilingEvent {
   quantity: DecimalString | null
   companyOwnershipPercent: DecimalString | null
   numericKind?: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated'
-  /** Same-basis rule: only figures with equal known bases may be compared (revision 3, optional). */
+  /** Same-basis rule: only figures with the same basis group may be compared (revision 3, optional).
+   * A1 `voting_rights` and recomputed `common_only` share the 보통주 group. */
   ratioBasisKind?: RatioBasisKind | null
   /** The filing's own combined-basis ratio, kept when it differs from the displayed per-class figure. */
   reportedCompanyOwnershipPercent?: DecimalString | null
+  /** Denominator source of the displayed figure, same vocabulary as holdings (revision 3.1, optional). */
+  ratioDenominatorReport?: string | null
   percentagePointChange?: DecimalString | null
   source: 'legacy-import' | 'dart-structured' | 'dart-document' | 'indirect-observation' | 'issuer-scope-observation'
   filingUrl: string | null

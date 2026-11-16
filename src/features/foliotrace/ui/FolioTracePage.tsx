@@ -42,6 +42,7 @@ import {
   formatPctShort,
   formatQty,
   hasReceiptNo,
+  holdingKeyOf,
   holdingStatus,
   isBelowFivePercent,
   latestUnresolvedReasonLabel,
@@ -49,6 +50,8 @@ import {
   isLateFilingWithOlderBasis,
   quotePriceDetail,
   ratioBasisLabel,
+  reportedIsCombinedBasis,
+  selectionKeyForEvent,
   sortHoldings,
   sumPercentText,
   topHoldings,
@@ -175,6 +178,7 @@ const STR = {
     basisChangeNote: "직전 공시와 지분율 계산 기준(분모)이 달라 증감 비교를 하지 않습니다",
     detailRatioBasis: "지분율 기준",
     reportedOriginal: "공시 원문",
+    reportedCombinedBasis: "(보통주+우선주 합산 기준)",
     preferredCombinedNote: "국민연금 공시가 우선주를 종류별로 나누지 않고 합계로만 발표해 종류별 수량과 평가금액을 알 수 없음",
     denominatorUnverified: "분모 미확인",
     verifiedObservationPending: "현재 지분율과 비교할 정보가 부족합니다",
@@ -398,6 +402,7 @@ const STR = {
     basisChangeNote: "The percentage basis (denominator) differs from the previous filing, so no change is shown",
     detailRatioBasis: "Ownership basis",
     reportedOriginal: "As filed",
+    reportedCombinedBasis: "(common + preferred combined basis)",
     preferredCombinedNote: "NPS filings report preferred shares only as a combined total, so per-class quantities and values cannot be determined",
     denominatorUnverified: "Denominator unverified",
     verifiedObservationPending: "Not enough information to compare with the current percentage",
@@ -562,7 +567,8 @@ function ownershipTitle(h: Holding, lang: Lang): string {
   const basis = ratioBasisLabel(h.ratioBasisKind ?? null, lang);
   if (basis) parts.push(basis);
   if (h.reportedCompanyOwnershipPercent != null) {
-    parts.push(`${STR[lang].reportedOriginal} ${formatPct(h.reportedCompanyOwnershipPercent)}`);
+    parts.push(`${STR[lang].reportedOriginal} ${formatPct(h.reportedCompanyOwnershipPercent)}` +
+      (reportedIsCombinedBasis(h.ratioBasisKind, h.ratioDenominatorReport, h.securityKind === "preferred") ? ` ${STR[lang].reportedCombinedBasis}` : ""));
   }
   return parts.join(" · ");
 }
@@ -572,7 +578,8 @@ function eventOwnershipTitle(event: FilingEvent, lang: Lang): string {
   const basis = ratioBasisLabel(event.ratioBasisKind ?? null, lang);
   if (basis) parts.push(basis);
   if (event.reportedCompanyOwnershipPercent != null) {
-    parts.push(`${STR[lang].reportedOriginal} ${formatPct(event.reportedCompanyOwnershipPercent)}`);
+    parts.push(`${STR[lang].reportedOriginal} ${formatPct(event.reportedCompanyOwnershipPercent)}` +
+      (reportedIsCombinedBasis(event.ratioBasisKind, event.ratioDenominatorReport, false) ? ` ${STR[lang].reportedCombinedBasis}` : ""));
   }
   return parts.join(" · ");
 }
@@ -814,10 +821,9 @@ function ReadyView({
       event.kind === "tracking-reentry").map((event) => `${event.corpCode}:${event.receiptNo}`)),
     [snapshot.events],
   );
-  /** Holdings are keyed by code + class: the combined-preferred aggregate reuses the
-   * common code, so a bare stock code no longer identifies one row. */
-  const holdingKey = (h: Pick<Holding, "stockCode" | "securityKind" | "receiptNo">) =>
-    `${h.stockCode}:${h.securityKind}:${h.receiptNo ?? "ye"}`;
+  /** Holdings are keyed by code + class + receipt: the combined-preferred aggregate
+   * uses the company code, so a bare stock code no longer identifies one row. */
+  const holdingKey = holdingKeyOf;
   const currentNameByCorpCode = useMemo(
     () => new Map(snapshot.holdings.map((holding) => [holding.corpCode, holding.name])),
     [snapshot.holdings],
@@ -1343,7 +1349,7 @@ function ReadyView({
                 <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}:${event.kind}:${event.basisDate ?? ""}`}>
                   <div className="foliotrace-event-heading">
                     <strong><button type="button" className="foliotrace-name-btn"
-                      onClick={() => setSelectedCode(event.stockCode ?? `corp:${event.corpCode}`)}>{eventName(event)}</button></strong>
+                      onClick={() => setSelectedCode(selectionKeyForEvent(event, snapshot.holdings))}>{eventName(event)}</button></strong>
                     {currentName && event.stockCode && <code className="foliotrace-code">{event.stockCode}</code>}
                     <span>{t.eventReceipt}: {event.receiptDate}</span>
                     {event.basisDate && <span>{t.eventBasis}: {event.basisDate}</span>}
@@ -1514,10 +1520,11 @@ function ReadyView({
                     {selected.ratioDenominatorReceipt && (
                       <> · <a href={dartFilingUrl(selected.ratioDenominatorReceipt)} target="_blank" rel="noreferrer">
                         <code className="foliotrace-code">{selected.ratioDenominatorReceipt}</code>
-                      </a></>}
+                      </a></>)}
                     {selected.reportedCompanyOwnershipPercent != null && (
                       <small className="foliotrace-row-reason">
                         {t.reportedOriginal} {formatPct(selected.reportedCompanyOwnershipPercent)}
+                        {reportedIsCombinedBasis(selected.ratioBasisKind, selected.ratioDenominatorReport, selected.securityKind === "preferred") ? ` ${t.reportedCombinedBasis}` : ""}
                       </small>
                     )}
                     {selected.preferredCombined && (

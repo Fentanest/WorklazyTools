@@ -140,7 +140,10 @@ function validQuote(value: unknown): boolean {
 }
 function validHolding(value: unknown): boolean {
   return isRecord(value) && str(value.corpCode) && /^\d{8}$/.test(value.corpCode) &&
-    str(value.stockCode) && STOCK.test(value.stockCode) && str(value.name) &&
+    str(value.stockCode) && (STOCK.test(value.stockCode) ||
+      // Combined-preferred aggregate: company-code identifier, never a listed code.
+      (value.preferredCombined === true && /^\d{8}$/.test(value.stockCode) && value.stockCode === value.corpCode)) &&
+    str(value.name) &&
     ['common', 'preferred', 'other', 'unknown'].includes(String(value.securityKind)) &&
     nullable(value.quantity, decimal) && nullable(value.companyOwnershipPercent, decimal) &&
     (value.ownershipNumericKind === undefined || nullable(value.ownershipNumericKind, numericKind)) &&
@@ -184,6 +187,7 @@ function validEvent(value: unknown): boolean {
     (value.numericKind === undefined || numericKind(value.numericKind)) &&
     (value.ratioBasisKind === undefined || nullable(value.ratioBasisKind, ratioBasisKind)) &&
     (value.reportedCompanyOwnershipPercent === undefined || nullable(value.reportedCompanyOwnershipPercent, decimal)) &&
+    (value.ratioDenominatorReport === undefined || nullable(value.ratioDenominatorReport, str)) &&
     (value.percentagePointChange === undefined || nullable(value.percentagePointChange, decimal)) &&
     nullable(value.filingUrl, filingUrl)
 }

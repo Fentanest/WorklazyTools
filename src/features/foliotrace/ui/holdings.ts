@@ -221,15 +221,43 @@ export function compareFilingOrder(a: FilingEvent, b: FilingEvent): number {
     a.receiptDate.localeCompare(b.receiptDate) || a.receiptNo.localeCompare(b.receiptNo);
 }
 
+/** Stable identity of one holding row: the combined-preferred aggregate reuses the
+ * common code's company, so a bare stock code no longer identifies one row. */
+export function holdingKeyOf(h: Pick<Holding, "stockCode" | "securityKind" | "receiptNo">): string {
+  return `${h.stockCode}:${h.securityKind}:${h.receiptNo ?? "ye"}`;
+}
+
+/** Selection key for an event's name button: the common-share holding when one exists,
+ * otherwise the event's own key (history-only sheet). */
+export function selectionKeyForEvent(event: FilingEvent, holdings: Holding[]): string {
+  const rows = holdings.filter((h) => event.stockCode != null && h.stockCode === event.stockCode);
+  const common = rows.find((h) => h.securityKind === "common") ?? rows[0];
+  return common ? holdingKeyOf(common) : (event.stockCode ?? `corp:${event.corpCode}`);
+}
+
 /** Ratio basis of one figure: null/undefined means an older snapshot without basis info. */
 export function figureBasisKind(figure: Pick<FilingEvent, "ratioBasisKind"> | Pick<Holding, "ratioBasisKind">): RatioBasisKind | null {
   return figure.ratioBasisKind ?? null;
 }
 
 /**
+ * Common-share basis group. An A1 voting-rights figure and a recomputed common-only
+ * figure share the same denominator kind (보통주): A1 의결권 총수가 DART 보통주 발행수와
+ * 같음이 실제 자료로 확인됐다(2026H2 근접 49쌍 중 48 일치, 1건은 빙그레 소각 시점차로
+ * A1=보통주 일치). Only a combined-basis (합산) figure stands apart.
+ */
+const COMMON_BASIS: ReadonlySet<RatioBasisKind> = new Set(["voting_rights", "common_only"]);
+
+function basisGroup(kind: RatioBasisKind | null): string | null {
+  if (kind === null) return null;
+  return COMMON_BASIS.has(kind) ? "common" : kind;
+}
+
+/**
  * Whether two reported ownership figures may be subtracted. Only figures with
  * equal *known* bases compare; a basis change (or an unknown side against a known
- * one) never produces a numeric delta. Figures from snapshots without any basis
+ * one) never produces a numeric delta. A1 voting-rights and recomputed common-only
+ * figures share the 보통주 group. Figures from snapshots without any basis
  * info keep the legacy behavior (they cannot be told apart).
  */
 export function sameRatioBasis(
@@ -239,17 +267,34 @@ export function sameRatioBasis(
   const left = figureBasisKind(current);
   const right = figureBasisKind(previous);
   if (left === null && right === null) return true;
-  return left !== null && left === right;
+  if (left === null || right === null) return false;
+  return basisGroup(left) === basisGroup(right);
 }
 
-/** True when both figures carry a known basis and the bases differ: show "basis change", not a delta. */
+/** True when both figures carry a known basis and the basis groups differ: show "basis change", not a delta. */
 export function ratioBasisChanged(
   current: Pick<FilingEvent, "ratioBasisKind"> | Pick<Holding, "ratioBasisKind">,
   previous: Pick<FilingEvent, "ratioBasisKind"> | Pick<Holding, "ratioBasisKind">,
 ): boolean {
   const left = figureBasisKind(current);
   const right = figureBasisKind(previous);
-  return left !== null && right !== null && left !== right;
+  return left !== null && right !== null && basisGroup(left) !== basisGroup(right);
+}
+
+/**
+ * Whether a preserved filing percentage (`reportedCompanyOwnershipPercent`) uses the
+ * combined (보통주+우선주 합산) basis. Unverified A2 figures and preferred-kind rows
+ * always quote the combined filing ratio; a common-only figure does so only when its
+ * denominator came from a quarterly report rather than the filing itself.
+ */
+export function reportedIsCombinedBasis(
+  kind: RatioBasisKind | null | undefined,
+  denReport: string | null | undefined,
+  isPreferredRow: boolean,
+): boolean {
+  if (kind === "unverified") return true;
+  if (isPreferredRow) return true;
+  return kind === "common_only" && denReport != null && denReport !== "A2";
 }
 
 /**
