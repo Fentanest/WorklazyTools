@@ -24,6 +24,16 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: rm -rf "$PB_JOB_ROOT"
       - uses: actions/checkout@v4
+        with:
+          # Full depth, like deploy-site.yml, for two reasons. First, the R3A
+          # diagnostic browser test reads a pinned historical blob
+          # (`tests/product-banner/r3a-diagnostic.browser.test.ts` runs
+          # `git show 151b1f1f…:src/features/product-banner/runtime.ts`), so
+          # this checkout itself needs the full history. Second, this job
+          # shares the persistent runner's workspace, and a shallow fetch here
+          # would mark the shared .git shallow again, forcing the next full
+          # fetch to re-download all history as a new pack (32GB incident).
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -37,3 +47,77 @@ jobs:
           export XDG_CACHE_HOME="$PB_JOB_ROOT/cache" XDG_CONFIG_HOME="$PB_JOB_ROOT/config" XDG_DATA_HOME="$PB_JOB_ROOT/data" XDG_RUNTIME_DIR="$PB_JOB_ROOT/runtime" GSETTINGS_BACKEND=memory
           npm run build:product-banner-tests
           npm run test:product-banner
+      - name: Clean this run's leftovers on the persistent runner
+        # Last step: removes only what this run created (this job's tmp dir
+        # under the workspace + this job's temp dir contents). Never touches
+        # other repositories, system folders, or docker. Deletion failures are
+        # logged with their real error and surfaced as ::warning:: (never
+        # hidden); "removed" is printed only when the path is actually gone.
+        # The step always exits 0 so cleanup never changes the job result.
+        if: always()
+        run: |
+          set -u
+          cleanup_failed=0
+          # du that never fails the step: prints the size when available and
+          # turns real errors into ::warning:: (never hidden).
+          du_log() {
+            local du_status=0 du_out=""
+            du_out=$(du -sh "$1" 2>&1) || du_status=$?
+            if [ -n "$du_out" ]; then echo "$du_out"; fi
+            if [ "$du_status" -ne 0 ]; then
+              echo "::warning::du reported errors for $1 (exit $du_status; size above may be partial)"
+              cleanup_failed=1
+            fi
+          }
+          echo "=== disk before runner cleanup ==="
+          df -h
+          if [ -n "${PB_JOB_ROOT:-}" ] && [ -d "$PB_JOB_ROOT" ]; then
+            du_log "$PB_JOB_ROOT"
+            rm_status=0
+            rm_err=$(rm -rf "$PB_JOB_ROOT" 2>&1) || rm_status=$?
+            if [ -e "$PB_JOB_ROOT" ]; then
+              echo "::warning::failed to remove $PB_JOB_ROOT (rm exit $rm_status): $rm_err"
+              cleanup_failed=1
+            else
+              echo "removed: $PB_JOB_ROOT"
+              if [ "$rm_status" -ne 0 ]; then
+                echo "::warning::rm for $PB_JOB_ROOT exited $rm_status but the path is gone: $rm_err"
+                cleanup_failed=1
+              fi
+            fi
+          else
+            echo "PB_JOB_ROOT absent, skipping"
+          fi
+          echo "node_modules: kept (explicitly excluded)"
+          echo "--- this repository .git size (watch for re-accumulation) ---"
+          if [ -d .git ]; then du_log .git; else echo ".git: absent"; fi
+          if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
+            du_log "$RUNNER_TEMP"
+            echo "entries before removal:"
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>&1 | head -30
+            find_status=0
+            find_err=$(find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>&1) || find_status=$?
+            if [ "$find_status" -ne 0 ]; then
+              echo "::warning::RUNNER_TEMP cleanup errors (find exit $find_status): $find_err"
+              cleanup_failed=1
+            elif [ -n "$find_err" ]; then
+              echo "RUNNER_TEMP cleanup notes: $find_err"
+            fi
+            leftover=$(find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>&1 | head -30)
+            if [ -n "$leftover" ]; then
+              echo "::warning::RUNNER_TEMP still has entries after cleanup:"
+              echo "$leftover"
+              cleanup_failed=1
+            else
+              echo "RUNNER_TEMP contents removed (this job temp only, directory itself kept)"
+            fi
+          else
+            echo "RUNNER_TEMP missing; skipping"
+          fi
+          echo "=== disk after runner cleanup ==="
+          df -h
+          if [ "$cleanup_failed" -ne 0 ]; then
+            echo "::warning::runner cleanup finished with failures (see above); job result unchanged"
+          fi
+          # Warnings only: cleanup must never change the job result.
+          exit 0
