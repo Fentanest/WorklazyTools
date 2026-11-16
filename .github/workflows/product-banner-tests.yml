@@ -37,3 +37,31 @@ jobs:
           export XDG_CACHE_HOME="$PB_JOB_ROOT/cache" XDG_CONFIG_HOME="$PB_JOB_ROOT/config" XDG_DATA_HOME="$PB_JOB_ROOT/data" XDG_RUNTIME_DIR="$PB_JOB_ROOT/runtime" GSETTINGS_BACKEND=memory
           npm run build:product-banner-tests
           npm run test:product-banner
+      - name: Clean this run's leftovers on the persistent runner
+        # Last step: removes only what this run created (this job's tmp dir
+        # under the workspace + this job's temp dir contents). Never touches
+        # other repositories, system folders, or docker. Logs what was removed.
+        if: always()
+        run: |
+          set -u
+          echo "=== disk before runner cleanup ==="
+          df -h
+          if [ -n "${PB_JOB_ROOT:-}" ] && [ -d "$PB_JOB_ROOT" ]; then
+            du -sh "$PB_JOB_ROOT" 2>/dev/null || true
+            rm -rf "$PB_JOB_ROOT" || true
+            echo "removed: $PB_JOB_ROOT"
+          else
+            echo "PB_JOB_ROOT absent, skipping"
+          fi
+          echo "node_modules: kept (explicitly excluded)"
+          if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
+            du -sh "$RUNNER_TEMP" 2>/dev/null || true
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>/dev/null | head -30 || true
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+            echo "RUNNER_TEMP contents removed (this job temp only, directory itself kept)"
+          else
+            echo "RUNNER_TEMP missing; skipping"
+          fi
+          echo "=== disk after runner cleanup ==="
+          df -h
+          true

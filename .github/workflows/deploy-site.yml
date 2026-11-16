@@ -196,6 +196,44 @@ jobs:
           path: dist
           retention-days: 1
 
+      - name: Clean this run's leftovers on the persistent runner
+        # Last step: runs after the Pages upload so it never removes what must
+        # be published. Removes only what this run created in this repository
+        # workspace (build outputs, data checkouts, job temp contents).
+        # Never touches other repositories, system folders, or docker.
+        # Logs what was removed.
+        if: always()
+        run: |
+          set -u
+          echo "=== disk before runner cleanup ==="
+          df -h
+          echo
+          echo "--- this repository workspace leftovers (this run only) ---"
+          for p in foliotrace-site-data market-calendar-state public/data/foliotrace dist; do
+            if [ -e "$p" ]; then
+              du -sh "$p" 2>/dev/null || true
+              rm -rf "$p" || true
+              echo "removed: $p"
+            else
+              echo "$p: absent, skipping"
+            fi
+          done
+          echo "node_modules: kept (explicitly excluded)"
+          echo
+          echo "--- this job RUNNER_TEMP contents ---"
+          if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
+            du -sh "$RUNNER_TEMP" 2>/dev/null || true
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>/dev/null | head -30 || true
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+            echo "RUNNER_TEMP contents removed (this job temp only, directory itself kept)"
+          else
+            echo "RUNNER_TEMP missing; skipping"
+          fi
+          echo
+          echo "=== disk after runner cleanup ==="
+          df -h
+          true
+
   deploy:
     needs: build
     if: github.event_name == 'push' || github.event_name == 'schedule' || inputs.mode == 'deploy'
@@ -258,3 +296,23 @@ jobs:
         continue-on-error: true
         timeout-minutes: 2
         run: node scripts/submit-indexnow.mjs --live
+
+      - name: Clean this run's temp leftovers on the persistent runner
+        # Last step: only this job's temp dir contents. Never touches other
+        # repositories, system folders, or docker. Logs what was removed.
+        if: always()
+        run: |
+          set -u
+          echo "=== disk before runner cleanup ==="
+          df -h
+          if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
+            du -sh "$RUNNER_TEMP" 2>/dev/null || true
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>/dev/null | head -30 || true
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
+            echo "RUNNER_TEMP contents removed (this job temp only, directory itself kept)"
+          else
+            echo "RUNNER_TEMP missing; skipping"
+          fi
+          echo "=== disk after runner cleanup ==="
+          df -h
+          true
