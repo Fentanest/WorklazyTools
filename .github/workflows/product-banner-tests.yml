@@ -40,28 +40,61 @@ jobs:
       - name: Clean this run's leftovers on the persistent runner
         # Last step: removes only what this run created (this job's tmp dir
         # under the workspace + this job's temp dir contents). Never touches
-        # other repositories, system folders, or docker. Logs what was removed.
+        # other repositories, system folders, or docker. Deletion failures are
+        # logged with their real error and surfaced as ::warning:: (never
+        # hidden); "removed" is printed only when the path is actually gone.
+        # The step always exits 0 so cleanup never changes the job result.
         if: always()
         run: |
           set -u
+          cleanup_failed=0
           echo "=== disk before runner cleanup ==="
           df -h
           if [ -n "${PB_JOB_ROOT:-}" ] && [ -d "$PB_JOB_ROOT" ]; then
             du -sh "$PB_JOB_ROOT" 2>/dev/null || true
-            rm -rf "$PB_JOB_ROOT" || true
-            echo "removed: $PB_JOB_ROOT"
+            rm_err=$(rm -rf "$PB_JOB_ROOT" 2>&1)
+            rm_status=$?
+            if [ -e "$PB_JOB_ROOT" ]; then
+              echo "::warning::failed to remove $PB_JOB_ROOT (rm exit $rm_status): $rm_err"
+              cleanup_failed=1
+            else
+              echo "removed: $PB_JOB_ROOT"
+              if [ "$rm_status" -ne 0 ]; then
+                echo "::warning::rm for $PB_JOB_ROOT exited $rm_status but the path is gone: $rm_err"
+                cleanup_failed=1
+              fi
+            fi
           else
             echo "PB_JOB_ROOT absent, skipping"
           fi
           echo "node_modules: kept (explicitly excluded)"
           if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
             du -sh "$RUNNER_TEMP" 2>/dev/null || true
-            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>/dev/null | head -30 || true
-            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
-            echo "RUNNER_TEMP contents removed (this job temp only, directory itself kept)"
+            echo "entries before removal:"
+            find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>&1 | head -30
+            find_err=$(find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>&1)
+            find_status=$?
+            if [ "$find_status" -ne 0 ]; then
+              echo "::warning::RUNNER_TEMP cleanup errors (find exit $find_status): $find_err"
+              cleanup_failed=1
+            elif [ -n "$find_err" ]; then
+              echo "RUNNER_TEMP cleanup notes: $find_err"
+            fi
+            leftover=$(find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>&1 | head -30)
+            if [ -n "$leftover" ]; then
+              echo "::warning::RUNNER_TEMP still has entries after cleanup:"
+              echo "$leftover"
+              cleanup_failed=1
+            else
+              echo "RUNNER_TEMP contents removed (this job temp only, directory itself kept)"
+            fi
           else
             echo "RUNNER_TEMP missing; skipping"
           fi
           echo "=== disk after runner cleanup ==="
           df -h
-          true
+          if [ "$cleanup_failed" -ne 0 ]; then
+            echo "::warning::runner cleanup finished with failures (see above); job result unchanged"
+          fi
+          # Warnings only: cleanup must never change the job result.
+          exit 0
