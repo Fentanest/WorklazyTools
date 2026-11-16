@@ -209,13 +209,24 @@ jobs:
         run: |
           set -u
           cleanup_failed=0
+          # du that never fails the step: prints the size when available and
+          # turns real errors into ::warning:: (never hidden).
+          du_log() {
+            local du_status=0 du_out=""
+            du_out=$(du -sh "$1" 2>&1) || du_status=$?
+            if [ -n "$du_out" ]; then echo "$du_out"; fi
+            if [ "$du_status" -ne 0 ]; then
+              echo "::warning::du reported errors for $1 (exit $du_status; size above may be partial)"
+              cleanup_failed=1
+            fi
+          }
           echo "=== disk before runner cleanup ==="
           df -h
           echo
           echo "--- this repository workspace leftovers (this run only) ---"
           for p in foliotrace-site-data market-calendar-state public/data/foliotrace dist; do
             if [ -e "$p" ]; then
-              du -sh "$p" 2>/dev/null || true
+              du_log "$p"
               rm_status=0
               rm_err=$(rm -rf "$p" 2>&1) || rm_status=$?
               if [ -e "$p" ]; then
@@ -234,12 +245,12 @@ jobs:
           done
           echo
           echo "--- this repository .git size (watch for re-accumulation) ---"
-          if [ -d .git ]; then du -sh .git; else echo ".git: absent"; fi
+          if [ -d .git ]; then du_log .git; else echo ".git: absent"; fi
           echo "node_modules: kept (explicitly excluded)"
           echo
           echo "--- this job RUNNER_TEMP contents ---"
           if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
-            du -sh "$RUNNER_TEMP" 2>/dev/null || true
+            du_log "$RUNNER_TEMP"
             echo "entries before removal:"
             find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>&1 | head -30
             find_status=0
@@ -347,12 +358,23 @@ jobs:
         run: |
           set -u
           cleanup_failed=0
+          # du that never fails the step: prints the size when available and
+          # turns real errors into ::warning:: (never hidden).
+          du_log() {
+            local du_status=0 du_out=""
+            du_out=$(du -sh "$1" 2>&1) || du_status=$?
+            if [ -n "$du_out" ]; then echo "$du_out"; fi
+            if [ "$du_status" -ne 0 ]; then
+              echo "::warning::du reported errors for $1 (exit $du_status; size above may be partial)"
+              cleanup_failed=1
+            fi
+          }
           echo "=== disk before runner cleanup ==="
           df -h
           echo "--- this repository .git size (watch for re-accumulation) ---"
-          if [ -d .git ]; then du -sh .git; else echo ".git: absent"; fi
+          if [ -d .git ]; then du_log .git; else echo ".git: absent"; fi
           if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
-            du -sh "$RUNNER_TEMP" 2>/dev/null || true
+            du_log "$RUNNER_TEMP"
             echo "entries before removal:"
             find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>&1 | head -30
             find_status=0

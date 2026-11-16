@@ -25,11 +25,14 @@ jobs:
         run: rm -rf "$PB_JOB_ROOT"
       - uses: actions/checkout@v4
         with:
-          # Full depth like deploy-site.yml: this job shares the persistent
-          # runner's workspace, and a shallow fetch here would mark the shared
-          # .git shallow again, forcing the next full fetch to re-download all
-          # history as a new pack (32GB incident, 11/17). Banner tests use no
-          # git history.
+          # Full depth, like deploy-site.yml, for two reasons. First, the R3A
+          # diagnostic browser test reads a pinned historical blob
+          # (`tests/product-banner/r3a-diagnostic.browser.test.ts` runs
+          # `git show 151b1f1f…:src/features/product-banner/runtime.ts`), so
+          # this checkout itself needs the full history. Second, this job
+          # shares the persistent runner's workspace, and a shallow fetch here
+          # would mark the shared .git shallow again, forcing the next full
+          # fetch to re-download all history as a new pack (32GB incident).
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
@@ -55,10 +58,21 @@ jobs:
         run: |
           set -u
           cleanup_failed=0
+          # du that never fails the step: prints the size when available and
+          # turns real errors into ::warning:: (never hidden).
+          du_log() {
+            local du_status=0 du_out=""
+            du_out=$(du -sh "$1" 2>&1) || du_status=$?
+            if [ -n "$du_out" ]; then echo "$du_out"; fi
+            if [ "$du_status" -ne 0 ]; then
+              echo "::warning::du reported errors for $1 (exit $du_status; size above may be partial)"
+              cleanup_failed=1
+            fi
+          }
           echo "=== disk before runner cleanup ==="
           df -h
           if [ -n "${PB_JOB_ROOT:-}" ] && [ -d "$PB_JOB_ROOT" ]; then
-            du -sh "$PB_JOB_ROOT" 2>/dev/null || true
+            du_log "$PB_JOB_ROOT"
             rm_status=0
             rm_err=$(rm -rf "$PB_JOB_ROOT" 2>&1) || rm_status=$?
             if [ -e "$PB_JOB_ROOT" ]; then
@@ -76,9 +90,9 @@ jobs:
           fi
           echo "node_modules: kept (explicitly excluded)"
           echo "--- this repository .git size (watch for re-accumulation) ---"
-          if [ -d .git ]; then du -sh .git; else echo ".git: absent"; fi
+          if [ -d .git ]; then du_log .git; else echo ".git: absent"; fi
           if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
-            du -sh "$RUNNER_TEMP" 2>/dev/null || true
+            du_log "$RUNNER_TEMP"
             echo "entries before removal:"
             find "$RUNNER_TEMP" -mindepth 1 -maxdepth 1 -print 2>&1 | head -30
             find_status=0
