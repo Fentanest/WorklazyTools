@@ -323,13 +323,37 @@ const DENOMINATOR_REPORT_LABELS: Record<string, Record<Lang, string>> = {
   "11012": { ko: "반기보고서", en: "Half-year report" },
   "11014": { ko: "3분기보고서", en: "Q3 report" },
   "11011": { ko: "사업보고서", en: "Annual report" },
-  A1: { ko: "대량보유보고서(A1)", en: "Large-holding report (A1)" },
-  A2: { ko: "임원·주요주주보고서(A2)", en: "Insider report (A2)" },
+  A1: { ko: "대량보유보고", en: "Large-holding report" },
+  A2: { ko: "임원·주요주주보고", en: "Insider report" },
 };
 
 export function denominatorReportLabel(report: string | null | undefined, lang: Lang): string | null {
   if (report == null || report === "") return null;
   return DENOMINATOR_REPORT_LABELS[report]?.[lang] ?? report;
+}
+
+/**
+ * A1 cover (주식등, incl. warrants etc.) figures line, shown only when the cover
+ * differs from the 주권 figures. The pipeline only emits the two fields together,
+ * so a half-present pair never renders.
+ */
+const TITLE_FILING_FIGURES: Record<Lang, string> = {
+  ko: "공시 표제(신주인수권 등 포함)",
+  en: "Filing cover (incl. subscription warrants etc.)",
+};
+
+export function titleFilingFiguresLabel(lang: Lang): string {
+  return TITLE_FILING_FIGURES[lang];
+}
+
+export function titleFiguresText(
+  figure: Pick<Holding, "titleQuantity" | "titleCompanyOwnershipPercent">, lang: Lang,
+): string | null {
+  if (figure.titleQuantity == null || figure.titleCompanyOwnershipPercent == null) return null;
+  const qty = parseDecimal(figure.titleQuantity);
+  const ratio = parseDecimal(figure.titleCompanyOwnershipPercent);
+  if (qty === null || ratio === null) return null;   // malformed strings never render
+  return `${TITLE_FILING_FIGURES[lang]} ${renderAmount(qty)}${lang === "ko" ? "주" : " shares"}·${renderExact(ratio)}%`;
 }
 
 /** Raw reported events only; corrections, first reports and indirect estimates stay neutral. */
@@ -464,8 +488,17 @@ export function hasReceiptNo(receiptNo: string | null): receiptNo is string {
   return receiptNo !== null && !/^0{14}$/.test(receiptNo);
 }
 
-/** True when the reported ownership is a decimal below 5 (rows kept in the list but outside the 5% filing threshold). */
+/**
+ * True when the reported ownership is a decimal below 5 (rows kept in the list but
+ * outside the 5% filing threshold). The 5% tracking rule is company-level and runs on
+ * the 보통주 (voting-rights) basis, so it applies to common rows only: preferred-kind
+ * rows now carry their own per-class ratios (0.75% etc.) that must never read as
+ * "below 5% · last confirmed quantity", and the combined-preferred aggregate is
+ * outside tracking by construction. A preferred row's company still has its common
+ * row carrying the status separately.
+ */
 export function isBelowFivePercent(h: Holding): boolean {
+  if (h.securityKind !== "common") return false;
   const ownership = parseDecimal(h.companyOwnershipPercent);
   const threshold = parseDecimal("5");
   return ownership !== null && threshold !== null && compareParsed(ownership, threshold) < 0;

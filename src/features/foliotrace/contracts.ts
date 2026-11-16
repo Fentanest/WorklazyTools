@@ -130,6 +130,9 @@ export interface Holding {
   /** DART quarterly report code ('11013' | '11012' | '11014' | '11011') or filing form ('A1' | 'A2'). */
   ratioDenominatorReport?: string | null
   ratioDenominatorReceipt?: string | null
+  /** A1 cover (주식등, incl. warrants etc.) figures, kept when they differ from the 주권 figures (revision 3.2, optional). */
+  titleQuantity?: DecimalString | null
+  titleCompanyOwnershipPercent?: DecimalString | null
   /** True for the combined-preferred aggregate line (kinds reported only as one total): never priced.
    * Its stockCode is the 8-digit company code, not a listed code. */
   preferredCombined?: boolean | null
@@ -161,6 +164,9 @@ export interface FilingEvent {
   reportedCompanyOwnershipPercent?: DecimalString | null
   /** Denominator source of the displayed figure, same vocabulary as holdings (revision 3.1, optional). */
   ratioDenominatorReport?: string | null
+  /** A1 cover (주식등, incl. warrants etc.) figures, kept when they differ from the 주권 figures (revision 3.2, optional). */
+  titleQuantity?: DecimalString | null
+  titleCompanyOwnershipPercent?: DecimalString | null
   percentagePointChange?: DecimalString | null
   source: 'legacy-import' | 'dart-structured' | 'dart-document' | 'indirect-observation' | 'issuer-scope-observation'
   filingUrl: string | null

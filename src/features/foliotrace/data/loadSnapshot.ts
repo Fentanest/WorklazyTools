@@ -168,6 +168,8 @@ function validHolding(value: unknown): boolean {
     (value.ratioDenominatorReport === undefined || nullable(value.ratioDenominatorReport, str)) &&
     (value.ratioDenominatorReceipt === undefined || nullable(value.ratioDenominatorReceipt,
       item => str(item) && RECEIPT.test(item))) &&
+    (value.titleQuantity === undefined || nullable(value.titleQuantity, decimal)) &&
+    (value.titleCompanyOwnershipPercent === undefined || nullable(value.titleCompanyOwnershipPercent, decimal)) &&
     (value.preferredCombined === undefined || nullable(value.preferredCombined, item => typeof item === 'boolean')) &&
     nullable(value.quote, validQuote) && nullable(value.estimatedValue, decimal) &&
     nullable(value.portfolioWeightPercent, decimal) && nullable(value.valuationExclusionReason, str) &&
@@ -188,6 +190,8 @@ function validEvent(value: unknown): boolean {
     (value.ratioBasisKind === undefined || nullable(value.ratioBasisKind, ratioBasisKind)) &&
     (value.reportedCompanyOwnershipPercent === undefined || nullable(value.reportedCompanyOwnershipPercent, decimal)) &&
     (value.ratioDenominatorReport === undefined || nullable(value.ratioDenominatorReport, str)) &&
+    (value.titleQuantity === undefined || nullable(value.titleQuantity, decimal)) &&
+    (value.titleCompanyOwnershipPercent === undefined || nullable(value.titleCompanyOwnershipPercent, decimal)) &&
     (value.percentagePointChange === undefined || nullable(value.percentagePointChange, decimal)) &&
     nullable(value.filingUrl, filingUrl)
 }

@@ -55,6 +55,7 @@ import {
   sortHoldings,
   sumPercentText,
   topHoldings,
+  titleFiguresText as titleFiguresLine,
 } from "./holdings";
 import type { FilingChangeDirection, Lang, QualityFilter, SortKey } from "./holdings";
 import { XIcon } from "lucide-react";
@@ -570,6 +571,8 @@ function ownershipTitle(h: Holding, lang: Lang): string {
     parts.push(`${STR[lang].reportedOriginal} ${formatPct(h.reportedCompanyOwnershipPercent)}` +
       (reportedIsCombinedBasis(h.ratioBasisKind, h.ratioDenominatorReport, h.securityKind === "preferred") ? ` ${STR[lang].reportedCombinedBasis}` : ""));
   }
+  const title = titleFiguresLine(h, lang);
+  if (title) parts.push(title);
   return parts.join(" · ");
 }
 
@@ -581,6 +584,8 @@ function eventOwnershipTitle(event: FilingEvent, lang: Lang): string {
     parts.push(`${STR[lang].reportedOriginal} ${formatPct(event.reportedCompanyOwnershipPercent)}` +
       (reportedIsCombinedBasis(event.ratioBasisKind, event.ratioDenominatorReport, false) ? ` ${STR[lang].reportedCombinedBasis}` : ""));
   }
+  const title = titleFiguresLine(event, lang);
+  if (title) parts.push(title);
   return parts.join(" · ");
 }
 
@@ -667,6 +672,7 @@ function FilingHistory({ events, lang }: { events: FilingEvent[]; lang: Lang }) 
             <code className="foliotrace-code">{e.receiptNo}</code>
             {(e.correctionOf || e.isCorrectionOrWithdrawal) && <small> · {t.eventCorrection}</small>}
             {e.correctionOf && <small> ← {e.correctionOf}</small>}
+            {titleFiguresLine(e, lang) && <small className="foliotrace-row-reason"> · {titleFiguresLine(e, lang)}</small>}
             {e.filingUrl && <> <a href={e.filingUrl} target="_blank" rel="noreferrer">{t.openFiling}</a></>}
           </li>
         ))}
@@ -862,7 +868,10 @@ function ReadyView({
 
   const entityName = lang === "ko" ? snapshot.entity.nameKo : snapshot.entity.nameEn;
   const scope = lang === "ko" ? snapshot.portfolio.scopeKo : snapshot.portfolio.scopeEn;
-  const trackingStatusLabel = (holding: Holding) =>
+  const trackingStatusLabel = (holding: Holding): string | null =>
+    // 5% 추적 상태는 보통주(의결권) 기준이라 우선주 행에는 붙이지 않는다: 같은 회사의 보통주 행이
+    // 별도로 상태를 가진다. 합계 줄은 추적 대상 밖이다.
+    (holding.securityKind === "preferred" || holding.preferredCombined) ? null :
     (indirectReentries.has(`${holding.corpCode}:${holding.receiptNo}`) ||
       (holding.observationStatus === "verified_scoped" && holding.tracking === "active")) ? t.eventIndirectReentry :
       holding.tracking === "active" ? (isBelowFivePercent(holding) ? t.statusActiveBelow5 : t.statusActiveRecord) :
@@ -896,7 +905,7 @@ function ReadyView({
       reasons.push(`${h.issuerScopeSource.laterChangeDate}: ${t.issuerScopeLaterChange}`);
     }
     const tracking = trackingStatusLabel(h);
-    if (tracking !== t.statusActiveRecord) reasons.push(tracking);
+    if (tracking !== null && tracking !== t.statusActiveRecord) reasons.push(tracking);
     if (h.estimatedValue === null) reasons.push(exclusionReasonLabel(h.valuationExclusionReason, lang) ?? t.statusExcluded);
     else if (holdingStatus(h) === "unresolved") reasons.push(statusLabel("unresolved"));
     return [...new Set(reasons)];
@@ -1506,7 +1515,8 @@ function ReadyView({
                   direction={filingChanges.get(selected)?.ownership ?? null} delta={filingChanges.get(selected)?.ownershipDelta ?? null}
                   basisChanged={filingBasisChanges.get(selected) === true} metric="ownership" lang={lang} /></dd>
               </div>
-              {(selected.ratioBasisKind || selected.reportedCompanyOwnershipPercent != null || selected.preferredCombined) && (
+              {(selected.ratioBasisKind || selected.reportedCompanyOwnershipPercent != null || selected.preferredCombined ||
+                (selected.titleQuantity != null && selected.titleCompanyOwnershipPercent != null)) && (
                 <div>
                   <dt>{t.detailRatioBasis}</dt>
                   <dd>
@@ -1529,6 +1539,9 @@ function ReadyView({
                     )}
                     {selected.preferredCombined && (
                       <small className="foliotrace-row-reason">{t.preferredCombinedNote}</small>
+                    )}
+                    {titleFiguresLine(selected, lang) && (
+                      <small className="foliotrace-row-reason">{titleFiguresLine(selected, lang)}</small>
                     )}
                   </dd>
                 </div>
@@ -1601,7 +1614,7 @@ function ReadyView({
               <div>
                 <dt>{t.detailInclusion}</dt>
                 <dd>
-                  {trackingStatusLabel(selected)} · {statusLabel(holdingStatus(selected))}
+                  {[trackingStatusLabel(selected), statusLabel(holdingStatus(selected))].filter((part) => part !== null).join(" · ")}
                   {(() => {
                     const reason = exclusionReasonLabel(selected.valuationExclusionReason, lang);
                     return reason ? ` — ${reason}` : "";

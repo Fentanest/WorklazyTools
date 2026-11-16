@@ -155,7 +155,8 @@ test("the combined-preferred aggregate never takes part in filing changes", () =
   assert.equal(filingBasisChangesForHoldings([combined], [ev]).has(combined), false);
 });
 
-test("basis and denominator-source labels render without raw codes", () => {
+test("basis and denominator-source labels render without raw codes", async () => {
+  const { titleFiguresText, titleFilingFiguresLabel } = await import("../../src/features/foliotrace/ui/holdings.ts");
   assert.equal(ratioBasisLabel("common_only", "ko"), "보통주만의 비율");
   assert.equal(ratioBasisLabel("preferred_combined", "ko"), "우선주 합계 비율");
   assert.equal(ratioBasisLabel("unverified", "ko"), "기준 미확인");
@@ -164,9 +165,22 @@ test("basis and denominator-source labels render without raw codes", () => {
   assert.equal(ratioBasisLabel(undefined, "en"), null);
   assert.equal(denominatorReportLabel("11012", "ko"), "반기보고서");
   assert.equal(denominatorReportLabel("11014", "en"), "Q3 report");
-  assert.equal(denominatorReportLabel("A1", "ko"), "대량보유보고서(A1)");
+  assert.equal(denominatorReportLabel("A1", "ko"), "대량보유보고");
+  assert.equal(denominatorReportLabel("A2", "ko"), "임원·주요주주보고");
+  assert.equal(denominatorReportLabel("A1", "en"), "Large-holding report");
+  assert.equal(denominatorReportLabel("A2", "en"), "Insider report");
   assert.equal(denominatorReportLabel("ZZ", "ko"), "ZZ");
   assert.equal(denominatorReportLabel(null, "ko"), null);
+  // 새 문구 전수: 내부 코드·영문 kind 값이 화면에 나오지 않는다.
+  const labels = [
+    titleFilingFiguresLabel("ko"), titleFilingFiguresLabel("en"),
+    titleFiguresText({ titleQuantity: "1", titleCompanyOwnershipPercent: "1" }, "ko"),
+    titleFiguresText({ titleQuantity: "1", titleCompanyOwnershipPercent: "1" }, "en"),
+  ];
+  for (const label of labels) {
+    assert.ok(label && !/\(A\d\)|\(A3\)|common_only|voting_rights|preferred_only|preferred_combined|issued_total|major_holder_report|year_end|stockCode|corpCode/.test(label),
+      `internal code leaked: ${label}`);
+  }
 });
 
 test("preserved filing percentages say when they use the combined basis", () => {
@@ -208,6 +222,16 @@ test("the recent-events name button goes through the holding-key resolver", () =
   const page = fs.readFileSync(path.join(root, "src/features/foliotrace/ui/FolioTracePage.tsx"), "utf8");
   assert.match(page, /setSelectedCode\(selectionKeyForEvent\(event, snapshot\.holdings\)\)/);
   assert.doesNotMatch(page, /setSelectedCode\(event\.stockCode/);
+});
+
+test("cover figures reach tooltips, history rows, and the detail sheet", () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+  const page = fs.readFileSync(path.join(root, "src/features/foliotrace/ui/FolioTracePage.tsx"), "utf8");
+  // 툴팁(보유·이벤트)과 상세·이력 표시가 모두 같은 헬퍼를 쓴다. 빼면 표제 표시가 사라진다.
+  assert.match(page, /const title = titleFiguresLine\(h, lang\);/);
+  assert.match(page, /const title = titleFiguresLine\(event, lang\);/);
+  assert.match(page, /\{titleFiguresLine\(e, lang\) && <small className="foliotrace-row-reason">/);
+  assert.match(page, /\{titleFiguresLine\(selected, lang\) && \(/);
 });
 
 test("the public-data validator accepts the company-code aggregate and rejects listed-code reuse", async () => {
@@ -316,4 +340,138 @@ test("the combined-preferred aggregate follows its company's market, still unpri
   assert.equal(allocation.markets.KOSPI.count, 2);
   assert.equal(allocation.markets.KOSPI.pricedCount, 0); // 주가·평가는 계속 없음
   assert.equal(allocation.markets.KOSPI.amount, "0");
+});
+
+test("the 5% tracking rule runs on common rows only", async () => {
+  const { filterHoldings, isBelowFivePercent } = await import("../../src/features/foliotrace/ui/holdings.ts");
+  // 코오롱인더우 0.75%: 종류별 비율이지 추적 이탈이 아니다.
+  const preferred = holding({ stockCode: "120115", securityKind: "preferred", quantity: "20773", companyOwnershipPercent: "0.750508" });
+  assert.equal(isBelowFivePercent(preferred), false);
+  const combined = holding({
+    stockCode: "00148540", securityKind: "unknown", quantity: "90712", companyOwnershipPercent: "1.398423",
+    preferredCombined: true, ratioBasisKind: "preferred_combined",
+  });
+  assert.equal(isBelowFivePercent(combined), false);
+  // 보통주 행은 그대로: 5% 미만이면 라벨·필터 대상.
+  assert.equal(isBelowFivePercent(holding({ stockCode: "120110", companyOwnershipPercent: "4.99" })), true);
+  assert.equal(isBelowFivePercent(holding({ stockCode: "120110", companyOwnershipPercent: "12.946446" })), false);
+  assert.deepEqual(filterHoldings([preferred, combined, holding({ stockCode: "120110", companyOwnershipPercent: "4.99" })], "", "below-5").map((h) => h.stockCode), ["120110"]);
+});
+
+test("user-facing basis labels never expose internal codes", () => {
+  const kinds = ["common_only", "voting_rights", "preferred_only", "preferred_combined", "issued_total", "major_holder_report", "unverified", "year_end"] as const;
+  for (const kind of kinds) {
+    for (const lang of ["ko", "en"] as const) {
+      const label = ratioBasisLabel(kind, lang);
+      assert.ok(label && !/\(A\d\)|_only|_rights|_combined|_total|_report|verified_scoped/.test(label), `${kind}/${lang}: ${label}`);
+    }
+  }
+  for (const lang of ["ko", "en"] as const) {
+    for (const report of ["11013", "11012", "11014", "11011", "A1", "A2"]) {
+      const label = denominatorReportLabel(report, lang);
+      assert.ok(label && !/\(A\d\)/.test(label), `${report}/${lang}: ${label}`);
+    }
+  }
+});
+
+test("cover figures render with the mandated label and never affect deltas", async () => {
+  const { filingChangesForEvents, titleFiguresText } = await import("../../src/features/foliotrace/ui/holdings.ts");
+  // RF머트리얼즈 A1 20260701000577 실제 수치: 표제 313,381주·3.68%, 주권 281,582주·3.31%.
+  assert.equal(
+    titleFiguresText({ titleQuantity: "313381", titleCompanyOwnershipPercent: "3.68" }, "ko"),
+    "공시 표제(신주인수권 등 포함) 313,381주·3.68%",
+  );
+  assert.equal(
+    titleFiguresText({ titleQuantity: "313381", titleCompanyOwnershipPercent: "3.68" }, "en"),
+    "Filing cover (incl. subscription warrants etc.) 313,381 shares·3.68%",
+  );
+  assert.equal(titleFiguresText({}, "ko"), null);
+  assert.equal(titleFiguresText({ titleQuantity: "313381" }, "ko"), null);
+  assert.equal(titleFiguresText({ titleQuantity: "garbage", titleCompanyOwnershipPercent: "3.68" }, "ko"), null);
+  // 표제 유무와 무관하게 증감은 주권 수치로만 계산된다(직전 631,125주 → 이번 281,582주).
+  const prev = (title?: object) => event({
+    receiptNo: "20260401002535", receiptDate: "2026-04-01", basisDate: "2026-02-13",
+    stockCode: "327260", corpCode: "01343665", kind: "decrease",
+    quantity: "631125", companyOwnershipPercent: "7.48", ratioBasisKind: "voting_rights",
+    ...title,
+  });
+  const cur = (title?: object) => event({
+    receiptNo: "20260701000577", receiptDate: "2026-07-01", basisDate: "2026-06-10",
+    stockCode: "327260", corpCode: "01343665", kind: "tracking-exit",
+    quantity: "281582", companyOwnershipPercent: "3.31", ratioBasisKind: "voting_rights",
+    ...title,
+  });
+  const p0 = prev(), c1 = cur({ titleQuantity: "313381", titleCompanyOwnershipPercent: "3.68" });
+  const titled = filingChangesForEvents([p0, c1]).get(c1);
+  assert.equal(titled?.quantityDelta, "-349543");
+  assert.equal(titled?.ownershipDelta, "-4.17");
+  const p1 = prev(), c2 = cur();
+  const plain = filingChangesForEvents([p1, c2]).get(c2);
+  assert.equal(plain?.quantityDelta, "-349543");
+  assert.equal(plain?.ownershipDelta, "-4.17");
+});
+
+test("the public-data validator accepts cover figures on holdings and events", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const { createHash } = await import("node:crypto");
+  const { validatePublicData, DATA_SUBPATH } = await import("../../scripts/foliotrace-public-data.mjs");
+
+  const version = "b".repeat(64);
+  const holding = {
+    corpCode: "01343665", stockCode: "327260", name: "RF머트리얼즈", securityKind: "common",
+    quantity: "281582", companyOwnershipPercent: "3.31",
+    ratioBasisKind: "issued_total",
+    ratioDenominatorValue: "8495135", ratioDenominatorDate: "2026-06-10",
+    ratioDenominatorReport: "A1", ratioDenominatorReceipt: "20260701000577",
+    titleQuantity: "313381", titleCompanyOwnershipPercent: "3.68",
+    receiptNo: "20260701000577", receiptDate: "2026-07-01", holdingDate: "2026-06-10",
+    evidence: "dart-structured", sourceKind: "nps-filing",
+    latestUnresolvedReceiptNo: null, latestUnresolvedReason: null,
+    tracking: "active", quote: { close: "10000", currency: "KRW", market: "KRX", session: "regular", tradeDate: "2026-11-13", adjusted: false, provider: "naver", observedAt: "2026-11-13T16:30:00+09:00", verified: true },
+    estimatedValue: "2815820000", portfolioWeightPercent: "100.00", valuationExclusionReason: null,
+    filingUrl: "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260701000577",
+  };
+  const snapEvent = {
+    receiptNo: "20260701000577", receiptDate: "2026-07-01", basisDate: "2026-06-10",
+    corpCode: "01343665", stockCode: "327260", kind: "tracking-exit",
+    correctionOf: null, isCorrectionOrWithdrawal: false,
+    quantity: "281582", companyOwnershipPercent: "3.31",
+    ratioBasisKind: "issued_total",
+    titleQuantity: "313381", titleCompanyOwnershipPercent: "3.68",
+    source: "dart-structured", filingUrl: "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260701000577",
+  };
+  const snap = {
+    schemaVersion: 1, datasetVersion: version,
+    portfolio: { id: "p", entityId: "e", market: "KRX", currency: "KRW", scopeKo: "s", scopeEn: "s", methodologyVersion: "2", legacyCoverage: "verified" },
+    entity: { id: "e", kind: "institution", nameKo: "n", nameEn: "n", officialId: null, source: "OpenDART" },
+    valuationTradeDate: "2026-11-13", filingsCheckedAt: null, generatedAt: "2026-11-15T00:00:00Z",
+    publishedAt: null, latestReceiptDate: "2026-07-01", trackedCount: 1,
+    pricedCount: 1, unresolvedCount: 0, estimatedValue: "2815820000",
+    valuationCoverage: "partial", filingCoverage: "complete",
+    holdings: [holding], events: [snapEvent], history: [],
+  };
+  const dir = mkdtempSync(join(tmpdir(), "ft-title-"));
+  const bytes = Buffer.from(JSON.stringify(snap));
+  mkdirSync(join(dir, DATA_SUBPATH, "snapshots"), { recursive: true });
+  writeFileSync(join(dir, DATA_SUBPATH, "snapshots", `${version}.json`), bytes);
+  writeFileSync(join(dir, DATA_SUBPATH, "manifest.json"), JSON.stringify({
+    schemaVersion: 1, datasetVersion: version,
+    snapshotPath: `snapshots/${version}.json`, snapshotSha256: createHash("sha256").update(bytes).digest("hex"),
+  }));
+  await validatePublicData(dir);
+  // 검증 줄을 빼면 비십진 표제 수치가 통과해 버리므로, 무효값은 거절되어야 한다.
+  const bad = JSON.parse(JSON.stringify(snap));
+  bad.holdings[0].titleQuantity = "not-a-number";
+  bad.datasetVersion = "c".repeat(64);
+  const dir2 = mkdtempSync(join(tmpdir(), "ft-title-bad-"));
+  const bytes2 = Buffer.from(JSON.stringify(bad));
+  mkdirSync(join(dir2, DATA_SUBPATH, "snapshots"), { recursive: true });
+  writeFileSync(join(dir2, DATA_SUBPATH, "snapshots", `${bad.datasetVersion}.json`), bytes2);
+  writeFileSync(join(dir2, DATA_SUBPATH, "manifest.json"), JSON.stringify({
+    schemaVersion: 1, datasetVersion: bad.datasetVersion,
+    snapshotPath: `snapshots/${bad.datasetVersion}.json`, snapshotSha256: createHash("sha256").update(bytes2).digest("hex"),
+  }));
+  await assert.rejects(validatePublicData(dir2));
 });
