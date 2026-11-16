@@ -24,6 +24,13 @@ jobs:
         if: runner.environment == 'self-hosted'
         run: rm -rf "$PB_JOB_ROOT"
       - uses: actions/checkout@v4
+        with:
+          # Full depth like deploy-site.yml: this job shares the persistent
+          # runner's workspace, and a shallow fetch here would mark the shared
+          # .git shallow again, forcing the next full fetch to re-download all
+          # history as a new pack (32GB incident, 11/17). Banner tests use no
+          # git history.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -68,6 +75,8 @@ jobs:
             echo "PB_JOB_ROOT absent, skipping"
           fi
           echo "node_modules: kept (explicitly excluded)"
+          echo "--- this repository .git size (watch for re-accumulation) ---"
+          if [ -d .git ]; then du -sh .git; else echo ".git: absent"; fi
           if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
             du -sh "$RUNNER_TEMP" 2>/dev/null || true
             echo "entries before removal:"

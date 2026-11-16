@@ -232,6 +232,9 @@ jobs:
               echo "$p: absent, skipping"
             fi
           done
+          echo
+          echo "--- this repository .git size (watch for re-accumulation) ---"
+          if [ -d .git ]; then du -sh .git; else echo ".git: absent"; fi
           echo "node_modules: kept (explicitly excluded)"
           echo
           echo "--- this job RUNNER_TEMP contents ---"
@@ -313,7 +316,12 @@ jobs:
         timeout-minutes: 5
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          # Same depth as the build job's checkout: this job shares the
+          # persistent runner's workspace, and a shallow fetch here would mark
+          # the shared .git shallow again, forcing the next full fetch to
+          # re-download all history as a new pack (32GB incident, 11/17).
+          # The submit script uses no git history.
+          fetch-depth: 0
           persist-credentials: false
       - name: Setup Node for IndexNow submission
         id: indexnow-node
@@ -341,6 +349,8 @@ jobs:
           cleanup_failed=0
           echo "=== disk before runner cleanup ==="
           df -h
+          echo "--- this repository .git size (watch for re-accumulation) ---"
+          if [ -d .git ]; then du -sh .git; else echo ".git: absent"; fi
           if [ -n "${RUNNER_TEMP:-}" ] && [ -d "$RUNNER_TEMP" ]; then
             du -sh "$RUNNER_TEMP" 2>/dev/null || true
             echo "entries before removal:"
