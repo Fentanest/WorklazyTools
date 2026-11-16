@@ -24,9 +24,32 @@ export function marketOf(stockCode: string): ListingMarket {
   return market === 'KOSPI' || market === 'KOSDAQ' || market === 'KONEX' ? market : 'UNKNOWN';
 }
 
+/** Company-code market of each issuer's common row, for rows that name no listed code. */
+function marketByCorpCode(holdings: readonly Holding[]): Map<string, ListingMarket> {
+  const markets = new Map<string, ListingMarket>();
+  for (const holding of holdings) {
+    if (holding.securityKind === 'common' && !markets.has(holding.corpCode)) {
+      markets.set(holding.corpCode, marketOf(holding.stockCode));
+    }
+  }
+  return markets;
+}
+
+/**
+ * Market of one holding. The combined-preferred aggregate carries the company code
+ * instead of a listed code, so it follows its company's (common row's) market and
+ * never lands in 「기타·시장 미확인」. Price and valuation stay absent: only the panel
+ * grouping changes.
+ */
+export function marketOfHolding(holding: Holding, markets: Map<string, ListingMarket>): ListingMarket {
+  if (holding.preferredCombined === true) return markets.get(holding.corpCode) ?? marketOf(holding.stockCode);
+  return marketOf(holding.stockCode);
+}
+
 export function groupHoldingsByMarket(holdings: readonly Holding[]): Record<ListingMarket, Holding[]> {
   const groups: Record<ListingMarket, Holding[]> = { KOSPI: [], KOSDAQ: [], KONEX: [], UNKNOWN: [] };
-  for (const holding of holdings) groups[marketOf(holding.stockCode)].push(holding);
+  const markets = marketByCorpCode(holdings);
+  for (const holding of holdings) groups[marketOfHolding(holding, markets)].push(holding);
   return groups;
 }
 
@@ -62,8 +85,9 @@ export function marketAllocation(holdings: readonly Holding[]) {
   const units: Record<ListingMarket, bigint> = { KOSPI: 0n, KOSDAQ: 0n, KONEX: 0n, UNKNOWN: 0n };
   const markets: Record<ListingMarket, MarketValue> = Object.fromEntries(LISTING_MARKETS.map(market =>
     [market, { count: 0, pricedCount: 0, amount: '0', percent: null }])) as Record<ListingMarket, MarketValue>;
+  const byCorp = marketByCorpCode(holdings);
   for (let i = 0; i < holdings.length; i++) {
-    const market = marketOf(holdings[i].stockCode), part = parts[i];
+    const market = marketOfHolding(holdings[i], byCorp), part = parts[i];
     markets[market].count++;
     if (part) { units[market] += part.units * 10n ** BigInt(scale - part.scale); markets[market].pricedCount++; }
   }

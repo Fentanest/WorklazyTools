@@ -274,3 +274,46 @@ test("the public-data validator accepts the company-code aggregate and rejects l
   // 종목코드 중복도 그대로 거절된다.
   await assert.rejects(validatePublicData(layOut([baseHolding, { ...baseHolding, quantity: "1" }])));
 });
+
+test("a combined-basis A1 never compares with the 보통주 group", () => {
+  // 호텔신라 A1(의결권 총수 40,000,000 = DART 합계): 파이프라인이 issued_total을 싣고,
+  // 사이트는 보통주 그룹(common_only)과 묶지 않는다.
+  const a1Combined = event({
+    receiptNo: "20260701000279", receiptDate: "2026-07-01", basisDate: "2026-04-24",
+    quantity: "3213595", companyOwnershipPercent: "8.03",
+    ratioBasisKind: "issued_total", reportedCompanyOwnershipPercent: "8.03",
+    ratioDenominatorReport: "A1", stockCode: "008770", corpCode: "00165680",
+  });
+  const a2Common = event({
+    receiptNo: "20261002000457", receiptDate: "2026-10-02", basisDate: "2026-09-09",
+    quantity: "2841803", companyOwnershipPercent: "7.24",
+    ratioBasisKind: "common_only", ratioDenominatorReport: "11012",
+    stockCode: "008770", corpCode: "00165680",
+  });
+  const changes = filingChangesForEvents([a1Combined, a2Common]);
+  assert.equal(changes.get(a2Common)?.quantityDelta, "-371792");
+  assert.equal(changes.get(a2Common)?.ownershipDelta, null);
+  assert.equal(filingBasisChangesForEvents([a1Combined, a2Common]).get(a2Common), true);
+});
+
+test("the combined-preferred aggregate follows its company's market, still unpriced", async () => {
+  const { groupHoldingsByMarket, marketAllocation, marketOf } = await import("../../src/features/foliotrace/ui/markets.ts");
+  const common = holding({ stockCode: "001040", corpCode: "00148540", receiptNo: "20261006000147" });
+  const combined = holding({
+    stockCode: "00148540", corpCode: "00148540", name: "CJ 우선주 합계", securityKind: "unknown",
+    quantity: "90712", companyOwnershipPercent: "1.398423089582047",
+    receiptNo: "20261006000147", receiptDate: "2026-10-06", holdingDate: "2026-09-30",
+    preferredCombined: true, ratioBasisKind: "preferred_combined",
+    quote: null, estimatedValue: null, portfolioWeightPercent: null,
+    valuationExclusionReason: "security_mapping_unverified",
+    filingUrl: "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261006000147",
+  });
+  assert.equal(marketOf("00148540"), "UNKNOWN"); // 회사코드는 참조표에 없다
+  const groups = groupHoldingsByMarket([common, combined]);
+  assert.deepEqual(groups.KOSPI, [common, combined]); // 보통주와 같은 KOSPI 패널
+  assert.deepEqual(groups.UNKNOWN, []);
+  const allocation = marketAllocation([common, combined]);
+  assert.equal(allocation.markets.KOSPI.count, 2);
+  assert.equal(allocation.markets.KOSPI.pricedCount, 0); // 주가·평가는 계속 없음
+  assert.equal(allocation.markets.KOSPI.amount, "0");
+});
