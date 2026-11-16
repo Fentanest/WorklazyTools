@@ -1,6 +1,6 @@
-# FolioTrace 공개 스냅샷 계약 (개정 2)
+# FolioTrace 공개 스냅샷 계약 (개정 3)
 
-작성 2026-10-25 · 계획 `foliotrace-ops-replacement-plan-20261024` P3-1 · 확정 결정 D2·D4·D5·D6·D8(2026-10-25 사용자).
+작성 2026-11-16 · FolioTrace 보통주·우선주 비율 기준 분리(사용자 결정 「권고안대로 해」 2026-11-16 + 우선주 합계 한 줄 결정 2026-11-16 20시대).
 코드 정본: `src/features/foliotrace/contracts.ts`(형), `src/features/foliotrace/data/loadSnapshot.ts`(`validSnapshot`·`SNAPSHOT_LIMITS`·`SOURCE_KINDS`), `scripts/foliotrace-public-data.mjs`(파일 단위 검증·비공개 내용 검사). 이 문서는 그 설명이며, 어긋나면 코드가 정본이다.
 
 ## 위치와 파일
@@ -9,6 +9,28 @@
 - 데이터 루트(`v1/`)에는 `manifest.json`과 `snapshots/` 외 아무것도 두지 않는다(검증기가 거절).
 - `snapshots/<datasetVersion>.json`: 스냅샷 본체. 폴더에는 **매니페스트가 가리키는 파일 하나만** 둔다(D5: 일자별 전체 사본 비보관, 이전 파일은 새 전달 때 삭제).
 - 화면은 `manifest.json`을 먼저 읽고(캐시 없음), 해시가 다르면 `schema-error`로 처리한다.
+
+## 개정 3에서 바뀐 것 (개정 2 대비 — 보통주·우선주 비율 기준 분리, 2026-11-16)
+
+보통주 줄은 보통주만의 비율(`보통주 수량 ÷ 보통주 발행주식수`), 우선주 줄은 그 우선주만의 비율로 표기한다.
+같은 필드에 분모가 다른 비율을 섞던 구조가 원인이다(공시 A1 비율의 분모는 의결권 있는 발행주식수,
+A2 비율의 분모는 보통주+우선주 합산 발행주식 총수). 화면은 이제 같은 기준(같은 분모 종류)의 비율끼리만
+비교하고, 기준이 바뀌면 수치 비교 대신 「기준 변경」을 표시한다.
+
+| 필드 | 형식 |
+|---|---|
+| `holdings[].ratioBasisKind` · `events[].ratioBasisKind` | 선택, `common_only`·`voting_rights`·`preferred_only`·`preferred_combined`·`issued_total`·`major_holder_report`·`unverified`·`year_end` 중 하나 |
+| `holdings[].reportedCompanyOwnershipPercent` · `events[].reportedCompanyOwnershipPercent` | 선택, 공시 원문 비율(합산 기준). 표시 비율과 같으면 생략 |
+| `holdings[].ratioDenominatorValue` | 선택, 분모 값(십진 문자열) |
+| `holdings[].ratioDenominatorDate` | 선택, 분모 기준일(YYYY-MM-DD) |
+| `holdings[].ratioDenominatorReport` | 선택, 분모 출처(`11013`·`11012`·`11014`·`11011` 분기보고서 코드 또는 `A1`·`A2`) |
+| `holdings[].ratioDenominatorReceipt` | 선택, 분모 출처 접수번호(14자리) |
+| `holdings[].preferredCombined` | 선택, 우선주 합계 줄이면 `true`. 주가·평가금액을 붙이지 않고 합계에서 제외(평가 불가 사유는 기존 제외 사유 체계 `security_mapping_unverified`로 기록). 상세 화면에 「국민연금 공시가 우선주를 종류별로 나누지 않고 합계로만 발표해 종류별 수량과 평가금액을 알 수 없음」(한/영) 표시 |
+
+**하위 호환**: 개정 3 필드는 전부 선택이라 개정 1·2 스냅샷이 그대로 통과한다. 기준 정보가 없는 옛 스냅샷에서는
+기존처럼 동작하되(기준을 알 수 없어 섞인 비교를 가려낼 수 없음), 기준이 알려진 앞뒤 공시는 같은 기준끼리만
+비교하고 기준 변경은 「기준 변경」으로 표시한다. 반대로 개정 3 스냅샷을 옛 검증기에 넣으면 통과한다
+(추가 필드는 무시되지만, 옛 화면은 합산/보통주 기준을 구분 없이 뺄셈하므로 게시 전에 반드시 이 저장소의 검증기로 확인한다).
 
 ## 개정 2에서 바뀐 것 (개정 1 대비)
 | 항목 | 개정 1 | 개정 2 |
@@ -74,7 +96,7 @@
 
 ## 생산자(foliotrace-pipeline) 후속 — 이 저장소 범위 밖
 1. 연말 목록 행의 `receiptNo`를 자리표시 `00000000000000` 대신 `null`로 낸다(둘 다 통과하지만 null이 계약).
-2. `contract_v1/` 사본(`contracts.ts`, `loadSnapshot.ts`)을 이 저장소의 개정 2 파일로 교체하고 드리프트 시험을 갱신한다. `scripts/foliotrace-public-data.mjs`의 비공개 내용 검사와 `gate.py`의 목록을 맞춘다.
+2. `contract_v1/` 사본(`contracts.ts`, `loadSnapshot.ts`)을 이 저장소의 개정 3 파일로 교체하고 드리프트 시험을 갱신한다. `scripts/foliotrace-public-data.mjs`의 비공개 내용 검사와 `gate.py`의 목록을 맞춘다.
 3. 전달 시 `manifest.json`·`snapshots/<버전>.json` 외 파일을 데이터 경로에 두지 않는다.
 
 

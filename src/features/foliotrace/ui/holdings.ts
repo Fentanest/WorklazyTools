@@ -1,4 +1,4 @@
-import type { FilingEvent, Holding, Quote } from "../contracts";
+import type { FilingEvent, Holding, Quote, RatioBasisKind } from "../contracts";
 
 export type SortKey = "value" | "weight" | "ownership" | "receipt";
 export type QualityFilter = "all" | "priced" | "unpriced" | "below-5" | "ratio-adjusted";
@@ -221,6 +221,72 @@ export function compareFilingOrder(a: FilingEvent, b: FilingEvent): number {
     a.receiptDate.localeCompare(b.receiptDate) || a.receiptNo.localeCompare(b.receiptNo);
 }
 
+/** Ratio basis of one figure: null/undefined means an older snapshot without basis info. */
+export function figureBasisKind(figure: Pick<FilingEvent, "ratioBasisKind"> | Pick<Holding, "ratioBasisKind">): RatioBasisKind | null {
+  return figure.ratioBasisKind ?? null;
+}
+
+/**
+ * Whether two reported ownership figures may be subtracted. Only figures with
+ * equal *known* bases compare; a basis change (or an unknown side against a known
+ * one) never produces a numeric delta. Figures from snapshots without any basis
+ * info keep the legacy behavior (they cannot be told apart).
+ */
+export function sameRatioBasis(
+  current: Pick<FilingEvent, "ratioBasisKind"> | Pick<Holding, "ratioBasisKind">,
+  previous: Pick<FilingEvent, "ratioBasisKind"> | Pick<Holding, "ratioBasisKind">,
+): boolean {
+  const left = figureBasisKind(current);
+  const right = figureBasisKind(previous);
+  if (left === null && right === null) return true;
+  return left !== null && left === right;
+}
+
+/** True when both figures carry a known basis and the bases differ: show "basis change", not a delta. */
+export function ratioBasisChanged(
+  current: Pick<FilingEvent, "ratioBasisKind"> | Pick<Holding, "ratioBasisKind">,
+  previous: Pick<FilingEvent, "ratioBasisKind"> | Pick<Holding, "ratioBasisKind">,
+): boolean {
+  const left = figureBasisKind(current);
+  const right = figureBasisKind(previous);
+  return left !== null && right !== null && left !== right;
+}
+
+/**
+ * User-facing labels for a reported figure's ratio basis (revision 3).
+ * Raw basis codes never reach the screen.
+ */
+const RATIO_BASIS_LABELS: Record<RatioBasisKind, Record<Lang, string>> = {
+  common_only: { ko: "보통주만의 비율", en: "Common shares only" },
+  voting_rights: { ko: "의결권 있는 주식 기준", en: "Voting-rights basis" },
+  preferred_only: { ko: "우선주 종류별 비율", en: "Preferred class basis" },
+  preferred_combined: { ko: "우선주 합계 비율", en: "Combined preferred basis" },
+  issued_total: { ko: "발행주식 총수 기준(원문 그대로)", en: "All issued shares (as filed)" },
+  major_holder_report: { ko: "최대주주 변동신고 기준", en: "Major-shareholder report basis" },
+  unverified: { ko: "기준 미확인", en: "Basis unverified" },
+  year_end: { ko: "연말 목록 종류별 기준", en: "Year-end list class basis" },
+};
+
+export function ratioBasisLabel(kind: RatioBasisKind | null | undefined, lang: Lang): string | null {
+  if (kind == null) return null;
+  return RATIO_BASIS_LABELS[kind]?.[lang] ?? null;
+}
+
+/** DART quarterly report codes and filing forms used as denominator sources. */
+const DENOMINATOR_REPORT_LABELS: Record<string, Record<Lang, string>> = {
+  "11013": { ko: "1분기보고서", en: "Q1 report" },
+  "11012": { ko: "반기보고서", en: "Half-year report" },
+  "11014": { ko: "3분기보고서", en: "Q3 report" },
+  "11011": { ko: "사업보고서", en: "Annual report" },
+  A1: { ko: "대량보유보고서(A1)", en: "Large-holding report (A1)" },
+  A2: { ko: "임원·주요주주보고서(A2)", en: "Insider report (A2)" },
+};
+
+export function denominatorReportLabel(report: string | null | undefined, lang: Lang): string | null {
+  if (report == null || report === "") return null;
+  return DENOMINATOR_REPORT_LABELS[report]?.[lang] ?? report;
+}
+
 /** Raw reported events only; corrections, first reports and indirect estimates stay neutral. */
 export function filingChangesForEvents(events: FilingEvent[]): Map<FilingEvent, FilingValueChanges> {
   const bySecurity = new Map<string, FilingEvent[]>();
@@ -242,11 +308,41 @@ export function filingChangesForEvents(events: FilingEvent[]): Map<FilingEvent, 
       const quantityDelta = reportedDelta(current.quantity, previous.quantity);
       const exactOwnership = (current.numericKind == null || current.numericKind === "exact") &&
         (previous.numericKind == null || previous.numericKind === "exact");
-      const ownershipDelta = exactOwnership ? reportedDelta(current.companyOwnershipPercent, previous.companyOwnershipPercent) : null;
+      // Ownership compares only within the same basis kind (보통주만의 비율끼리 등).
+      // A cross-basis pair (e.g. A1 의결권 기준 → A2 합산 기준) shows a basis change instead.
+      const ownershipDelta = exactOwnership && sameRatioBasis(current, previous)
+        ? reportedDelta(current.companyOwnershipPercent, previous.companyOwnershipPercent) : null;
       changes.set(current, { quantity: deltaDirection(quantityDelta), ownership: deltaDirection(ownershipDelta), quantityDelta, ownershipDelta });
     }
   }
   return changes;
+}
+
+/**
+ * Per-event basis-change flags for the same pairs `filingChangesForEvents` walks:
+ * true when the current and previous figures carry different known bases.
+ */
+export function filingBasisChangesForEvents(events: FilingEvent[]): Map<FilingEvent, boolean> {
+  const bySecurity = new Map<string, FilingEvent[]>();
+  for (const event of events) {
+    if (!event.stockCode || !DIRECT_EVENT_SOURCES.has(event.source)) continue;
+    const key = `${event.corpCode}:${event.stockCode}`;
+    const filings = bySecurity.get(key) ?? [];
+    filings.push(event);
+    bySecurity.set(key, filings);
+  }
+  const changed = new Map<FilingEvent, boolean>();
+  for (const filings of bySecurity.values()) {
+    filings.sort(compareFilingOrder);
+    for (let index = 1; index < filings.length; index++) {
+      const current = filings[index], previous = filings[index - 1];
+      if (current.isCorrectionOrWithdrawal !== false || previous.isCorrectionOrWithdrawal !== false ||
+          current.correctionOf || previous.correctionOf ||
+          current.kind === "new-report" || current.kind === "tracking-reentry") continue;
+      changed.set(current, ratioBasisChanged(current, previous));
+    }
+  }
+  return changed;
 }
 
 function sameReportedValue(left: string | null, right: string | null): boolean {
@@ -274,6 +370,8 @@ export function filingChangesForHoldings(
   const changes = new Map<Holding, FilingValueChanges>();
   for (const holding of holdings) {
     if (!DIRECT_HOLDING_EVIDENCE.has(holding.evidence)) continue;
+    // The combined-preferred aggregate has no per-filing event series: never colour it.
+    if (holding.preferredCombined) continue;
     const current = latestBySecurity.get(`${holding.corpCode}:${holding.stockCode}`);
     if (!current || current.receiptNo !== holding.receiptNo) continue;
     // Ratio-adjusted quantities are estimates, not reported figures: never colour them as a trade.
@@ -283,11 +381,37 @@ export function filingChangesForHoldings(
     const quantityDelta = sameReportedValue(holding.quantity, current.quantity) ? change.quantityDelta : null;
     const exactOwnership = (holding.ownershipNumericKind == null || holding.ownershipNumericKind === "exact") &&
       sameReportedValue(holding.companyOwnershipPercent, current.companyOwnershipPercent);
-    const ownershipDelta = exactOwnership ? change.ownershipDelta : null;
+    const ownershipDelta = exactOwnership && sameRatioBasis(holding, current) ? change.ownershipDelta : null;
     const quantity = deltaDirection(quantityDelta), ownership = deltaDirection(ownershipDelta);
     if (quantity || ownership) changes.set(holding, { quantity, ownership, quantityDelta, ownershipDelta });
   }
   return changes;
+}
+
+/** Holdings whose latest filing pair carries different known bases (show "basis change"). */
+export function filingBasisChangesForHoldings(
+  holdings: Holding[], events: FilingEvent[],
+): Map<Holding, boolean> {
+  const latestBySecurity = new Map<string, FilingEvent>();
+  for (const event of events) {
+    if (!event.stockCode || !DIRECT_EVENT_SOURCES.has(event.source)) continue;
+    const key = `${event.corpCode}:${event.stockCode}`;
+    const prior = latestBySecurity.get(key);
+    if (!prior || compareFilingOrder(event, prior) > 0) latestBySecurity.set(key, event);
+  }
+  const eventBasisChanges = filingBasisChangesForEvents(events);
+  const changed = new Map<Holding, boolean>();
+  for (const holding of holdings) {
+    if (!DIRECT_HOLDING_EVIDENCE.has(holding.evidence)) continue;
+    if (holding.preferredCombined) continue;
+    const current = latestBySecurity.get(`${holding.corpCode}:${holding.stockCode}`);
+    if (!current || current.receiptNo !== holding.receiptNo) continue;
+    if (eventBasisChanges.get(current) === true &&
+        sameReportedValue(holding.companyOwnershipPercent, current.companyOwnershipPercent)) {
+      changed.set(holding, true);
+    }
+  }
+  return changed;
 }
 
 /** Year-end list rows carry no receipt (null; the all-zero placeholder of early dry-runs counts as none). */
