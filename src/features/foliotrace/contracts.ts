@@ -1,7 +1,7 @@
 /**
- * Public FolioTrace snapshot contract, revision 2 (docs/foliotrace-public-snapshot-contract.md).
- * The wire `schemaVersion` and the data URL stay at 1: revision 2 only relaxes `Holding.receiptNo`
- * to nullable and adds the optional `Holding.sourceKind`, so revision-1 snapshots still load.
+ * Public FolioTrace snapshot contract, revision 3 (docs/foliotrace-public-snapshot-contract.md).
+ * The wire `schemaVersion` and the data URL stay at 1: revisions only relax `Holding.receiptNo`
+ * to nullable and add optional fields, so revision-1 snapshots still load.
  * Decimal quantities and money are strings.
  */
 import type { ReconstructedValuationSeries } from './valuationSeriesContract'
@@ -63,8 +63,20 @@ export interface QuantityAdjustment {
   }>
 }
 
+/** Per-figure ratio basis: which denominator the displayed ownership percent uses.
+ * Figures of different bases must never be subtracted from each other.
+ * `common_only` 보통주만의 비율 · `voting_rights` A1 의결권 기준(보통주 기준과 동일) ·
+ * `preferred_only` 우선주 종류별 비율 · `preferred_combined` 우선주 합산 비율(참고값) ·
+ * `issued_total` 공시 원문 비율 그대로(합산 기준) · `major_holder_report` A3 ·
+ * `unverified` 분모 미확인 · `year_end` 연말 목록 종류별 재계산.
+ */
+export type RatioBasisKind = 'common_only' | 'voting_rights' | 'preferred_only' | 'preferred_combined' | 'issued_total' | 'major_holder_report' | 'unverified' | 'year_end'
+
 export interface Holding {
   corpCode: string
+  /** Listed 6-char code — except the combined-preferred aggregate line, whose stockCode is
+   * the 8-digit company code (the same value as corpCode, not a listed security).
+   * Such rows always carry `preferredCombined: true` and are never priced. */
   stockCode: string
   name: string
   securityKind: 'common' | 'preferred' | 'other' | 'unknown'
@@ -109,6 +121,21 @@ export interface Holding {
   latestUnresolvedReceiptNo: string | null
   latestUnresolvedReason: string | null
   tracking: 'active' | 'below-5-percent' | 'unknown'
+  /** Displayed-basis denominator info (revision 3, all optional; absent in older snapshots). */
+  ratioBasisKind?: RatioBasisKind | null
+  /** The filing's own combined-basis ratio, kept when it differs from the displayed per-class figure. */
+  reportedCompanyOwnershipPercent?: DecimalString | null
+  ratioDenominatorValue?: DecimalString | null
+  ratioDenominatorDate?: IsoDate | null
+  /** DART quarterly report code ('11013' | '11012' | '11014' | '11011') or filing form ('A1' | 'A2'). */
+  ratioDenominatorReport?: string | null
+  ratioDenominatorReceipt?: string | null
+  /** A1 cover (주식등, incl. warrants etc.) figures, kept when they differ from the 주권 figures (revision 3.2, optional). */
+  titleQuantity?: DecimalString | null
+  titleCompanyOwnershipPercent?: DecimalString | null
+  /** True for the combined-preferred aggregate line (kinds reported only as one total): never priced.
+   * Its stockCode is the 8-digit company code, not a listed code. */
+  preferredCombined?: boolean | null
   quote: Quote | null
   estimatedValue: DecimalString | null
   portfolioWeightPercent: DecimalString | null
@@ -130,6 +157,16 @@ export interface FilingEvent {
   quantity: DecimalString | null
   companyOwnershipPercent: DecimalString | null
   numericKind?: 'exact' | 'lower_bound' | 'upper_bound' | 'estimated'
+  /** Same-basis rule: only figures with the same basis group may be compared (revision 3, optional).
+   * A1 `voting_rights` and recomputed `common_only` share the 보통주 group. */
+  ratioBasisKind?: RatioBasisKind | null
+  /** The filing's own combined-basis ratio, kept when it differs from the displayed per-class figure. */
+  reportedCompanyOwnershipPercent?: DecimalString | null
+  /** Denominator source of the displayed figure, same vocabulary as holdings (revision 3.1, optional). */
+  ratioDenominatorReport?: string | null
+  /** A1 cover (주식등, incl. warrants etc.) figures, kept when they differ from the 주권 figures (revision 3.2, optional). */
+  titleQuantity?: DecimalString | null
+  titleCompanyOwnershipPercent?: DecimalString | null
   percentagePointChange?: DecimalString | null
   source: 'legacy-import' | 'dart-structured' | 'dart-document' | 'indirect-observation' | 'issuer-scope-observation'
   filingUrl: string | null

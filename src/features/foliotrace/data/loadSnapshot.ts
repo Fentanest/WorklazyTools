@@ -47,6 +47,11 @@ function filingUrl(value: unknown): boolean { return str(value) && FILING_URL.te
 function numericKind(value: unknown): boolean {
   return value === 'exact' || value === 'lower_bound' || value === 'upper_bound' || value === 'estimated'
 }
+function ratioBasisKind(value: unknown): boolean {
+  return value === 'common_only' || value === 'voting_rights' || value === 'preferred_only' ||
+    value === 'preferred_combined' || value === 'issued_total' || value === 'major_holder_report' ||
+    value === 'unverified' || value === 'year_end'
+}
 function validIndirectSource(value: unknown): boolean {
   return isRecord(value) && nullable(value.documentNo, item => str(item) && /^\d+$/.test(item)) &&
     str(value.sourceSha256) && VERSION.test(value.sourceSha256) && isoDate(value.basisDate) &&
@@ -135,7 +140,10 @@ function validQuote(value: unknown): boolean {
 }
 function validHolding(value: unknown): boolean {
   return isRecord(value) && str(value.corpCode) && /^\d{8}$/.test(value.corpCode) &&
-    str(value.stockCode) && STOCK.test(value.stockCode) && str(value.name) &&
+    str(value.stockCode) && (STOCK.test(value.stockCode) ||
+      // Combined-preferred aggregate: company-code identifier, never a listed code.
+      (value.preferredCombined === true && /^\d{8}$/.test(value.stockCode) && value.stockCode === value.corpCode)) &&
+    str(value.name) &&
     ['common', 'preferred', 'other', 'unknown'].includes(String(value.securityKind)) &&
     nullable(value.quantity, decimal) && nullable(value.companyOwnershipPercent, decimal) &&
     (value.ownershipNumericKind === undefined || nullable(value.ownershipNumericKind, numericKind)) &&
@@ -153,6 +161,16 @@ function validHolding(value: unknown): boolean {
     nullable(value.latestUnresolvedReceiptNo, (item) => str(item) && RECEIPT.test(item)) &&
     nullable(value.latestUnresolvedReason, str) &&
     ['active', 'below-5-percent', 'unknown'].includes(String(value.tracking)) &&
+    (value.ratioBasisKind === undefined || nullable(value.ratioBasisKind, ratioBasisKind)) &&
+    (value.reportedCompanyOwnershipPercent === undefined || nullable(value.reportedCompanyOwnershipPercent, decimal)) &&
+    (value.ratioDenominatorValue === undefined || nullable(value.ratioDenominatorValue, decimal)) &&
+    (value.ratioDenominatorDate === undefined || nullable(value.ratioDenominatorDate, isoDate)) &&
+    (value.ratioDenominatorReport === undefined || nullable(value.ratioDenominatorReport, str)) &&
+    (value.ratioDenominatorReceipt === undefined || nullable(value.ratioDenominatorReceipt,
+      item => str(item) && RECEIPT.test(item))) &&
+    (value.titleQuantity === undefined || nullable(value.titleQuantity, decimal)) &&
+    (value.titleCompanyOwnershipPercent === undefined || nullable(value.titleCompanyOwnershipPercent, decimal)) &&
+    (value.preferredCombined === undefined || nullable(value.preferredCombined, item => typeof item === 'boolean')) &&
     nullable(value.quote, validQuote) && nullable(value.estimatedValue, decimal) &&
     nullable(value.portfolioWeightPercent, decimal) && nullable(value.valuationExclusionReason, str) &&
     nullable(value.filingUrl, filingUrl)
@@ -169,6 +187,11 @@ function validEvent(value: unknown): boolean {
     nullable(value.quantity, decimal) &&
     nullable(value.companyOwnershipPercent, decimal) && ['legacy-import', 'dart-structured', 'dart-document', 'indirect-observation', 'issuer-scope-observation'].includes(String(value.source)) &&
     (value.numericKind === undefined || numericKind(value.numericKind)) &&
+    (value.ratioBasisKind === undefined || nullable(value.ratioBasisKind, ratioBasisKind)) &&
+    (value.reportedCompanyOwnershipPercent === undefined || nullable(value.reportedCompanyOwnershipPercent, decimal)) &&
+    (value.ratioDenominatorReport === undefined || nullable(value.ratioDenominatorReport, str)) &&
+    (value.titleQuantity === undefined || nullable(value.titleQuantity, decimal)) &&
+    (value.titleCompanyOwnershipPercent === undefined || nullable(value.titleCompanyOwnershipPercent, decimal)) &&
     (value.percentagePointChange === undefined || nullable(value.percentagePointChange, decimal)) &&
     nullable(value.filingUrl, filingUrl)
 }

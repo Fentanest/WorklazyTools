@@ -24,8 +24,11 @@ import { dartFilingUrl } from "../data/dartLink";
 import {
   approxNumber,
   compactKrw,
+  denominatorReportLabel,
   eventRangeOf,
   exclusionReasonLabel,
+  filingBasisChangesForEvents,
+  filingBasisChangesForHoldings,
   filingChangesForHoldings,
   filingChangesForEvents,
   compareFilingOrder,
@@ -39,15 +42,20 @@ import {
   formatPctShort,
   formatQty,
   hasReceiptNo,
+  holdingKeyOf,
   holdingStatus,
   isBelowFivePercent,
   latestUnresolvedReasonLabel,
   latestFilingsByStock,
   isLateFilingWithOlderBasis,
   quotePriceDetail,
+  ratioBasisLabel,
+  reportedIsCombinedBasis,
+  selectionKeyForEvent,
   sortHoldings,
   sumPercentText,
   topHoldings,
+  titleFiguresText as titleFiguresLine,
 } from "./holdings";
 import type { FilingChangeDirection, Lang, QualityFilter, SortKey } from "./holdings";
 import { XIcon } from "lucide-react";
@@ -122,7 +130,7 @@ const STR = {
     marketTabs: "보유 종목 시장 선택",
     marketReferenceOld: "시장 구분 자료가 평가일보다 {days}일 오래되었습니다. 출처 기준일 {reference} · 평가일 {valuation}. 최근 이전상장 등은 KRX에서 확인해 주세요.",
     tableUnavailable: "—는 확인된 평가 금액이 없다는 뜻입니다. 종목명 아래에서 제외 사유를 확인하세요.",
-    tableChangeNote: "같은 종목의 직전 공시와 비교해 수량·지분율을 각각 표시합니다. 증가는 빨강, 감소는 파랑이며 지분율 차이는 %p입니다. 첫 확인·비교 불가·동일 값은 기본색이며, 색이 실제 매매를 뜻하지는 않습니다.",
+    tableChangeNote: "같은 종목의 직전 공시와 비교해 수량·지분율을 각각 표시합니다. 증가는 빨강, 감소는 파랑이며 지분율 차이는 %p입니다. 지분율은 계산 기준(분모)이 같은 공시끼리만 비교하며, 기준이 바뀌면 '기준 변경'으로 표시합니다. 첫 확인·비교 불가·동일 값은 기본색이며, 색이 실제 매매를 뜻하지는 않습니다.",
     tableDetailNote: "좁은 표에서는 평가금액·종가·비중·기준일을 폭에 따라 생략합니다. 종목명을 누르면 모든 수치와 접수일·제외 사유를 볼 수 있습니다.",
     changeUp: "직전 공시 수치보다 증가",
     changeDown: "직전 공시 수치보다 감소",
@@ -167,6 +175,13 @@ const STR = {
     verifiedObservationApplied: "현재 지분율에 반영",
     rowVerifiedValue: "기준일과 지분율 확인",
     rowScopedValue: "국민연금 본인·발행주식수 기준 · 직접 공시와 증감 비교 보류",
+    basisChange: "기준 변경",
+    basisChangeNote: "직전 공시와 지분율 계산 기준(분모)이 달라 증감 비교를 하지 않습니다",
+    detailRatioBasis: "지분율 기준",
+    reportedOriginal: "공시 원문",
+    reportedCombinedBasis: "(보통주+우선주 합산 기준)",
+    preferredCombinedNote: "국민연금 공시가 우선주를 종류별로 나누지 않고 합계로만 발표해 종류별 수량과 평가금액을 알 수 없음",
+    denominatorUnverified: "분모 미확인",
     verifiedObservationPending: "현재 지분율과 비교할 정보가 부족합니다",
     directBasisPending: "직접 공시의 보유 기준일을 확인 중입니다",
     verifiedObservationConflict: "같은 날짜의 공시 수치가 달라 현재값에 넣지 않았습니다",
@@ -205,7 +220,7 @@ const STR = {
     sourceTextRead: "공시 원문 판독",
     unknownDate: "기준일 모름",
     eventsTitle: "최근 공시 변화",
-    eventsDesc: "공시 {total}건에서 종목별 최신 {shown}건을 표시합니다. 기준일·접수일·접수번호가 큰 순서이며 정정·철회도 포함합니다. 종목명을 누르면 이전 공시를 볼 수 있습니다. 수량·지분율은 공시에 적힌 값입니다.",
+    eventsDesc: "공시 {total}건에서 종목별 최신 {shown}건을 표시합니다. 기준일·접수일·접수번호가 큰 순서이며 정정·철회도 포함합니다. 종목명을 누르면 이전 공시를 볼 수 있습니다. 보통주 지분율은 보통주만의 비율로, 우선주 합계는 우선주 합계 기준으로 표시하며 공시 원문 비율도 함께 둡니다.",
     eventCorrection: "정정·철회 공시",
     eventOlderBasis: "현재 보유값보다 과거 기준일",
     eventsVisible: "최신 {total}건 중 {shown}건 표시",
@@ -339,7 +354,7 @@ const STR = {
     marketTabs: "Select holdings market",
     marketReferenceOld: "Listing-market data is {days} days older than the valuation date (reference {reference}; valuation {valuation}). Check KRX for recent listing changes.",
     tableUnavailable: "— means no verified valuation is available. See the exclusion reason under the security name.",
-    tableChangeNote: "Quantity and ownership are compared independently with the previous filing for the same security: red for increases, blue for decreases. Ownership differences use percentage points (%p). First reports, incomparable and unchanged values keep the usual color; colors do not establish a trade.",
+    tableChangeNote: "Quantity and ownership are compared independently with the previous filing for the same security: red for increases, blue for decreases. Ownership differences use percentage points (%p). Ownership compares only filings with the same calculation basis (denominator); a changed basis shows as 'Basis change'. First reports, incomparable and unchanged values keep the usual color; colors do not establish a trade.",
     tableDetailNote: "Narrow tables hide value, price, weight and holding date as space requires. Select a name for all figures, receipt date and exclusion details.",
     changeUp: "Higher than the previous filing",
     changeDown: "Lower than the previous filing",
@@ -384,6 +399,13 @@ const STR = {
     verifiedObservationApplied: "Applied to current ownership",
     rowVerifiedValue: "Holding date and percentage checked",
     rowScopedValue: "NPS-held shares / all issued shares · change from direct filing unverified",
+    basisChange: "Basis change",
+    basisChangeNote: "The percentage basis (denominator) differs from the previous filing, so no change is shown",
+    detailRatioBasis: "Ownership basis",
+    reportedOriginal: "As filed",
+    reportedCombinedBasis: "(common + preferred combined basis)",
+    preferredCombinedNote: "NPS filings report preferred shares only as a combined total, so per-class quantities and values cannot be determined",
+    denominatorUnverified: "Denominator unverified",
     verifiedObservationPending: "Not enough information to compare with the current percentage",
     directBasisPending: "Checking the holding date in the direct filing",
     verifiedObservationConflict: "Filings for the same date disagree, so this was not used for the current value",
@@ -422,7 +444,7 @@ const STR = {
     sourceTextRead: "Disclosure text reading",
     unknownDate: "Unknown (no holding date)",
     eventsTitle: "Recent filing changes",
-    eventsDesc: "Showing {shown} latest filings by stock from {total} records, newest basis date, receipt date, then receipt number first, including corrections and withdrawals. Select a name for earlier filings. Quantities and percentages are as reported.",
+    eventsDesc: "Showing {shown} latest filings by stock from {total} records, newest basis date, receipt date, then receipt number first, including corrections and withdrawals. Select a name for earlier filings. Common-share percentages use the common-only basis and combined preferred uses the combined-preferred basis; the filed percentage is shown alongside.",
     eventCorrection: "Correction/withdrawal filing",
     eventOlderBasis: "Earlier basis than current holding",
     eventsVisible: "Showing {shown} of {total} latest filings",
@@ -540,6 +562,33 @@ function observedPercent(value: string | null, kind?: Holding["ownershipNumericK
   return rendered;
 }
 
+/** Tooltip for an ownership figure: value, its basis, and the filed percentage when they differ. */
+function ownershipTitle(h: Holding, lang: Lang): string {
+  const parts = [observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)];
+  const basis = ratioBasisLabel(h.ratioBasisKind ?? null, lang);
+  if (basis) parts.push(basis);
+  if (h.reportedCompanyOwnershipPercent != null) {
+    parts.push(`${STR[lang].reportedOriginal} ${formatPct(h.reportedCompanyOwnershipPercent)}` +
+      (reportedIsCombinedBasis(h.ratioBasisKind, h.ratioDenominatorReport, h.securityKind === "preferred") ? ` ${STR[lang].reportedCombinedBasis}` : ""));
+  }
+  const title = titleFiguresLine(h, lang);
+  if (title) parts.push(title);
+  return parts.join(" · ");
+}
+
+function eventOwnershipTitle(event: FilingEvent, lang: Lang): string {
+  const parts = [observedPercent(event.companyOwnershipPercent, event.numericKind)];
+  const basis = ratioBasisLabel(event.ratioBasisKind ?? null, lang);
+  if (basis) parts.push(basis);
+  if (event.reportedCompanyOwnershipPercent != null) {
+    parts.push(`${STR[lang].reportedOriginal} ${formatPct(event.reportedCompanyOwnershipPercent)}` +
+      (reportedIsCombinedBasis(event.ratioBasisKind, event.ratioDenominatorReport, false) ? ` ${STR[lang].reportedCombinedBasis}` : ""));
+  }
+  const title = titleFiguresLine(event, lang);
+  if (title) parts.push(title);
+  return parts.join(" · ");
+}
+
 /**
  * Renders an exact formatted financial string with break opportunities
  * after each thousands separator. The commas stay in the text (so
@@ -555,13 +604,23 @@ function breakableValue(text: string): ReactNode {
   );
 }
 
-function FilingChangeValue({ value, direction, delta, metric, lang }: {
+function FilingChangeValue({ value, direction, delta, basisChanged, metric, lang }: {
   value: string;
   direction: FilingChangeDirection;
   delta: string | null;
+  basisChanged?: boolean;
   metric: "quantity" | "ownership";
   lang: Lang;
 }) {
+  if (basisChanged) {
+    const label = STR[lang].basisChangeNote;
+    return (
+      <span title={label}>
+        {value}{" "}<small className="foliotrace-change-delta" aria-hidden="true">({STR[lang].basisChange})</small>
+        <span className="sr-only"> · {label}</span>
+      </span>
+    );
+  }
   if (delta === null) return value;
   const label = filingDeltaLabel(delta, metric, lang);
   return (
@@ -613,6 +672,7 @@ function FilingHistory({ events, lang }: { events: FilingEvent[]; lang: Lang }) 
             <code className="foliotrace-code">{e.receiptNo}</code>
             {(e.correctionOf || e.isCorrectionOrWithdrawal) && <small> · {t.eventCorrection}</small>}
             {e.correctionOf && <small> ← {e.correctionOf}</small>}
+            {titleFiguresLine(e, lang) && <small className="foliotrace-row-reason"> · {titleFiguresLine(e, lang)}</small>}
             {e.filingUrl && <> <a href={e.filingUrl} target="_blank" rel="noreferrer">{t.openFiling}</a></>}
           </li>
         ))}
@@ -717,7 +777,12 @@ function ReadyView({
     () => filingChangesForHoldings(snapshot.holdings, snapshot.events),
     [snapshot.holdings, snapshot.events],
   );
+  const filingBasisChanges = useMemo(
+    () => filingBasisChangesForHoldings(snapshot.holdings, snapshot.events),
+    [snapshot.holdings, snapshot.events],
+  );
   const eventChanges = useMemo(() => filingChangesForEvents(snapshot.events), [snapshot.events]);
+  const eventBasisChanges = useMemo(() => filingBasisChangesForEvents(snapshot.events), [snapshot.events]);
 
   const topWeights = useMemo(() => topHoldings(snapshot.holdings), [snapshot.holdings]);
   const top10 = useMemo(() => topHoldings(snapshot.holdings, 10), [snapshot.holdings]);
@@ -762,20 +827,29 @@ function ReadyView({
       event.kind === "tracking-reentry").map((event) => `${event.corpCode}:${event.receiptNo}`)),
     [snapshot.events],
   );
+  /** Holdings are keyed by code + class + receipt: the combined-preferred aggregate
+   * uses the company code, so a bare stock code no longer identifies one row. */
+  const holdingKey = holdingKeyOf;
   const currentNameByCorpCode = useMemo(
     () => new Map(snapshot.holdings.map((holding) => [holding.corpCode, holding.name])),
     [snapshot.holdings],
   );
-  const holdingByStockCode = useMemo(
-    () => new Map(snapshot.holdings.map((holding) => [holding.stockCode, holding])),
+  const holdingByKey = useMemo(
+    () => new Map(snapshot.holdings.map((holding) => [holdingKey(holding), holding])),
     [snapshot.holdings],
   );
+  /** The common-share row for an event's stock code (events are common-class observations). */
+  const holdingForEvent = (stockCode: string | null | undefined): Holding | undefined => {
+    if (!stockCode) return undefined;
+    const rows = snapshot.holdings.filter((h) => h.stockCode === stockCode);
+    return rows.find((h) => h.securityKind === "common") ?? rows[0];
+  };
   const eventsDescription = t.eventsDesc
     .replace("{shown}", formatCount(latestEvents.length))
     .replace("{total}", formatCount(snapshot.events.length));
 
   const selected: Holding | null =
-    selectedCode === null ? null : (holdingByStockCode.get(selectedCode) ?? null);
+    selectedCode === null ? null : (holdingByKey.get(selectedCode) ?? null);
   const selectedEvent = selectedCode === null || selected ? null : latestEvents.find((event) =>
     (event.stockCode ?? `corp:${event.corpCode}`) === selectedCode) ?? null;
   const selectedCorpCode = selected?.corpCode ?? selectedEvent?.corpCode;
@@ -794,7 +868,10 @@ function ReadyView({
 
   const entityName = lang === "ko" ? snapshot.entity.nameKo : snapshot.entity.nameEn;
   const scope = lang === "ko" ? snapshot.portfolio.scopeKo : snapshot.portfolio.scopeEn;
-  const trackingStatusLabel = (holding: Holding) =>
+  const trackingStatusLabel = (holding: Holding): string | null =>
+    // 새 종류별 비율이 붙은 우선주 줄·합계 줄에는 5% 상태를 붙이지 않는다: 같은 회사의 보통주 행이
+    // 상태를 별도로 가진다. 그 외의 행(연말 목록 우선주 줄 포함)은 종전과 같다.
+    (holding.ratioBasisKind === "preferred_only" || holding.ratioBasisKind === "preferred_combined") ? null :
     (indirectReentries.has(`${holding.corpCode}:${holding.receiptNo}`) ||
       (holding.observationStatus === "verified_scoped" && holding.tracking === "active")) ? t.eventIndirectReentry :
       holding.tracking === "active" ? (isBelowFivePercent(holding) ? t.statusActiveBelow5 : t.statusActiveRecord) :
@@ -804,7 +881,7 @@ function ReadyView({
 
   const recentSummary = recentEvents.slice(0, 6);
   const eventDate = (event: FilingEvent) => (event.basisDate ?? event.receiptDate).slice(5).replace("-", ".");
-  const eventName = (event: FilingEvent) => holdingByStockCode.get(event.stockCode ?? "")?.name ?? currentNameByCorpCode.get(event.corpCode) ?? (event.stockCode
+  const eventName = (event: FilingEvent) => holdingForEvent(event.stockCode)?.name ?? currentNameByCorpCode.get(event.corpCode) ?? (event.stockCode
     ? `${t.eventStockCode} ${event.stockCode}`
     : `${t.eventCorpCode} ${event.corpCode}`);
   const valueCompact = snapshot.estimatedValue === null ? null : compactKrw(snapshot.estimatedValue, lang, { decimals: 1 });
@@ -818,6 +895,7 @@ function ReadyView({
   ];
   const rowReasons = (h: Holding) => {
     const reasons: string[] = [];
+    if (h.preferredCombined) reasons.push(t.preferredCombinedNote);
     if (h.observationStatus) {
       reasons.push(h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict :
         h.observationStatus === "verified_scoped" ? t.rowScopedValue : t.rowVerifiedValue);
@@ -827,7 +905,7 @@ function ReadyView({
       reasons.push(`${h.issuerScopeSource.laterChangeDate}: ${t.issuerScopeLaterChange}`);
     }
     const tracking = trackingStatusLabel(h);
-    if (tracking !== t.statusActiveRecord) reasons.push(tracking);
+    if (tracking !== null && tracking !== t.statusActiveRecord) reasons.push(tracking);
     if (h.estimatedValue === null) reasons.push(exclusionReasonLabel(h.valuationExclusionReason, lang) ?? t.statusExcluded);
     else if (holdingStatus(h) === "unresolved") reasons.push(statusLabel("unresolved"));
     return [...new Set(reasons)];
@@ -917,9 +995,9 @@ function ReadyView({
                   const change = filingChanges.get(h);
                   const reasons = rowReasons(h);
                   return (
-                    <li key={h.stockCode}>
-                      <button type="button" className="foliotrace-mrow" onClick={() => setSelectedCode(h.stockCode)}
-                        title={`${observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)} · ${formatPct(h.portfolioWeightPercent)}`}>
+                    <li key={holdingKey(h)}>
+                      <button type="button" className="foliotrace-mrow" onClick={() => setSelectedCode(holdingKey(h))}
+                        title={`${ownershipTitle(h, lang)} · ${formatPct(h.portfolioWeightPercent)}`}>
                         <span className="foliotrace-mrow-name">{h.name} <span className="foliotrace-code-plain foliotrace-num">{h.stockCode}</span></span>
                         <span className="foliotrace-mrow-value foliotrace-num">{amountText(h)}</span>
                         <span className="foliotrace-mrow-sub foliotrace-num">
@@ -927,7 +1005,8 @@ function ReadyView({
                             direction={change?.quantity ?? null} delta={change?.quantityDelta ?? null} metric="quantity" lang={lang} />
                           {" · "}{t.mOwn}{" "}
                           <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind, true)}
-                            direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null} metric="ownership" lang={lang} />
+                            direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null}
+                            basisChanged={filingBasisChanges.get(h) === true} metric="ownership" lang={lang} />
                         </span>
                         <span className="foliotrace-mrow-weight foliotrace-num">{t.mWeight} {formatPctShort(h.portfolioWeightPercent)}</span>
                         <span className="foliotrace-mrow-note">{t.colClose}: {h.quote ? `${formatKrw(h.quote.close, lang)} · ${h.quote.tradeDate}` : "—"}</span>
@@ -959,9 +1038,9 @@ function ReadyView({
                     {filtered.map((h) => {
                       const reasons = rowReasons(h);
                       return (
-                        <tr key={h.stockCode} onClick={() => setSelectedCode(h.stockCode)}>
+                        <tr key={holdingKey(h)} onClick={() => setSelectedCode(holdingKey(h))}>
                           <th scope="row">
-                            <button type="button" className="foliotrace-name-btn" title={`${h.name} · ${h.stockCode}`} onClick={() => setSelectedCode(h.stockCode)}
+                            <button type="button" className="foliotrace-name-btn" title={`${h.name} · ${h.stockCode}`} onClick={() => setSelectedCode(holdingKey(h))}
                               aria-label={`${h.name} ${h.stockCode} ${t.detailButton}`}>
                               {h.name}
                             </button>
@@ -977,9 +1056,10 @@ function ReadyView({
                             <FilingChangeValue value={formatQty(h.quantity)} direction={filingChanges.get(h)?.quantity ?? null}
                               delta={filingChanges.get(h)?.quantityDelta ?? null} metric="quantity" lang={lang} />
                           </td>
-                          <td className="foliotrace-num" title={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind)}>
+                          <td className="foliotrace-num" title={ownershipTitle(h, lang)}>
                             <FilingChangeValue value={observedPercent(h.companyOwnershipPercent, h.ownershipNumericKind, true)}
-                              direction={filingChanges.get(h)?.ownership ?? null} delta={filingChanges.get(h)?.ownershipDelta ?? null} metric="ownership" lang={lang} />
+                              direction={filingChanges.get(h)?.ownership ?? null} delta={filingChanges.get(h)?.ownershipDelta ?? null}
+                              basisChanged={filingBasisChanges.get(h) === true} metric="ownership" lang={lang} />
                           </td>
                           <td className="foliotrace-num foliotrace-col-close" title={h.quote ? `${t.detailPrice}: ${h.quote.tradeDate}` : undefined}>
                             {h.quote ? formatKrw(h.quote.close, lang) : "—"}
@@ -1170,8 +1250,9 @@ function ReadyView({
                       <span className="foliotrace-recent-value foliotrace-num">
                         <span><FilingChangeValue value={`${formatQty(event.quantity)}${lang === "ko" ? "주" : " shares"}`}
                           direction={change?.quantity ?? null} delta={change?.quantityDelta ?? null} metric="quantity" lang={lang} /></span>
-                        <span><FilingChangeValue value={observedPercent(event.companyOwnershipPercent, event.numericKind, true)}
-                          direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null} metric="ownership" lang={lang} /></span>
+                        <span title={eventOwnershipTitle(event, lang)}><FilingChangeValue value={observedPercent(event.companyOwnershipPercent, event.numericKind, true)}
+                          direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null}
+                          basisChanged={eventBasisChanges.get(event) === true} metric="ownership" lang={lang} /></span>
                       </span>
                     </li>
                   );
@@ -1277,11 +1358,11 @@ function ReadyView({
                 <li key={event.observationKey ?? `${event.receiptNo}:${event.corpCode}:${event.stockCode ?? ""}:${event.kind}:${event.basisDate ?? ""}`}>
                   <div className="foliotrace-event-heading">
                     <strong><button type="button" className="foliotrace-name-btn"
-                      onClick={() => setSelectedCode(event.stockCode ?? `corp:${event.corpCode}`)}>{eventName(event)}</button></strong>
+                      onClick={() => setSelectedCode(selectionKeyForEvent(event, snapshot.holdings))}>{eventName(event)}</button></strong>
                     {currentName && event.stockCode && <code className="foliotrace-code">{event.stockCode}</code>}
                     <span>{t.eventReceipt}: {event.receiptDate}</span>
                     {event.basisDate && <span>{t.eventBasis}: {event.basisDate}</span>}
-                    {isLateFilingWithOlderBasis(event, holdingByStockCode.get(event.stockCode ?? "")) && <small>{t.eventOlderBasis}</small>}
+                    {isLateFilingWithOlderBasis(event, holdingForEvent(event.stockCode)) && <small>{t.eventOlderBasis}</small>}
                     {(event.correctionOf || event.isCorrectionOrWithdrawal) && <small>{t.eventCorrection}</small>}
                     <span>{event.kind === "tracking-reentry" && event.source === "indirect-observation" ?
                       t.eventIndirectReentry : EVENT_KIND[lang][event.kind]}</span>
@@ -1289,8 +1370,9 @@ function ReadyView({
                   <div className="foliotrace-event-values">
                     <span>{t.eventQuantity}: <span className="foliotrace-num"><FilingChangeValue value={event.quantity === null ? t.eventUnknown : formatQty(event.quantity)}
                       direction={change?.quantity ?? null} delta={change?.quantityDelta ?? null} metric="quantity" lang={lang} /></span></span>
-                    <span>{t.eventOwnership}: <span className="foliotrace-num"><FilingChangeValue value={event.companyOwnershipPercent === null ? t.eventUnknown : observedPercent(event.companyOwnershipPercent, event.numericKind)}
-                      direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null} metric="ownership" lang={lang} /></span></span>
+                    <span>{t.eventOwnership}: <span className="foliotrace-num" title={eventOwnershipTitle(event, lang)}><FilingChangeValue value={event.companyOwnershipPercent === null ? t.eventUnknown : observedPercent(event.companyOwnershipPercent, event.numericKind)}
+                      direction={change?.ownership ?? null} delta={change?.ownershipDelta ?? null}
+                      basisChanged={eventBasisChanges.get(event) === true} metric="ownership" lang={lang} /></span></span>
                     {event.percentagePointChange != null && <span>{t.eventPointChange.replace("{amount}", String(event.percentagePointChange))}</span>}
                   </div>
                   <div className="foliotrace-event-source">
@@ -1429,9 +1511,41 @@ function ReadyView({
               </div>
               <div>
                 <dt>{t.colOwnership}</dt>
-                <dd className="foliotrace-num"><FilingChangeValue value={observedPercent(selected.companyOwnershipPercent, selected.ownershipNumericKind)}
-                  direction={filingChanges.get(selected)?.ownership ?? null} delta={filingChanges.get(selected)?.ownershipDelta ?? null} metric="ownership" lang={lang} /></dd>
+                <dd className="foliotrace-num" title={ownershipTitle(selected, lang)}><FilingChangeValue value={observedPercent(selected.companyOwnershipPercent, selected.ownershipNumericKind)}
+                  direction={filingChanges.get(selected)?.ownership ?? null} delta={filingChanges.get(selected)?.ownershipDelta ?? null}
+                  basisChanged={filingBasisChanges.get(selected) === true} metric="ownership" lang={lang} /></dd>
               </div>
+              {(selected.ratioBasisKind || selected.reportedCompanyOwnershipPercent != null || selected.preferredCombined ||
+                (selected.titleQuantity != null && selected.titleCompanyOwnershipPercent != null)) && (
+                <div>
+                  <dt>{t.detailRatioBasis}</dt>
+                  <dd>
+                    {ratioBasisLabel(selected.ratioBasisKind ?? null, lang) ?? t.denominatorUnverified}
+                    {selected.ratioDenominatorValue != null && (
+                      <> · <span className="foliotrace-num">{formatQty(selected.ratioDenominatorValue)}</span></>
+                    )}
+                    {selected.ratioDenominatorDate && <> · {selected.ratioDenominatorDate}</>}
+                    {denominatorReportLabel(selected.ratioDenominatorReport ?? null, lang) &&
+                      <> · {denominatorReportLabel(selected.ratioDenominatorReport ?? null, lang)}</>}
+                    {selected.ratioDenominatorReceipt && (
+                      <> · <a href={dartFilingUrl(selected.ratioDenominatorReceipt)} target="_blank" rel="noreferrer">
+                        <code className="foliotrace-code">{selected.ratioDenominatorReceipt}</code>
+                      </a></>)}
+                    {selected.reportedCompanyOwnershipPercent != null && (
+                      <small className="foliotrace-row-reason">
+                        {t.reportedOriginal} {formatPct(selected.reportedCompanyOwnershipPercent)}
+                        {reportedIsCombinedBasis(selected.ratioBasisKind, selected.ratioDenominatorReport, selected.securityKind === "preferred") ? ` ${t.reportedCombinedBasis}` : ""}
+                      </small>
+                    )}
+                    {selected.preferredCombined && (
+                      <small className="foliotrace-row-reason">{t.preferredCombinedNote}</small>
+                    )}
+                    {titleFiguresLine(selected, lang) && (
+                      <small className="foliotrace-row-reason">{titleFiguresLine(selected, lang)}</small>
+                    )}
+                  </dd>
+                </div>
+              )}
               <div>
                 <dt>{t.detailHoldingDate}</dt>
                 <dd>{selected.holdingDate ?? t.unknownDate}</dd>
@@ -1500,7 +1614,7 @@ function ReadyView({
               <div>
                 <dt>{t.detailInclusion}</dt>
                 <dd>
-                  {trackingStatusLabel(selected)} · {statusLabel(holdingStatus(selected))}
+                  {[trackingStatusLabel(selected), statusLabel(holdingStatus(selected))].filter((part) => part !== null).join(" · ")}
                   {(() => {
                     const reason = exclusionReasonLabel(selected.valuationExclusionReason, lang);
                     return reason ? ` — ${reason}` : "";
