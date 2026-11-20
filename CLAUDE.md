@@ -1,5 +1,7 @@
 # CLAUDE.md — 총괄·감사·최종 판정
 
+> **2026-11-21 사용자 지시**: 총괄은 Paseo 안에서 연 Hermes다(운영 규칙 `/home/better0101/projects/worklazytools/HERMES.md`). 작업자 모델·모드의 유일한 정본은 `/home/better0101/projects/worklazytools/AGENTS.md` 「에이전트 배정」(Sol·Astra는 6.2), 공통 발주 절차는 `/home/better0101/projects/worklazytools/docs/agent-dispatch-runbook.md`, 공통 원칙은 `/home/better0101/projects/worklazytools/CLAUDE.md`다. 「총괄 부재 시 Astra 대리 총괄」 규정은 삭제됐다. 이 문서의 내용이 그 문서들과 어긋나면 그 문서들을 따른다.
+
 @PROJECT_RULES.md
 
 ## 담당
@@ -61,7 +63,7 @@ Gemini 는 `gemini-4-argon-high`로 먼저 호출하고 실제 한도 초과가 
 
 ## 팀 정본(`.team/`) 갱신
 
-위치는 `/home/better0101/projects/worklazytools/.team/`이다. `ledger.md`는 작업·배정·진행, `decisions.md`는 사용자 결정·판정, `HANDOFF.md`는 맨 위 현재 현황을 담는다. 갱신은 총괄이 하고, 총괄 부재 시 대리 총괄(deputy)이 한다. 대리 총괄은 Astra(`gpt-6-astra`)다(2026-11-10 사용자 지시).
+위치는 `/home/better0101/projects/worklazytools/.team/`이다. `ledger.md`는 작업·배정·진행, `decisions.md`는 사용자 결정·판정, `HANDOFF.md`는 맨 위 현재 현황을 담는다. 갱신은 총괄(Hermes)만 한다.
 
 - 발주·회수·검수 판정·설치/출고·사용자 결정이 생길 때마다 `ledger.md`·`decisions.md`를 즉시 고친다.
 - 인계·세션 종료·재시작 전에는 `HANDOFF.md` 맨 위 현황을 교체한다.

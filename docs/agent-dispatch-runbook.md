@@ -1,26 +1,28 @@
 # 에이전트 호출·복구 런북
 
+> **2026-11-21 사용자 지시**: 총괄은 Paseo 안에서 연 Hermes다(운영 규칙 `/home/better0101/projects/worklazytools/HERMES.md`). 작업자 모델·모드의 유일한 정본은 `/home/better0101/projects/worklazytools/AGENTS.md` 「에이전트 배정」(Sol·Astra는 6.2), 공통 발주 절차는 `/home/better0101/projects/worklazytools/docs/agent-dispatch-runbook.md`, 공통 원칙은 `/home/better0101/projects/worklazytools/CLAUDE.md`다. 「총괄 부재 시 Astra 대리 총괄」 규정은 삭제됐다. 이 문서의 내용이 그 문서들과 어긋나면 그 문서들을 따른다.
+
 2026-09-22 정리. 정책은 PROJECT_RULES.md 가 정본이다. 에이전트 이름 → Paseo 실행값(provider/model·모드)은 §0 표가 정본이고, `docs/agent-ops-config.json` 은 보조 실행기(`agent_ops.py`·`codex_direct.py`·`gemini_research.py`)가 읽는 모델 설정이다 — 두 곳의 같은 모델 값은 일치시킨다. 첫 호출·설치 버전/환경 변경·복구 때 읽고 확인한 같은 계약은 재사용한다. 아래 명령은 사용자 Linux 호스트에서 실행한다. 문서·파일 생성은 호스트에서의 성공 증명이 아니다.
 
 ## 0. 기본 실행 표면 — Paseo (2026-11-09 사용자 지시로 herdr 에서 전환)
 
-사용자가 Paseo 앱에서 직접 지켜볼 수 있도록 **외부 에이전트는 모두 Paseo 에이전트(총괄의 하위 에이전트)로 띄운다.** 대상은 Muse(OpenCode), Codex(Sol·Astra·Terra), Claude 작업자(Sonnet), Gemini(antigravity/agy)다(Gemini 는 2026-11-10 사용자 지시로 Paseo 에이전트 호출로 바꿨다. 메모리 주의는 아래). 총괄 Claude 는 Paseo 가 주입한 MCP 도구(`create_agent`·`send_agent_prompt` 등)로 발주한다. 헤드리스 `codex exec`·companion `--background`·`agy -p`·`opencode run`·`nohup`, Claude `Agent` 서브에이전트로 다른 모델 몫을 대신 돌리는 방식은 기본 경로가 아니다. Paseo 를 쓸 수 없을 때(Paseo MCP 도구 없음, daemon 장애)만 §2~§5의 기존 경로를 쓰고 그 이유를 작업 기록에 남긴다.
+사용자가 Paseo 앱에서 직접 지켜볼 수 있도록 **외부 에이전트는 모두 Paseo 에이전트(총괄의 하위 에이전트)로 띄운다.** 대상은 Muse(OpenCode), Codex(Sol·Astra·Terra), Claude 작업자(Sonnet), Gemini(antigravity/agy)다(Gemini 는 2026-11-10 사용자 지시로 Paseo 에이전트 호출로 바꿨다. 메모리 주의는 아래). 총괄은 Paseo 가 주입한 MCP 도구(`create_agent`·`send_agent_prompt` 등)로 발주한다. 헤드리스 `codex exec`·companion `--background`·`agy -p`·`opencode run`·`nohup`, Claude `Agent` 서브에이전트로 다른 모델 몫을 대신 돌리는 방식은 기본 경로가 아니다. Paseo 를 쓸 수 없을 때(Paseo MCP 도구 없음, daemon 장애)만 §2~§5의 기존 경로를 쓰고 그 이유를 작업 기록에 남긴다.
 
 **권한 — 사용자 명시 승인(2026-10-26: "권한 차단당하지 말고", opencode 호출 포함).** 권한 질문이나 샌드박스 때문에 작업자가 멈추거나, 질문이 자동 거부돼 빈 결과로 끝나지 않도록 아래 모드로 시작한다. 모델은 항상 명시한다.
 
-**에이전트 표 — 이 표가 유일한 정본이다**(2026-11-09 사용자 지시). Paseo 에이전트 프로필(`list_profiles`)은 쓰지 않는다 — 비어 있어도 정상이고, 생겨도 이 표가 우선한다. 에이전트 이름은 모든 저장소에서 같은 provider/model 을 가리키고 역할만 저장소마다 다르다. `create_agent` 에는 `provider`=`<provider>/<model>`, `settings.modeId`, `settings.thinkingOptionId` 로 그대로 옮겨 적는다.
+**에이전트 표 — 정본은 프로젝트 공통 `AGENTS.md` 「에이전트 배정」이다**(2026-11-21 사용자 지시, 아래 표는 그 사본). Paseo 에이전트 프로필(`list_profiles`)은 쓰지 않는다 — 비어 있어도 정상이고, 생겨도 이 표가 우선한다. 에이전트 이름은 모든 저장소에서 같은 provider/model 을 가리키고 역할만 저장소마다 다르다. `create_agent` 에는 `provider`=`<provider>/<model>`, `settings.modeId`, `settings.thinkingOptionId` 로 그대로 옮겨 적는다.
 
 | 에이전트 | `provider`(provider/model) | `modeId` | `thinkingOptionId` | 이 프로젝트의 역할 |
 |---|---|---|---|---|
 | Muse | `opencode/opencode-go/muse-spark-1.3-contributor` | `build` | (기본) | **주 구현**(우선 배정). 실제 ID 를 `muse_runtime_id` 와 대조한다. Muse 는 codex 로 띄울 수 없다 |
-| Sol | `codex/gpt-6.1-sol` | `full-access` | `high` | 보조 구현(Muse 불가 시), 정식 검수 기본(Muse·Sonnet 구현분) |
+| Sol | `codex/gpt-6.2-sol` | `full-access` | `high` | 보조 구현(Muse 불가 시), 정식 검수 기본(Muse·Sonnet 구현분) |
 | Sonnet | `claude/claude-sonnet-5-5` | `bypassPermissions` | (기본) | Claude 작업자 구현, Sol 구현분 정식 검수(대척점 교차) |
-| Astra | `codex/gpt-6-astra` | `full-access` | `high` | `!계획!`·`!계획만!` 계획 기술 검토, 같은 지적 3회 수정 실패 시 추가 검토, 총괄(Claude) 부재 시 대리 총괄(2026-11-10 사용자 지시) |
+| Astra | `codex/gpt-6.2-astra` | `full-access` | `high` | `!계획!`·`!계획만!` 계획 기술 검토, 같은 지적 3회 수정 실패 시 추가 검토 |
 | Gemini | `antigravity/gemini-4-argon-high` | `full-access` | — | 조사·원문 수집·시각 검토. Paseo `create_agent` 로 띄운다(2026-11-10 사용자 지시). 실제 한도 초과 확인 시 `antigravity/gemini-3.8-flash-high` 로 재호출, 그것도 한도 초과면 Terra. 작은 전용 작업 폴더만 작업 공간으로 준다(아래 메모리 주의) |
 | Terra | `codex/gpt-6.1-terra` | `full-access` | `high` | Gemini 두 모델(argon·3.8 Flash) 모두 실제 한도 초과 시 조사 대체만(2026-11-12 사용자 지시로 Luna 에서 변경, 모델 ID 는 Paseo `list_models` 로 확인). DART 원문·판정·검증물 열람 금지 |
 
 - 모드 대응: OpenCode `build`(호스트 `~/.config/opencode/opencode.jsonc` 의 edit·bash·webfetch allow)는 기존 `--auto`, Codex `full-access` 는 `--dangerously-bypass-approvals-and-sandbox`, Claude `bypassPermissions`·antigravity `full-access` 는 `--dangerously-skip-permissions` 와 같은 취지다.
-- 총괄 자신은 사용자가 Paseo 앱에서 Fable(없으면 실제 확인한 Opus)로 띄운다. Claude 사용량이 다해 총괄이 없으면 대리 총괄은 표의 Astra 값으로 띄우고 작업서에 대리 총괄 역할을 적는다(2026-11-10 사용자 지시).
+- 총괄은 사용자가 Paseo 안에서 연 Hermes다(2026-11-21). 다른 에이전트가 총괄을 대신 맡지 않는다.
 - 에이전트 제목은 `<에이전트>-<작업>`(예: `muse-<작업>`, `sol-review-<작업>`, `sonnet-review-<작업>`, `astra-plan-<작업>`)으로 해 구현 세션과 검수 세션을 구분한다.
 - 권한 모드와 아래 「최대 허용」 범위를 따른다(2026-10-31). 남기는 금지는 아래 목록뿐이며 작업서와 사후 검사(`git status --short`, `find <경로> -newer <marker>`)로 지킨다.
 
@@ -31,10 +33,10 @@
 
 ### 절차
 
-총괄 Claude 는 Paseo 에이전트로 실행 중이어야 한다(`PASEO_AGENT_ID` 가 있고 `mcp__paseo__*` 도구가 보임). 하나라도 어기면 소환하지 않는다: Paseo 도구 없음·대상 worktree 없음·모델 ID 불일치. 아니면 바깥에서 사용자의 Paseo 세션을 조작하지 말고 Paseo 안에서 Claude 를 다시 열어 달라고 요청한다. 도구 문법의 정본은 Paseo MCP 도구 설명과 `paseo --help` 다.
+총괄(Hermes)은 Paseo 에이전트로 실행 중이어야 한다(`PASEO_AGENT_ID` 가 있고 `mcp__paseo__*` 도구가 보임). 하나라도 어기면 소환하지 않는다: Paseo 도구 없음·대상 worktree 없음·모델 ID 불일치. 아니면 바깥에서 사용자의 Paseo 세션을 조작하지 말고 Paseo 안에서 Claude 를 다시 열어 달라고 요청한다. 도구 문법의 정본은 Paseo MCP 도구 설명과 `paseo --help` 다.
 
 1. 작업 공간: 총괄이 작업 worktree 를 준비한 뒤 `create_workspace(isolation="local", path=<WT 절대경로>, title=<작업>, projectId=<기존 프로젝트 ID>)` 로 등록하고 `workspaceId` 를 받는다. **새 Paseo 프로젝트를 만들지 않는다**(2026-11-12 사용자 지적): `projectId` 를 빼면 worktree 마다 프로젝트가 새로 생기므로, 먼저 `list_workspaces` 로 총괄 자신의 작업 공간이 속한 `projectId` 를 확인해 그대로 넘기고, 응답의 `projectId` 가 그 값과 같은지 바로 확인한다. 다르면 에이전트를 띄우기 전에 그 작업 공간을 `archive_workspace` 로 정리하고 다시 등록한다. 이미 등록된 경로는 `list_workspaces` 로 찾아 재사용한다. Paseo 관리 worktree(`isolation="worktree"`)로 브랜치를 만들지 않는다.
-2. 기동: `create_agent(title="sol-<작업>", provider="codex/gpt-6.1-sol", settings={modeId:"full-access", thinkingOptionId:"high"}, workspaceId=<id>, initialPrompt="작업서 $WT/docs/jobs/todo/<파일>.md 를 읽고 수행하라. 결과는 $WT/<결과경로> 에 쓰고, 끝나면 그 경로와 한 줄 요약만 답하라.", notifyOnFinish=true)`. agentId 를 작업 기록·`.team/ledger.md` 에 남긴다.
+2. 기동: `create_agent(title="sol-<작업>", provider="codex/gpt-6.2-sol", settings={modeId:"full-access", thinkingOptionId:"high"}, workspaceId=<id>, initialPrompt="작업서 $WT/docs/jobs/todo/<파일>.md 를 읽고 수행하라. 결과는 $WT/<결과경로> 에 쓰고, 끝나면 그 경로와 한 줄 요약만 답하라.", notifyOnFinish=true)`. agentId 를 작업 기록·`.team/ledger.md` 에 남긴다.
 3. 대기·완료: `notifyOnFinish` 알림(완료·오류·권한 요청)을 받는다. 짧은 폴링·`pgrep`·로그 grep 대기 루프를 만들지 않는다. 필요할 때 `get_agent_status`·`get_agent_activity`(셸에서는 `paseo wait`·`paseo logs`)로 본다.
 4. 후속: 같은 작업의 후속은 같은 agentId 로 `send_agent_prompt` 해 세션을 잇는다. 다른 작업·다른 worktree 는 새 에이전트.
 
@@ -142,7 +144,7 @@ agy --add-dir "$WORKTREE" --dangerously-skip-permissions \
 
 ## 4. 정식 검수 발주
 
-`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비한다. **기본(Paseo):** 그 worktree 를 Paseo 작업 공간으로 등록하고 §0 의 검수 에이전트(Muse·Sonnet 구현분은 Sol, Sol 구현분은 Sonnet)에 발주해, 프롬프트에 지정한 정식 결과 파일로 회수한다. `dispatch-review`·`finish-review` 는 거치지 않는다(§0 「묶음 검수」). **대체(Paseo 를 쓸 수 없을 때만):** `dispatch-review`를 실행하고(`--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다) 결과는 `finish-review`로 회수한다. companion 대체 경로의 담당 모델은 `agent-ops-config.json`의 `models.review`(`gpt-6.1-sol`)이고, Sol 구현분은 companion 으로 넘기지 않고 Paseo 가 복구된 뒤 Sonnet 검수 에이전트로 발주한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
+`check`는 모델을 호출하지 않고 원문 범위 해시·테스트 영수증·소스 불변을 확인해 누적/보충/수리/검수 필요를 반환한다(요구사항 판정은 `not_assessed`). `boundary`는 영역 전환 또는 최종 단계에서 묶음을 닫는다. 검수할 때만 고정 후보의 별도 review worktree를 준비한다. **기본(Paseo):** 그 worktree 를 Paseo 작업 공간으로 등록하고 §0 의 검수 에이전트(Muse·Sonnet 구현분은 Sol, Sol 구현분은 Sonnet)에 발주해, 프롬프트에 지정한 정식 결과 파일로 회수한다. `dispatch-review`·`finish-review` 는 거치지 않는다(§0 「묶음 검수」). **대체(Paseo 를 쓸 수 없을 때만):** `dispatch-review`를 실행하고(`--dispatch --review-worktree ...`를 주면 check가 검수 필요로 판정한 경우 같은 발주기를 호출한다) 결과는 `finish-review`로 회수한다. companion 대체 경로의 담당 모델은 `agent-ops-config.json`의 `models.review`(`gpt-6.2-sol`)이고, Sol 구현분은 companion 으로 넘기지 않고 Paseo 가 복구된 뒤 Sonnet 검수 에이전트로 발주한다. 일반 단계에 Claude의 재승인을 끼워 넣지 않는다.
 
 이 코드 설치는 전역 Stop hook·MCP·새 daemon을 설치하지 않는다. 구현 종료/영역 전환 단계가 해당 명령을 실제 호출해야 작동한다. 기존 플러그인의 자동 review gate가 켜져 있으면 건별 중복 검수가 발생할 수 있으므로 현재 설정을 확인해 이번 묶음 정책과 충돌하는지 기록한다. 관련 설정을 조용히 바꾸거나 CI 필수 검사와 혼동하지 않는다.
 
