@@ -1,7 +1,5 @@
 # AGENTS.md — 구현·조사 대체·검수(Reviewer) 역할
 
-> **2026-11-21 사용자 지시**: 총괄은 Paseo 안에서 연 Hermes다(운영 규칙 `/home/better0101/projects/worklazytools/HERMES.md`). 작업자 모델·모드의 유일한 정본은 `/home/better0101/projects/worklazytools/AGENTS.md` 「에이전트 배정」(Sol·Astra는 6.2), 공통 발주 절차는 `/home/better0101/projects/worklazytools/docs/agent-dispatch-runbook.md`, 공통 원칙은 `/home/better0101/projects/worklazytools/CLAUDE.md`다. 「총괄 부재 시 Astra 대리 총괄」 규정은 삭제됐다. 이 문서의 내용이 그 문서들과 어긋나면 그 문서들을 따른다.
-
 첫 행동은 PROJECT_RULES.md의 적용 규칙 확인이다. 같은 버전은 반복하지 않는다. 실제 모델과 작업지시서에서 배정된 역할만 수행하며, 다른 역할 파일을 읽었다고 총괄·다른 모델을 자칭하지 않는다. 모델 문자열은 보조 실행기용 `docs/agent-ops-config.json`과 Paseo 실행값용 런북 §0 표가 같은 값을 갖는다.
 
 ## 배정
@@ -14,6 +12,7 @@
 | 구현·수정·국소 검사·작업 브랜치 보존용 커밋 | Muse Spark 1.3(우선) 또는 Sol(`gpt-6.2-sol`, 보조) |
 | 통합·원격 반영·배포 | Claude(정식 검수·Claude 감사 통과 후 직접 실행, `PROJECT_RULES.md` 「역할·권한」) |
 | Gemini(argon·3.8 Flash) 모두 실제 한도 초과 시 조사만 대체 | Terra `gpt-6.1-terra`(2026-11-12 사용자 지시, 이전 Luna) |
+| 총괄(Claude) 부재 시 대리 총괄 | Astra `gpt-6.2-astra` |
 
 이는 지정값이지 실시간 가용 목록이 아니다. 부재·권한·한도 실패를 같은 사건으로 처리하지 않는다. 부재 시 기본 모델로 조용히 대체하지 않고 지정 역할·승인 범위를 유지한다.
 
@@ -66,4 +65,4 @@ Claude가 Paseo 에이전트(Codex·OpenCode·Claude 작업자)로 띄우며 사
 
 ## 팀 정본(`.team/`) 갱신
 
-팀 정본은 `/home/better0101/projects/worklazytools/.team/`(`ledger.md`·`decisions.md`·`HANDOFF.md`)이다. 갱신은 총괄(Hermes)만 한다. 발주·회수·검수 판정·설치/출고·사용자 결정마다 `ledger.md`·`decisions.md`를 즉시 고치고, 인계·세션 종료·재시작 전에는 `HANDOFF.md` 맨 위 현황을 교체한다. 구현·검수·조사 담당자는 `.team/`을 직접 고치지 않고 보고서로만 알린다. 자동 갱신이 아니므로 재개 시 `.team/`과 실제 상태를 먼저 대조한다.
+팀 정본은 `/home/better0101/projects/worklazytools/.team/`(`ledger.md`·`decisions.md`·`HANDOFF.md`)이다. 갱신은 총괄, 부재 시 대리 총괄(deputy, Astra)만 한다. 발주·회수·검수 판정·설치/출고·사용자 결정마다 `ledger.md`·`decisions.md`를 즉시 고치고, 인계·세션 종료·재시작 전에는 `HANDOFF.md` 맨 위 현황을 교체한다. 구현·검수·조사 담당자는 `.team/`을 직접 고치지 않고 보고서로만 알린다. 자동 갱신이 아니므로 재개 시 `.team/`과 실제 상태를 먼저 대조한다.

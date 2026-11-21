@@ -1,8 +1,6 @@
 # PROJECT_RULES.md — 공통 운영 정책 정본
 
-> **2026-11-21 사용자 지시**: 총괄은 Paseo 안에서 연 Hermes다(운영 규칙 `/home/better0101/projects/worklazytools/HERMES.md`). 작업자 모델·모드의 유일한 정본은 `/home/better0101/projects/worklazytools/AGENTS.md` 「에이전트 배정」(Sol·Astra는 6.2), 공통 발주 절차는 `/home/better0101/projects/worklazytools/docs/agent-dispatch-runbook.md`, 공통 원칙은 `/home/better0101/projects/worklazytools/CLAUDE.md`다. 「총괄 부재 시 Astra 대리 총괄」 규정은 삭제됐다. 이 문서의 내용이 그 문서들과 어긋나면 그 문서들을 따른다.
-
-정책 버전: 2026-11-21(총괄을 Paseo 안의 Hermes로 변경, Sol·Astra 6.2, 대리 총괄 규정 삭제, 실행값·발주 절차 정본을 프로젝트 공통 문서로 이동; 이전 2026-11-12: 「원인 수리 원칙 — 우회·덮기 금지」 신설: 원인을 찾아 고치는 것이 의무, 증상만 덮는 구현·판정·시험 삭제 금지; 조사 대체 담당을 Luna 에서 Terra 로 변경; 이전 2026-11-10: Gemini 도 Paseo 에이전트로 호출, argon 우선·한도 초과 시 3.8 Flash·그다음 조사 대체, 총괄 부재 시 대리 총괄 Astra; 이전 2026-11-09: 실행 표면 herdr → Paseo, 에이전트 이름 명칭·실행값 정본은 런북 §0 표, Paseo 프로필 미사용; 이전 2026-11-02 검수자 배정). 이 파일은 역할·승인·증거·검수·종료 정책의 정본이다. 실제 모델 지정은 런북 §0 표(Paseo 실행값)와 `docs/agent-ops-config.json`(보조 실행기 설정, 같은 값), 역할별 행동은 `CLAUDE.md`·`AGENTS.md`·`GEMINI.md`, 호출 방법은 `docs/agent-dispatch-runbook.md`를 따른다. 정책을 역할 파일·스킬에서 다시 정의하지 않는다. 최신 명시적 사용자 지시가 우선하며, 환경의 안전 제한을 문서로 우회하지 않는다. 규칙 참조는 제목으로 한다.
+정책 버전: 2026-11-12(「원인 수리 원칙 — 우회·덮기 금지」 신설: 원인을 찾아 고치는 것이 의무, 증상만 덮는 구현·판정·시험 삭제 금지; 조사 대체 담당을 Luna 에서 Terra 로 변경; 이전 2026-11-10: Gemini 도 Paseo 에이전트로 호출, argon 우선·한도 초과 시 3.8 Flash·그다음 조사 대체, 총괄 부재 시 대리 총괄 Astra; 이전 2026-11-09: 실행 표면 herdr → Paseo, 에이전트 이름 명칭·실행값 정본은 런북 §0 표, Paseo 프로필 미사용; 이전 2026-11-02 검수자 배정). 이 파일은 역할·승인·증거·검수·종료 정책의 정본이다. 실제 모델 지정은 런북 §0 표(Paseo 실행값)와 `docs/agent-ops-config.json`(보조 실행기 설정, 같은 값), 역할별 행동은 `CLAUDE.md`·`AGENTS.md`·`GEMINI.md`, 호출 방법은 `docs/agent-dispatch-runbook.md`를 따른다. 정책을 역할 파일·스킬에서 다시 정의하지 않는다. 최신 명시적 사용자 지시가 우선하며, 환경의 안전 제한을 문서로 우회하지 않는다. 규칙 참조는 제목으로 한다.
 
 ## 제품 계약 — 변경하지 않는다
 
@@ -74,9 +72,9 @@
 
 | 담당 | 역할 |
 |---|---|
-| Hermes(사용자가 Paseo 안에서 직접 엶. 다른 에이전트가 총괄을 대신 맡지 않는다) | 요구·범위·완료 기준, 총괄·감사·최종 판정, 계획·운영 문서 유지보수 |
+| Claude(Fable 또는 실제 확인한 Opus, 사용자가 Paseo 에서 직접 띄움; Claude 사용량이 다해 부재하면 Astra 가 대리 총괄) | 요구·범위·완료 기준, 총괄·감사·최종 판정, 계획·운영 문서 유지보수 |
 | Muse Spark 1.3 Contributor(주) 또는 Sol(`gpt-6.2-sol`, 보조)·Sonnet(Claude 작업자) | 승인된 제품 코드·테스트·설정 구현, 국소 검사, 자기 작업 브랜치의 보존용 커밋. 구현은 Muse 우선 배정, Muse 불가 시 Sol |
-| Astra(`gpt-6.2-astra`) | `!계획!`·`!계획만!`의 계획 기술 검토·반박, 같은 지적 3회 수정 실패 시 추가 검토 |
+| Astra(`gpt-6.2-astra`) | `!계획!`·`!계획만!`의 계획 기술 검토·반박, 같은 지적 3회 수정 실패 시 추가 검토, 총괄 부재 시 대리 총괄(2026-11-10 사용자 지시) |
 | Sol(`gpt-6.2-sol`)·Sonnet(`claude-sonnet-5-5`) 검수 에이전트 | 완료된 묶음의 정식 기술 검수·격리 재현. 배정은 「검수자 배정」. 구현 에이전트와 분리 |
 | Gemini(`gemini-4-argon-high`, 한도 초과 시 `gemini-3.8-flash-high`) | 코드·문서·외부 자료 조사, 원문 수집, 지정 시각 검토, 필요한 보충 분석 |
 | Terra(`gpt-6.1-terra`) | Gemini(argon·3.8 Flash 모두)의 실제 한도 초과가 확인된 경우의 조사 대체만(2026-11-12 사용자 지시로 Luna 에서 변경). DART 원문·판정·검증물 열람 금지 |
