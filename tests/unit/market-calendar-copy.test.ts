@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { Settings } from 'luxon'
-import { dateCopyKeys, dateDescriptions, formatLastUpdated, koreaSessionRange, officialSources, type CalendarTextKey } from '../../src/features/market-calendar/calendarDisplay.ts'
+import { dateCopyKeys, dateDescriptions, formatLastUpdated, koreaSessionRange, officialSources, publicationTextKey, type CalendarTextKey } from '../../src/features/market-calendar/calendarDisplay.ts'
 import type { CalendarRow } from '../../src/features/market-calendar/loadCalendar.ts'
 import ko from '../../src/locales/ko/features.json' with { type: 'json' }
 import en from '../../src/locales/en/features.json' with { type: 'json' }
@@ -76,4 +76,54 @@ test('U.S. hours include the correct Korea date across winter and summer time', 
 
 test('source links are safe, unique by URL and keep the original excerpts', () => {
   assert.deepEqual(officialSources([{ id: 'a', url: 'https://example.com/notice', quote: 'A' }, { id: 'b', url: 'https://example.com/notice', quote: 'B' }, { id: 'c', url: 'urn:market-calendar:rule:weekend', quote: 'weekend' }]), [{ url: 'https://example.com/notice', quotes: ['A', 'B'] }])
+})
+
+test('proxy-based rows show which market the decision came from, in Korean and English', () => {
+  const closed = (venue: CalendarRow['venue'], reason: string): CalendarRow =>
+    ({ ...row, venue, status: 'closed', sessions: [], reason, notes: [] })
+  const cases: Array<[CalendarRow, CalendarTextKey, string, string]> = [
+    [closed('nyse', 'Nasdaq 공지에 따른 휴장(NYSE 자체 공지는 확인되지 않음)'), 'nasdaqNoticeProxyClosure', 'Nasdaq 공지(NYSE 자체 공지는 확인되지 않음) 휴장', 'Closed for Nasdaq notice (no NYSE notice confirmed)'],
+    [closed('nxt', 'KRX 공지에 따른 휴장(NXT 자체 공지는 확인되지 않음)'), 'krxNoticeProxyClosure', 'KRX 공지(NXT 자체 공지는 확인되지 않음) 휴장', 'Closed for KRX notice (no NXT notice confirmed)'],
+    [closed('krx', 'NXT 공지에 따른 휴장(KRX 자체 공지는 확인되지 않음)'), 'nxtNoticeProxyClosure', 'NXT 공지(KRX 자체 공지는 확인되지 않음) 휴장', 'Closed for NXT notice (no KRX notice confirmed)'],
+    [closed('nasdaq', 'NYSE 연간표에 따른 종일 휴장, Nasdaq 자체 연간표 미확인'), 'nyseAnnualProxyClosure', 'NYSE 연간표(Nasdaq 자체 연간표 미확인) 휴장', 'Closed for the NYSE annual calendar (Nasdaq calendar unconfirmed)'],
+  ]
+  for (const [sample, key, koText, enText] of cases) {
+    assert.deepEqual(dateCopyKeys(sample), [key])
+    assert.deepEqual(dateDescriptions(sample, text('ko')), [koText])
+    assert.deepEqual(dateDescriptions(sample, text('en')), [enText])
+  }
+  const weekday: CalendarRow = { ...row, venue: 'nasdaq', status: 'open', reason: 'NYSE 연간표 기준, Nasdaq 자체 연간표 미확인', notes: [] }
+  assert.deepEqual(dateCopyKeys(weekday), ['nyseAnnualProxyWeekday'])
+  assert.deepEqual(dateDescriptions(weekday, text('ko')), ['NYSE 연간표 기준, Nasdaq 자체 연간표 미확인'])
+  assert.deepEqual(dateDescriptions(weekday, text('en')), ['Based on the NYSE annual calendar (Nasdaq calendar unconfirmed)'])
+})
+
+test('opening ceremony and csat day are visible; bare memos stay hidden without duplication', () => {
+  const open = (venue: CalendarRow['venue'], special: string | null, notes: string[], sessions: CalendarRow['sessions']): CalendarRow =>
+    ({ ...row, venue, status: 'open', special, reason: null, sessions, notes })
+  const krxAuction = [
+    { code: 'regular', start: '10:00:00', end: '15:30:00', tz: 'Asia/Seoul' },
+    { code: 'opening_auction', start: '09:30:00', end: '10:00:00', tz: 'Asia/Seoul' },
+    { code: 'closing_auction', start: '15:20:00', end: '15:30:00', tz: 'Asia/Seoul' },
+  ] as CalendarRow['sessions']
+  assert.equal(publicationTextKey('특수일'), null)
+  assert.equal(publicationTextKey('Early close at 1:00 p.m.'), null)
+  const ceremony = open('krx', '증시 개장식', ['특수일', '현행판 기준'], krxAuction)
+  assert.deepEqual(dateCopyKeys(ceremony), ['openingCeremonyLabel'])
+  assert.deepEqual(dateDescriptions(ceremony, text('ko')), ['증시 개장식'])
+  assert.deepEqual(dateDescriptions(ceremony, text('en')), ['Market opening ceremony'])
+  const csat = open('krx', '대학수학능력시험일', ['특수일', '현행판 기준'], krxAuction)
+  assert.deepEqual(dateCopyKeys(csat), ['csatDayLabel'])
+  assert.deepEqual(dateDescriptions(csat, text('ko')), ['대학수학능력시험일'])
+  assert.deepEqual(dateDescriptions(csat, text('en')), ['College Scholastic Ability Test day'])
+  const yearOpen = open('nxt', '연초 개장일', ['특수일', '현행판 기준'], krxAuction)
+  assert.deepEqual(dateCopyKeys(yearOpen), ['yearOpen'])
+  assert.deepEqual(dateDescriptions(yearOpen, text('ko')), ['연초 개장일'])
+  const nasdaqEarly = open('nasdaq', 'Early Close', ['Early close at 1:00 p.m.'], row.sessions)
+  assert.deepEqual(dateCopyKeys(nasdaqEarly), ['earlyClose'])
+  assert.deepEqual(dateDescriptions(nasdaqEarly, text('ko')), ['조기폐장 · 13:00 마감 (뉴욕 시간)'])
+  assert.deepEqual(dateDescriptions(nasdaqEarly, text('en')), ['Early close at 13:00 (New York time)'])
+  const nyseEarly = open('nyse', 'Early Close', ['특수일'], row.sessions)
+  assert.deepEqual(dateCopyKeys(nyseEarly), ['earlyClose'])
+  assert.deepEqual(dateDescriptions(nyseEarly, text('en')), ['Early close at 13:00 (New York time)'])
 })

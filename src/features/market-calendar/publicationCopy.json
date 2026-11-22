@@ -143,7 +143,16 @@
     "양 시장 휴장 공지를 대조. 06-03은 지방선거일이며 연간 표의 임시공휴일 표기를 공지로 보완.": null,
     "양 시장의 일반 주식 세션을 대조. 동시호가 종료는 예정 시각이며 조문상 무작위 종료·VI에 따른 종목별 연장은 별도.": null,
     "원문 표의 2026·2027·2028 열 중 2027 열을 적용했다.": null,
-    "제36290호 분리 시행: 제2조 단서·제2호는 05-11, 그 밖의 개정은 05-01. 05-01~05-10은 registry의 조문별 연속성 승인 범위만 적용.": null
+    "제36290호 분리 시행: 제2조 단서·제2호는 05-11, 그 밖의 개정은 05-01. 05-01~05-10은 registry의 조문별 연속성 승인 범위만 적용.": null,
+    "Nasdaq 공지에 따른 휴장(NYSE 자체 공지는 확인되지 않음)": "nasdaqNoticeProxyClosure",
+    "KRX 공지에 따른 휴장(NXT 자체 공지는 확인되지 않음)": "krxNoticeProxyClosure",
+    "NXT 공지에 따른 휴장(KRX 자체 공지는 확인되지 않음)": "nxtNoticeProxyClosure",
+    "NYSE 연간표 기준, Nasdaq 자체 연간표 미확인": "nyseAnnualProxyWeekday",
+    "NYSE 연간표에 따른 종일 휴장, Nasdaq 자체 연간표 미확인": "nyseAnnualProxyClosure",
+    "증시 개장식": "openingCeremonyLabel",
+    "대학수학능력시험일": "csatDayLabel",
+    "특수일": null,
+    "Early close at 1:00 p.m.": null
   },
   "prefix": {
     "special 불일치:": null,
