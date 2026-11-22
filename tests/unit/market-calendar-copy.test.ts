@@ -77,3 +77,23 @@ test('U.S. hours include the correct Korea date across winter and summer time', 
 test('source links are safe, unique by URL and keep the original excerpts', () => {
   assert.deepEqual(officialSources([{ id: 'a', url: 'https://example.com/notice', quote: 'A' }, { id: 'b', url: 'https://example.com/notice', quote: 'B' }, { id: 'c', url: 'urn:market-calendar:rule:weekend', quote: 'weekend' }]), [{ url: 'https://example.com/notice', quotes: ['A', 'B'] }])
 })
+
+test('proxy-based rows show which market the decision came from, in Korean and English', () => {
+  const closed = (venue: CalendarRow['venue'], reason: string): CalendarRow =>
+    ({ ...row, venue, status: 'closed', sessions: [], reason, notes: [] })
+  const cases: Array<[CalendarRow, CalendarTextKey, string, string]> = [
+    [closed('nyse', 'Nasdaq 공지에 따른 휴장(NYSE 자체 공지는 확인되지 않음)'), 'nasdaqNoticeProxyClosure', 'Nasdaq 공지(NYSE 자체 공지는 확인되지 않음) 휴장', 'Closed for Nasdaq notice (no NYSE notice confirmed)'],
+    [closed('nxt', 'KRX 공지에 따른 휴장(NXT 자체 공지는 확인되지 않음)'), 'krxNoticeProxyClosure', 'KRX 공지(NXT 자체 공지는 확인되지 않음) 휴장', 'Closed for KRX notice (no NXT notice confirmed)'],
+    [closed('krx', 'NXT 공지에 따른 휴장(KRX 자체 공지는 확인되지 않음)'), 'nxtNoticeProxyClosure', 'NXT 공지(KRX 자체 공지는 확인되지 않음) 휴장', 'Closed for NXT notice (no KRX notice confirmed)'],
+    [closed('nasdaq', 'NYSE 연간표에 따른 종일 휴장, Nasdaq 자체 연간표 미확인'), 'nyseAnnualProxyClosure', 'NYSE 연간표(Nasdaq 자체 연간표 미확인) 휴장', 'Closed for the NYSE annual calendar (Nasdaq calendar unconfirmed)'],
+  ]
+  for (const [sample, key, koText, enText] of cases) {
+    assert.deepEqual(dateCopyKeys(sample), [key])
+    assert.deepEqual(dateDescriptions(sample, text('ko')), [koText])
+    assert.deepEqual(dateDescriptions(sample, text('en')), [enText])
+  }
+  const weekday: CalendarRow = { ...row, venue: 'nasdaq', status: 'open', reason: 'NYSE 연간표 기준, Nasdaq 자체 연간표 미확인', notes: [] }
+  assert.deepEqual(dateCopyKeys(weekday), ['nyseAnnualProxyWeekday'])
+  assert.deepEqual(dateDescriptions(weekday, text('ko')), ['NYSE 연간표 기준, Nasdaq 자체 연간표 미확인'])
+  assert.deepEqual(dateDescriptions(weekday, text('en')), ['Based on the NYSE annual calendar (Nasdaq calendar unconfirmed)'])
+})
