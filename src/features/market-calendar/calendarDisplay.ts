@@ -24,6 +24,12 @@ export const hasPublicationTextMapping = (value: string) => publicationTextKey(v
 type Translate = (key: CalendarTextKey, values?: Record<string, string | number>) => string
 export const displayClock = (value: string) => value.replace(/^(\d{2}:\d{2}):00$/, '$1')
 
+export function sessionClockRange(session: CalendarRow['sessions'][number], text: Translate): string {
+  const start = displayClock(session.start)
+  const startLabel = session.code === 'overnight' ? text('previousDayTime', { time: start }) : start
+  return `${startLabel}–${displayClock(session.end)}`
+}
+
 export function dateCopyKeys(row: CalendarRow): CalendarTextKey[] {
   if (row.status === 'unknown') return []
   const keys = [row.special, row.reason, ...row.notes].filter((v): v is string => Boolean(v)).map(publicationTextKey).filter((v): v is CalendarTextKey => typeof v === 'string')
@@ -70,10 +76,11 @@ export function formatLastUpdated(value: string, language: string): string | nul
 export function koreaSessionRange(date: string, session: CalendarRow['sessions'][number], language: string): string | null {
   if (session.tz === 'Asia/Seoul') return null
   const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`
-  const start = DateTime.fromISO(`${isoDate}T${session.start}`, { zone: session.tz })
+  let start = DateTime.fromISO(`${isoDate}T${session.start}`, { zone: session.tz })
   let end = DateTime.fromISO(`${isoDate}T${session.end}`, { zone: session.tz })
   if (!start.isValid || !end.isValid) return null
-  if (end < start) end = end.plus({ days: 1 })
+  if (session.code === 'overnight') start = start.minus({ days: 1 })
+  else if (end < start) end = end.plus({ days: 1 })
   const precision = start.second || end.second ? 'HH:mm:ss' : 'HH:mm'
   const ko = language.startsWith('ko'), pattern = ko ? `M월 d일 ${precision}` : `MMM d, ${precision}`
   const from = start.setZone('Asia/Seoul').setLocale(ko ? 'ko' : 'en'), to = end.setZone('Asia/Seoul').setLocale(ko ? 'ko' : 'en')
@@ -94,7 +101,8 @@ export function officialSources(sources: CalendarRow['sources']) {
 
 // Display transformations only; keep the published rows unchanged.
 export function sortSessions(sessions: CalendarRow['sessions']) {
-  return [...sessions].sort((a, b) => a.start.localeCompare(b.start))
+  return [...sessions].sort((a, b) =>
+    Number(b.code === 'overnight') - Number(a.code === 'overnight') || a.start.localeCompare(b.start))
 }
 
 export function groupSources(sources: CalendarRow['sources']) {
@@ -107,7 +115,7 @@ export function groupSources(sources: CalendarRow['sources']) {
   return [...groups.values()]
 }
 
-type SessionNameKey = 'openingAuction' | 'regularSession' | 'closingAuction' | 'preMarket' | 'mainMarket' | 'afterMarket'
+type SessionNameKey = 'openingAuction' | 'regularSession' | 'closingAuction' | 'preMarket' | 'mainMarket' | 'afterMarket' | 'overnightSession'
 const sessionNames: Partial<Record<string, SessionNameKey>> = {
   'krx:opening_auction': 'openingAuction',
   'krx:regular': 'regularSession',
@@ -117,6 +125,7 @@ const sessionNames: Partial<Record<string, SessionNameKey>> = {
   'nxt:after': 'afterMarket',
   'nyse:regular': 'regularSession',
   'nasdaq:regular': 'regularSession',
+  'nasdaq:overnight': 'overnightSession',
 }
 
 export const sessionNameKey = (venue: Venue, code: string) => sessionNames[`${venue}:${code}`]

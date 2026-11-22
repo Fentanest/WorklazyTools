@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { loadCalendar, isOld, sourceHref } from '../../src/features/market-calendar/loadCalendar.ts'
-import { groupSources, hasPublicationTextMapping, publicationTextKey, sessionNameKey, sortSessions } from '../../src/features/market-calendar/calendarDisplay.ts'
+import { groupSources, hasPublicationTextMapping, koreaSessionRange, publicationTextKey, sessionClockRange, sessionNameKey, sortSessions } from '../../src/features/market-calendar/calendarDisplay.ts'
 import ko from '../../src/locales/ko/features.json' with { type: 'json' }
 import en from '../../src/locales/en/features.json' with { type: 'json' }
 import publicationCopy from '../../src/features/market-calendar/publicationCopy.json' with { type: 'json' }
@@ -45,6 +45,35 @@ test('source display groups each id once and retains its distinct original quote
     { id: 'weekend', url: 'urn:market-calendar:rule:weekend', quotes: ['주말'] },
   ])
   assert.deepEqual(sources, before)
+})
+
+test('Nasdaq overnight starts on the previous ET evening of the published trade date', async t => {
+  const night = { code: 'overnight', start: '21:00:00', end: '03:55:00', tz: 'America/New_York' }
+  const day = { code: 'regular', start: '09:30:00', end: '16:00:00', tz: night.tz }
+  const nasdaq = { ...row, venue: 'nasdaq', status: 'open', reason: null }
+  const payload = JSON.stringify([
+    { ...nasdaq, date: '20261204', sessions: [day] },
+    { ...nasdaq, date: '20261207', sessions: [day, night] },
+  ])
+  const manifest = makeManifest(payload)
+  manifest.scopes[0].venue = 'nasdaq'
+  t.mock.method(globalThis, 'fetch', async (url: string) => new Response(url.endsWith('manifest.json')
+    ? JSON.stringify(manifest) : payload))
+  const view = await loadCalendar('/data/')
+  assert.equal(view.status, 'ready')
+  if (view.status !== 'ready') return
+  assert.deepEqual(view.rows.map(r => r.sessions), [[day], [day, night]])
+  const [overnight, regular] = sortSessions(view.rows[1].sessions)
+  assert.equal(sessionNameKey('nasdaq', overnight.code), 'overnightSession')
+  assert.equal(ko.marketCalendar.overnightSession, '야간 거래')
+  assert.equal(en.marketCalendar.overnightSession, 'Overnight trading')
+  assert.equal(sessionClockRange(overnight, (key, values) =>
+    ko.marketCalendar[key].replace('{{time}}', String(values?.time))), '전날 21:00–03:55')
+  assert.equal(sessionClockRange(overnight, (key, values) =>
+    en.marketCalendar[key].replace('{{time}}', String(values?.time))), 'Previous day 21:00–03:55')
+  assert.equal(sessionClockRange(regular, () => assert.fail('regular session uses same-day labels')), '09:30–16:00')
+  assert.equal(koreaSessionRange('20261207', overnight, 'ko'), '12월 7일 11:00–17:55')
+  assert.equal(koreaSessionRange('20270315', overnight, 'en'), 'Mar 15, 10:00–16:55')
 })
 
 test('verified publication preserves unknown status and original reasons without inferring sessions', async t => {

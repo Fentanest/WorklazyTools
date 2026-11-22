@@ -3340,6 +3340,8 @@
     "mainMarket": "메인마켓",
     "afterMarket": "애프터마켓",
     "otherSession": "기타 거래",
+    "overnightSession": "야간 거래",
+    "previousDayTime": "전날 {{time}}",
     "closedFor": "{{reason}} 휴장",
     "earlyCloseAt": "조기폐장 · {{time}} 마감 ({{zone}})",
     "earlyClose": "조기폐장일",

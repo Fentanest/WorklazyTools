@@ -3347,6 +3347,8 @@
     "mainMarket": "Main market",
     "afterMarket": "After-market",
     "otherSession": "Other trading",
+    "overnightSession": "Overnight trading",
+    "previousDayTime": "Previous day {{time}}",
     "closedFor": "Closed for {{reason}}",
     "earlyCloseAt": "Early close at {{time}} ({{zone}})",
     "earlyClose": "Early closing day",

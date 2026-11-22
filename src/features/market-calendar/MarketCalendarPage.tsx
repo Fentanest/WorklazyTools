@@ -7,7 +7,7 @@ import { UtilityPage } from '../../components/UtilitySurface'
 import { ToolGuideWrapper } from '../../components/ToolGuideWrapper'
 import type { TranslationResources } from '../../i18n/resources'
 import { loadCalendar, isOld, venues, type Venue, type CalendarView } from './loadCalendar'
-import { dateCopyKeys, dateDescriptions, displayClock, formatLastUpdated, koreaSessionRange, sessionNameKey, sortSessions } from './calendarDisplay'
+import { dateCopyKeys, dateDescriptions, formatLastUpdated, koreaSessionRange, sessionClockRange, sessionNameKey, sortSessions } from './calendarDisplay'
 import { calendarSelectionSearch, moveCalendarSelection, readCalendarSelection, type CalendarSelection } from './calendarSelection'
 import './market-calendar.css'
 import { CalendarSources } from './CalendarSources'
@@ -128,7 +128,7 @@ export function MarketCalendarPage() {
               const nameKey = sessionNameKey(venue, s.code)
               const korea = koreaSessionRange(selected.date, s, i18n.language)
               return <li key={i}>
-                <strong>{text(nameKey ?? 'otherSession')}</strong> · {displayClock(s.start)}–{displayClock(s.end)}
+                <strong>{text(nameKey ?? 'otherSession')}</strong> · {sessionClockRange(s, text)}
                 {korea && <span className="block text-sm text-muted-foreground">{text('koreaTime')} · {korea}</span>}
               </li>
             })}</ul></>}
