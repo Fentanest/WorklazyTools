@@ -332,6 +332,14 @@ export function denominatorReportLabel(report: string | null | undefined, lang: 
   return DENOMINATOR_REPORT_LABELS[report]?.[lang] ?? report;
 }
 
+export function denominatorCancellationLabel(receipts: readonly string[] | undefined, lang: Lang): string | null {
+  if (!receipts?.length) return null;
+  const numbers = receipts.join(", ");
+  return lang === "ko"
+    ? `소각 공시 반영(${numbers})`
+    : `Adjusted for share cancellation ${receipts.length === 1 ? "filing" : "filings"} ${numbers}`;
+}
+
 /**
  * A1 cover (주식등, incl. warrants etc.) figures line, shown only when the cover
  * differs from the 주권 figures. The pipeline only emits the two fields together,

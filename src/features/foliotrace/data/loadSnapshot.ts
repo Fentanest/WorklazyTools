@@ -138,6 +138,9 @@ function validQuote(value: unknown): boolean {
     value.session === 'regular' && isoDate(value.tradeDate) && value.adjusted === false &&
     value.provider === 'naver' && timestamp(value.observedAt) && value.verified === true
 }
+function validCancellationReceipts(value: unknown): boolean {
+  return Array.isArray(value) && value.length > 0 && value.every(item => str(item) && RECEIPT.test(item))
+}
 function validHolding(value: unknown): boolean {
   return isRecord(value) && str(value.corpCode) && /^\d{8}$/.test(value.corpCode) &&
     str(value.stockCode) && (STOCK.test(value.stockCode) ||
@@ -166,6 +169,7 @@ function validHolding(value: unknown): boolean {
     (value.ratioDenominatorValue === undefined || nullable(value.ratioDenominatorValue, decimal)) &&
     (value.ratioDenominatorDate === undefined || nullable(value.ratioDenominatorDate, isoDate)) &&
     (value.ratioDenominatorReport === undefined || nullable(value.ratioDenominatorReport, str)) &&
+    (value.ratioDenominatorCancellationReceipts === undefined || validCancellationReceipts(value.ratioDenominatorCancellationReceipts)) &&
     (value.ratioDenominatorReceipt === undefined || nullable(value.ratioDenominatorReceipt,
       item => str(item) && RECEIPT.test(item))) &&
     (value.titleQuantity === undefined || nullable(value.titleQuantity, decimal)) &&
@@ -190,6 +194,7 @@ function validEvent(value: unknown): boolean {
     (value.ratioBasisKind === undefined || nullable(value.ratioBasisKind, ratioBasisKind)) &&
     (value.reportedCompanyOwnershipPercent === undefined || nullable(value.reportedCompanyOwnershipPercent, decimal)) &&
     (value.ratioDenominatorReport === undefined || nullable(value.ratioDenominatorReport, str)) &&
+    (value.ratioDenominatorCancellationReceipts === undefined || validCancellationReceipts(value.ratioDenominatorCancellationReceipts)) &&
     (value.titleQuantity === undefined || nullable(value.titleQuantity, decimal)) &&
     (value.titleCompanyOwnershipPercent === undefined || nullable(value.titleCompanyOwnershipPercent, decimal)) &&
     (value.percentagePointChange === undefined || nullable(value.percentagePointChange, decimal)) &&

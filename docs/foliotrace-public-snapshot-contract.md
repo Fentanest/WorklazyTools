@@ -28,6 +28,7 @@ A2 비율의 분모는 보통주+우선주 합산 발행주식 총수). 화면�
 | `holdings[].ratioDenominatorDate` | 선택, 분모 기준일(YYYY-MM-DD) |
 | `holdings[].ratioDenominatorReport` | 선택, 분모 출처(`11013`·`11012`·`11014`·`11011` 분기보고서 코드 또는 `A1`·`A2`) |
 | `holdings[].ratioDenominatorReceipt` | 선택, 분모 출처 접수번호(14자리) |
+| `holdings[].ratioDenominatorCancellationReceipts` · `events[].ratioDenominatorCancellationReceipts` | 선택, 분모 계산에 실제 반영한 소각 공시 접수번호(14자리) 배열. 반영한 공시가 있을 때만 싣고 화면에서 한·영 문구로 표시 |
 | `holdings[].preferredCombined` | 선택, 우선주 합계 줄이면 `true`. 합계 줄의 `stockCode`는 상장 종목코드가 아니라
 8자리 회사코드(`corpCode`와 같은 값)이며, 파이프라인 검증기와 사이트 공개 검증기는 같은 규칙(종목코드 유일키 +
 합계 줄 식별자 검사)으로 검사한다. 주가 조회·평가가 붙지 않고 합계에서 제외(평가 불가 사유는 기존 제외 사유 체계 `security_mapping_unverified`로 기록). 상세 화면에 「국민연금 공시가 우선주를 종류별로 나누지 않고 합계로만 발표해 종류별 수량과 평가금액을 알 수 없음」(한/영) 표시 |

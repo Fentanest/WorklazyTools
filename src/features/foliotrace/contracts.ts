@@ -130,6 +130,8 @@ export interface Holding {
   /** DART quarterly report code ('11013' | '11012' | '11014' | '11011') or filing form ('A1' | 'A2'). */
   ratioDenominatorReport?: string | null
   ratioDenominatorReceipt?: string | null
+  /** DART receipt numbers of share cancellations applied to the denominator. */
+  ratioDenominatorCancellationReceipts?: string[]
   /** A1 cover (주식등, incl. warrants etc.) figures, kept when they differ from the 주권 figures (revision 3.2, optional). */
   titleQuantity?: DecimalString | null
   titleCompanyOwnershipPercent?: DecimalString | null
@@ -164,6 +166,8 @@ export interface FilingEvent {
   reportedCompanyOwnershipPercent?: DecimalString | null
   /** Denominator source of the displayed figure, same vocabulary as holdings (revision 3.1, optional). */
   ratioDenominatorReport?: string | null
+  /** DART receipt numbers of share cancellations applied to the denominator. */
+  ratioDenominatorCancellationReceipts?: string[]
   /** A1 cover (주식등, incl. warrants etc.) figures, kept when they differ from the 주권 figures (revision 3.2, optional). */
   titleQuantity?: DecimalString | null
   titleCompanyOwnershipPercent?: DecimalString | null
