@@ -3350,6 +3350,8 @@
     "nxtNoticeProxyClosure": "NXT 공지(KRX 자체 공지는 확인되지 않음)",
     "nyseAnnualProxyWeekday": "NYSE 연간표 기준, Nasdaq 자체 연간표 미확인",
     "nyseAnnualProxyClosure": "NYSE 연간표(Nasdaq 자체 연간표 미확인)",
+    "openingCeremonyLabel": "증시 개장식",
+    "csatDayLabel": "대학수학능력시험일",
     "sources": "공식 공지 보기",
     "moreSources": "다른 공식 공지",
     "sourceNumber": "공식 공지 {{number}}",

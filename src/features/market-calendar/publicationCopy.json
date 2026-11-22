@@ -148,7 +148,11 @@
     "KRX 공지에 따른 휴장(NXT 자체 공지는 확인되지 않음)": "krxNoticeProxyClosure",
     "NXT 공지에 따른 휴장(KRX 자체 공지는 확인되지 않음)": "nxtNoticeProxyClosure",
     "NYSE 연간표 기준, Nasdaq 자체 연간표 미확인": "nyseAnnualProxyWeekday",
-    "NYSE 연간표에 따른 종일 휴장, Nasdaq 자체 연간표 미확인": "nyseAnnualProxyClosure"
+    "NYSE 연간표에 따른 종일 휴장, Nasdaq 자체 연간표 미확인": "nyseAnnualProxyClosure",
+    "증시 개장식": "openingCeremonyLabel",
+    "대학수학능력시험일": "csatDayLabel",
+    "특수일": null,
+    "Early close at 1:00 p.m.": null
   },
   "prefix": {
     "special 불일치:": null,

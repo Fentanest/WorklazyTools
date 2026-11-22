@@ -3357,6 +3357,8 @@
     "nxtNoticeProxyClosure": "NXT notice (no KRX notice confirmed)",
     "nyseAnnualProxyWeekday": "Based on the NYSE annual calendar (Nasdaq calendar unconfirmed)",
     "nyseAnnualProxyClosure": "the NYSE annual calendar (Nasdaq calendar unconfirmed)",
+    "openingCeremonyLabel": "Market opening ceremony",
+    "csatDayLabel": "College Scholastic Ability Test day",
     "sources": "View official notice",
     "moreSources": "More official notices",
     "sourceNumber": "Official notice {{number}}",
