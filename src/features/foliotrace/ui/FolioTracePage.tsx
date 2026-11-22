@@ -24,6 +24,7 @@ import { dartFilingUrl } from "../data/dartLink";
 import {
   approxNumber,
   compactKrw,
+  denominatorCancellationLabel,
   denominatorReportLabel,
   eventRangeOf,
   exclusionReasonLabel,
@@ -571,6 +572,8 @@ function ownershipTitle(h: Holding, lang: Lang): string {
     parts.push(`${STR[lang].reportedOriginal} ${formatPct(h.reportedCompanyOwnershipPercent)}` +
       (reportedIsCombinedBasis(h.ratioBasisKind, h.ratioDenominatorReport, h.securityKind === "preferred") ? ` ${STR[lang].reportedCombinedBasis}` : ""));
   }
+  const cancellation = denominatorCancellationLabel(h.ratioDenominatorCancellationReceipts, lang);
+  if (cancellation) parts.push(cancellation);
   const title = titleFiguresLine(h, lang);
   if (title) parts.push(title);
   return parts.join(" · ");
@@ -584,6 +587,8 @@ function eventOwnershipTitle(event: FilingEvent, lang: Lang): string {
     parts.push(`${STR[lang].reportedOriginal} ${formatPct(event.reportedCompanyOwnershipPercent)}` +
       (reportedIsCombinedBasis(event.ratioBasisKind, event.ratioDenominatorReport, false) ? ` ${STR[lang].reportedCombinedBasis}` : ""));
   }
+  const cancellation = denominatorCancellationLabel(event.ratioDenominatorCancellationReceipts, lang);
+  if (cancellation) parts.push(cancellation);
   const title = titleFiguresLine(event, lang);
   if (title) parts.push(title);
   return parts.join(" · ");
@@ -664,18 +669,22 @@ function FilingHistory({ events, lang }: { events: FilingEvent[]; lang: Lang }) 
     <h3 className="foliotrace-detail-h3">{t.detailHistory}</h3>
     {events.length === 0 ? <p className="foliotrace-state-text">{t.eventsEmpty}</p> : (
       <ul className="foliotrace-events">
-        {events.map((e) => (
-          <li key={e.observationKey ?? `${e.receiptNo}:${e.corpCode}:${e.stockCode ?? ""}:${e.kind}:${e.basisDate ?? ""}`}>
-            <strong>{e.kind === "tracking-reentry" && e.source === "indirect-observation" ?
-              t.eventIndirectReentry : EVENT_KIND[lang][e.kind]}</strong>
-            {" · "}<span>{e.basisDate ? `${t.eventBasis}: ${e.basisDate}` : `${t.eventReceipt}: ${e.receiptDate}`}</span>{" "}
-            <code className="foliotrace-code">{e.receiptNo}</code>
-            {(e.correctionOf || e.isCorrectionOrWithdrawal) && <small> · {t.eventCorrection}</small>}
-            {e.correctionOf && <small> ← {e.correctionOf}</small>}
-            {titleFiguresLine(e, lang) && <small className="foliotrace-row-reason"> · {titleFiguresLine(e, lang)}</small>}
-            {e.filingUrl && <> <a href={e.filingUrl} target="_blank" rel="noreferrer">{t.openFiling}</a></>}
-          </li>
-        ))}
+        {events.map((e) => {
+          const cancellation = denominatorCancellationLabel(e.ratioDenominatorCancellationReceipts, lang);
+          return (
+            <li key={e.observationKey ?? `${e.receiptNo}:${e.corpCode}:${e.stockCode ?? ""}:${e.kind}:${e.basisDate ?? ""}`}>
+              <strong>{e.kind === "tracking-reentry" && e.source === "indirect-observation" ?
+                t.eventIndirectReentry : EVENT_KIND[lang][e.kind]}</strong>
+              {" · "}<span>{e.basisDate ? `${t.eventBasis}: ${e.basisDate}` : `${t.eventReceipt}: ${e.receiptDate}`}</span>{" "}
+              <code className="foliotrace-code">{e.receiptNo}</code>
+              {(e.correctionOf || e.isCorrectionOrWithdrawal) && <small> · {t.eventCorrection}</small>}
+              {e.correctionOf && <small> ← {e.correctionOf}</small>}
+              {titleFiguresLine(e, lang) && <small className="foliotrace-row-reason"> · {titleFiguresLine(e, lang)}</small>}
+              {cancellation && <small className="foliotrace-row-reason"> · {cancellation}</small>}
+              {e.filingUrl && <> <a href={e.filingUrl} target="_blank" rel="noreferrer">{t.openFiling}</a></>}
+            </li>
+          );
+        })}
       </ul>
     )}
   </>;
@@ -1375,6 +1384,9 @@ function ReadyView({
                       basisChanged={eventBasisChanges.get(event) === true} metric="ownership" lang={lang} /></span></span>
                     {event.percentagePointChange != null && <span>{t.eventPointChange.replace("{amount}", String(event.percentagePointChange))}</span>}
                   </div>
+                  {event.ratioDenominatorCancellationReceipts && (
+                    <small className="foliotrace-row-reason">{denominatorCancellationLabel(event.ratioDenominatorCancellationReceipts, lang)}</small>
+                  )}
                   <div className="foliotrace-event-source">
                     <span>{event.source === "legacy-import" ? t.eventLegacySource :
                       event.source === "indirect-observation" ? t.eventIndirectSource :
@@ -1531,6 +1543,9 @@ function ReadyView({
                       <> · <a href={dartFilingUrl(selected.ratioDenominatorReceipt)} target="_blank" rel="noreferrer">
                         <code className="foliotrace-code">{selected.ratioDenominatorReceipt}</code>
                       </a></>)}
+                    {selected.ratioDenominatorCancellationReceipts && (
+                      <small className="foliotrace-row-reason">{denominatorCancellationLabel(selected.ratioDenominatorCancellationReceipts, lang)}</small>
+                    )}
                     {selected.reportedCompanyOwnershipPercent != null && (
                       <small className="foliotrace-row-reason">
                         {t.reportedOriginal} {formatPct(selected.reportedCompanyOwnershipPercent)}

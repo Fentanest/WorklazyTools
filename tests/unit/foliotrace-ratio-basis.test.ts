@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import type { FilingEvent, Holding } from "../../src/features/foliotrace/contracts.ts";
 import {
+  denominatorCancellationLabel,
   denominatorReportLabel,
   filingBasisChangesForEvents,
   filingBasisChangesForHoldings,
@@ -182,6 +183,14 @@ test("basis and denominator-source labels render without raw codes", async () =>
     assert.ok(label && !/\(A\d\)|\(A3\)|common_only|voting_rights|preferred_only|preferred_combined|issued_total|major_holder_report|year_end|stockCode|corpCode/.test(label),
       `internal code leaked: ${label}`);
   }
+});
+
+test("share cancellation receipts have their own Korean and English labels", () => {
+  const receipts = ["20260917800163"];
+  assert.equal(denominatorReportLabel("11012", "en"), "Half-year report");
+  assert.equal(denominatorCancellationLabel(receipts, "ko"), "소각 공시 반영(20260917800163)");
+  assert.equal(denominatorCancellationLabel(receipts, "en"), "Adjusted for share cancellation filing 20260917800163");
+  assert.equal(denominatorCancellationLabel(undefined, "en"), null);
 });
 
 test("preserved filing percentages say when they use the combined basis", () => {
