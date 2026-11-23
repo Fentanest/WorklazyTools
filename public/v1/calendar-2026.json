@@ -38480,6 +38480,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -38488,6 +38494,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -38615,6 +38631,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -38623,6 +38645,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -38750,6 +38782,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -38758,6 +38796,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -38885,6 +38933,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -38893,6 +38947,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -39020,6 +39084,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -39028,6 +39098,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -39291,6 +39371,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -39299,6 +39385,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -39426,6 +39522,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -39434,6 +39536,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -39561,6 +39673,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -39569,6 +39687,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -39696,6 +39824,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -39704,6 +39838,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -39831,6 +39975,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -39839,6 +39989,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -40102,6 +40262,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -40110,6 +40276,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -40237,6 +40413,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -40245,6 +40427,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -40372,6 +40564,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -40380,6 +40578,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -40507,6 +40715,12 @@
         "start": "09:30:00",
         "end": "13:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": "Early Close",
@@ -40515,6 +40729,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "Early CloseDecember 24, 20261:00 p.m."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -40855,6 +41079,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -40863,6 +41093,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -40990,6 +41230,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -40998,6 +41244,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -41106,6 +41362,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -41114,6 +41376,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
@@ -41193,6 +41465,12 @@
         "start": "09:30:00",
         "end": "16:00:00",
         "tz": "America/New_York"
+      },
+      {
+        "code": "overnight",
+        "start": "21:00:00",
+        "end": "03:55:00",
+        "tz": "America/New_York"
       }
     ],
     "special": null,
@@ -41201,6 +41479,16 @@
         "id": "nasdaq-holiday-schedule",
         "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
         "quote": "The Nasdaq Stock Market\nOpens: 9:30 am Eastern Time Zone; Closes: 4:00 pm Eastern Time Zone"
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "Beginning on December 6th, The Nasdaq Stock Market will offer new trading hours from 9 p.m. ET to 3:55 a.m. ET*."
+      },
+      {
+        "id": "nasdaq-notice-eta2026-72",
+        "url": "https://www.nasdaqtrader.com/TraderNews.aspx?id=ETA2026-72",
+        "quote": "December 6, 2026 launch"
       }
     ],
     "reason": null,
