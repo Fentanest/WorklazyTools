@@ -430,7 +430,7 @@
 
 .foliotrace-events a,
 .foliotrace-detail-list a {
-  color: var(--brand-on-bg, var(--brand, #e8502f));
+  color: var(--brand-strong, #b93a1b);
 }
 
 .foliotrace-faq {
@@ -538,6 +538,7 @@
 }
 
 .foliotrace-detail-list dd {
+  min-width: 0;
   margin: 0;
   text-align: right;
   overflow-wrap: anywhere;
@@ -1135,7 +1136,8 @@
 }
 
 .foliotrace-name-btn:hover {
-  color: var(--brand-on-bg, var(--brand, #e8502f));
+  color: var(--label);
+  text-decoration: underline;
 }
 
 .foliotrace-strong {
@@ -1194,7 +1196,7 @@ th.foliotrace-num,
 }
 
 .foliotrace-marker {
-  color: var(--brand-on-bg, var(--brand, #b93a1b));
+  color: var(--brand-strong, #b93a1b);
 }
 
 /* Phone holdings list */
@@ -1263,7 +1265,7 @@ th.foliotrace-num,
 }
 
 .foliotrace-mrow-note.foliotrace-marker {
-  color: var(--brand-on-bg, var(--brand, #b93a1b));
+  color: var(--brand-strong, #b93a1b);
 }
 
 /* Method: three short columns */
@@ -1414,4 +1416,31 @@ th.foliotrace-num,
   .foliotrace-excluded {
     padding: 1.25rem 1.25rem;
   }
+}
+
+/* History has three content-sized columns, unlike the fixed holdings table. */
+.foliotrace-history-table {
+  table-layout: auto;
+}
+
+.foliotrace-mrow .foliotrace-code-plain,
+.foliotrace-table .foliotrace-code-plain {
+  color: var(--label-secondary, currentColor);
+}
+
+.foliotrace-table tbody tr:hover .foliotrace-marker {
+  color: var(--label);
+}
+
+.foliotrace-detail-list > .foliotrace-assumption-evidence {
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.foliotrace-assumption-evidence dd {
+  text-align: left;
+}
+
+.foliotrace-detail-list dd .foliotrace-row-reason {
+  white-space: normal;
 }

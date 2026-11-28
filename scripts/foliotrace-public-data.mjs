@@ -3,6 +3,7 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import path from 'node:path'
+import { assumptionSummary, quantityAssumptionLabel } from '../src/features/foliotrace/ui/holdings.ts'
 import { SNAPSHOT_LIMITS, validSnapshot } from '../src/features/foliotrace/data/loadSnapshot.ts'
 
 export const DATA_SUBPATH = 'data/foliotrace/v1'
@@ -74,9 +75,12 @@ export async function injectStaticSummary(distRoot, snapshot) {
         BigInt(b.estimatedValue.split('.')[0]) < BigInt(a.estimatedValue.split('.')[0]) ? -1 : 0)).slice(0, 10)
     const table = rows.length === 0 ? '' :
       `<h2>${ko ? '상위 보유종목' : 'Top holdings'}</h2><table><thead><tr><th>${ko ? '종목' : 'Security'}</th><th>${ko ? '코드' : 'Code'}</th><th>KRW</th></tr></thead><tbody>` +
-      rows.map(h => `<tr><th scope='row'>${escapeHtml(h.name)}</th><td>${escapeHtml(h.stockCode)}</td><td>${escapeHtml(h.estimatedValue)}</td></tr>`).join('') + '</tbody></table>'
+      rows.map(h => `<tr><th scope='row'>${escapeHtml(h.name)}${h.quantityAssumption ? ` — ${escapeHtml(quantityAssumptionLabel(h.quantityAssumption.code, lang))}` : ''}</th><td>${escapeHtml(h.stockCode)}</td><td>${escapeHtml(h.estimatedValue)}</td></tr>`).join('') + '</tbody></table>'
+    const assumed = assumptionSummary(snapshot.holdings)
+    const assumptionNote = assumed.count ? `<p>${ko ? `평가 포함 ${snapshot.pricedCount}종목 가운데 수량 가정 ${assumed.count}종목` : `${assumed.count} quantity-assumed securities among ${snapshot.pricedCount} priced`}. ${ko ? '총 평가액에 포함된 수량 가정 종목 금액' : 'Value using quantity assumptions, included in the total'}: ${escapeHtml(assumed.value)} KRW</p>` : ''
+    const methodNote = snapshot.portfolio.methodologyVersion === '3' ? `<p>${ko ? '현재 평가 방법 3: 증자 뒤 수량 미확인 종목은 미청약 가정으로 포함합니다. 과거 값과 방법은 보존하며 방법 변경에 따른 차이는 투자수익이 아닙니다.' : 'Current valuation method 3 includes unconfirmed post-offering quantities assuming no subscription. Historical values and methods are preserved; methodology changes are not investment returns.'}</p>` : ''
     const summary = `<section data-foliotrace-dataset='${version}'><h2>${ko ? '추정 평가금액' : 'Estimated value'}</h2>` +
-      `<p>${escapeHtml(snapshot.estimatedValue ?? unavailable)}</p><p>${ko ? '평가 기준 거래일' : 'Valuation trade date'}: ${escapeHtml(snapshot.valuationTradeDate ?? unavailable)}</p>${table}</section>`
+      `<p>${escapeHtml(snapshot.estimatedValue ?? unavailable)}</p><p>${ko ? '평가 기준 거래일' : 'Valuation trade date'}: ${escapeHtml(snapshot.valuationTradeDate ?? unavailable)}</p>${assumptionNote}${methodNote}${table}</section>`
     if (!source.includes('</main>')) throw new Error('FolioTrace page has no main element')
     await fs.writeFile(file, source.replace('</main>', summary + '</main>'), 'utf8')
   }

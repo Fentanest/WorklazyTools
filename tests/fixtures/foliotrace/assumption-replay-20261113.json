@@ -1,0 +1,1392 @@
+{
+  "datasetVersion": "c4608c093ac39f9db0b9545ff11e5c4c02c894045015194dc0ac8446ac0ec64a",
+  "entity": {
+    "id": "nps",
+    "kind": "institution",
+    "nameEn": "National Pension Service",
+    "nameKo": "국민연금공단",
+    "officialId": null,
+    "source": "OpenDART"
+  },
+  "estimatedValue": "220535910423",
+  "events": [],
+  "filingCoverage": "partial",
+  "filingsCheckedAt": "2026-11-02T15:03:28.309977+00:00",
+  "generatedAt": "2026-11-12T00:00:00Z",
+  "history": [
+    {
+      "datasetVersion": "8b39a4bd75ec7eda9b653d821198a65e16a4ed22c3519302596e94c4e5d513b3",
+      "estimatedValue": "350016593930338",
+      "tradeDate": "2026-10-23",
+      "methodologyVersion": "2"
+    },
+    {
+      "datasetVersion": "08756eb4a90eb9112d52a8afb32a0173dd58bf39fcca41b71f435b0237191f0c",
+      "estimatedValue": "344648536484713",
+      "tradeDate": "2026-10-26",
+      "methodologyVersion": "2"
+    },
+    {
+      "datasetVersion": "0bf155b43de0589666a7f282747c628b2d6663bb88387fa8ad50940807578786",
+      "estimatedValue": "355610586883349",
+      "tradeDate": "2026-10-27",
+      "methodologyVersion": "2"
+    },
+    {
+      "datasetVersion": "28bbd58b22031f1acb80c05bf50921e3a0811be316a0eb597137b55643a64001",
+      "estimatedValue": "379726252607836",
+      "tradeDate": "2026-10-28",
+      "methodologyVersion": "2"
+    },
+    {
+      "datasetVersion": "3beaf37da370196b9ccfbd3cc3daecfa5fa6e40d817ec7843f731daa47dae40a",
+      "estimatedValue": "375053642866907",
+      "tradeDate": "2026-10-29",
+      "methodologyVersion": "2"
+    },
+    {
+      "datasetVersion": "b1e872d992b55d10c363306785ec9f0885b87f214646e509ae51ba4a7ccd87bb",
+      "estimatedValue": "361235809293306",
+      "tradeDate": "2026-10-30",
+      "methodologyVersion": "2"
+    },
+    {
+      "datasetVersion": "61c89664a356224b403e940500205358ed8ed33a9f012d769727674f5c93805a",
+      "estimatedValue": "369286224850488",
+      "tradeDate": "2026-11-02",
+      "methodologyVersion": "2"
+    },
+    {
+      "tradeDate": "2026-11-11",
+      "estimatedValue": "220535910423",
+      "datasetVersion": "c4608c093ac39f9db0b9545ff11e5c4c02c894045015194dc0ac8446ac0ec64a",
+      "methodologyVersion": "3",
+      "trackedCount": 18,
+      "pricedCount": 17,
+      "unvaluedCount": 1
+    }
+  ],
+  "holdings": [
+    {
+      "companyOwnershipPercent": "0.75932",
+      "corpCode": "00152385",
+      "estimatedValue": null,
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "에이프로젠",
+      "portfolioWeightPercent": null,
+      "quantity": "2500478",
+      "quote": null,
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "007460",
+      "tracking": "active",
+      "valuationExclusionReason": "corporate_action_ratio_unverified"
+    },
+    {
+      "companyOwnershipPercent": "3.96",
+      "corpCode": "00113261",
+      "estimatedValue": "67485705000",
+      "evidence": "dart-structured",
+      "filingUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260401004407",
+      "holdingDate": "2026-01-06",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "대한광통신",
+      "portfolioWeightPercent": "30.600778",
+      "quantity": "5231450",
+      "quote": {
+        "adjusted": false,
+        "close": "12900",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2026-04-01",
+      "receiptNo": "20260401004407",
+      "securityKind": "common",
+      "sourceKind": "nps-filing",
+      "stockCode": "010170",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260306900886",
+            "listingDate": "2026-03-19",
+            "shares": "23500000"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.239716",
+      "corpCode": "00138297",
+      "estimatedValue": "13237560",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "STX",
+      "portfolioWeightPercent": "0.006002",
+      "quantity": "721",
+      "quote": {
+        "adjusted": false,
+        "close": "18360",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "011810",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAdjustment": {
+        "reportedQuantity": "74355",
+        "ratioNumerator": "1",
+        "ratioDenominator": "103",
+        "events": [
+          {
+            "receiptNo": "20261013000426",
+            "kind": "capital-reduction",
+            "priceChangeDate": "2026-11-06",
+            "quantityChangeDate": "2026-11-06"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.277212",
+      "corpCode": "00102618",
+      "estimatedValue": "189417150",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "계양전기",
+      "portfolioWeightPercent": "0.085889",
+      "quantity": "75465",
+      "quote": {
+        "adjusted": false,
+        "close": "2510",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "012200",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260911800534",
+            "listingDate": "2026-09-29",
+            "shares": "8200000"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "4.19",
+      "corpCode": "00298447",
+      "estimatedValue": "9690902330",
+      "evidence": "dart-structured",
+      "filingUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260701000466",
+      "holdingDate": "2026-05-29",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "아모텍",
+      "portfolioWeightPercent": "4.394251",
+      "quantity": "673447",
+      "quote": {
+        "adjusted": false,
+        "close": "14390",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2026-07-01",
+      "receiptNo": "20260701000466",
+      "securityKind": "common",
+      "sourceKind": "nps-filing",
+      "stockCode": "052710",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260811900495",
+            "listingDate": "2026-08-25",
+            "shares": "2370000"
+          }
+        ]
+      },
+      "quantityAdjustment": {
+        "reportedQuantity": "612225",
+        "ratioNumerator": "11",
+        "ratioDenominator": "10",
+        "events": [
+          {
+            "receiptNo": "20260730000319",
+            "kind": "bonus-issue",
+            "priceChangeDate": "2026-08-13",
+            "quantityChangeDate": "2026-09-04"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.259434",
+      "corpCode": "00412348",
+      "estimatedValue": "421923600",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "LB세미콘",
+      "portfolioWeightPercent": "0.191317",
+      "quantity": "150687",
+      "quote": {
+        "adjusted": false,
+        "close": "2800",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "061970",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260811900721",
+            "listingDate": "2026-08-26",
+            "shares": "12000000"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.535721",
+      "corpCode": "00671376",
+      "estimatedValue": "932366330",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "티웨이항공",
+      "portfolioWeightPercent": "0.422773",
+      "quantity": "359987",
+      "quote": {
+        "adjusted": false,
+        "close": "2590",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "091810",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260319800361",
+            "listingDate": "2026-04-02",
+            "shares": "76985450"
+          }
+        ]
+      },
+      "quantityAdjustment": {
+        "reportedQuantity": "1799937",
+        "ratioNumerator": "1",
+        "ratioDenominator": "5",
+        "events": [
+          {
+            "receiptNo": "20260703800820",
+            "kind": "reverse-split",
+            "priceChangeDate": "2026-08-31",
+            "quantityChangeDate": "2026-08-31"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.051787",
+      "corpCode": "00441243",
+      "estimatedValue": "5447120",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "형지엘리트",
+      "portfolioWeightPercent": "0.002470",
+      "quantity": "3976",
+      "quote": {
+        "adjusted": false,
+        "close": "1370",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "093240",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260130800356",
+            "listingDate": "2026-02-13",
+            "shares": "23000000"
+          }
+        ]
+      },
+      "quantityAdjustment": {
+        "reportedQuantity": "19881",
+        "ratioNumerator": "1",
+        "ratioDenominator": "5",
+        "events": [
+          {
+            "receiptNo": "20260706800691",
+            "kind": "reverse-split",
+            "priceChangeDate": "2026-10-20",
+            "quantityChangeDate": "2026-10-20"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.922876",
+      "corpCode": "00646732",
+      "estimatedValue": "1521739800",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "진양홀딩스",
+      "portfolioWeightPercent": "0.690019",
+      "quantity": "515844",
+      "quote": {
+        "adjusted": false,
+        "close": "2950",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "100250",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260312801103",
+            "listingDate": "2026-03-25",
+            "shares": "8004708"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.361877",
+      "corpCode": "00508344",
+      "estimatedValue": "131981748",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "SK디앤디",
+      "portfolioWeightPercent": "0.059846",
+      "quantity": "67372",
+      "quote": {
+        "adjusted": false,
+        "close": "1959",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "210980",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20261015800709",
+            "listingDate": "2026-10-28",
+            "shares": "44679623"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.757238",
+      "corpCode": "01053540",
+      "estimatedValue": "1332812760",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "퓨쳐켐",
+      "portfolioWeightPercent": "0.604352",
+      "quantity": "203794",
+      "quote": {
+        "adjusted": false,
+        "close": "6540",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "220100",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260911900340",
+            "listingDate": "2026-09-29",
+            "shares": "3389830"
+          }
+        ]
+      },
+      "quantityAdjustment": {
+        "reportedQuantity": "169829",
+        "ratioNumerator": "6",
+        "ratioDenominator": "5",
+        "events": [
+          {
+            "receiptNo": "20260901000041",
+            "kind": "bonus-issue",
+            "priceChangeDate": "2026-09-17",
+            "quantityChangeDate": "2026-10-13"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "1.11",
+      "corpCode": "01160363",
+      "estimatedValue": "100070829000",
+      "evidence": "dart-document",
+      "filingUrl": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260814002535",
+      "holdingDate": "2026-06-30",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "에코프로비엠",
+      "portfolioWeightPercent": "45.376206",
+      "quantity": "1088910",
+      "quote": {
+        "adjusted": false,
+        "close": "91900",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2026-08-14",
+      "receiptNo": "20260814002535",
+      "securityKind": "common",
+      "sourceKind": "issuer-report",
+      "stockCode": "247540",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20261023900714",
+            "listingDate": "2026-11-05",
+            "shares": "9900990"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "1.283557",
+      "corpCode": "01181515",
+      "estimatedValue": "14251464700",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "엘앤씨바이오",
+      "portfolioWeightPercent": "6.462197",
+      "quantity": "631994",
+      "quantityAdjustment": {
+        "reportedQuantity": "315997",
+        "ratioNumerator": "2",
+        "ratioDenominator": "1",
+        "events": [
+          {
+            "receiptNo": "20261012000188",
+            "kind": "bonus-issue",
+            "priceChangeDate": "2026-10-26",
+            "quantityChangeDate": "2026-11-12"
+          }
+        ]
+      },
+      "quote": {
+        "adjusted": false,
+        "close": "22550",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "290650",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20261022900534",
+            "listingDate": "2026-11-04",
+            "shares": "3700000"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "1.21359",
+      "corpCode": "01397620",
+      "estimatedValue": "10041011960",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "루닛",
+      "portfolioWeightPercent": "4.553005",
+      "quantity": "710114",
+      "quote": {
+        "adjusted": false,
+        "close": "14140",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "328130",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260430901181",
+            "listingDate": "2026-05-15",
+            "shares": "7906816"
+          }
+        ]
+      },
+      "quantityAdjustment": {
+        "reportedQuantity": "355057",
+        "ratioNumerator": "2",
+        "ratioDenominator": "1",
+        "events": [
+          {
+            "receiptNo": "20260420000223",
+            "kind": "bonus-issue",
+            "priceChangeDate": "2026-05-04",
+            "quantityChangeDate": "2026-05-26"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.967829",
+      "corpCode": "00920379",
+      "estimatedValue": "7279969500",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "티엘비",
+      "portfolioWeightPercent": "3.301036",
+      "quantity": "190326",
+      "quote": {
+        "adjusted": false,
+        "close": "38250",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "356860",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260714900455",
+            "listingDate": "2026-07-27",
+            "shares": "2073000"
+          }
+        ]
+      },
+      "quantityAdjustment": {
+        "reportedQuantity": "95163",
+        "ratioNumerator": "2",
+        "ratioDenominator": "1",
+        "events": [
+          {
+            "receiptNo": "20260702000142",
+            "kind": "bonus-issue",
+            "priceChangeDate": "2026-07-16",
+            "quantityChangeDate": "2026-08-07"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.42675",
+      "corpCode": "01622720",
+      "estimatedValue": "576902405",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "KB스타리츠",
+      "portfolioWeightPercent": "0.261591",
+      "quantity": "432785",
+      "quote": {
+        "adjusted": false,
+        "close": "1333",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "432320",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260423800592",
+            "listingDate": "2026-05-07",
+            "shares": "49350000"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "0.968773",
+      "corpCode": "01700587",
+      "estimatedValue": "1462322500",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "이노스페이스",
+      "portfolioWeightPercent": "0.663077",
+      "quantity": "239725",
+      "quote": {
+        "adjusted": false,
+        "close": "6100",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "462350",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260612900584",
+            "listingDate": "2026-06-25",
+            "shares": "7000000"
+          }
+        ]
+      },
+      "quantityAdjustment": {
+        "reportedQuantity": "199771",
+        "ratioNumerator": "6",
+        "ratioDenominator": "5",
+        "events": [
+          {
+            "receiptNo": "20260612000418",
+            "kind": "bonus-issue",
+            "priceChangeDate": "2026-06-18",
+            "quantityChangeDate": "2026-07-09"
+          }
+        ]
+      }
+    },
+    {
+      "companyOwnershipPercent": "1.188758",
+      "corpCode": "01784914",
+      "estimatedValue": "5127876960",
+      "evidence": "legacy-import",
+      "filingUrl": null,
+      "holdingDate": "2025-12-31",
+      "latestUnresolvedReason": null,
+      "latestUnresolvedReceiptNo": null,
+      "name": "클로봇",
+      "portfolioWeightPercent": "2.325189",
+      "quantity": "297096",
+      "quote": {
+        "adjusted": false,
+        "close": "17260",
+        "currency": "KRW",
+        "market": "KRX",
+        "observedAt": "2026-11-02T23:35:43.825084Z",
+        "provider": "naver",
+        "session": "regular",
+        "tradeDate": "2026-11-11",
+        "verified": true
+      },
+      "receiptDate": "2025-12-31",
+      "receiptNo": null,
+      "securityKind": "common",
+      "sourceKind": "year-end-list",
+      "stockCode": "466100",
+      "tracking": "active",
+      "valuationExclusionReason": null,
+      "quantityAssumption": {
+        "code": "rights_offering_not_subscribed",
+        "offerings": [
+          {
+            "receiptNo": "20260824900353",
+            "listingDate": "2026-09-07",
+            "shares": "5494500"
+          }
+        ]
+      }
+    }
+  ],
+  "latestReceiptDate": "2026-11-02",
+  "portfolio": {
+    "currency": "KRW",
+    "entityId": "nps",
+    "id": "nps-kr-disclosed",
+    "legacyCoverage": "verified",
+    "market": "KRX",
+    "methodologyVersion": "3",
+    "scopeEn": "NPS Korean equity holdings estimate",
+    "scopeKo": "국민연금 국내주식 보유 추정"
+  },
+  "pricedCount": 17,
+  "publishedAt": null,
+  "schemaVersion": 1,
+  "trackedCount": 18,
+  "unresolvedCount": 16,
+  "valuationCoverage": "partial",
+  "valuationTradeDate": "2026-11-11",
+  "valuationSeries": {
+    "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+    "currency": "KRW",
+    "generatedAt": "2026-11-03T07:50:49.918848+00:00",
+    "knowledgePolicy": "ledger-known-by-trade-date-retrospective-cache",
+    "limitations": [
+      "Current cached parsing and corrections; known_at is daily and backfills may use filing date.",
+      "Current pending-delisting review is conservatively applied throughout; confirmed delistings cut by effective event date.",
+      "CA filing lists and structured detail receipts cut to trade date; missing historical details stay unverified.",
+      "Denominator cache uses current cached reports with existing settlement-date/lag rules; no historical fetch timestamps.",
+      "Stored quantity snapshots from 2026-10-22 use assembly date T; public vintages may assemble after T.",
+      "Partial disclosed-holdings estimate; not total NPS assets or investment performance."
+    ],
+    "methodologyVersion": "2",
+    "points": [
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "440605701324954",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 10,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-06",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-06",
+        "methodologyVersion": "2",
+        "priceContentSha256": "32936196891def7445562fbde0d80bc6b9970376905d4bd1bc8aed79b1b8518d",
+        "pricedCount": 1173,
+        "quantityContentSha256": "345f5852388ab4955a8da37bd8c9e0c833d0a76a5fd330f929f17a5e7aefdebe",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-06",
+        "unvaluedCount": 19,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "431574493224963",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 10,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-07",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-07",
+        "methodologyVersion": "2",
+        "priceContentSha256": "08615238ffc87a78ce02303e8a71ad92a830382d38a8372f9e10336060e3b9e6",
+        "pricedCount": 1173,
+        "quantityContentSha256": "bbfeb2cd6b381e428b402a9501894a6a369396019973e552c2a86a046cb3eabf",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-07",
+        "unvaluedCount": 19,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "420075996517076",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 10,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-08",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-08",
+        "methodologyVersion": "2",
+        "priceContentSha256": "d82ec829bd675350124e9c4f2db65bca47c7afc5c3cc54a0aa131e5561f819e3",
+        "pricedCount": 1173,
+        "quantityContentSha256": "bbfeb2cd6b381e428b402a9501894a6a369396019973e552c2a86a046cb3eabf",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-08",
+        "unvaluedCount": 19,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "404452573973040",
+        "exclusionCounts": {
+          "corporate_action_pending": 1,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-12",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-12",
+        "methodologyVersion": "2",
+        "priceContentSha256": "2d01105465d59fda956908a7cd2a5a380f50d50d34ff15c9bf1d72b4be270ca3",
+        "pricedCount": 1175,
+        "quantityContentSha256": "635bf412e24705f645dd9c417d8b3466a67e2c6b2af9d91248f976abade171fa",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-12",
+        "unvaluedCount": 17,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "381914191866308",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-13",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-13",
+        "methodologyVersion": "2",
+        "priceContentSha256": "d4a2ce97605e63877cdea4fa3b0aebe3cc9e61f8eb60e09a284bdae6d7aff446",
+        "pricedCount": 1174,
+        "quantityContentSha256": "5f217ba4a1cd2aa04e8952fcc280a89b625abea2aac92563f153a5b09c4d0644",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-13",
+        "unvaluedCount": 18,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "379888517138364",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-14",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-14",
+        "methodologyVersion": "2",
+        "priceContentSha256": "8e0fd9ddbcb3409520c1a2ef1d8d0d2209cb7dc10d2b47444f23b4e00a07c4b6",
+        "pricedCount": 1174,
+        "quantityContentSha256": "5f217ba4a1cd2aa04e8952fcc280a89b625abea2aac92563f153a5b09c4d0644",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-14",
+        "unvaluedCount": 18,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "350209976259800",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-15",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-15",
+        "methodologyVersion": "2",
+        "priceContentSha256": "43892076379b7008511e3671c0053b7b7ae6c541e45fca7bde5c2f8bc2c3829d",
+        "pricedCount": 1174,
+        "quantityContentSha256": "4891b4cfb6d6cb9b237df221f1453d4595d614bde1cc3328533c98506935d713",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-15",
+        "unvaluedCount": 18,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "357743368996706",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 8,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-16",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-16",
+        "methodologyVersion": "2",
+        "priceContentSha256": "49527feb375142e063dfaa3ffd1f6fa44bb651919544b9697962f9694aa3db79",
+        "pricedCount": 1175,
+        "quantityContentSha256": "4f5f8abc0dc96b9bfb08df9d9e6ca333ef1e7fc6617a859af07e59a58ce27691",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-16",
+        "unvaluedCount": 17,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "363751852387733",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 8,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-19",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-19",
+        "methodologyVersion": "2",
+        "priceContentSha256": "caf36cf6a9da7cbf0e22c973e0dc812dc1ccd558710346c529369e6d728be6b1",
+        "pricedCount": 1175,
+        "quantityContentSha256": "4f5f8abc0dc96b9bfb08df9d9e6ca333ef1e7fc6617a859af07e59a58ce27691",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-19",
+        "unvaluedCount": 17,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "350196363526349",
+        "exclusionCounts": {
+          "corporate_action_pending": 1,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-20",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-20",
+        "methodologyVersion": "2",
+        "priceContentSha256": "c70b3bffcdd9864827a0ca3c88d05c704791086ed8b48360b5da54327b5fe108",
+        "pricedCount": 1175,
+        "quantityContentSha256": "e47a6f2b42199c4fb16d56a14f3f0a581b6b360fd1df0e8b55f04060b3345ef6",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-20",
+        "unvaluedCount": 17,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "361971394129996",
+        "exclusionCounts": {
+          "corporate_action_pending": 1,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-21",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-21",
+        "methodologyVersion": "2",
+        "priceContentSha256": "f767116d617bcef542674f6de74ad35fc6c1585d60db317ba1e74f87a81b8aa7",
+        "pricedCount": 1175,
+        "quantityContentSha256": "e47a6f2b42199c4fb16d56a14f3f0a581b6b360fd1df0e8b55f04060b3345ef6",
+        "quantityOrigin": "ledger-yearend-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-21",
+        "unvaluedCount": 17,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "349091281505715",
+        "exclusionCounts": {
+          "corporate_action_pending": 1,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-22",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-22",
+        "methodologyVersion": "2",
+        "priceContentSha256": "a7bb49530266b87336c404c98b29cf25d37dc6517a4246dc8ab6b5978a9b560f",
+        "pricedCount": 1175,
+        "quantityContentSha256": "e47a6f2b42199c4fb16d56a14f3f0a581b6b360fd1df0e8b55f04060b3345ef6",
+        "quantityOrigin": "stored-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-22",
+        "unvaluedCount": 17,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "350021232296458",
+        "exclusionCounts": {
+          "corporate_action_pending": 1,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-23",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-23",
+        "methodologyVersion": "2",
+        "priceContentSha256": "31360f1187c73b9508f0118c102ca901036b8de23a475907c2aa44c568fe868b",
+        "pricedCount": 1175,
+        "quantityContentSha256": "48b714e65a3a4f9b8f568705f140e3244330cc86a36b8d29133dc573d72ae379",
+        "quantityOrigin": "stored-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-23",
+        "unvaluedCount": 17,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "344661108100713",
+        "exclusionCounts": {
+          "corporate_action_pending": 1,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-26",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-26",
+        "methodologyVersion": "2",
+        "priceContentSha256": "73765744706b6e86ac829adfc3cfe2e56b87bcdb80105c227628a659a3806b5c",
+        "pricedCount": 1175,
+        "quantityContentSha256": "64d5f0104b074d9d3af21f119a9d205f2fb12b7c7b7734a871a19708550e4af0",
+        "quantityOrigin": "stored-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-26",
+        "unvaluedCount": 17,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "355687333610549",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 5,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-27",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-27",
+        "methodologyVersion": "2",
+        "priceContentSha256": "73be734cb1ecd97b84fafa15a1a1c58244ab5d357d4c42ddb787b9dae933c164",
+        "pricedCount": 1174,
+        "quantityContentSha256": "3c7ab088127b1191afde3448c26737084f54a4ea1db042bfcf2a034c5d9ee076",
+        "quantityOrigin": "stored-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-27",
+        "unvaluedCount": 18,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "379789320266936",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 6,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-28",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-28",
+        "methodologyVersion": "2",
+        "priceContentSha256": "f2b51ffe24ae705f2571b929a0f6d011c1c354f8ad39fb749f70d4688ba9c508",
+        "pricedCount": 1173,
+        "quantityContentSha256": "267ef07442891a9fa9919e98a2662c1cce8988f98c778654a875628225b467fa",
+        "quantityOrigin": "stored-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-28",
+        "unvaluedCount": 19,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "375053642866907",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 6,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-29",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-29",
+        "methodologyVersion": "2",
+        "priceContentSha256": "25a46ea9b323a0609fb247bd57dda0782c83d6a2cb38e49fb7783cababd19d59",
+        "pricedCount": 1173,
+        "quantityContentSha256": "f298536b273a781107aefca03b67259eecb12b0996f880d933452a5bb8744dbd",
+        "quantityOrigin": "stored-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-29",
+        "unvaluedCount": 19,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "361282216506406",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 6,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-10-30",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-10-30",
+        "methodologyVersion": "2",
+        "priceContentSha256": "5a85b5c9f09c782debbdade3635c8d955485a4589b0e227bb6055e2734cc0c65",
+        "pricedCount": 1173,
+        "quantityContentSha256": "f298536b273a781107aefca03b67259eecb12b0996f880d933452a5bb8744dbd",
+        "quantityOrigin": "stored-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-10-30",
+        "unvaluedCount": 19,
+        "valuationCoverage": "partial"
+      },
+      {
+        "calculationPolicyRevision": "f6-reconstruction-20261103-v1",
+        "datasetVersion": null,
+        "estimatedValue": "369496157018088",
+        "exclusionCounts": {
+          "corporate_action_pending": 2,
+          "corporate_action_ratio_unverified": 9,
+          "corporate_action_unverified": 6,
+          "delisting_pending": 2
+        },
+        "holdingsAssemblyDate": "2026-11-02",
+        "kind": "reconstructed",
+        "knowledgeCutoff": "2026-11-02",
+        "methodologyVersion": "2",
+        "priceContentSha256": "89b43bde0eca435fab1a4df2ea835a9537bddb74b25ba59d0fbe076e34ebae73",
+        "pricedCount": 1173,
+        "quantityContentSha256": "b0d17c44a7e666d4a7768d5133576e2f3f48015ab77891bdf5eb4a96e8efbf7a",
+        "quantityOrigin": "stored-assembly",
+        "reconstructed": true,
+        "trackedCount": 1192,
+        "tradeDate": "2026-11-02",
+        "unvaluedCount": 19,
+        "valuationCoverage": "partial"
+      }
+    ],
+    "portfolioId": "nps-kr-disclosed",
+    "priceBasis": "krx-official-unadjusted-close",
+    "schemaVersion": 1,
+    "scopeId": "yearend-2025-plus-known-ledger-current-conservative-delisting",
+    "seriesId": "nps-kr-disclosed-reconstructed-20261006-20261102-v1"
+  }
+}

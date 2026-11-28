@@ -94,9 +94,9 @@
         ]
       },
       {
-        "title": "Values use checked quantities and same-day closes",
+        "title": "Values use valuation quantities and same-day closing prices",
         "paragraphs": [
-          "A value is calculated only when the filing gives a checked share quantity and a checked KRX regular-session close exists for the same trading day. Each holding's share is shown as a percentage of the combined value of all holdings with a calculated value. Holdings without a checked close are left out of the value calculation."
+          "A value is calculated only when the filing gives a checked share quantity and a checked KRX regular-session close exists for the same trading day. Each holding's share is shown as a percentage of the combined value of all holdings with a calculated value. Holdings without a checked close are left out of the value calculation. In method-3 snapshots, unconfirmed post-offering quantities are valued using the existing reported quantity, assuming no subscription, with confirmed ratio adjustments applied. Quantity-assumed counts and amounts are then shown separately as part of the total. Actual subscriptions and subscription-right values are not shown in the data. Method changes are dated in the chart and history; their effect is not investment return."
         ]
       },
       {
@@ -119,7 +119,7 @@
       },
       "valuation": {
         "q": "How is the estimated value calculated?",
-        "a": "The checked share quantity from the filing is multiplied by the KRX regular-session close on the same trading day. The values of holdings with a calculated value are added up, and each holding's share of that total is shown as a percentage."
+        "a": "The checked share quantity from the filing is multiplied by the KRX regular-session close on the same trading day. The values of holdings with a calculated value are added up, and each holding's share of that total is shown as a percentage. In method-3 snapshots, unconfirmed post-offering quantities are valued using the existing reported quantity, assuming no subscription, with confirmed ratio adjustments applied. Quantity-assumed counts and amounts are then shown separately as part of the total. Actual subscriptions and subscription-right values are not shown in the data. Method changes are dated in the chart and history; their effect is not investment return."
       },
       "dates": {
         "q": "How do the price date and the filings check differ?",

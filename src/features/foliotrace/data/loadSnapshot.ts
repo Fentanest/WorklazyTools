@@ -1,5 +1,5 @@
 import type { FolioTraceView, QuantityAdjustmentKind, Snapshot, SourceKind } from '../contracts'
-import { validPublishedHistory, validValuationSeries } from './valuationSeries.ts'
+import { compatibleValuationMethodology, validPublishedHistory, validTradeDate, validValuationSeries } from './valuationSeries.ts'
 
 const DATA_ROOT = '/data/foliotrace/v1/'
 const VERSION = /^[a-f0-9]{64}$/
@@ -133,6 +133,13 @@ function validQuantityAdjustment(value: unknown): boolean {
       str(event.kind) && (QUANTITY_ADJUSTMENT_KINDS as readonly string[]).includes(event.kind) &&
       isoDate(event.priceChangeDate) && nullable(event.quantityChangeDate, isoDate))
 }
+function validQuantityAssumption(value: unknown): boolean {
+  return isRecord(value) && str(value.code) && /^[a-z][a-z0-9_]{0,79}$/.test(value.code) &&
+    Array.isArray(value.offerings) && value.offerings.length >= 1 && value.offerings.length <= 20 &&
+    value.offerings.every((offering: unknown) => isRecord(offering) &&
+      str(offering.receiptNo) && RECEIPT.test(offering.receiptNo) && validTradeDate(offering.listingDate) &&
+      str(offering.shares) && POSITIVE_INTEGER.test(offering.shares))
+}
 function validQuote(value: unknown): boolean {
   return isRecord(value) && decimal(value.close) && value.currency === 'KRW' && value.market === 'KRX' &&
     value.session === 'regular' && isoDate(value.tradeDate) && value.adjusted === false &&
@@ -157,6 +164,9 @@ function validHolding(value: unknown): boolean {
     (value.sourceKind === undefined || (str(value.sourceKind) && (SOURCE_KINDS as readonly string[]).includes(value.sourceKind))) &&
     ['legacy-import', 'dart-structured', 'dart-document', 'unresolved-latest', 'indirect-observation', 'issuer-scope-observation'].includes(String(value.evidence)) &&
     (value.quantityAdjustment === undefined || nullable(value.quantityAdjustment, validQuantityAdjustment)) &&
+    (value.quantityAssumption === undefined || value.quantityAssumption === null ||
+      (validQuantityAssumption(value.quantityAssumption) && value.quantity !== null &&
+        value.quote !== null && value.estimatedValue !== null && value.valuationExclusionReason === null)) &&
     (value.indirectSource === undefined || nullable(value.indirectSource, validIndirectSource)) &&
     (value.issuerScopeSource === undefined || nullable(value.issuerScopeSource, validIssuerScopeSource)) &&
     (value.directBaseline === undefined || nullable(value.directBaseline, validDirectBaseline)) &&
@@ -280,10 +290,14 @@ function validCoreSnapshot(value: unknown, version: string): value is CoreSnapsh
 
 function validChartData(value: CoreSnapshot): value is Snapshot {
   if (!validPublishedHistory(value.history)) return false
+  const history = value.history as Snapshot['history']
+  if (history.some(point => point.methodologyVersion !== undefined &&
+    ((['1', '2', '3'].includes(value.portfolio.methodologyVersion) && point.methodologyVersion > value.portfolio.methodologyVersion) ||
+      (point.datasetVersion === value.datasetVersion && point.methodologyVersion !== value.portfolio.methodologyVersion)))) return false
   if (value.valuationSeries !== undefined) {
     const valuationDay = typeof value.valuationTradeDate === 'string' ? value.valuationTradeDate : null
     if (!validValuationSeries(value.valuationSeries) || value.valuationSeries.portfolioId !== value.portfolio.id ||
-      value.valuationSeries.methodologyVersion !== value.portfolio.methodologyVersion ||
+      !compatibleValuationMethodology(value.valuationSeries, value.portfolio.methodologyVersion) ||
       (valuationDay !== null && value.valuationSeries.points.some(point => point.tradeDate > valuationDay))) return false
   }
   return true

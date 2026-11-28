@@ -1,7 +1,8 @@
 /**
  * Public FolioTrace snapshot contract, revision 3 (docs/foliotrace-public-snapshot-contract.md).
  * The wire `schemaVersion` and the data URL stay at 1: revisions only relax `Holding.receiptNo`
- * to nullable and add optional fields, so revision-1 snapshots still load.
+ * to nullable and add optional fields (ratio basis, quantity assumptions, history methods),
+ * so revision-1 snapshots still load.
  * Decimal quantities and money are strings.
  */
 import type { ReconstructedValuationSeries } from './valuationSeriesContract'
@@ -72,6 +73,12 @@ export interface QuantityAdjustment {
  */
 export type RatioBasisKind = 'common_only' | 'voting_rights' | 'preferred_only' | 'preferred_combined' | 'issued_total' | 'major_holder_report' | 'unverified' | 'year_end'
 
+/** Optional: valuation retains the existing quantity without assuming subscription. */
+export interface QuantityAssumption {
+  code: string
+  offerings: Array<{ receiptNo: string; listingDate: IsoDate; shares: DecimalString }>
+}
+
 export interface Holding {
   corpCode: string
   /** Listed 6-char code — except the combined-preferred aggregate line, whose stockCode is
@@ -92,6 +99,7 @@ export interface Holding {
   sourceKind?: SourceKind
   /** Absent or null when the quantity is the reported one. */
   quantityAdjustment?: QuantityAdjustment | null
+  quantityAssumption?: QuantityAssumption | null
   evidence: 'legacy-import' | 'dart-structured' | 'dart-document' | 'unresolved-latest' | 'indirect-observation' | 'issuer-scope-observation'
   indirectSource?: {
     documentNo: string | null
@@ -284,7 +292,7 @@ export interface Snapshot {
   }>
   /** Counts describe the holdings used for this published point; all three are present or all absent. */
   history: Array<{ tradeDate: IsoDate; estimatedValue: DecimalString; datasetVersion: string;
-    trackedCount?: number; pricedCount?: number; unvaluedCount?: number }>
+    trackedCount?: number; pricedCount?: number; unvaluedCount?: number; methodologyVersion?: string }>
   /** Optional independent reconstruction; overlapping dates remain available in the source data. */
   valuationSeries?: ReconstructedValuationSeries
 }

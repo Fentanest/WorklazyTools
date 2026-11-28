@@ -31,6 +31,8 @@ export function validPublishedHistory(value: unknown): boolean {
       typeof point.estimatedValue !== 'string' || !LEGACY_AMOUNT.test(point.estimatedValue) ||
       typeof point.datasetVersion !== 'string' || !HASH.test(point.datasetVersion) ||
       (['trackedCount', 'pricedCount', 'unvaluedCount'].some(key => key in point) && !validHistoryCounts(point))) return false;
+    if (point.methodologyVersion !== undefined && (typeof point.methodologyVersion !== 'string' ||
+      !['1', '2', '3'].includes(point.methodologyVersion))) return false;
     previous = point.tradeDate;
   }
   return true;
@@ -72,4 +74,10 @@ export function validValuationSeries(value: unknown): value is ReconstructedValu
     previous = point.tradeDate;
   }
   return true;
+}
+
+/** Current v3 and the unchanged, explicitly named historical v2 policy may coexist. */
+export function compatibleValuationMethodology(series: ReconstructedValuationSeries, current: string): boolean {
+  return series.methodologyVersion === current ||
+    (current === '3' && series.methodologyVersion === '2' && series.calculationPolicyRevision === 'f6-reconstruction-20261103-v1');
 }

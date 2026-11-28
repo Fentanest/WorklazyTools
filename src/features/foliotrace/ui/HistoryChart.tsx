@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import { ColorType, CrosshairMode, LineSeries, LineStyle, createChart } from 'lightweight-charts';
+import { ColorType, CrosshairMode, LineSeries, LineStyle, createChart, createSeriesMarkers } from 'lightweight-charts';
 import type { IChartApi, MouseEventParams, Time } from 'lightweight-charts';
 import type { Snapshot } from '../contracts';
 import { useAppliedTheme } from '../../../theme';
@@ -18,7 +18,7 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang, unavail
   const model = useMemo(() => chartHistory(snapshot.history, snapshot.valuationSeries, snapshot), [snapshot]);
   const host = useRef<HTMLDivElement>(null), tooltip = useRef<HTMLDivElement>(null);
   const tooltipDate = useRef<HTMLTimeElement>(null), tooltipValue = useRef<HTMLElement>(null);
-  const tooltipCounts = useRef<HTMLElement>(null);
+  const tooltipCounts = useRef<HTMLElement>(null), tooltipMethod = useRef<HTMLElement>(null);
   const [renderError, setRenderError] = useState(false);
   useEffect(() => {
     setRenderError(false);
@@ -41,13 +41,19 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang, unavail
         handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
       });
       chart = created;
-      // One series spans all origins. Missing values remain whitespace, never zero-filled.
-      created.addSeries(LineSeries, {
+      // Method changes are explicitly marked; missing values remain whitespace.
+      const line = created.addSeries(LineSeries, {
         color: lineColor, lineStyle: LineStyle.Solid, lineWidth: 2,
         pointMarkersVisible: false, crosshairMarkerVisible: false,
         priceLineVisible: false, lastValueVisible: false,
         priceFormat: { type: 'custom', minMove: 0.000001, formatter: (value: number) => formatHistoryAxis(value * HISTORY_COORDINATE_SCALE, lang) },
-      }).setData(model.lineData);
+      });
+      line.setData(model.lineData);
+      if (model.methodChanges.length) createSeriesMarkers(line, model.methodChanges.map(change => ({
+        time: change.tradeDate, position: 'aboveBar', color: style.color, shape: 'arrowDown',
+        text: `${t.markerMethod} ${change.to}`,
+      })));
+
       element.querySelectorAll('canvas').forEach(canvas => canvas.setAttribute('aria-hidden', 'true'));
       const byDay = new Map(model.points.map(point => [point.tradeDate, point]));
       crosshair = event => {
@@ -60,6 +66,10 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang, unavail
         if (tooltipCounts.current) {
           tooltipCounts.current.hidden = point.pricedCount === undefined;
           tooltipCounts.current.textContent = point.pricedCount === undefined ? '' : t.counts.replace('{count}', formatCount(point.pricedCount));
+        }
+        if (tooltipMethod.current) {
+          tooltipMethod.current.hidden = model.methodChanges.length === 0;
+          tooltipMethod.current.textContent = `${t.method}: ${point.methodologyVersion ?? t.unknownMethod}`;
         }
         tip.hidden = false;
         const compact = element.clientWidth <= 640;
@@ -98,12 +108,28 @@ export const HistoryChart = memo(function HistoryChart({ snapshot, lang, unavail
     <h2 id="foliotrace-history-h" className="foliotrace-h2">{t.title}</h2>
     <figure className="foliotrace-trend-figure" aria-labelledby="foliotrace-history-h">
       {model.available ? <div className="foliotrace-trend-plot">
-        <div ref={host} className="foliotrace-trend-canvas" role="img" aria-label={t.title}
+        <div ref={host} className="foliotrace-trend-canvas" role="group" aria-label={t.title}
           data-testid="foliotrace-history-chart" data-point-count={model.points.length} data-chart-theme={theme} />
         <div ref={tooltip} className="foliotrace-chart-tooltip" role="tooltip" hidden>
-          <time ref={tooltipDate} /><strong ref={tooltipValue} /><small ref={tooltipCounts} />
+          <time ref={tooltipDate} /><strong ref={tooltipValue} /><small ref={tooltipCounts} />{model.methodChanges.length > 0 && <small ref={tooltipMethod} hidden />}
         </div>
       </div> : <p className="foliotrace-state-text" role="status">{t.empty}</p>}
+      {model.methodChanges.length > 0 && <figcaption className="foliotrace-note" data-testid="foliotrace-method-changes">
+        {model.methodChanges.map(change => <p key={change.tradeDate}>
+          <time dateTime={change.tradeDate}>{formatHistoryDate(change.tradeDate, lang)}</time>{" · "}
+          {t.methodChange}: {change.from ?? t.unknownMethod} → {change.to}
+        </p>)}
+        <p>{t.methodNote}</p>
+        <details><summary>{t.records}</summary>
+          <div className="foliotrace-table-wrap" tabIndex={0} role="region" aria-label={t.records}><table className="foliotrace-table foliotrace-history-table">
+            <thead><tr><th scope="col">{lang === 'ko' ? '거래일' : 'Trade date'}</th><th scope="col">{t.amount}</th><th scope="col">{t.method}</th></tr></thead>
+            <tbody>{model.points.map(point => <tr key={point.tradeDate}>
+              <th scope="row"><time dateTime={point.tradeDate}>{point.tradeDate}</time></th>
+              <td>{formatKrw(point.estimatedValue, lang)}</td><td>{point.methodologyVersion ?? t.unknownMethod}</td>
+            </tr>)}</tbody>
+          </table></div>
+        </details>
+      </figcaption>}
       {renderError && <p className="foliotrace-state-text" role="status">{t.unavailable}</p>}
     </figure>
   </section>;

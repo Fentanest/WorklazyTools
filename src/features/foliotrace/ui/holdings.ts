@@ -1,8 +1,8 @@
 import type { FilingEvent, Holding, Quote, RatioBasisKind } from "../contracts";
 
 export type SortKey = "value" | "weight" | "ownership" | "receipt";
-export type QualityFilter = "all" | "priced" | "unpriced" | "below-5" | "ratio-adjusted";
-export type HoldingStatus = "included" | "excluded" | "exit" | "unresolved";
+export type QualityFilter = "all" | "priced" | "unpriced" | "below-5" | "ratio-adjusted" | "assumed";
+export type HoldingStatus = "included" | "excluded" | "exit" | "unresolved" | "assumed";
 export type Lang = "ko" | "en";
 
 export function formatKstTimestamp(value: string | null, lang: Lang): string | null {
@@ -448,7 +448,7 @@ export function filingChangesForHoldings(
     const current = latestBySecurity.get(`${holding.corpCode}:${holding.stockCode}`);
     if (!current || current.receiptNo !== holding.receiptNo) continue;
     // Ratio-adjusted quantities are estimates, not reported figures: never colour them as a trade.
-    if (holding.quantityAdjustment) continue;
+    if (holding.quantityAdjustment || holding.quantityAssumption) continue;
     const change = eventChanges.get(current);
     if (!change) continue;
     const quantityDelta = sameReportedValue(holding.quantity, current.quantity) ? change.quantityDelta : null;
@@ -509,6 +509,7 @@ export function isBelowFivePercent(h: Holding): boolean {
 }
 
 export function holdingStatus(h: Holding): HoldingStatus {
+  if (h.quantityAssumption && h.quote !== null && h.estimatedValue !== null) return "assumed";
   if (h.tracking === "below-5-percent") return "exit";
   if (h.evidence === "unresolved-latest") return "unresolved";
   if (h.quote === null || h.estimatedValue === null) return "excluded";
@@ -660,9 +661,10 @@ export function filterHoldings(holdings: Holding[], query: string, quality: Qual
       (compactQuery && searchText(h.name).includes(compactQuery)) ||
       (spokenQuery && searchText(h.name).includes(spokenQuery)))) return false;
     const s = holdingStatus(h);
-    if (quality === "priced" && s !== "included") return false;
-    if (quality === "unpriced" && s === "included") return false;
+    if (quality === "priced" && s !== "included" && s !== "assumed") return false;
+    if (quality === "unpriced" && (s === "included" || s === "assumed")) return false;
     if (quality === "below-5" && s !== "exit" && !isBelowFivePercent(h)) return false;
+    if (quality === "assumed" && s !== "assumed") return false;
     if (quality === "ratio-adjusted" && !h.quantityAdjustment) return false;
     return true;
   });
@@ -734,4 +736,28 @@ export function eventRangeOf(events: FilingEvent[]): EventRange | null {
   if (!events.length) return null;
   const dates = events.map((e) => e.receiptDate).sort();
   return { from: dates[0], to: dates[dates.length - 1], count: events.length };
+}
+
+/** Never echo a producer's unknown assumption code. */
+export function quantityAssumptionLabel(code: string, lang: Lang): string {
+  if (code === 'rights_offering_not_subscribed') return lang === 'ko'
+    ? '증자 뒤 수량 미확인 — 청약하지 않은 것으로 보고 기존 수량으로 평가(확정 비율 보정은 반영)'
+    : 'Quantity after rights offering unconfirmed — assumed not subscribed; existing quantity valued (confirmed ratio adjustments applied)';
+  return lang === 'ko' ? '수량 가정을 적용해 평가 — 상세 사유 미확인' : 'Valued using a quantity assumption — details unconfirmed';
+}
+
+/** Exact decimal sum for the included assumption subset, never floating-point money. */
+export function assumptionSummary(holdings: Holding[]): { count: number; value: string } {
+  let count = 0, total = '0';
+  for (const holding of holdings) {
+    if (!holding.quantityAssumption || holding.estimatedValue === null) continue;
+    count++;
+    total = reportedDelta(total, reportedDelta('0', holding.estimatedValue))!;
+  }
+  return { count, value: total };
+}
+
+export function quantityAssumptionTitle(code: string, lang: Lang): string {
+  if (code === 'rights_offering_not_subscribed') return lang === 'ko' ? '증자 뒤 수량 미확인' : 'Post-offering quantity unconfirmed';
+  return lang === 'ko' ? '수량 가정' : 'Quantity assumed';
 }

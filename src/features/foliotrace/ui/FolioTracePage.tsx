@@ -23,6 +23,9 @@ import "./foliotrace.css";
 import { dartFilingUrl } from "../data/dartLink";
 import {
   approxNumber,
+  assumptionSummary,
+  quantityAssumptionLabel,
+  quantityAssumptionTitle,
   compactKrw,
   denominatorCancellationLabel,
   denominatorReportLabel,
@@ -87,6 +90,8 @@ const STR = {
     description:
       "연말 보유 목록과 DART 공시로 추적하는 국민연금 국내주식 공개 포트폴리오 추정치입니다. 국민연금 전체 자산·실제 계좌 잔고·실제 운용 수익률이 아닙니다.",
     scopeNote:
+      "국민연금의 연말 국내주식 보유 목록과 이후 공시를 바탕으로 한 추정 내역입니다. 지분율 5% 미만 종목도 포함하며, 보고 수량과 확정 비율 보정, 별도 표시한 증자 뒤 수량 가정을 기준으로 종가를 곱해 합계에 넣습니다.",
+    scopeNoteNoAssumption:
       "국민연금의 연말 국내주식 보유 목록과 이후 공시를 바탕으로 한 추정 내역입니다. 지분율 5% 미만 종목도 포함하며, 마지막으로 확인된 수량에 종가를 곱해 합계에 넣습니다.",
     historicalCoverageTitle: "과거 공시 확인 범위",
     historicalCoverageRange: "확인한 접수일",
@@ -257,9 +262,19 @@ const STR = {
     prevVerifiedReceipt: "이전에 확인한 접수",
     latestUnresolvedReceipt: "아직 확인하지 못한 최신 접수",
     retry: "게시된 자료 다시 불러오기",
+    statusAssumed: "평가 포함 · 수량 가정",
+    qualityAssumed: "수량 가정",
+    assumptionMarker: "증자 뒤 수량 미확인",
+    assumptionQuantity: "평가 수량(가정)",
+    assumptionCount: "평가 포함 {n}종목 가운데 수량 가정 {m}종목",
+    assumptionValue: "수량 가정 종목 {value}은 총 평가액에 포함됩니다.",
+    assumptionShares: "발행 신주(보유자의 청약 수량 아님)",
+    assumptionListing: "신주 상장일",
+    assumptionGuide: "증자 뒤 수량 미확인 표시는 청약하지 않은 것으로 보고 기존 보고 수량으로 평가한 종목입니다. 확정된 비율 보정은 반영하며, 실제 청약 수량과 청약권 가치는 확인되지 않았습니다.",
     statusIncluded: "평가 포함",
     statusExcluded: "평가 제외",
     statusActiveRecord: "공시 지분율 5% 이상",
+    statusBelow5: "지분율 5% 미만",
     statusActiveBelow5: "지분율 5% 미만 · 마지막 확인 수량 기준",
     statusUnknownTracking: "추적 상태 확인 중",
     statusExit: "5% 추적 범위 이탈",
@@ -288,7 +303,8 @@ const STR = {
     eventsAll: "종목별 최신 {total}건",
     eventsFullTitle: "종목별 최신 공시",
     excludedTitle: "평가에서 뺀 {n}종목",
-    excludedFoot: "틀린 값을 보여 주지 않으려고 확인될 때까지 합계에서 뺍니다. 주주배정 유상증자 참여 수량을 확인할 수 없는 종목은 다음 국민연금 보유 공시를 기다립니다. 배정비율을 알아도 전액 참여로 가정하지 않습니다.",
+    excludedFoot: "틀린 값을 보여 주지 않으려고 확인될 때까지 합계에서 뺍니다. 주주배정 유상증자 뒤 수량이 미확인인 경우 청약하지 않은 것으로 보고 기존 수량으로 평가하며 별도 표시합니다. 다른 미확인 사유가 있는 종목은 계속 제외합니다.",
+    excludedFootNoAssumption: "틀린 값을 보여 주지 않으려고 확인될 때까지 합계에서 뺍니다. 주주배정 유상증자 참여 수량을 확인할 수 없는 종목은 다음 국민연금 보유 공시를 기다립니다. 배정비율을 알아도 전액 참여로 가정하지 않습니다.",
     excludedView: "목록에서 보기",
     tableAll: "전체 보유 종목",
     qualityRatio: "비율 보정",
@@ -311,6 +327,8 @@ const STR = {
     description:
       "An estimated public portfolio of NPS domestic equities tracked from the year-end holdings list and later DART filings. Not total NPS assets, real account balances, or actual returns.",
     scopeNote:
+      "This estimate follows the NPS year-end domestic equity holdings list and later filings. Holdings below 5% are included; the total uses reported quantities and confirmed ratio adjustments, plus explicitly marked post-offering quantity assumptions, multiplied by closing prices.",
+    scopeNoteNoAssumption:
       "This estimate follows the NPS year-end domestic equity holdings list and later filings. Holdings below 5% are included; the total multiplies the last confirmed quantity by the closing price.",
     historicalCoverageTitle: "Historical filings checked",
     historicalCoverageRange: "Receipt dates checked",
@@ -481,9 +499,19 @@ const STR = {
     prevVerifiedReceipt: "Previously checked receipt",
     latestUnresolvedReceipt: "Latest unchecked receipt",
     retry: "Reload published data",
+    statusAssumed: "Included · quantity assumed",
+    qualityAssumed: "Quantity assumed",
+    assumptionMarker: "Post-offering quantity unconfirmed",
+    assumptionQuantity: "Valued quantity (assumed)",
+    assumptionCount: "{m} quantity-assumed securities among {n} priced",
+    assumptionValue: "The {value} valued using quantity assumptions is included in the total.",
+    assumptionShares: "New shares issued (not the holder’s subscription)",
+    assumptionListing: "New-share listing date",
+    assumptionGuide: "Post-offering quantity unconfirmed marks securities valued using the existing reported quantity, assuming no subscription. Confirmed ratio adjustments apply; actual subscriptions and subscription-right values are unconfirmed.",
     statusIncluded: "Included",
     statusExcluded: "Excluded",
     statusActiveRecord: "Filed ownership at or above 5%",
+    statusBelow5: "Below 5% ownership",
     statusActiveBelow5: "Below 5% · last confirmed quantity",
     statusUnknownTracking: "Tracking status under review",
     statusExit: "Exited 5% scope",
@@ -512,7 +540,8 @@ const STR = {
     eventsAll: "Latest by stock ({total})",
     eventsFullTitle: "Latest filings by stock",
     excludedTitle: "{n} securities left out of the valuation",
-    excludedFoot: "To avoid showing wrong values, they stay out of the total until confirmed. Where participation in a rights offering is unknown, valuation waits for the next National Pension Service holdings filing. An allotment ratio does not prove full subscription.",
+    excludedFoot: "To avoid showing wrong values, they stay out of the total until confirmed. Unconfirmed post-offering quantities are valued using existing quantities assuming no subscription, with a separate label. Other unverified holdings remain excluded.",
+    excludedFootNoAssumption: "To avoid showing wrong values, they stay out of the total until confirmed. Where participation in a rights offering is unknown, valuation waits for the next National Pension Service holdings filing. An allotment ratio does not prove full subscription.",
     excludedView: "View in the list",
     tableAll: "All holdings",
     qualityRatio: "Ratio-adjusted",
@@ -817,6 +846,10 @@ function ReadyView({
     }
     return { total, rows: [...groups.entries()].sort((x, y) => y[1] - x[1]) };
   }, [snapshot.holdings, lang, t]);
+  const assumed = useMemo(() => assumptionSummary(snapshot.holdings), [snapshot.holdings]);
+  const hasAssumption = assumed.count > 0;
+  const scopeNoteText = hasAssumption ? t.scopeNote : t.scopeNoteNoAssumption;
+  const excludedFootText = hasAssumption ? t.excludedFoot : t.excludedFootNoAssumption;
   const ratioAdjustedPriced = useMemo(
     () => snapshot.holdings.filter((h) => h.quantityAdjustment && h.estimatedValue !== null).length,
     [snapshot.holdings],
@@ -883,10 +916,10 @@ function ReadyView({
     (holding.ratioBasisKind === "preferred_only" || holding.ratioBasisKind === "preferred_combined") ? null :
     (indirectReentries.has(`${holding.corpCode}:${holding.receiptNo}`) ||
       (holding.observationStatus === "verified_scoped" && holding.tracking === "active")) ? t.eventIndirectReentry :
-      holding.tracking === "active" ? (isBelowFivePercent(holding) ? t.statusActiveBelow5 : t.statusActiveRecord) :
+      holding.tracking === "active" ? (isBelowFivePercent(holding) ? (holding.quantityAssumption ? t.statusBelow5 : t.statusActiveBelow5) : t.statusActiveRecord) :
         holding.tracking === "below-5-percent" ? t.statusExit : t.statusUnknownTracking;
   const statusLabel = (s: ReturnType<typeof holdingStatus>) =>
-    s === "included" ? t.statusIncluded : s === "excluded" ? t.statusExcluded : s === "exit" ? t.statusExit : t.statusUnresolved;
+    s === "assumed" ? t.statusAssumed : s === "included" ? t.statusIncluded : s === "excluded" ? t.statusExcluded : s === "exit" ? t.statusExit : t.statusUnresolved;
 
   const recentSummary = recentEvents.slice(0, 6);
   const eventDate = (event: FilingEvent) => (event.basisDate ?? event.receiptDate).slice(5).replace("-", ".");
@@ -901,10 +934,12 @@ function ReadyView({
     ["unpriced", t.qualityUnpriced],
     ["below-5", t.qualityBelow5],
     ["ratio-adjusted", t.qualityRatio],
+    ["assumed", t.qualityAssumed],
   ];
   const rowReasons = (h: Holding) => {
     const reasons: string[] = [];
     if (h.preferredCombined) reasons.push(t.preferredCombinedNote);
+    if (h.quantityAssumption) reasons.push(quantityAssumptionTitle(h.quantityAssumption.code, lang));
     if (h.observationStatus) {
       reasons.push(h.observationStatus === "same_basis_conflict" ? t.verifiedObservationConflict :
         h.observationStatus === "verified_scoped" ? t.rowScopedValue : t.rowVerifiedValue);
@@ -1148,6 +1183,10 @@ function ReadyView({
         </div>
       </section>
 
+      {assumed.count > 0 && <p className="foliotrace-note" data-testid="foliotrace-assumption-summary">
+        {t.assumptionCount.replace("{n}", formatCount(snapshot.pricedCount)).replace("{m}", formatCount(assumed.count))}
+        {" · "}{t.assumptionValue.replace("{value}", formatKrw(assumed.value, lang))}
+      </p>}
       <HistoryChart snapshot={snapshot} lang={lang} unavailable={view.chartUnavailable} />
 
       <div className="foliotrace-status-line" role="status" aria-live="polite">
@@ -1219,6 +1258,7 @@ function ReadyView({
                     <span className="foliotrace-bar-rank foliotrace-num">{index + 1}</span>
                     <span className="foliotrace-bar-name">
                       {h.name} <span className="foliotrace-code-plain foliotrace-num">{h.stockCode}</span>
+                      {h.quantityAssumption && <small className="foliotrace-row-reason">{quantityAssumptionTitle(h.quantityAssumption.code, lang)}</small>}
                     </span>
                     <span className="foliotrace-bar-track" role="img" aria-label={`${h.name} ${formatPct(h.portfolioWeightPercent)}`}>
                       <span className="foliotrace-bar-fill" style={{ width: `${maxWeight > 0 ? (w / maxWeight) * 100 : 0}%` }} />
@@ -1278,7 +1318,7 @@ function ReadyView({
                   <div key={label}><dt>{label}</dt><dd className="foliotrace-num">{formatCount(count)}</dd></div>
                 ))}
               </dl>
-              <p className="foliotrace-note">{t.excludedFoot}</p>
+              <p className="foliotrace-note">{excludedFootText}</p>
               <a className="foliotrace-more-link" href="#foliotrace-holdings" onClick={() => setMarketFilters(current => Object.fromEntries(LISTING_MARKETS.map(market =>
                   [market, { ...current[market], query: "", quality: "unpriced" }])) as Record<ListingMarket, MarketFilters>)}>
                 {t.excludedView}
@@ -1409,8 +1449,9 @@ function ReadyView({
       <section className="foliotrace-method" aria-labelledby="foliotrace-method-h">
         <h2 id="foliotrace-method-h" className="foliotrace-h3">{t.guideTitle}</h2>
         <div className="foliotrace-method-cols">
-          <div><h3>{t.methodQuantity}</h3><p>{t.scopeNote}</p></div>
+          <div><h3>{t.methodQuantity}</h3><p>{scopeNoteText}</p></div>
           <div><h3>{t.methodRatio}</h3><p>{t.ratioGuide}</p></div>
+          {hasAssumption && <div><h3>{t.assumptionMarker}</h3><p>{t.assumptionGuide}</p></div>}
           <div>
             <h3>{t.methodPrice}</h3>
             <p>{t.formula}</p>
@@ -1475,10 +1516,21 @@ function ReadyView({
             </SheetDescription>
             <dl className="foliotrace-detail-list">
               <div>
-                <dt>{selected.quantityAdjustment ? t.adjustedQuantity : t.colQuantity}</dt>
+                <dt>{selected.quantityAssumption ? t.assumptionQuantity : selected.quantityAdjustment ? t.adjustedQuantity : t.colQuantity}</dt>
                 <dd className="foliotrace-num"><FilingChangeValue value={formatQty(selected.quantity)}
                   direction={filingChanges.get(selected)?.quantity ?? null} delta={filingChanges.get(selected)?.quantityDelta ?? null} metric="quantity" lang={lang} /></dd>
               </div>
+              {selected.quantityAssumption && <div className="foliotrace-assumption-evidence" data-testid="foliotrace-assumption-detail">
+                <dt>{quantityAssumptionTitle(selected.quantityAssumption.code, lang)}</dt>
+                <dd>{quantityAssumptionLabel(selected.quantityAssumption.code, lang)}
+                  <ul className="foliotrace-detail-events">
+                    {selected.quantityAssumption.offerings.map((offering, index) => <li key={`${offering.receiptNo}-${index}`}>
+                      <a href={dartFilingUrl(offering.receiptNo)} target="_blank" rel="noreferrer">{t.openFiling} · {offering.receiptNo}</a>
+                      <small className="foliotrace-row-reason">{t.assumptionListing}: {offering.listingDate} · {t.assumptionShares}: {formatQty(offering.shares)}</small>
+                    </li>)}
+                  </ul>
+                </dd>
+              </div>}
               {selected.quantityAdjustment && (
                 <>
                   <div>

@@ -546,3 +546,5 @@ Office 6형식→PDF와 실제 MarkItDown 개별 converter의 Pyodide 프로브�
 - Codx(Sol): Added the product-banner core case runner and dedicated Chromium CI workflow, strengthened export height checks, and added local Firefox/WebKit and privacy-preserving real XLS verification. Full matrix coverage remains in T6b.
 
 - Codx(Sol): Preserve product-banner copy, save and JSON error notices during passive image status updates. Added controlled HTML/iframe copy regressions; the 229-case banner core passed three consecutive runs.
+
+- 2026-11-13 (Codx): FolioTrace 방법 3·과거 재구성 2 호환, 평가 방법 변경일·이력 안내, 증자 뒤 수량 가정 상태/필터/포함 금액·공시 근거의 한영 표시를 추가. 기존 방법 2 자료 호환 유지. 가정 상세의 모바일 영문 줄바꿈, 차트 출처 링크 역할 및 국소 텍스트 대비를 보완. 정식 검수·배포 대기.

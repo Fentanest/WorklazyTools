@@ -9,6 +9,7 @@ export interface ChartHistoryPoint {
   tradeDate: string;
   estimatedValue: string | null;
   origin: HistoryOrigin;
+  methodologyVersion?: string;
   plotValue: number | null;
   trackedCount?: number;
   pricedCount?: number;
@@ -25,7 +26,7 @@ function chartCoordinate(value: string | null): number | null {
 }
 
 export function chartHistory(history: Snapshot['history'], extension?: ReconstructedValuationSeries,
-  current?: Pick<Snapshot, 'datasetVersion' | 'valuationTradeDate' | 'trackedCount' | 'pricedCount'>) {
+  current?: Pick<Snapshot, 'datasetVersion' | 'valuationTradeDate' | 'trackedCount' | 'pricedCount'> & { portfolio?: Pick<Snapshot['portfolio'], 'methodologyVersion'> }) {
   const publicDays = new Set(history.map(point => point.tradeDate));
   const published: ChartHistoryPoint[] = history.map(point => {
     // Published history owns its counts. Only a legacy point can use the identical current revision.
@@ -34,7 +35,8 @@ export function chartHistory(history: Snapshot['history'], extension?: Reconstru
         trackedCount: current.trackedCount, pricedCount: current.pricedCount, unvaluedCount: current.trackedCount - current.pricedCount,
       } : undefined;
     return {
-      tradeDate: point.tradeDate, estimatedValue: point.estimatedValue, origin: 'published', plotValue: chartCoordinate(point.estimatedValue),
+      tradeDate: point.tradeDate, estimatedValue: point.estimatedValue, origin: 'published', methodologyVersion: point.methodologyVersion ??
+        (current?.datasetVersion === point.datasetVersion ? current.portfolio?.methodologyVersion : undefined), plotValue: chartCoordinate(point.estimatedValue),
       ...(counts && validHistoryCounts(counts) ? {
         trackedCount: counts.trackedCount, pricedCount: counts.pricedCount, unvaluedCount: counts.unvaluedCount,
       } : {}),
@@ -43,12 +45,25 @@ export function chartHistory(history: Snapshot['history'], extension?: Reconstru
   // Latest user decision: public dates win. Keep the full extension unchanged;
   // only its 12 non-overlapping dates enter the display projection.
   const reconstructed: ChartHistoryPoint[] = (extension?.points ?? []).filter(point => !publicDays.has(point.tradeDate)).map(point => ({
-    tradeDate: point.tradeDate, estimatedValue: point.estimatedValue, origin: 'reconstructed', plotValue: chartCoordinate(point.estimatedValue),
+    tradeDate: point.tradeDate, estimatedValue: point.estimatedValue, origin: 'reconstructed', methodologyVersion: point.methodologyVersion, plotValue: chartCoordinate(point.estimatedValue),
     trackedCount: point.trackedCount, pricedCount: point.pricedCount, unvaluedCount: point.unvaluedCount,
   }));
   const points = [...reconstructed, ...published].sort((a, b) => a.tradeDate.localeCompare(b.tradeDate));
+  // Missing legacy versions remain unknown. A marker identifies the first supplied point
+  // under a changed method; it never assigns a version to undocumented old points.
+  let previousMethod: string | undefined, lastProvidedMethod: string | undefined;
+  const methodChanges: Array<{ tradeDate: string; from?: string; to: string }> = [];
+  for (const point of points) {
+    if (point.methodologyVersion !== undefined) {
+      if ((lastProvidedMethod !== undefined && lastProvidedMethod !== point.methodologyVersion) ||
+        (lastProvidedMethod === undefined && point.methodologyVersion === '3'))
+        methodChanges.push({ tradeDate: point.tradeDate, from: previousMethod, to: point.methodologyVersion });
+      lastProvidedMethod = point.methodologyVersion;
+    }
+    previousMethod = point.methodologyVersion;
+  }
   const lineData = points.map(point => point.plotValue === null ? { time: point.tradeDate } : { time: point.tradeDate, value: point.plotValue });
-  return { points, published, reconstructed, lineData, available: points.filter(point => point.plotValue !== null).length >= 3 };
+  return { points, published, reconstructed, lineData, methodChanges, available: points.filter(point => point.plotValue !== null).length >= 3 };
 }
 
 const dateFormatters = {
@@ -78,6 +93,8 @@ export const HISTORY_COPY = {
     empty: '추이 선을 표시하려면 3거래일 이상의 평가 기록이 필요합니다.',
     unavailable: '차트를 표시할 수 없습니다.',
     invalidData: '평가 이력을 확인할 수 없습니다.',
+    markerMethod: '방법', amount: '평가금액', method: '평가 방법', methodChange: '평가 방법 변경', unknownMethod: '미제공', records: '평가 이력과 방법',
+    methodNote: '표시한 날짜는 바뀐 방법으로 평가한 첫 제공 지점입니다. 방법 3은 증자 뒤 수량 미확인 종목을 미청약 가정으로 포함합니다. 방법 변경에 따른 금액 차이를 투자수익으로 해석하지 마세요. 과거 값과 방법은 그대로 보존합니다.',
     unpriced: '평가금액 없음', counts: '평가 {count}종목',
   },
   en: {
@@ -85,6 +102,8 @@ export const HISTORY_COPY = {
     empty: 'At least three trading days with values are needed to draw a trend.',
     unavailable: 'The chart cannot be displayed.',
     invalidData: 'The valuation history could not be verified.',
+    markerMethod: 'Method', amount: 'Value (KRW)', method: 'Valuation method', methodChange: 'Valuation method change', unknownMethod: 'Not provided', records: 'Valuation history and methods',
+    methodNote: 'Each marked date is the first supplied point under a changed method. Method 3 includes unconfirmed post-offering quantities assuming no subscription. A change in value caused by methodology is not investment return. Historical values and methods are preserved.',
     unpriced: 'No valuation', counts: '{count} securities priced',
   },
 } as const;
