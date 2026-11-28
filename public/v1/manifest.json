@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "generation_id": "20261127T210003.844447Z",
-  "created_at": "2026-11-27T21:11:07.087969+00:00",
-  "source_manifest_sha256": "b79aaa4bbfc64e97f0ec962d711ef5d997826f77c0f5c91a654e9499756567e6",
+  "generation_id": "20261128T210000.353143Z",
+  "created_at": "2026-11-28T21:12:34.097955+00:00",
+  "source_manifest_sha256": "a41057fbc1ade708d4d742410f20b436e0db73715438be255a422fc35cabda1e",
   "files": [
     {
       "path": "calendar-2026.json",
@@ -13,8 +13,8 @@
     {
       "path": "calendar-2027.json",
       "year": 2027,
-      "sha256": "feb12ca390b4cf74eda24eef2cf8e418397c9cf9280f54292873e41491b80feb",
-      "source_sha256": "25c7bdfffc365083ede7e751886af1fa179832e442841725bfba257afca0aeda"
+      "sha256": "71698d778b3096b241cdf19dbb73867dde1012edec5488f4aafb8a8edcd604b0",
+      "source_sha256": "eef8146de80a7c5986fb6db1b57cfeabb4fb95dbe3f2ad056587a5006826453a"
     }
   ],
   "scopes": [
@@ -23,7 +23,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "dfca3f5c1563108ccb6ffb34d51cc56753ad5c128116d44ff2b25206ed3e75f1",
-      "last_checked_at": "2026-11-27T21:03:49.318658+00:00",
+      "last_checked_at": "2026-11-28T21:03:35.967853+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -47,12 +47,12 @@
         "latest_checks": [
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:22.137613+00:00",
+            "fetched_at": "2026-11-28T21:01:09.725849+00:00",
             "last_verified_absence": null,
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "1dbdfec99753fe3cbcbc9411768c2e7b059089a87f2b1b62a2b136381d65e705",
+            "receipt_ref": "a31de3a1e733b8eb3be9264812a01f40c803a197af1e88d28896768eaf9eed9e",
             "receipt_status": "ok",
             "source_id": "krx-annual-2026",
             "status": "ok",
@@ -65,7 +65,7 @@
           "status": "not_checked",
           "checked_at": null,
           "receipt_refs": [],
-          "next_check_at": "2026-11-29T06:00:00+09:00",
+          "next_check_at": "2026-11-30T06:00:00+09:00",
           "reason": "domestic_discovery_checked_by_required",
           "requested_period": null,
           "coverage": "unavailable",
@@ -80,62 +80,49 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "e84add0983c4d841151f14775ab72fcc96b81ac8574badaf4fbae83abd5746c0",
-      "last_checked_at": "2026-11-27T21:03:49.318658+00:00",
+      "last_checked_at": "2026-11-28T21:03:35.967853+00:00",
       "validity": "stale",
-      "reason": "collection:nasdaq-2026-annual; collection:tiered_notice_evidence_missing:nasdaq-notice-eta2026-17; collection:tiered_notice_evidence_missing:nasdaq-notice-eta2026-27; collection:tiered_notice_evidence_missing:nasdaq-notice-eta2026-29; collection:tiered_notice_evidence_missing:nasdaq-notice-eta2026-31; collection:tiered_notice_evidence_missing:nasdaq-notice-eta2026-46; collection:tiered_notice_evidence_missing:nasdaq-notice-eta2026-69",
+      "reason": "collection:tiered_answer_unresolved:nasdaq-notice-eta2026-17; collection:tiered_answer_unresolved:nasdaq-notice-eta2026-27",
       "unpublished": false,
       "unpublished_evidence": [],
       "annual_evidence": {
-        "year_state": "historical",
+        "year_state": "published",
         "basis": [],
         "latest_checks": [
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:19.678258+00:00",
+            "fetched_at": "2026-11-28T21:01:04.012191+00:00",
             "last_verified_absence": null,
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "95c385d412fe3100a2ea349655e4102981cb2cc44c6f87d6ef6de7da6c3c0125",
+            "receipt_ref": "45d73eb8a2552f8a6c1d874001900566104de9ec8084930b2a69384d7403d15f",
             "receipt_status": "ok",
             "source_id": "nasdaq-holiday-schedule",
             "status": "ok",
             "verified_years": [
               2026
             ]
-          },
-          {
-            "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:20.673865+00:00",
-            "last_verified_absence": null,
-            "parse_status": null,
-            "parser_version": null,
-            "reason": "redirect_target_not_allowed",
-            "receipt_ref": "e060dbc53ba12e94c725cff8c87f59bc79536358ebe0653d179c60367013998c",
-            "receipt_status": "incomplete",
-            "source_id": "nasdaqtrader-calendar",
-            "status": "incomplete",
-            "verified_years": []
           }
         ],
         "correction_check": {
           "status": "complete",
-          "checked_at": "2026-11-27T21:03:34.422952+00:00",
+          "checked_at": "2026-11-28T21:03:19.878558+00:00",
           "receipt_refs": [
-            "9b4a9f08a89aa997914be713690e873a584cc16fd640bc889854cc2c10e1232b",
-            "997791947e926535f83e444d7154235176de864e1d973d34dec70f76fa48b8f1",
-            "a9e494a8fa59bb0b0db79755179725663f0ab96ee494645fccf6f0338d81eb17",
-            "4aa99f0ff05d1548ec3cd82db0678b7d25903c861f01350dfe4175c42699b3a2",
-            "21c6ea743e71298b7506e42079d79f52412a19a0976565b6c85ce32da31bf40d",
-            "d7551e9182a10c1e1aecf6e9552a53bc7fdf3e0a122b03ec79c5326fb6347994",
-            "00b33b63cd0420993aad39a7047691a0cc01d97c218f9c1618b3753152a5a984",
-            "8a683c8afd560d39fee243f63252fb1d447ee90968c7d5ff2e348e0f5ed4322a",
-            "dfffd237602800c36f2b4cd7a5b7000c3c140bb0b2ebe189914587b622effcb6",
-            "03b394b471e3e467c9b999aacc8d131b0156608ae9b679a900df4ceb20eba8cf",
-            "d3568ce843c9f493ccd4f9e3add63db08ae5cc481c74b9e94a95249ef78d8da8",
-            "baeda90b11955e8d5f52f20fc88cb136c3eac7da617ed2291a4e0934aeb2a8c0"
+            "f8aed60fa0b345b86b915fcad259c6c9a63c3d1901a04d642763bc3ff677563b",
+            "c83b7883cc1ba2dbcd09115f89e626558969b41b657b48d9846106abdf2da75d",
+            "889f8040498b7637c5e44ac45ad6341538d6a8e54a2fa11e4cb7006a7bc28c2d",
+            "80bcc23d8d658fdf95a8719a726274cb9a147d18432fe7938bd9abd76289b38b",
+            "2cce7d050f9a7bddaf92f931e93eec4900fca06a6e57d08c95663d249220a18c",
+            "71f3ac657d78437982fe7ec55aa6bc60a3eeeff1518a564b8b005e41850c305e",
+            "f8eaf86a89a0d005ea0b5838753ac6b94667de10be488e3bc7fab571bd16e1d3",
+            "dcea926e7147c1f589d80bb97665366752da9f20f02687434f779c756412efb3",
+            "4094fb9c64e7d077254729d59d14468a74a5150f063c361819fc2ba25fdb3540",
+            "a11cbb02aad4266b74b81895666f0404757b5f8e5a60f895f404bea43c3d5bbd",
+            "71e4ecb0ba7a294a266f22bd73f5b475eb82e763350e8b4366bc64a8281b8a05",
+            "eadb8236176673a21b01398b57b99902371a7827af971aa4ebb6c8cd47177f26"
           ],
-          "next_check_at": "2026-11-29T06:00:00+09:00",
+          "next_check_at": "2026-11-30T06:00:00+09:00",
           "reason": "archive_next_year_not_offered",
           "requested_period": {
             "start": "2026-01-01",
@@ -147,20 +134,7 @@
             2
           ],
           "matched_count": 74,
-          "notice_failures": [
-            {
-              "source_id": "nasdaq-notice-eta2026-46",
-              "status": "incomplete"
-            },
-            {
-              "source_id": "nasdaq-notice-eta2026-47",
-              "status": "incomplete"
-            },
-            {
-              "source_id": "nasdaq-notice-eta2026-6",
-              "status": "incomplete"
-            }
-          ],
+          "notice_failures": [],
           "signal": "nasdaq_equity_archive"
         }
       }
@@ -170,7 +144,7 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "403cc0059ee983c46b52b05f246c715292b70c123c5b87f0c31fb580e985e21c",
-      "last_checked_at": "2026-11-27T21:03:49.318658+00:00",
+      "last_checked_at": "2026-11-28T21:03:35.967853+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -194,12 +168,12 @@
         "latest_checks": [
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:22.137613+00:00",
+            "fetched_at": "2026-11-28T21:01:09.725849+00:00",
             "last_verified_absence": null,
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "1dbdfec99753fe3cbcbc9411768c2e7b059089a87f2b1b62a2b136381d65e705",
+            "receipt_ref": "a31de3a1e733b8eb3be9264812a01f40c803a197af1e88d28896768eaf9eed9e",
             "receipt_status": "ok",
             "source_id": "krx-annual-2026",
             "status": "ok",
@@ -212,7 +186,7 @@
           "status": "not_checked",
           "checked_at": null,
           "receipt_refs": [],
-          "next_check_at": "2026-11-29T06:00:00+09:00",
+          "next_check_at": "2026-11-30T06:00:00+09:00",
           "reason": "domestic_discovery_checked_by_required",
           "requested_period": null,
           "coverage": "unavailable",
@@ -227,9 +201,9 @@
       "year": 2026,
       "included": true,
       "evidence_generation": "4943e9d0f197f88821af711709ad676724248f5155f658d7ecb847594944caf0",
-      "last_checked_at": "2026-11-27T21:03:49.318658+00:00",
-      "validity": "valid",
-      "reason": null,
+      "last_checked_at": "2026-11-28T21:03:35.967853+00:00",
+      "validity": "stale",
+      "reason": "collection:tiered_answer_unresolved:nasdaq-notice-eta2026-17; collection:tiered_answer_unresolved:nasdaq-notice-eta2026-27",
       "unpublished": false,
       "unpublished_evidence": [],
       "annual_evidence": {
@@ -253,12 +227,12 @@
         "latest_checks": [
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:15.516149+00:00",
+            "fetched_at": "2026-11-28T21:01:02.168626+00:00",
             "last_verified_absence": null,
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "269d798def43bd6e05a60a8e8c03450ec3eae4822551d6414e18498a631d677c",
+            "receipt_ref": "13ccb8e01bebf3aa1fcd09db6010fc9dff83b7519ed7d1e592d753885235c85e",
             "receipt_status": "ok",
             "source_id": "nyse-hours-calendars",
             "status": "ok",
@@ -271,22 +245,22 @@
         ],
         "correction_check": {
           "status": "complete",
-          "checked_at": "2026-11-27T21:03:34.422952+00:00",
+          "checked_at": "2026-11-28T21:03:19.878558+00:00",
           "receipt_refs": [
-            "9b4a9f08a89aa997914be713690e873a584cc16fd640bc889854cc2c10e1232b",
-            "997791947e926535f83e444d7154235176de864e1d973d34dec70f76fa48b8f1",
-            "a9e494a8fa59bb0b0db79755179725663f0ab96ee494645fccf6f0338d81eb17",
-            "4aa99f0ff05d1548ec3cd82db0678b7d25903c861f01350dfe4175c42699b3a2",
-            "21c6ea743e71298b7506e42079d79f52412a19a0976565b6c85ce32da31bf40d",
-            "d7551e9182a10c1e1aecf6e9552a53bc7fdf3e0a122b03ec79c5326fb6347994",
-            "00b33b63cd0420993aad39a7047691a0cc01d97c218f9c1618b3753152a5a984",
-            "8a683c8afd560d39fee243f63252fb1d447ee90968c7d5ff2e348e0f5ed4322a",
-            "dfffd237602800c36f2b4cd7a5b7000c3c140bb0b2ebe189914587b622effcb6",
-            "03b394b471e3e467c9b999aacc8d131b0156608ae9b679a900df4ceb20eba8cf",
-            "d3568ce843c9f493ccd4f9e3add63db08ae5cc481c74b9e94a95249ef78d8da8",
-            "baeda90b11955e8d5f52f20fc88cb136c3eac7da617ed2291a4e0934aeb2a8c0"
+            "f8aed60fa0b345b86b915fcad259c6c9a63c3d1901a04d642763bc3ff677563b",
+            "c83b7883cc1ba2dbcd09115f89e626558969b41b657b48d9846106abdf2da75d",
+            "889f8040498b7637c5e44ac45ad6341538d6a8e54a2fa11e4cb7006a7bc28c2d",
+            "80bcc23d8d658fdf95a8719a726274cb9a147d18432fe7938bd9abd76289b38b",
+            "2cce7d050f9a7bddaf92f931e93eec4900fca06a6e57d08c95663d249220a18c",
+            "71f3ac657d78437982fe7ec55aa6bc60a3eeeff1518a564b8b005e41850c305e",
+            "f8eaf86a89a0d005ea0b5838753ac6b94667de10be488e3bc7fab571bd16e1d3",
+            "dcea926e7147c1f589d80bb97665366752da9f20f02687434f779c756412efb3",
+            "4094fb9c64e7d077254729d59d14468a74a5150f063c361819fc2ba25fdb3540",
+            "a11cbb02aad4266b74b81895666f0404757b5f8e5a60f895f404bea43c3d5bbd",
+            "71e4ecb0ba7a294a266f22bd73f5b475eb82e763350e8b4366bc64a8281b8a05",
+            "eadb8236176673a21b01398b57b99902371a7827af971aa4ebb6c8cd47177f26"
           ],
-          "next_check_at": "2026-11-29T06:00:00+09:00",
+          "next_check_at": "2026-11-30T06:00:00+09:00",
           "reason": "archive_next_year_not_offered",
           "requested_period": {
             "start": "2026-01-01",
@@ -298,20 +272,7 @@
             2
           ],
           "matched_count": 74,
-          "notice_failures": [
-            {
-              "source_id": "nasdaq-notice-eta2026-46",
-              "status": "incomplete"
-            },
-            {
-              "source_id": "nasdaq-notice-eta2026-47",
-              "status": "incomplete"
-            },
-            {
-              "source_id": "nasdaq-notice-eta2026-6",
-              "status": "incomplete"
-            }
-          ],
+          "notice_failures": [],
           "signal": "nasdaq_equity_archive_proxy_for_nyse"
         }
       }
@@ -321,7 +282,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "7901a67ba8ec5e9c7148551eb5cc1735bedeb9cf70ad1d74fbfe369e7c9c76b8",
-      "last_checked_at": "2026-11-27T21:03:49.318658+00:00",
+      "last_checked_at": "2026-11-28T21:03:35.967853+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -332,12 +293,12 @@
         "latest_checks": [
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:23.959548+00:00",
+            "fetched_at": "2026-11-28T21:01:11.872616+00:00",
             "last_verified_absence": null,
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "620432e5e74491834efc4baaac50a1f1dc7810ac39a972b28378f9bed0fec1fb",
+            "receipt_ref": "5e7e8980b35a92537540e1c5b58040a9b5ff466ae9f9c1b08baccf532a385a39",
             "receipt_status": "ok",
             "source_id": "krx-annual-2027",
             "status": "ok",
@@ -350,7 +311,7 @@
           "status": "not_checked",
           "checked_at": null,
           "receipt_refs": [],
-          "next_check_at": "2026-11-29T06:00:00+09:00",
+          "next_check_at": "2026-11-30T06:00:00+09:00",
           "reason": "domestic_discovery_checked_by_required",
           "requested_period": null,
           "coverage": "unavailable",
@@ -364,49 +325,47 @@
       "venue": "nasdaq",
       "year": 2027,
       "included": true,
-      "evidence_generation": "a4605c9508290379ad871a893cd34372225233b7d7e5f5e8aa0a7e387457c2e0",
-      "last_checked_at": "2026-11-27T21:03:49.318658+00:00",
-      "validity": "stale",
-      "reason": "collection:nasdaq-2027-annual",
+      "evidence_generation": "73935817e7b54aaa0586777a110914139ccb34064d09c95754bea94cfcf8e3fc",
+      "last_checked_at": "2026-11-28T21:03:35.967853+00:00",
+      "validity": "valid",
+      "reason": null,
       "unpublished": false,
       "unpublished_evidence": [],
       "annual_evidence": {
         "year_state": "published",
         "basis": [
           {
-            "source_id": "nyse-hours-calendars",
-            "edition_id": "nyse-hours-calendars.ed.a1e4f3251863bcf53f871d35107a3ae22ace8711f2cede0e34dba2e8396054b0",
-            "url": "https://www.nyse.com/trade/hours-calendars",
-            "raw_sha256": "8f213c85de7fc30cf98625535e225f7103f2fe0ae4a910640301ee8023e3ee57",
-            "text_sha256": "f5e855f39c19c4f6336f24189753a1e7edcf2347ce7beea3c5ea72c61dcdc976",
+            "source_id": "nasdaq-trading-calendar-2027",
+            "edition_id": "nasdaq-trading-calendar-2027.ed.afd251b17c6a2c12032703d9f97c725a6ba5168cd93e1d21ec25987f0e2ca748",
+            "url": "https://www.nasdaq.com/docs/2027-trading-calendar",
+            "raw_sha256": "9f751f5b9fdacebffbeab1c87b03d368cf92659c1fc7df2a28b3b72614a3a57b",
+            "text_sha256": "25d6674b486365b9ab4d317d7a4d0ab6ec250c353129b5f490f36954ef077105",
             "verified_years": [
-              2026,
-              2027,
-              2028
+              2027
             ],
-            "fetched_at": "2026-11-22T21:00:59.963897+00:00",
+            "fetched_at": "2026-11-28T21:03:16.560280+00:00",
             "use": "current"
           },
           {
             "source_id": "nasdaq-holiday-schedule",
-            "edition_id": "nasdaq-holiday-schedule.ed.bffcd4de2135fc99d4d7a2d7fe61e3474788697a57e79bc7f4e8bb582c665039",
+            "edition_id": "nasdaq-holiday-schedule.ed.97f1de513f0fc950adb9e56aa29231e7cd189effa938a1192607696cd4b57ed0",
             "url": "https://www.nasdaq.com/market-activity/stock-market-holiday-schedule",
-            "raw_sha256": "e1e7ed0c7a5177170597b434b3cc5be51be5db3cb782d4787d02de2eeef5fb0e",
-            "text_sha256": "2489e1efe75dc270c47c4cbc0cc44a2e21fbdf2d7c2e7b109bdbf7ee17a74b12",
+            "raw_sha256": "be9402504da7213c62682bfc27e208fc6e136e8b63da0b75e861da1adefda6f1",
+            "text_sha256": "5818eb0d8303f0a6aa39dbed40de1b0d35e6e7802a47ca0bdd86c13256b53b59",
             "verified_years": [
               2026
             ],
-            "fetched_at": "2026-11-22T21:01:04.008395+00:00",
+            "fetched_at": "2026-11-28T21:01:04.012191+00:00",
             "use": "current"
           }
         ],
         "latest_checks": [
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:19.678258+00:00",
+            "fetched_at": "2026-11-28T21:01:04.012191+00:00",
             "last_verified_absence": {
-              "fetched_at": "2026-11-27T21:01:19.678258+00:00",
-              "receipt_ref": "95c385d412fe3100a2ea349655e4102981cb2cc44c6f87d6ef6de7da6c3c0125",
+              "fetched_at": "2026-11-28T21:01:04.012191+00:00",
+              "receipt_ref": "45d73eb8a2552f8a6c1d874001900566104de9ec8084930b2a69384d7403d15f",
               "verified_years": [
                 2026
               ]
@@ -414,7 +373,7 @@
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "95c385d412fe3100a2ea349655e4102981cb2cc44c6f87d6ef6de7da6c3c0125",
+            "receipt_ref": "45d73eb8a2552f8a6c1d874001900566104de9ec8084930b2a69384d7403d15f",
             "receipt_status": "ok",
             "source_id": "nasdaq-holiday-schedule",
             "status": "ok",
@@ -424,31 +383,12 @@
           },
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:20.673865+00:00",
-            "last_verified_absence": {
-              "fetched_at": "2026-11-24T21:01:05.735110+00:00",
-              "receipt_ref": "2477ef58e57124cd5b90cb7e2f19021750aab8984a1aa130e4146b82b248782f",
-              "verified_years": [
-                2026
-              ]
-            },
-            "parse_status": null,
-            "parser_version": null,
-            "reason": "redirect_target_not_allowed",
-            "receipt_ref": "e060dbc53ba12e94c725cff8c87f59bc79536358ebe0653d179c60367013998c",
-            "receipt_status": "incomplete",
-            "source_id": "nasdaqtrader-calendar",
-            "status": "incomplete",
-            "verified_years": []
-          },
-          {
-            "diagnostic": null,
-            "fetched_at": "2026-11-27T21:03:30.967637+00:00",
+            "fetched_at": "2026-11-28T21:03:16.560280+00:00",
             "last_verified_absence": null,
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "c10794e4fdabe4203f0c0d125b29fa6d85314d3223652ac434c7f0d388e3d034",
+            "receipt_ref": "81d6c0175ae9010483db19e2785545ab3bb932bc1f5f080efe0cdf5ca1132fe0",
             "receipt_status": "ok",
             "source_id": "nasdaq-trading-calendar-2027",
             "status": "ok",
@@ -459,13 +399,13 @@
         ],
         "correction_check": {
           "status": "complete",
-          "checked_at": "2026-11-27T21:03:34.422952+00:00",
+          "checked_at": "2026-11-28T21:03:19.878558+00:00",
           "receipt_refs": [
-            "9b4a9f08a89aa997914be713690e873a584cc16fd640bc889854cc2c10e1232b",
-            "997791947e926535f83e444d7154235176de864e1d973d34dec70f76fa48b8f1",
-            "4aa99f0ff05d1548ec3cd82db0678b7d25903c861f01350dfe4175c42699b3a2"
+            "f8aed60fa0b345b86b915fcad259c6c9a63c3d1901a04d642763bc3ff677563b",
+            "c83b7883cc1ba2dbcd09115f89e626558969b41b657b48d9846106abdf2da75d",
+            "80bcc23d8d658fdf95a8719a726274cb9a147d18432fe7938bd9abd76289b38b"
           ],
-          "next_check_at": "2026-11-29T06:00:00+09:00",
+          "next_check_at": "2026-11-30T06:00:00+09:00",
           "reason": "archive_next_year_not_offered",
           "requested_period": {
             "start": "2026-01-01",
@@ -487,7 +427,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4974b98307f235b3f6b4e648f56f6cdb55176aca8c43a778693c69136411ad60",
-      "last_checked_at": "2026-11-27T21:03:49.318658+00:00",
+      "last_checked_at": "2026-11-28T21:03:35.967853+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -498,12 +438,12 @@
         "latest_checks": [
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:23.959548+00:00",
+            "fetched_at": "2026-11-28T21:01:11.872616+00:00",
             "last_verified_absence": null,
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "620432e5e74491834efc4baaac50a1f1dc7810ac39a972b28378f9bed0fec1fb",
+            "receipt_ref": "5e7e8980b35a92537540e1c5b58040a9b5ff466ae9f9c1b08baccf532a385a39",
             "receipt_status": "ok",
             "source_id": "krx-annual-2027",
             "status": "ok",
@@ -516,7 +456,7 @@
           "status": "not_checked",
           "checked_at": null,
           "receipt_refs": [],
-          "next_check_at": "2026-11-29T06:00:00+09:00",
+          "next_check_at": "2026-11-30T06:00:00+09:00",
           "reason": "domestic_discovery_checked_by_required",
           "requested_period": null,
           "coverage": "unavailable",
@@ -531,7 +471,7 @@
       "year": 2027,
       "included": true,
       "evidence_generation": "4943e9d0f197f88821af711709ad676724248f5155f658d7ecb847594944caf0",
-      "last_checked_at": "2026-11-27T21:03:49.318658+00:00",
+      "last_checked_at": "2026-11-28T21:03:35.967853+00:00",
       "validity": "valid",
       "reason": null,
       "unpublished": false,
@@ -557,12 +497,12 @@
         "latest_checks": [
           {
             "diagnostic": null,
-            "fetched_at": "2026-11-27T21:01:15.516149+00:00",
+            "fetched_at": "2026-11-28T21:01:02.168626+00:00",
             "last_verified_absence": null,
             "parse_status": "parsed",
             "parser_version": "annual-v2:d2319d0482a54fd1ee48b63fe3bb27c966dfc439339eb306155665fc00ab0552",
             "reason": "document_identifier_and_extraction_verified",
-            "receipt_ref": "269d798def43bd6e05a60a8e8c03450ec3eae4822551d6414e18498a631d677c",
+            "receipt_ref": "13ccb8e01bebf3aa1fcd09db6010fc9dff83b7519ed7d1e592d753885235c85e",
             "receipt_status": "ok",
             "source_id": "nyse-hours-calendars",
             "status": "ok",
@@ -575,13 +515,13 @@
         ],
         "correction_check": {
           "status": "complete",
-          "checked_at": "2026-11-27T21:03:34.422952+00:00",
+          "checked_at": "2026-11-28T21:03:19.878558+00:00",
           "receipt_refs": [
-            "9b4a9f08a89aa997914be713690e873a584cc16fd640bc889854cc2c10e1232b",
-            "997791947e926535f83e444d7154235176de864e1d973d34dec70f76fa48b8f1",
-            "4aa99f0ff05d1548ec3cd82db0678b7d25903c861f01350dfe4175c42699b3a2"
+            "f8aed60fa0b345b86b915fcad259c6c9a63c3d1901a04d642763bc3ff677563b",
+            "c83b7883cc1ba2dbcd09115f89e626558969b41b657b48d9846106abdf2da75d",
+            "80bcc23d8d658fdf95a8719a726274cb9a147d18432fe7938bd9abd76289b38b"
           ],
-          "next_check_at": "2026-11-29T06:00:00+09:00",
+          "next_check_at": "2026-11-30T06:00:00+09:00",
           "reason": "archive_next_year_not_offered",
           "requested_period": {
             "start": "2026-01-01",
