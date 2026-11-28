@@ -22,7 +22,7 @@ python3 scripts/codex_direct.py doctor
 |---|---|
 | `scripts/agent_ops.py` | 원문 추출·계획 해시·테스트 영수증·누적 상태·조건 판정·묶음 검수 발주/회수 |
 | `scripts/codex_direct.py` | 설치된 companion 직접 실행·실제 모델/cwd/sandbox 확인·발주 예약·중복 방지 |
-| `scripts/gemini_research.py` | Gemini(설정 모델 `gemini-4-argon-high`)·셸 허용·전경 실행·결과/오류 영속 보관. 이 보조 실행기는 argon 만 호출한다. 실제 한도 초과가 확인되면 `gemini-3.8-flash-high`는 런북 §0 표의 Gemini 값(model 만 교체) 또는 §3 의 직접 `agy` 호출로 다시 부른다(자동 전환 없음) |
+| `scripts/gemini_research.py` | Gemini(설정 `models.gemini`=`gemini-4-hydrogen-high`)·셸 허용·전경 실행·결과/오류 영속 보관. 이 보조 실행기는 Hydrogen 만 `--model`로 넘긴다(자동 전환 없음). 실제 한도 초과가 확인되면 같은 작업을 `gemini-3.8-flash-high`(설정 `models.gemini_on_quota_exceeded`)로 다시 부르고, 그것도 한도 초과면 Terra 로 대체한다(런북 §0 표·§3) |
 | `scripts/secret_scan.py` | 영수증·프롬프트·출력에 대한 비밀값 모양 검사(보조 수단, 경로 허용 목록이 1차 통제) |
 | `docs/agent-ops-config.json` | 모델 매핑, 5개/800줄 초기 상한, 고위험 경로·줄 수 제외 목록 |
 
@@ -54,7 +54,7 @@ python3 scripts/agent_ops.py check --task "$TASK_JSON"
 
 영수증·키 없는 원장·예약은 `<git-common-dir>/agent-ops`에 저장된다. HEAD가 같아도 실제 입력 바이트가 달라지면 검사가 무효다. 반대로 같은 바이트를 보존 커밋으로 저장했다는 이유만으로 무효화하지 않는다. 검사 환경·외부 입력 변화가 있는 결과는 목록 해시만 보고 재사용하지 않는다.
 
-`check`는 모델을 호출하지 않는 로컬 조건 판정이다. 승인 계획 해시·요구사항 원문 범위의 해시·테스트 영수증·판정 중 소스 불변을 확인하고, 요구사항별 판정은 항상 `not_assessed`로 남긴다. 요구사항 충족 여부는 구현자 보고·Gemini 1차 보충·정식 검수자가 판단하며 `check` 통과를 충족 증거로 쓰지 않는다.
+`check`는 모델을 호출하지 않는 로컬 조건 판정이다. 승인 계획 해시·요구사항 원문 범위의 해시·테스트 영수증·판정 중 소스 불변을 확인하고, 요구사항별 판정은 항상 `not_assessed`로 남긴다. 요구사항 충족 여부는 구현자 보고를 받은 지시한 Neon이 판단하며 `check` 통과를 충족 증거로 쓰지 않는다.
 
 check의 출력은 `continue_accumulating`, `collect_evidence`, `repair_or_run_required_tests`, `review_required`로 주변 코드가 연결한다. 근거 부족에는 지정 원문만 보충하고 다시 check한다. 명확한 누락은 해당 구현 항목만 확인한다. 같은 오류로 끝없는 조사·검수 재호출을 하지 않는다.
 
@@ -73,7 +73,7 @@ python3 scripts/agent_ops.py status
 
 검수 필요 시 보존용 커밋으로 후보를 고정하고, 그 커밋을 별도의 검수 worktree에서 checkout한다. 자동 발주기가 작업트리를 무단 checkout·reset하거나 환경 설정을 고치지 않도록 이 준비는 지정 담당이 수행한다. 필요한 의존성·규칙·접근 범위도 준비한다. 생성 예시:
 
-검수 worktree 준비(`git worktree add --detach`)는 두 경로에 공통이다. 기본은 그 worktree 를 Paseo 작업 공간으로 등록해 런북 §0 의 검수 에이전트(Sol, Sol 구현분은 Sonnet)에 발주하고 지정한 결과 파일로 회수하는 것이다. 아래 `dispatch-review` 는 Paseo 를 쓸 수 없을 때의 companion 대체 발주다.
+검수 worktree 준비(`git worktree add --detach`)는 두 경로에 공통이다. 기본은 그 worktree 를 Paseo 작업 공간으로 등록한 묶음 Neon 이 고정 후보에서 직접 검수하고(Neon 이 직접 고친 것만 별도 Opus 세션에 발주), 지정한 결과 파일로 회수하는 것이다. 아래 `dispatch-review` 는 Paseo 를 쓸 수 없을 때의 대체 발주로, Neon 을 부를 수 없으면 이유를 남기고 멈춘다.
 
 ```bash
 git worktree add --detach "$REVIEW_WORKTREE" "$CANDIDATE_COMMIT"
@@ -94,7 +94,7 @@ A+B 검수 중 C가 추가되면 A+B만 통과로 기록하고 C는 남긴다. �
 
 ## 5. 일반 Codex 구현·순수 조사 호출
 
-`docs/agent-ops-examples/dispatch.example.json`의 필드를 실제 승인 작업으로 채운다. 역할과 실행 유형을 따로 지정한다. `implementation`은 구현 허가·linked worktree, `verification`은 격리 검수 worktree가 필요하다. `research` 역할의 Terra는 `fallback_reason=gemini_quota_exceeded`(argon·3.8 Flash 모두 한도 초과)와 실제 실패 증거 참조가 있어야 한다.
+`docs/agent-ops-examples/dispatch.example.json`의 필드를 실제 승인 작업으로 채운다. 역할과 실행 유형을 따로 지정한다. `implementation`은 구현 허가·linked worktree, `verification`은 격리 검수 worktree가 필요하다. `research` 역할의 Terra는 `fallback_reason=gemini_quota_exceeded`(Hydrogen·Flash 모두 한도 초과)와 실제 실패 증거 참조가 있어야 한다.
 
 기본은 런북 §0 의 Paseo 에이전트 발주다. 아래 `codex_direct.py dispatch` 는 Paseo 를 쓸 수 없을 때의 companion 대체 발주다.
 
