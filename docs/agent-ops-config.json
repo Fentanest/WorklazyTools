@@ -1,19 +1,18 @@
 {
   "schema_version": 1,
   "project": "WorklazyTools",
-  "policy_version": "2026-11-12",
+  "policy_version": "2026-11-28",
   "models": {
     "gemini": "gemini-4-hydrogen-high",
     "gemini_on_quota_exceeded": "gemini-3.8-flash-high",
     "implementation": "muse-spark-1.3-contributor",
     "implementation_fallback": "gpt-6.2-sol",
-    "review": "gpt-6.2-sol",
+    "review": "gemini-4-neon-high",
     "research": "gpt-6.1-terra",
     "terra": "gpt-6.1-terra",
     "muse_runtime_id": "opencode-go/muse-spark-1.3-contributor",
-    "review_alt_for_sol_implementation": "claude-sonnet-5-5",
     "plan_review": "gpt-6.2-astra",
-    "escalation_review": "gpt-6.2-astra"
+    "escalation_after_five_rounds": "gpt-6.2-astra"
   },
   "review": {
     "max_tasks": 5,
@@ -97,12 +96,11 @@
     }
   ],
   "review_assignment": {
-    "muse": "Sol",
-    "sonnet": "Sol",
-    "sol": "Sonnet",
+    "default": "Neon",
+    "neon_direct_fix": "Opus",
     "plan": "Astra",
-    "escalate_after_same_finding_fix_rounds": 3,
+    "escalate_after_same_finding_fix_rounds": 5,
     "escalation": "Astra",
-    "effective": "2026-11-02 new jobs"
+    "effective": "2026-11-28 new jobs"
   }
 }

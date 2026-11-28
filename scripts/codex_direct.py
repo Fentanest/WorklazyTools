@@ -29,6 +29,14 @@ class DispatchError(RuntimeError):
     pass
 
 
+# 2026-11-28 policy (PROJECT_RULES.md 「에이전트 배정·검수」): the reviewer is the
+# instructing Neon, reached via agy as gemini-4-neon-high. The Codex companion
+# path cannot run a Gemini model, so role == "review" never dispatches here.
+NEON_MODEL = "gemini-4-neon-high"
+# Real quota shapes observed on this host (agy/Gemini logs).
+NEON_QUOTA_MARKERS = ("Individual quota reached", "RESOURCE_EXHAUSTED")
+
+
 def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -268,6 +276,46 @@ def invoke(plugin: Path, workspace: Path, command: str, job: str, env: dict) -> 
                workspace, env=env, timeout=30)
 
 
+def review_assignment_of(config: dict) -> dict:
+    assignment = config.get("review_assignment")
+    if not isinstance(assignment, dict):
+        raise DispatchError("MISSING_REVIEW_ASSIGNMENT; the fallback path follows "
+                            "docs/agent-ops-config.json review_assignment (2026-11-28: default Neon)")
+    return assignment
+
+
+def resolve_review_target(config: dict, *, agy_available: bool | None = None,
+                          quota_evidence: str = "") -> dict:
+    """Fallback-path review routing per review_assignment (2026-11-28 policy).
+
+    Returns the Neon target (agy gemini-4-neon-high) when Neon can be called.
+    Raises DispatchError — stop with the reason, for the caller to record —
+    when Neon is unreachable (no agy path, or quota markers confirmed in the
+    log) or when the configuration names any other reviewer. This never
+    substitutes Sol, Sonnet, or any other reviewer: with Neon unreachable the
+    lead (총괄) takes over the Neon share directly.
+    """
+    assignment = review_assignment_of(config)
+    if assignment.get("default") != "Neon":
+        raise DispatchError("REVIEW_ASSIGNMENT_IS_NOT_NEON; refusing to substitute another "
+                            "reviewer — the lead takes over the Neon share directly")
+    models = config.get("models")
+    model = models.get("review") if isinstance(models, dict) else None
+    if model != NEON_MODEL:
+        raise DispatchError("REVIEW_MODEL_IS_NOT_NEON; refusing to substitute another "
+                            "reviewer — the lead takes over the Neon share directly")
+    evidence = quota_evidence or ""
+    if any(marker in evidence for marker in NEON_QUOTA_MARKERS):
+        raise DispatchError("NEON_QUOTA_EXCEEDED; review stays with Neon and stops here — "
+                            "the lead takes over the Neon share directly, no substitute reviewer")
+    if agy_available is None:
+        agy_available = shutil.which("agy") is not None
+    if not agy_available:
+        raise DispatchError("NEON_UNREACHABLE_NO_AGY_PATH; review stays with Neon and stops here — "
+                            "the lead takes over the Neon share directly, no substitute reviewer")
+    return {"reviewer": "Neon", "model": model, "via": "agy"}
+
+
 def dispatch(root: Path, request: dict, config: dict, plugin_arg: str | None = None) -> dict:
     root = repo_root(root)
     workspace = repo_root(request["workspace"])
@@ -297,6 +345,14 @@ def dispatch(root: Path, request: dict, config: dict, plugin_arg: str | None = N
         raise DispatchError("ISOLATED_REVIEW_WORKSPACE_REQUIRED")
     # This is the Codex companion path. Muse (the primary implementer) runs in OpenCode via Paseo,
     # so a Codex implementation job uses the configured Codex fallback implementer (Sol).
+    # Review (2026-11-28: Neon) is never sent through the Codex companion: resolve the
+    # Neon target first so the decision names Neon, then stop with the reason recorded.
+    if role == "review":
+        target = resolve_review_target(config, quota_evidence=request.get("quota_evidence") or "")
+        raise DispatchError("REVIEW_REQUIRES_NEON_VIA_AGY; reviewer=" + target["reviewer"]
+                            + " model=" + target["model"] + " via=" + target["via"]
+                            + " (agy --model " + target["model"] + ") — the Codex companion path "
+                            "must not dispatch reviews under the 2026-11-28 policy")
     model = config["models"]["implementation_fallback"] if role == "implementation" and config["models"].get("implementation_fallback") else config["models"][role]
     if request.get("model", model) != model:
         raise DispatchError("ROLE_MODEL_CONFLICT")

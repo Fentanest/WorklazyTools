@@ -530,7 +530,7 @@ def dispatch_review(root: Path, batch_id: str, review_workspace: str, plugin_arg
         atomic_json(folder / "review-input.json", packet)
         prompt = folder / "review-prompt.txt"
         prompt.write_text(
-            "역할: Astra 정식 기술 검수. 총괄·감사·제품 구현·커밋·push·배포 금지.\n"
+            "역할: 지시한 Neon의 정식 검수. 총괄·감사·제품 구현·커밋·push·배포 금지.\n"
             f"작업 공간: {review}\n기준: {record['baseline']}\n고정 후보: {candidate}\n"
             f"먼저 PROJECT_RULES.md와 AGENTS.md의 검수 역할을 읽고 {folder / 'review-input.json'}을 읽어라.\n"
             "구현자 보고나 1차 표시만 보지 말고 묶음의 전체 요구사항·regression_requirements와 누적 diff 및 실제 소비 경로를 검토해라.\n"

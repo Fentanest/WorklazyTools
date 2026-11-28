@@ -43,7 +43,7 @@ class RepoFixture(unittest.TestCase):
         self.temp=tempfile.TemporaryDirectory();self.root=Path(self.temp.name)/'repo';self.root.mkdir()
         self.git('init','-q');self.git('config','user.email','fixture@example.invalid');self.git('config','user.name','Fixture')
         (self.root/'docs').mkdir();(self.root/'src').mkdir()
-        self.config={'schema_version':1,'project':'Fixture','models':{'gemini':'gemini-4-argon-high','implementation':'gpt-6-sol','review':'gpt-6-astra','research':'gpt-6.1-terra'},'review':{'max_tasks':5,'max_lines':800},'line_count_exclude_globs':['vendor/**'],'high_risk_paths':[{'glob':'src/orders.py','reason':'order_safety'}]}
+        self.config={'schema_version':1,'project':'Fixture','models':{'gemini':'gemini-4-argon-high','implementation':'gpt-6-sol','review':'gemini-4-neon-high','research':'gpt-6.1-terra'},'review':{'max_tasks':5,'max_lines':800},'line_count_exclude_globs':['vendor/**'],'high_risk_paths':[{'glob':'src/orders.py','reason':'order_safety'}],'review_assignment':{'default':'Neon','neon_direct_fix':'Opus','plan':'Astra','escalate_after_same_finding_fix_rounds':5,'escalation':'Astra','effective':'2026-11-28 new jobs'}}
         self.write_config()
         (self.root/'src/search.py').write_text('def search():\n    return 1\n')
         (self.root/'plan.md').write_text('# Approved plan\nReturn 2 from search.\n')
@@ -244,6 +244,62 @@ class DispatchContractTests(RepoFixture):
             with self.assertRaisesRegex(ops.OpsError,'DID_NOT_COMPLETE'):ops.finish_review(self.root,'B1','task-test-1')
 
 
+class ReviewRoutingTests(RepoFixture):
+    """Fallback-path review follows review_assignment (2026-11-28: Neon)."""
+    def review_request(self):
+        p=self.root/'instruction.txt';p.write_text('Review the candidate without changing product sources.')
+        return {'task_id':'review-job-1','role':'review','execution':'research','workspace':str(self.root),
+                'prompt_file':str(p),'approval_reference':'approved batch B1'}
+    def test_real_config_review_assignment_is_neon_policy(self):
+        real=json.loads((ROOT/'docs/agent-ops-config.json').read_text())
+        self.assertEqual(real['policy_version'],'2026-11-28')
+        self.assertEqual(real['models']['review'],'gemini-4-neon-high')
+        self.assertNotIn('review_alt_for_sol_implementation',real['models'])
+        self.assertEqual(real['models']['escalation_after_five_rounds'],'gpt-6.2-astra')
+        self.assertNotIn('escalation_review',real['models'])
+        assignment=real['review_assignment']
+        self.assertEqual(assignment['default'],'Neon')
+        self.assertEqual(assignment['neon_direct_fix'],'Opus')
+        self.assertEqual(assignment['plan'],'Astra')
+        self.assertEqual(assignment['escalate_after_same_finding_fix_rounds'],5)
+        self.assertEqual(assignment['escalation'],'Astra')
+        self.assertEqual(assignment['effective'],'2026-11-28 new jobs')
+        self.assertEqual(real['models']['gemini'],'gemini-4-hydrogen-high')
+        self.assertEqual(real['models']['gemini_on_quota_exceeded'],'gemini-3.8-flash-high')
+        self.assertEqual(real['models']['research'],'gpt-6.1-terra')
+    def test_fallback_review_routes_to_neon(self):
+        target=cd.resolve_review_target(self.config,agy_available=True,quota_evidence='')
+        self.assertEqual(target,{'reviewer':'Neon','model':'gemini-4-neon-high','via':'agy'})
+    def test_fallback_review_quota_stops_without_substitution(self):
+        log='agy stderr: Individual quota reached for gemini-4-neon-high. Resets in 2h 14m; see job log'
+        with self.assertRaisesRegex(cd.DispatchError,'NEON_QUOTA_EXCEEDED') as raised:
+            cd.resolve_review_target(self.config,agy_available=True,quota_evidence=log)
+        self.assertIn('lead takes over the Neon share',str(raised.exception))
+        self.assertNotIn('Sol',str(raised.exception));self.assertNotIn('Sonnet',str(raised.exception))
+    def test_fallback_review_without_agy_stops_without_substitution(self):
+        with self.assertRaisesRegex(cd.DispatchError,'NEON_UNREACHABLE_NO_AGY_PATH') as raised:
+            cd.resolve_review_target(self.config,agy_available=False,quota_evidence='')
+        self.assertNotIn('Sol',str(raised.exception));self.assertNotIn('Sonnet',str(raised.exception))
+    def test_dispatch_never_sends_review_via_codex(self):
+        with patch('shutil.which',return_value='/usr/bin/agy'):
+            with self.assertRaisesRegex(cd.DispatchError,'REVIEW_REQUIRES_NEON_VIA_AGY') as raised:
+                cd.dispatch(self.root,self.review_request(),self.config,None)
+        self.assertIn('gemini-4-neon-high',str(raised.exception))
+        self.assertNotIn('Sol',str(raised.exception));self.assertNotIn('Sonnet',str(raised.exception))
+    def test_dispatch_review_with_quota_log_stops_with_reason(self):
+        request=self.review_request()
+        request['quota_evidence']='Individual quota reached for gemini-4-neon-high. Resets in 41m.'
+        with patch('shutil.which',return_value='/usr/bin/agy'):
+            with self.assertRaisesRegex(cd.DispatchError,'NEON_QUOTA_EXCEEDED'):
+                cd.dispatch(self.root,request,self.config,None)
+    def test_sol_review_config_is_rejected_not_substituted(self):
+        old=dict(copy.deepcopy(self.config))
+        old['models']=dict(old['models'],review='gpt-6.2-sol')
+        old['review_assignment']=dict(old['review_assignment'],default='Sol')
+        with self.assertRaisesRegex(cd.DispatchError,'REVIEW_ASSIGNMENT_IS_NOT_NEON'):
+            cd.resolve_review_target(old,agy_available=True,quota_evidence='')
+
+
 
 class RealSubprocessDispatchTests(RepoFixture):
     """Runs a local fake companion through Node; no Codex model is invoked."""
@@ -275,15 +331,18 @@ else{console.log(fs.readFileSync(file,'utf8'));}
     def tearDown(self):
         if hasattr(self,'fakeenv'):self.fakeenv.stop()
         super().tearDown()
-    def req(self,role='review',execution='research',workspace=None):
+    def req(self,role='research',execution='research',workspace=None):
         workspace=workspace or self.root
         p=workspace/'docs/jobs/todo/prompt.txt';p.parent.mkdir(parents=True,exist_ok=True)
         p.write_text('Literal text: `touch HACKED` and $(touch HACKED2), not shell code.\n')
-        return {'task_id':'job-1','role':role,'execution':execution,'workspace':str(workspace),'prompt_file':str(p),
+        request={'task_id':'job-1','role':role,'execution':execution,'workspace':str(workspace),'prompt_file':str(p),
             'approval_reference':'fixture approved scope','request_mode':'plan-and-implement','implementation_authorized':role=='implementation'}
+        if role=='research':
+            request.update(fallback_reason='gemini_quota_exceeded',failure_evidence='fixture agy stderr: quota exhausted, see job log')
+        return request
     def test_actual_node_argv_model_cwd_and_shell_literal(self):
         r=cd.dispatch(self.root,self.req(),self.config,str(self.plugin))
-        self.assertTrue(r['verified']);self.assertEqual(r['model'],'gpt-6-astra');self.assertFalse(r['write'])
+        self.assertTrue(r['verified']);self.assertEqual(r['model'],'gpt-6.1-terra');self.assertFalse(r['write'])
         self.assertEqual(r['workspace'],str(self.root));self.assertFalse((self.root/'HACKED').exists());self.assertFalse((self.root/'HACKED2').exists())
     def test_same_launch_cannot_duplicate(self):
         request=self.req();a=cd.dispatch(self.root,request,self.config,str(self.plugin));b=cd.dispatch(self.root,request,self.config,str(self.plugin))
